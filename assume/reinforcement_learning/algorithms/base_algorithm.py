@@ -60,6 +60,8 @@ class RLAlgorithm:
         "regret",
         "profit",
     )
+    # Algorithms that add noise to a deterministic actor set this from their config (see DDPG/TD3).
+    episodes_collecting_initial_experience: int = 0
 
     def __init__(self, learning_role):
         """Initialize the RL algorithm.
@@ -88,7 +90,7 @@ class RLAlgorithm:
         self.setup_action_noise_schedule()
 
     def setup_action_noise_schedule(self) -> None:
-        """Set up the exploration noise schedule of the algorithm, 
+        """Set up the exploration noise schedule of the algorithm,
             to be specified by the specific subclass algorithm.
         """
 

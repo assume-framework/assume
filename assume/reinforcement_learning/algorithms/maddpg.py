@@ -62,6 +62,11 @@ class DDPG(ActorCriticAlgorithm):
         # Define the critic architecture class for DDPG (single critic)
         self.critic_architecture_class = CriticDDPG
 
+        # Episodes of random actions before learning starts
+        self.episodes_collecting_initial_experience = (
+            self.learning_config.off_policy.episodes_collecting_initial_experience
+        )
+
     def setup_action_noise_schedule(self) -> None:
         """Set up the decay schedule of the exploration noise.
 

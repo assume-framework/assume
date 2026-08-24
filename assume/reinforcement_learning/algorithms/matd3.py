@@ -57,6 +57,11 @@ class TD3(ActorCriticAlgorithm):
         # Define the critic architecture class for TD3
         self.critic_architecture_class = CriticTD3
 
+        # Episodes of random actions before learning starts
+        self.episodes_collecting_initial_experience = (
+            self.learning_config.off_policy.episodes_collecting_initial_experience
+        )
+
     def setup_action_noise_schedule(self) -> None:
         """Set up the decay schedule of the exploration noise.
 

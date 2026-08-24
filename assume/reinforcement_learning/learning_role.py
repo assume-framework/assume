@@ -158,6 +158,11 @@ class Learning(Role):
         Args:
             buffer: The replay buffer to be initialized.
         """
+        min_episode_for_eval = (
+            self.rl_algorithm.episodes_collecting_initial_experience
+            + validation_interval
+        )
+
         if is_off_policy(self.learning_config.algorithm):
             buffer = ReplayBuffer(
                 buffer_size=self.learning_config.off_policy.replay_buffer_size,
@@ -166,10 +171,6 @@ class Learning(Role):
                 n_rl_units=len(self.rl_strats),
                 device=self.device,
                 float_type=self.float_type,
-            )
-            min_episode_for_eval = (
-                self.learning_config.off_policy.episodes_collecting_initial_experience
-                + validation_interval
             )
         else:
             train_freq = pd.Timedelta(str(self.learning_config.train_freq))
@@ -185,7 +186,6 @@ class Learning(Role):
                 gamma=self.learning_config.gamma,
                 gae_lambda=self.learning_config.on_policy.gae_lambda,
             )
-            min_episode_for_eval = validation_interval
 
         return buffer, min_episode_for_eval
 
@@ -242,25 +242,20 @@ class Learning(Role):
         training_episodes = self.learning_config.training_episodes
         validation_interval = min(training_episodes, default_interval)
 
-        # Only check initial experience episodes for off-policy algorithms
-        if is_off_policy(self.learning_config.algorithm):
-            min_required_episodes = (
-                self.learning_config.off_policy.episodes_collecting_initial_experience
-                + validation_interval
+        initial_experience_episodes = (
+            self.rl_algorithm.episodes_collecting_initial_experience
+        )
+        min_required_episodes = initial_experience_episodes + validation_interval
+
+        if training_episodes < min_required_episodes:
+            requirement = (
+                f"greater than the sum of initial experience episodes ({initial_experience_episodes}) and evaluation interval ({validation_interval})"
+                if initial_experience_episodes
+                else f"greater than the evaluation interval ({validation_interval})"
             )
-
-            if self.learning_config.training_episodes < min_required_episodes:
-                raise ValueError(
-                    f"Training episodes ({training_episodes}) must be greater than the sum of initial experience episodes ({self.learning_config.off_policy.episodes_collecting_initial_experience}) and evaluation interval ({validation_interval})."
-                )
-        else:
-            # For on-policy algorithms, no initial experience collection needed
-            min_required_episodes = validation_interval
-
-            if self.learning_config.training_episodes < min_required_episodes:
-                raise ValueError(
-                    f"Training episodes ({training_episodes}) must be greater than evaluation interval ({validation_interval})."
-                )
+            raise ValueError(
+                f"Training episodes ({training_episodes}) must be {requirement}."
+            )
 
         return validation_interval
 
@@ -472,15 +467,8 @@ class Learning(Role):
                 reward=transform_buffer_data(cache["rewards"], device, unit_id_order),
             )
 
-        # Only update policy after initial experience for off-policy algorithms
-        if is_off_policy(self.learning_config.algorithm):
-            if (
-                self.episodes_done
-                >= self.learning_config.off_policy.episodes_collecting_initial_experience
-            ):
-                self.rl_algorithm.update_policy()
-        else:
-            # For on-policy algorithms, update policy immediately
+        # Only update policy after initial experience episodes, if any.
+        if self.episodes_done >= self.rl_algorithm.episodes_collecting_initial_experience:
             self.rl_algorithm.update_policy()
 
     def add_observation_to_cache(self, unit_id, start, observation) -> None:
@@ -561,15 +549,9 @@ class Learning(Role):
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
-        # Disable initial exploration if initial experience collection is complete
-        # Only for off-policy algorithms
-        if is_off_policy(self.learning_config.algorithm):
-            if (
-                self.episodes_done
-                >= self.learning_config.off_policy.episodes_collecting_initial_experience
-            ):
-                self.turn_off_initial_exploration()
-        # For on-policy algorithms, no initial exploration to disable
+        # Disable initial exploration if initial experience collection is complete or not performed.
+        if self.episodes_done >= self.rl_algorithm.episodes_collecting_initial_experience:
+            self.turn_off_initial_exploration()
 
         # In continue_learning mode, disable it only for loaded strategies
         elif self.learning_config.continue_learning:
@@ -827,11 +809,7 @@ class Learning(Role):
             evaluation_mode=self.learning_config.evaluation_mode,
             episode=episode,
             eval_episode=eval_episode,
-            episodes_collecting_initial_experience=(
-                self.learning_config.off_policy.episodes_collecting_initial_experience
-                if is_off_policy(self.learning_config.algorithm)
-                else 0
-            ),
+            episodes_collecting_initial_experience=self.rl_algorithm.episodes_collecting_initial_experience,
         )
 
         # Parameters required for sending data to the output role
