@@ -282,12 +282,15 @@ class TorchLearningStrategy(LearningStrategy):
             Actions that include bid price and direction.
         torch.Tensor
             Noise component which is already added to actions for exploration, if applicable.
+        dict | None
+            Extra per-action data to cache (e.g. PPO/MAPPO's value estimate
+            and log-prob), or None if the algorithm has nothing extra to cache.
 
         Notes
         -----
         In learning mode, actions incorporate noise for exploration. Initial exploration relies
         solely on noise to cover the action space broadly.
-        For PPO, we also store log_prob and value estimates for later use.
+        For PPO, `extra_data` carries the log_prob and value estimate for later use.
         """
         if self.learning_mode or self.evaluation_mode:
             return self.learning_role.rl_algorithm.get_action(self, next_observation)
@@ -301,7 +304,7 @@ class TorchLearningStrategy(LearningStrategy):
                 action = self.actor(next_observation)
 
         noise = th.zeros_like(action, dtype=self.float_type)
-        return action, noise
+        return action, noise, None
 
 
 class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
@@ -450,7 +453,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         # =============================================================================
         # 2. Get the Actions, based on the observations
         # =============================================================================
-        actions, noise = self.get_actions(next_observation)
+        actions, noise, extra_data = self.get_actions(next_observation)
 
         # =============================================================================
         # 3. Transform Actions into bids
@@ -490,7 +493,9 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         ]
 
         if self.learning_mode:
-            self.learning_role.add_actions_to_cache(self.unit_id, start, actions, noise)
+            self.learning_role.add_actions_to_cache(
+                self.unit_id, start, actions, noise, extra_data
+            )
 
         return bids
 
@@ -507,6 +512,8 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         -------
         tuple of torch.Tensor
             A tuple containing: Actions to be taken (with or without noise). The noise component (if any), useful for diagnostics.
+        dict | None
+            Extra per-action data to cache, passed through unchanged from the parent implementation.
 
         Notes
         -----
@@ -514,7 +521,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         """
 
         # Get the base action and associated noise from the parent implementation
-        curr_action, noise = super().get_actions(next_observation)
+        curr_action, noise, extra_data = super().get_actions(next_observation)
 
         if self.learning_mode and not self.evaluation_mode:
             if self.collect_initial_experience_mode and is_off_policy(
@@ -527,7 +534,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
                 # Add marginal cost to the action directly for initial random exploration
                 curr_action += marginal_cost
 
-        return curr_action, noise
+        return curr_action, noise, extra_data
 
     def get_individual_observations(
         self, unit: SupportsMinMax, start: datetime, end: datetime
@@ -772,7 +779,7 @@ class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
         # =============================================================================
         # 2. Get the Actions, based on the observations
         # =============================================================================
-        actions, noise = self.get_actions(next_observation)
+        actions, noise, extra_data = self.get_actions(next_observation)
 
         # =============================================================================
         # 3. Transform Actions into bids
@@ -794,7 +801,9 @@ class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
         ]
 
         if self.learning_mode:
-            self.learning_role.add_actions_to_cache(self.unit_id, start, actions, noise)
+            self.learning_role.add_actions_to_cache(
+                self.unit_id, start, actions, noise, extra_data
+            )
 
         return bids
 
@@ -958,7 +967,7 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         # =============================================================================
         # Get the Actions, based on the observations
         # =============================================================================
-        actions, noise = self.get_actions(next_observation)
+        actions, noise, extra_data = self.get_actions(next_observation)
 
         # =============================================================================
         # 3. Transform Actions into bids
@@ -1004,7 +1013,9 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
             )
 
         if self.learning_mode:
-            self.learning_role.add_actions_to_cache(self.unit_id, start, actions, noise)
+            self.learning_role.add_actions_to_cache(
+                self.unit_id, start, actions, noise, extra_data
+            )
 
         return bids
 

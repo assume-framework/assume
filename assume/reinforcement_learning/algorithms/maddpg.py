@@ -62,7 +62,7 @@ class DDPG(ActorCriticAlgorithm):
 
     def get_action(
         self, strategy: "LearningStrategy", obs: th.Tensor
-    ) -> tuple[th.Tensor, th.Tensor]:
+    ) -> tuple[th.Tensor, th.Tensor, None]:
         """Sample an action using the off-policy strategy.
 
         During learning mode the agent either performs pure-noise initial
@@ -71,7 +71,8 @@ class DDPG(ActorCriticAlgorithm):
         without any noise.
 
         This default implementation is shared by TD3 and DDPG.  PPO overrides
-        it with its own stochastic Gaussian sampling.
+        it with its own stochastic Gaussian sampling. Off-policy algorithms
+        have no extra per-action data to cache, so `extra_data` is always None.
         """
         if strategy.learning_mode and not strategy.evaluation_mode:
             if strategy.collect_initial_experience_mode:
@@ -83,7 +84,7 @@ class DDPG(ActorCriticAlgorithm):
                     dtype=strategy.float_type,
                     device=strategy.device,
                 )
-                return noise, noise
+                return noise, noise, None
 
             action = strategy.actor(obs).detach()
             noise = strategy.action_noise.noise(
@@ -94,14 +95,14 @@ class DDPG(ActorCriticAlgorithm):
                 strategy.actor.min_output,
                 strategy.actor.max_output,
             )
-            return action, noise
+            return action, noise, None
 
         # Evaluation
         action = strategy.actor(obs).detach()
         noise = th.zeros(
             strategy.act_dim, dtype=strategy.float_type, device=strategy.device
         )
-        return action, noise
+        return action, noise, None
 
     def update_policy(self) -> None:
         """Update actor and critic networks using DDPG algorithm.

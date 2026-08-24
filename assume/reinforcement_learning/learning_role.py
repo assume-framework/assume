@@ -503,7 +503,9 @@ class Learning(Role):
         """
         self.cache["obs"][start][unit_id].append(observation)
 
-    def add_actions_to_cache(self, unit_id, start, action, noise) -> None:
+    def add_actions_to_cache(
+        self, unit_id, start, action, noise, extra_data: dict[str, object] | None = None
+    ) -> None:
         """Add the action and noise to the cache dict, per unit_id.
 
         Args:
@@ -511,6 +513,11 @@ class Learning(Role):
             start: The start time.
             action (torch.Tensor): The action to be added.
             noise (torch.Tensor): The noise to be added.
+            extra_data: Extra per-action data returned by
+                ``RLAlgorithm.get_action`` alongside the action, keyed by
+                buffer field name (e.g. PPO/MAPPO's value estimate, log-prob,
+                and done flag for GAE). None for algorithms with nothing
+                extra to cache at action time.
 
         """
 
@@ -524,33 +531,15 @@ class Learning(Role):
         self.cache["actions"][start][unit_id].append(action)
         self.cache["noises"][start][unit_id].append(noise)
 
-        # For on-policy algorithms (MAPPO), cache PPO metadata at action time so
-        # rollout entries stay aligned across strategies and timesteps.
-        if "log_probs" in self.cache:
-            strategy = self.rl_strats.get(unit_id)
-            if strategy is None or not hasattr(strategy, "_last_log_prob"):
-                return
+        if not extra_data:
+            return
 
-            # Avoid duplicate appends if add_actions_to_cache is called multiple
-            # times for the same unit/timestamp during one market step.
-            if self.cache["log_probs"][start][unit_id]:
-                return
-
-            value = getattr(strategy, "_last_value", 0.0)
-            log_prob = strategy._last_log_prob
-
-            if hasattr(value, "item"):
-                value = value.item()
-            if hasattr(log_prob, "item"):
-                log_prob = log_prob.item()
-
-            self.add_ppo_data_to_cache(
-                unit_id=unit_id,
-                start=start,
-                value=value,
-                log_prob=log_prob,
-                done=False,
-            )
+        for field, value in extra_data.items():
+            # Avoid duplicate appends if add_actions_to_cache is called
+            # multiple times for the same unit/timestamp during one market step.
+            if self.cache[field][start][unit_id]:
+                continue
+            self.cache[field][start][unit_id].append(value)
 
     def add_reward_to_cache(self, unit_id, start, reward, regret, profit) -> None:
         """Add the reward to the cache dict, per unit_id.
@@ -565,22 +554,6 @@ class Learning(Role):
         self.cache["rewards"][start][unit_id].append(reward)
         self.cache["regret"][start][unit_id].append(regret)
         self.cache["profit"][start][unit_id].append(profit)
-
-    def add_ppo_data_to_cache(
-        self, unit_id, start, value, log_prob, done=False
-    ) -> None:
-        """Add PPO specific data to the cache dict, per unit_id.
-
-        Args:
-            unit_id: The id of the unit.
-            start: The start time.
-            value: The value estimate V(s) from the critic.
-            log_prob: The log probability of the action.
-            done: Whether a terminal state or not.
-        """
-        self.cache["values"][start][unit_id].append(value)
-        self.cache["log_probs"][start][unit_id].append(log_prob)
-        self.cache["dones"][start][unit_id].append(float(done))
 
     def load_inter_episodic_data(self, inter_episodic_data):
         """Load the inter-episodic data from the dict stored across simulation runs.

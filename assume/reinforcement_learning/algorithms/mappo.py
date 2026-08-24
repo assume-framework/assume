@@ -108,29 +108,39 @@ class PPO(ActorCriticAlgorithm):
     # Note: save_params, save_critic_params, save_actor_params, load_params,
     # load_critic_params, load_actor_params, initialize_policy are inherited from A2CAlgorithm
 
-    def get_action(self, strategy, obs: th.Tensor) -> tuple[th.Tensor, th.Tensor]:
+    def get_action(
+        self, strategy, obs: th.Tensor
+    ) -> tuple[th.Tensor, th.Tensor, dict[str, object] | None]:
         """Sample a stochastic action.
 
         In learning mode the actor's Gaussian policy is sampled and the
-        log-probability is cached on the strategy for later use in
-        _store_to_buffer_and_update_sync.  In evaluation mode the
-        deterministic mean action is returned instead.
+        value estimate and log-probability are returned as `extra_data` for
+        the caller to cache alongside the action (see
+        ``Learning.add_actions_to_cache``), for later use in
+        _store_to_buffer_and_update_sync. In evaluation mode the
+        deterministic mean action is returned instead, with no extra_data.
 
         PPO does *not* have an initial-exploration phase — the stochastic
         policy provides sufficient exploration from the very first episode.
+
+        Note: the value estimate returned here is a placeholder (``0.0``) —
+        for MAPPO it is recomputed centrally in
+        ``_store_to_buffer_and_update_sync`` using the centralized critic.
         """
         if strategy.learning_mode and not strategy.evaluation_mode:
             action, log_prob = strategy.actor.get_action_and_log_prob(obs.unsqueeze(0))
             action = action.squeeze(0).detach()
-            # Cache log-prob for rollout buffer; value is recomputed centrally
-            strategy._last_log_prob = log_prob.squeeze(0).detach()
+            log_prob = log_prob.squeeze(0).detach()
+            if hasattr(log_prob, "item"):
+                log_prob = log_prob.item()
             noise = th.zeros_like(action, dtype=strategy.float_type)
-            return action, noise
+            extra_data = {"values": 0.0, "log_probs": log_prob, "dones": 0.0}
+            return action, noise, extra_data
 
         # Evaluation
         action = strategy.actor(obs, deterministic=True).detach()
         noise = th.zeros_like(action, dtype=strategy.float_type)
-        return action, noise
+        return action, noise, None
 
     def create_actors(self) -> None:
         """Create stochastic actor networks for all agents.

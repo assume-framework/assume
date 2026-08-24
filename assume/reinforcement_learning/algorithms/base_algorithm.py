@@ -9,9 +9,11 @@ import torch as th
 from torch.optim import AdamW
 
 from assume.common.base import LearningStrategy
-from assume.reinforcement_learning.algorithms import actor_architecture_aliases
 from assume.reinforcement_learning.learning_utils import (
     transfer_weights,
+)
+from assume.reinforcement_learning.neural_network_architecture import (
+    actor_architecture_aliases,
 )
 
 logger = logging.getLogger(__name__)
@@ -113,7 +115,7 @@ class RLAlgorithm:
 
     def get_action(
         self, strategy: "LearningStrategy", obs: th.Tensor
-    ) -> tuple[th.Tensor, th.Tensor]:
+    ) -> tuple[th.Tensor, th.Tensor, dict[str, object] | None]:
         """Sample an action for strategy given observation *obs*.
 
         Each concrete algorithm overrides this method with its own sampling
@@ -124,7 +126,14 @@ class RLAlgorithm:
             obs: Flat observation tensor for a single time-step.
 
         Returns:
-            A (action, noise) tuple, both tensors on the same device as strategy.
+            A (action, noise, extra_data) tuple. `action` and `noise` are
+            tensors on the same device as strategy. `extra_data` is a dict
+            mapping buffer field name to value for whatever extra data this
+            algorithm wants cached alongside the action (see
+            ``RLAlgorithm.buffer_fields``), or None when there is nothing
+            extra to cache — e.g. off-policy algorithms have no extra
+            per-action data, while PPO/MAPPO return their value estimate
+            and log-prob for later use in ``Learning.add_actions_to_cache``.
         """
         raise NotImplementedError(f"{type(self).__name__} must implement get_action()")
 
