@@ -21,7 +21,6 @@ from assume.common.base import (
 from assume.common.utils import (
     create_rrule,
     datetime2timestamp,
-    timestamp2datetime,
 )
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.maddpg import DDPG
@@ -900,50 +899,12 @@ class Learning(Role):
             unit_params_list: A list of dictionaries containing critic losses for each
                 time step (mapping critic names to their losses in dict).
         """
-        # gradient steps performed in previous training episodes
-        if is_off_policy(self.learning_config.algorithm):
-            gradient_steps_done = (
-                max(
-                    self.episodes_done
-                    - self.learning_config.off_policy.episodes_collecting_initial_experience,
-                    0,
-                )
-                * int(
-                    (timestamp2datetime(self.end) - timestamp2datetime(self.start))
-                    / pd.Timedelta(self.learning_config.train_freq)
-                )
-                * self.learning_config.off_policy.gradient_steps
-            )
-        else:
-            # For on-policy, no gradient steps concept - use 0 for calculation purposes
-            gradient_steps_done = 0
-
-        # Handle different parameter structures for on-policy vs off-policy
-        if self.learning_config.algorithm == "mappo":
-            # For PPO/MAPPO: unit_params_list length equals actual update steps
-            actual_gradient_steps = len(unit_params_list)
-            gradient_step_range = range(actual_gradient_steps)
-            # For on-policy, use simple step counting
-            base_step = self.update_steps * actual_gradient_steps
-        else:
-            # For off-policy: use configured gradient_steps
-            actual_gradient_steps = self.learning_config.off_policy.gradient_steps
-            gradient_step_range = range(actual_gradient_steps)
-
-            # gradient steps performed in previous training episodes
-            gradient_steps_done = (
-                max(
-                    self.episodes_done
-                    - self.learning_config.off_policy.episodes_collecting_initial_experience,
-                    0,
-                )
-                * int(
-                    (timestamp2datetime(self.end) - timestamp2datetime(self.start))
-                    / pd.Timedelta(self.learning_config.train_freq)
-                )
-                * self.learning_config.off_policy.gradient_steps
-            )
-            base_step = gradient_steps_done + self.update_steps * actual_gradient_steps
+        # How many gradient steps this update performed, and what global step
+        # index to start counting from, depends on the algorithm (off-policy
+        # vs on-policy) — see RLAlgorithm.compute_gradient_step_range.
+        gradient_step_range, base_step = self.rl_algorithm.compute_gradient_step_range(
+            unit_params_list
+        )
 
         output_list = [
             {

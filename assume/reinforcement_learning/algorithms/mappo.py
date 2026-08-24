@@ -142,6 +142,17 @@ class PPO(ActorCriticAlgorithm):
         noise = th.zeros_like(action, dtype=strategy.float_type)
         return action, noise, None
 
+    def compute_gradient_step_range(
+        self, unit_params_list: list[dict]
+    ) -> tuple[range, int]:
+        """On-policy step counting: no "gradient steps done in previous
+        episodes" concept, and the number of steps in this update simply
+        equals the length of `unit_params_list`."""
+        actual_gradient_steps = len(unit_params_list)
+        gradient_step_range = range(actual_gradient_steps)
+        base_step = self.learning_role.update_steps * actual_gradient_steps
+        return gradient_step_range, base_step
+
     def create_actors(self) -> None:
         """Create stochastic actor networks for all agents.
 

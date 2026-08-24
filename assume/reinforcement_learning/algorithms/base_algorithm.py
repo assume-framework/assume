@@ -5,10 +5,12 @@ import json
 import logging
 import os
 
+import pandas as pd
 import torch as th
 from torch.optim import AdamW
 
 from assume.common.base import LearningStrategy
+from assume.common.utils import timestamp2datetime
 from assume.reinforcement_learning.learning_utils import (
     transfer_weights,
 )
@@ -136,6 +138,55 @@ class RLAlgorithm:
             and log-prob for later use in ``Learning.add_actions_to_cache``.
         """
         raise NotImplementedError(f"{type(self).__name__} must implement get_action()")
+
+    def compute_gradient_step_range(
+        self, unit_params_list: list[dict]
+    ) -> tuple[range, int]:
+        """Compute the gradient-step range and base step for output logging.
+
+        Called from ``Learning.write_rl_grad_params_to_output`` to determine
+        how many gradient steps were performed in this update call, and what
+        global step index (across the whole training run so far) to start
+        counting from.
+
+        This default implementation covers off-policy algorithms (TD3/DDPG),
+        which perform a fixed, configured number of gradient steps per update
+        and need to account for gradient steps done in previous episodes.
+        PPO/MAPPO override this since on-policy algorithms have no such
+        concept — the number of gradient steps simply equals the length of
+        `unit_params_list`.
+
+        Args:
+            unit_params_list: List of per-gradient-step dicts mapping unit_id
+                to its actor/critic losses for that step.
+
+        Returns:
+            A (gradient_step_range, base_step) tuple.
+        """
+        learning_role = self.learning_role
+        off_policy_config = self.learning_config.off_policy
+
+        actual_gradient_steps = off_policy_config.gradient_steps
+        gradient_step_range = range(actual_gradient_steps)
+
+        start = timestamp2datetime(learning_role.start)
+        end = timestamp2datetime(learning_role.end)
+
+        # gradient steps performed in previous training episodes
+        gradient_steps_done = (
+            max(
+                learning_role.episodes_done
+                - off_policy_config.episodes_collecting_initial_experience,
+                0,
+            )
+            * int((end - start) / pd.Timedelta(self.learning_config.train_freq))
+            * off_policy_config.gradient_steps
+        )
+        base_step = (
+            gradient_steps_done + learning_role.update_steps * actual_gradient_steps
+        )
+
+        return gradient_step_range, base_step
 
     def update_policy(self) -> None:
         """Update the policy parameters.
