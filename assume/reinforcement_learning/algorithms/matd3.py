@@ -7,24 +7,21 @@ import logging
 import torch as th
 from torch.nn import functional as F
 
-from assume.common.base import LearningStrategy
-from assume.reinforcement_learning.algorithms.base_algorithm import ActorCriticAlgorithm
-from assume.reinforcement_learning.learning_utils import (
-    NormalActionNoise,
-    linear_schedule_func,
-    polyak_update,
-)
+from assume.reinforcement_learning.algorithms.maddpg import DDPG
+from assume.reinforcement_learning.learning_utils import polyak_update
 from assume.reinforcement_learning.neural_network_architecture import CriticTD3
 
 logger = logging.getLogger(__name__)
 
 
-class TD3(ActorCriticAlgorithm):
+class TD3(DDPG):
     """
     Twin Delayed Deep Deterministic Policy Gradients (TD3).
     Addressing Function Approximation Error in Actor-Critic Methods.
     TD3 is a direct successor of DDPG and improves it using three major tricks:
     clipped double Q-Learning, delayed policy update and target policy smoothing.
+    It therefore inherits DDPG's exploration and action selection and only
+    replaces the update step.
 
     Open AI Spinning guide: https://spinningup.openai.com/en/latest/algorithms/td3.html
     Original paper: https://arxiv.org/pdf/1802.09477.pdf
@@ -39,104 +36,8 @@ class TD3(ActorCriticAlgorithm):
         >>> td3.update_policy()
     """
 
-    def __init__(self, learning_role):
-        """Initialize the TD3 algorithm.
-
-        Sets up the algorithm with gradient counters, clipping parameters,
-        and critic architecture.
-
-        Args:
-            learning_role: Learning role object managing agents and replay buffer.
-                Must have off-policy configuration.
-        """
-        super().__init__(learning_role)
-
-        self.n_updates = 0
-        self.grad_clip_norm = 1.0
-
-        # Define the critic architecture class for TD3
-        self.critic_architecture_class = CriticTD3
-
-        # Episodes of random actions before learning starts
-        self.episodes_collecting_initial_experience = (
-            self.learning_config.off_policy.episodes_collecting_initial_experience
-        )
-
-    def setup_action_noise_schedule(self) -> None:
-        """Set up the decay schedule of the exploration noise.
-
-        The noise decay factor is applied to the action noise of every
-        strategy at each policy update.
-        """
-        off_policy_config = self.learning_config.off_policy
-
-        if off_policy_config.action_noise_schedule == "linear":
-            self.calc_noise_from_progress = linear_schedule_func(
-                off_policy_config.noise_dt
-            )
-        else:
-            self.calc_noise_from_progress = lambda x: off_policy_config.noise_dt
-
-    def setup_strategy_noise(self, strategy: "LearningStrategy") -> None:
-        """Give the strategy its own action noise process for exploration.
-
-        TD3 acts deterministically, so exploration is driven by the noise added to
-        the actor output, preceded by an initial phase of purely random actions.
-        """
-        off_policy_config = self.learning_config.off_policy
-
-        strategy.collect_initial_experience_mode = True
-        strategy.action_noise = NormalActionNoise(
-            mu=0.0,
-            sigma=off_policy_config.noise_sigma,
-            action_dimension=strategy.act_dim,
-            scale=off_policy_config.noise_scale,
-            dt=off_policy_config.noise_dt,
-        )
-
-    def get_action(
-        self, strategy: "LearningStrategy", obs: th.Tensor
-    ) -> tuple[th.Tensor, th.Tensor, None]:
-        """Sample an action using the off-policy strategy.
-
-        During learning mode the agent either performs pure-noise initial
-        exploration (first N episodes) or uses its deterministic actor plus
-        Gaussian action noise.  During evaluation mode the actor is used
-        without any noise.
-
-        This default implementation is shared by TD3 and DDPG.  PPO overrides
-        it with its own stochastic Gaussian sampling. Off-policy algorithms
-        have no extra per-action data to cache, so `extra_data` is always None.
-        """
-        if strategy.learning_mode and not strategy.evaluation_mode:
-            if strategy.collect_initial_experience_mode:
-                # Pure Gaussian noise for initial random exploration
-                noise = th.normal(
-                    mean=0.0,
-                    std=strategy.exploration_noise_std,
-                    size=(strategy.act_dim,),
-                    dtype=strategy.float_type,
-                    device=strategy.device,
-                )
-                return noise, noise, None
-
-            action = strategy.actor(obs).detach()
-            noise = strategy.action_noise.noise(
-                device=strategy.device, dtype=strategy.float_type
-            )
-            action = th.clamp(
-                action + noise,
-                strategy.actor.min_output,
-                strategy.actor.max_output,
-            )
-            return action, noise, None
-
-        # Evaluation
-        action = strategy.actor(obs).detach()
-        noise = th.zeros(
-            strategy.act_dim, dtype=strategy.float_type, device=strategy.device
-        )
-        return action, noise, None
+    # Twin critic for clipped double Q-learning, replacing DDPG's single critic.
+    critic_architecture_class = CriticTD3
 
     def update_policy(self):
         """Update the policy using the Twin Delayed Deep Deterministic Policy Gradients (TD3).

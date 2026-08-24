@@ -41,6 +41,9 @@ class DDPG(ActorCriticAlgorithm):
         >>> ddpg.update_policy()  # Performs one training iteration
     """
 
+    # Single critic; the TD3 subclass overrides this with its twin critic.
+    critic_architecture_class = CriticDDPG
+
     def __init__(self, learning_role) -> None:
         """Initialize the DDPG algorithm.
 
@@ -58,9 +61,6 @@ class DDPG(ActorCriticAlgorithm):
 
         # Gradient clipping threshold
         self.grad_clip_norm = 1.0
-
-        # Define the critic architecture class for DDPG (single critic)
-        self.critic_architecture_class = CriticDDPG
 
         # Episodes of random actions before learning starts
         self.episodes_collecting_initial_experience = (
@@ -85,8 +85,9 @@ class DDPG(ActorCriticAlgorithm):
     def setup_strategy_noise(self, strategy: "LearningStrategy") -> None:
         """Give the strategy its own action noise process for exploration.
 
-        DDPG acts deterministically, so exploration is driven by the noise added to
-        the actor output, preceded by an initial phase of purely random actions.
+        DDPG and its TD3 subclass act deterministically, so exploration is driven by
+        the noise added to the actor output, preceded by an initial phase of purely
+        random actions.
         """
         off_policy_config = self.learning_config.off_policy
 
@@ -109,9 +110,8 @@ class DDPG(ActorCriticAlgorithm):
         Gaussian action noise.  During evaluation mode the actor is used
         without any noise.
 
-        This default implementation is shared by TD3 and DDPG.  PPO overrides
-        it with its own stochastic Gaussian sampling. Off-policy algorithms
-        have no extra per-action data to cache, so `extra_data` is always None.
+        Shared with the TD3 subclass.  Neither has extra per-action data to
+        cache, so `extra_data` is always None.
         """
         if strategy.learning_mode and not strategy.evaluation_mode:
             if strategy.collect_initial_experience_mode:
