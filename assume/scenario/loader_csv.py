@@ -1320,10 +1320,13 @@ def run_learning(
         world.learning_role.sync_train_freq_with_simulation_horizon()
     )
 
-    # Build the appropriate buffer for the selected algorithm category.
-    buffer, min_episode_for_eval = world.learning_role.initialize_buffer(
+    min_episode_for_eval = world.learning_role.determine_min_episode_for_eval(
+        validation_interval
+    )
+
+    # buffer type is determined by the RL algorithm
+    buffer = world.learning_role.rl_algorithm.create_buffer(
         time_step=world.scenario_data["config"]["time_step"],
-        validation_interval=validation_interval,
     )
 
     # -----------------------------------------

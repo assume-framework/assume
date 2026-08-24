@@ -5,6 +5,7 @@
 import logging
 
 import numpy as np
+import pandas as pd
 import torch as th
 from torch.nn import functional as F
 from torch.optim import AdamW
@@ -13,6 +14,8 @@ from assume.reinforcement_learning.algorithms.base_algorithm import (
     ActorCriticAlgorithm,
     RLAlgorithm,
 )
+from assume.reinforcement_learning.buffer import RolloutBuffer
+from assume.reinforcement_learning.learning_utils import transform_buffer_data
 from assume.reinforcement_learning.neural_network_architecture import (
     ActorPPO,
     CriticPPO,
@@ -141,6 +144,121 @@ class PPO(ActorCriticAlgorithm):
         action = strategy.actor(obs, deterministic=True).detach()
         noise = th.zeros_like(action, dtype=strategy.float_type)
         return action, noise, None
+
+    def create_buffer(self, time_step) -> RolloutBuffer:
+        """Create the rollout buffer holding exactly one update window.
+
+        On-policy learning discards its experience after every update, so the
+        buffer only has to span the `train_freq` window between two updates —
+        `train_freq / time_step` transitions. At least 2, since
+        ``update_policy`` reserves the last transition to bootstrap
+        V(s_{t+1}) and trains on the rest.
+        """
+        train_freq = pd.Timedelta(str(self.learning_config.train_freq))
+        rollout_buffer_size = max(2, int(train_freq / pd.Timedelta(time_step)))
+
+        return RolloutBuffer(
+            buffer_size=rollout_buffer_size,
+            obs_dim=self.obs_dim,
+            act_dim=self.act_dim,
+            n_rl_units=len(self.learning_role.rl_strats),
+            device=self.device,
+            float_type=self.float_type,
+            gamma=self.learning_config.gamma,
+            gae_lambda=self.learning_config.on_policy.gae_lambda,
+        )
+
+    def _centralized_values(self, obs: np.ndarray) -> np.ndarray:
+        """Evaluate every agent's centralized critic on one joint observation.
+
+        Args:
+            obs: Joint observation for a single time-step,
+                shape (n_agents, obs_dim).
+
+        Returns:
+            Value estimate per agent, shape (n_agents,), in the agent order of
+            ``learning_role.rl_strats``.
+        """
+        strategies = list(self.learning_role.rl_strats.values())
+        values = np.zeros(len(strategies))
+
+        # agent-specific slice of every agent's observation
+        unique_obs_all = obs[:, self.obs_dim - self.unique_obs_dim :]
+
+        with th.no_grad():
+            for i, strategy in enumerate(strategies): # TODO: does this need to be ordered by unit_id?
+                other_unique = np.concatenate(
+                    (unique_obs_all[:i], unique_obs_all[i + 1 :]), axis=0
+                )
+                centralized_obs = np.concatenate(
+                    (obs[i : i + 1], other_unique.reshape(1, -1)), axis=1
+                )
+                obs_tensor = th.as_tensor(
+                    centralized_obs, device=self.device, dtype=self.float_type
+                )
+                values[i] = strategy.critics(obs_tensor).cpu().numpy().reshape(-1)[0]
+
+        return values
+
+    def store_experience(self, cache: dict, device) -> None:
+        """Append the update window to the rollout buffer, one time-step at a time.
+
+        Unlike the replay buffer, the rollout buffer stores single transitions,
+        and each of them needs a value estimate V(s_t) from the centralized
+        critic. That value cannot be produced at action time — a centralized
+        value needs *all* agents' observations for the same timestep, and an
+        agent only has its own — so ``get_action`` caches a placeholder and the
+        real value is computed here, where the joint observation first exists.
+        The critic is unchanged over the whole window (``update_policy`` runs
+        only after this method), so these values are still the behaviour
+        policy's, as PPO requires.
+        """
+        unit_id_order = list(self.learning_role.rl_strats.keys())
+
+        for timestamp in sorted(cache["obs"].keys()):
+            missing_units = [
+                u
+                for u in unit_id_order
+                if u not in cache["obs"][timestamp]
+                or u not in cache["actions"][timestamp]
+                or u not in cache["rewards"][timestamp]
+                or u not in cache["log_probs"][timestamp]
+                or u not in cache["dones"][timestamp]
+            ]
+            if missing_units:
+                logger.warning(
+                    "Skipping on-policy rollout step at %s: missing data for units %s. "
+                    "This usually means a learning unit failed to report an "
+                    "observation/action/reward/log_prob/done for this timestep, "
+                    "and we do not fill the buffer with default values instead.",
+                    timestamp,
+                    missing_units,
+                )
+                continue
+
+            step = {
+                field: transform_buffer_data(
+                    {timestamp: cache[field][timestamp]}, device, unit_id_order
+                )
+                for field in ("obs", "actions", "rewards", "dones", "log_probs")
+            }
+
+            # Recompute V(s_t) centrally, overriding the placeholder that
+            # get_action cached, and reshape to the buffer's (1, n_agents, 1).
+            values_data = (
+                self._centralized_values(step["obs"][0])
+                .reshape(1, -1, 1)
+                .astype(np.float32)
+            )
+
+            self.buffer.add(
+                obs=step["obs"],
+                action=step["actions"],
+                reward=step["rewards"],
+                done=step["dones"],
+                value=values_data,
+                log_prob=step["log_probs"],
+            )
 
     def compute_gradient_step_range(
         self, unit_params_list: list[dict]
@@ -287,7 +405,7 @@ class PPO(ActorCriticAlgorithm):
         n_rl_agents = len(strategies)
 
         # Getting the buffer, this will be a RolloutBuffer for on-policy algorithms.
-        rollout_buffer = self.learning_role.buffer
+        rollout_buffer = self.buffer
 
         # Check if rollout buffer has data
         if rollout_buffer is None or rollout_buffer.pos == 0:
@@ -341,30 +459,10 @@ class PPO(ActorCriticAlgorithm):
             if rollout_buffer.full:
                 rollout_buffer.full = False  # If it was full, it's not anymore
 
-            # Prepare unique observations for centralized critic
-            last_unique_obs = last_obs[:, self.obs_dim - self.unique_obs_dim :]
-
-            with th.no_grad():
-                for i, strategy in enumerate(strategies):
-                    # Construct centralized observation
-                    obs_i = last_obs[i : i + 1]
-                    other_unique = np.concatenate(
-                        (last_unique_obs[:i], last_unique_obs[i + 1 :]), axis=0
-                    )
-                    centralized_obs = np.concatenate(
-                        (obs_i, other_unique.reshape(1, -1)), axis=1
-                    )
-
-                    obs_tensor = th.as_tensor(
-                        centralized_obs,
-                        device=self.device,
-                        dtype=self.float_type,
-                    )
-                    # Get value estimate from critic
-                    last_values[i] = (
-                        strategy.critics(obs_tensor).cpu().numpy().flatten()[0]
-                    )
-                    dones[i] = last_dones[i]
+            # Bootstrap value, from the same centralized critics that produced
+            # the V(s_t) already stored in the buffer by store_experience.
+            last_values = self._centralized_values(last_obs)
+            dones = last_dones.copy() # TODO: is this the correct behavior?
 
         # Compute advantages and returns
         rollout_buffer.compute_returns_and_advantages(last_values, dones)

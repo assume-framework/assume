@@ -7,7 +7,6 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import torch as th
 from mango import Role
@@ -16,7 +15,6 @@ from assume.common.base import (
     LearningConfig,
     LearningStrategy,
     is_off_policy,
-    is_on_policy,
 )
 from assume.common.utils import (
     create_rrule,
@@ -26,10 +24,8 @@ from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.maddpg import DDPG
 from assume.reinforcement_learning.algorithms.mappo import PPO
 from assume.reinforcement_learning.algorithms.matd3 import TD3
-from assume.reinforcement_learning.buffer import ReplayBuffer, RolloutBuffer
 from assume.reinforcement_learning.learning_utils import (
     linear_schedule_func,
-    transform_buffer_data,
 )
 from assume.reinforcement_learning.tensorboard_logger import TensorBoardLogger
 
@@ -39,9 +35,10 @@ logger = logging.getLogger(__name__)
 class Learning(Role):
     """Manages the learning process of reinforcement learning agents.
 
-    This class handles the initialization of key components such as neural networks,
-    replay buffer, and learning hyperparameters. It handles both training and evaluation
-    modes based on the provided learning configuration.
+    This class handles the general processes for reinforcement learning, 
+    including the management of learning strategies, handling necessary communication 
+    within the framework and coordinating auxiliary functions. Algorithmic-specific 
+    details are delegated to the respective RLAlgorithm class.
 
     Args:
         learning_config (LearningConfig): The configuration for the learning process.
@@ -58,13 +55,11 @@ class Learning(Role):
     ):
         super().__init__()
 
-        # Single buffer that can be either ReplayBuffer (off-policy) or RolloutBuffer (on-policy)
-        self.buffer = None
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
         self.learning_config = learning_config
-        self.critics = {}
-        self.target_critics = {}
+        self.critics = {} # TODO: do we still use this?
+        self.target_critics = {} # TODO: do we still use this?
 
         device = "cpu"
         if self.learning_config:
@@ -152,43 +147,6 @@ class Learning(Role):
             src="no_wait",
         )
 
-    def initialize_buffer(self, time_step, validation_interval):
-        """Initialize the replay buffer for reinforcement learning training.
-
-        Args:
-            buffer: The replay buffer to be initialized.
-        """
-        min_episode_for_eval = (
-            self.rl_algorithm.episodes_collecting_initial_experience
-            + validation_interval
-        )
-
-        if is_off_policy(self.learning_config.algorithm):
-            buffer = ReplayBuffer(
-                buffer_size=self.learning_config.off_policy.replay_buffer_size,
-                obs_dim=self.rl_algorithm.obs_dim,
-                act_dim=self.rl_algorithm.act_dim,
-                n_rl_units=len(self.rl_strats),
-                device=self.device,
-                float_type=self.float_type,
-            )
-        else:
-            train_freq = pd.Timedelta(str(self.learning_config.train_freq))
-            time_step = pd.Timedelta(time_step)
-            rollout_buffer_size = max(2, int(train_freq / time_step))
-            buffer = RolloutBuffer(
-                buffer_size=rollout_buffer_size,
-                obs_dim=self.rl_algorithm.obs_dim,
-                act_dim=self.rl_algorithm.act_dim,
-                n_rl_units=len(self.rl_strats),
-                device=self.device,
-                float_type=self.float_type,
-                gamma=self.learning_config.gamma,
-                gae_lambda=self.learning_config.on_policy.gae_lambda,
-            )
-
-        return buffer, min_episode_for_eval
-
     def sync_train_freq_with_simulation_horizon(self) -> str | None:
         """Ensure self.train_freq evenly divides the simulation length.
 
@@ -258,6 +216,25 @@ class Learning(Role):
             )
 
         return validation_interval
+
+    def determine_min_episode_for_eval(self, validation_interval: int) -> int:
+        """Determine the first episode at which evaluation runs may start.
+
+        Evaluating a policy is meaningless while the agents are still collecting
+        initial experience with random actions, so the first evaluation run is
+        pushed back by ``episodes_collecting_initial_experience``
+        
+        Args:
+            validation_interval: The interval as returned by
+                ``determine_validation_interval``.
+
+        Returns:
+            The first episode number eligible for an evaluation run.
+        """
+        return (
+            self.rl_algorithm.episodes_collecting_initial_experience
+            + validation_interval
+        )
 
     def register_strategy(self, strategy: LearningStrategy) -> None:
         """Register a learning strategy with this learning role.
@@ -350,122 +327,8 @@ class Learning(Role):
                 )
                 return
 
-        # Add data to buffer - type depends on algorithm category
-        if is_on_policy(self.learning_config.algorithm):
-            # Using RolloutBuffer for on-policy algorithms (PPO/MAPPO).
-            unit_id_order = list(self.rl_strats.keys())
-            n_rl_agents = len(unit_id_order)
-            added_timestamps = 0
-
-            for timestamp in sorted(cache["obs"].keys()):
-                missing_units = [
-                    u
-                    for u in unit_id_order
-                    if u not in cache["obs"][timestamp]
-                    or u not in cache["actions"][timestamp]
-                    or u not in cache["rewards"][timestamp]
-                    or u not in cache["log_probs"][timestamp]
-                    or u not in cache["dones"][timestamp]
-                ]
-                if missing_units:
-                    logger.warning(
-                        "Skipping on-policy rollout step at %s: missing data for units %s. "
-                        "This usually means a learning unit failed to report an "
-                        "observation/action/reward/log_prob/done for this timestep, "
-                        "and we refuse to fill the buffer with zeros.",
-                        timestamp,
-                        missing_units,
-                    )
-                    continue
-
-                obs_data = transform_buffer_data(
-                    {timestamp: cache["obs"][timestamp]},
-                    device,
-                    unit_id_order,
-                )
-                actions_data = transform_buffer_data(
-                    {timestamp: cache["actions"][timestamp]},
-                    device,
-                    unit_id_order,
-                )
-                rewards_data = transform_buffer_data(
-                    {timestamp: cache["rewards"][timestamp]},
-                    device,
-                    unit_id_order,
-                )
-
-                # Computing MAPPO value targets with the centralized critic
-                # using the joint observation available at this timestamp.
-                if self.learning_config.algorithm == "mappo":
-                    values_data = np.zeros((1, n_rl_agents, 1), dtype=np.float32)
-                    obs_step = obs_data[0]
-                    unique_obs_all = obs_step[
-                        :,
-                        self.rl_algorithm.obs_dim - self.rl_algorithm.unique_obs_dim :,
-                    ]
-
-                    with th.no_grad():
-                        for i, unit_id in enumerate(unit_id_order):
-                            strategy = self.rl_strats[unit_id]
-                            obs_i = obs_step[i : i + 1]
-                            other_unique = np.concatenate(
-                                (unique_obs_all[:i], unique_obs_all[i + 1 :]),
-                                axis=0,
-                            )
-                            centralized_obs = np.concatenate(
-                                (obs_i, other_unique.reshape(1, -1)),
-                                axis=1,
-                            )
-                            obs_tensor = th.as_tensor(
-                                centralized_obs,
-                                device=self.device,
-                                dtype=self.float_type,
-                            )
-                            values_data[0, i, 0] = (
-                                strategy.critics(obs_tensor)
-                                .cpu()
-                                .numpy()
-                                .reshape(-1)[0]
-                            )
-                else:
-                    values_data = transform_buffer_data(
-                        {timestamp: cache["values"][timestamp]},
-                        device,
-                        unit_id_order,
-                    )
-
-                log_probs_data = transform_buffer_data(
-                    {timestamp: cache["log_probs"][timestamp]},
-                    device,
-                    unit_id_order,
-                )
-
-                dones_data = transform_buffer_data(
-                    {timestamp: cache["dones"][timestamp]},
-                    device,
-                    unit_id_order,
-                )
-
-                # Adding data to the rollout buffer.
-                self.buffer.add(
-                    obs=obs_data,
-                    action=actions_data,
-                    reward=rewards_data,
-                    done=dones_data,
-                    value=values_data,
-                    log_prob=log_probs_data,
-                )
-                added_timestamps += 1
-
-        else:
-            # Using ReplayBuffer for off-policy algorithms (TD3/DDPG).
-            # Rewriting the dict so obs.shape == (n_rl_units, obs_dim), used by keys in learning role.
-            unit_id_order = list(self.rl_strats.keys())
-            self.buffer.add(
-                obs=transform_buffer_data(cache["obs"], device, unit_id_order),
-                actions=transform_buffer_data(cache["actions"], device, unit_id_order),
-                reward=transform_buffer_data(cache["rewards"], device, unit_id_order),
-            )
+        # Add data to buffer - the algorithm knows the layout of its own buffer
+        self.rl_algorithm.store_experience(cache, device)
 
         # Only update policy after initial experience episodes, if any.
         if self.episodes_done >= self.rl_algorithm.episodes_collecting_initial_experience:
@@ -545,7 +408,7 @@ class Learning(Role):
         self.max_eval = inter_episodic_data["max_eval"]
         self.rl_eval = inter_episodic_data["all_eval"]
         self.avg_rewards = inter_episodic_data["avg_all_eval"]
-        self.buffer = inter_episodic_data["buffer"]
+        self.rl_algorithm.buffer = inter_episodic_data["buffer"]
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
@@ -570,7 +433,7 @@ class Learning(Role):
             "max_eval": self.max_eval,
             "all_eval": self.rl_eval,
             "avg_all_eval": self.avg_rewards,
-            "buffer": self.buffer,
+            "buffer": self.rl_algorithm.buffer,
             "actors_and_critics": self.rl_algorithm.extract_policy(),
         }
 

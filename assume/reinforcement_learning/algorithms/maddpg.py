@@ -9,10 +9,12 @@ from torch.nn import functional as F
 
 from assume.common.base import LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import ActorCriticAlgorithm
+from assume.reinforcement_learning.buffer import ReplayBuffer
 from assume.reinforcement_learning.learning_utils import (
     NormalActionNoise,
     linear_schedule_func,
     polyak_update,
+    transform_buffer_data,
 )
 from assume.reinforcement_learning.neural_network_architecture import CriticDDPG
 
@@ -65,6 +67,37 @@ class DDPG(ActorCriticAlgorithm):
         # Episodes of random actions before learning starts
         self.episodes_collecting_initial_experience = (
             self.learning_config.off_policy.episodes_collecting_initial_experience
+        )
+
+    def create_buffer(self, time_step) -> ReplayBuffer:
+        """Create the replay buffer this off-policy algorithm samples from.
+
+        Args:
+            time_step: Not used for this algorithm, but included for interface consistency.
+        """
+        return ReplayBuffer(
+            buffer_size=self.learning_config.off_policy.replay_buffer_size,
+            obs_dim=self.obs_dim,
+            act_dim=self.act_dim,
+            n_rl_units=len(self.learning_role.rl_strats),
+            device=self.device,
+            float_type=self.float_type,
+        )
+
+    def store_experience(self, cache: dict, device) -> None:
+        """Append the cached data to the replay buffer in one go.
+
+        The replay buffer stores transitions batched over time, so the cache can
+        be transformed and added as a single block. Rewriting the dicts gives
+        ``obs.shape == (n_timesteps, n_rl_units, obs_dim)``, ordered by the
+        unit_id names.
+        """
+        unit_id_order = list(self.learning_role.rl_strats.keys())
+
+        self.buffer.add(
+            obs=transform_buffer_data(cache["obs"], device, unit_id_order),
+            actions=transform_buffer_data(cache["actions"], device, unit_id_order),
+            reward=transform_buffer_data(cache["rewards"], device, unit_id_order),
         )
 
     def setup_action_noise_schedule(self) -> None:
@@ -192,7 +225,7 @@ class DDPG(ActorCriticAlgorithm):
             self.n_updates += 1
 
             # Sample transition batch from replay buffer
-            transitions = self.learning_role.buffer.sample(
+            transitions = self.buffer.sample(
                 self.learning_config.batch_size
             )
 

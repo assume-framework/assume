@@ -89,7 +89,10 @@ class RLAlgorithm:
         self.setup_action_noise_schedule()
 
         # Algorithms that add noise to a deterministic actor set this from their config (see DDPG/TD3)
-        self.episodes_collecting_initial_experience = 0 
+        self.episodes_collecting_initial_experience = 0
+
+        # Experience buffer depending on the algorithm type
+        self.buffer = None
 
     def setup_action_noise_schedule(self) -> None:
         """Set up the exploration noise schedule of the algorithm,
@@ -159,6 +162,41 @@ class RLAlgorithm:
             and log-prob for later use in ``Learning.add_actions_to_cache``.
         """
         raise NotImplementedError(f"{type(self).__name__} must implement get_action()")
+
+    def create_buffer(self, time_step):
+        """Create the experience buffer this algorithm learns from.
+
+        Called once per training episode (see ``run_learning``), after ``initialize_policy`` 
+        so that obs/act dimensions exist, and after all strategies have registered with 
+        the learning role. 
+
+        Args:
+            time_step: The simulation time step. Used by on-policy algorithms to
+                size the rollout to one ``train_freq`` window; off-policy
+                algorithms ignore it.
+
+        Returns:
+            The buffer, which the caller stores in ``inter_episodic_data`` and
+            re-injects into every subsequent episode's algorithm instance.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} must implement create_buffer()"
+        )
+
+    def store_experience(self, cache: dict, device) -> None:
+        """Write one update window of cached experience into ``self.buffer``.
+
+        Called from ``Learning._store_to_buffer_and_update_sync`` once the cache
+        has been validated, just before ``update_policy``. 
+
+        Args:
+            cache: Maps each of ``self.buffer_fields`` to a nested dict of
+                ``{timestamp: {unit_id: [value]}}``.
+            device: The device the transformed data should be built on.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} must implement store_experience()"
+        )
 
     def _updates_per_episode(self) -> int:
         """Number of ``train_freq`` intervals in the simulation horizon.

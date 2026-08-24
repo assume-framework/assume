@@ -103,7 +103,7 @@ class TD3(DDPG):
         for step in range(self.learning_config.off_policy.gradient_steps):
             self.n_updates += 1
 
-            transitions = self.learning_role.buffer.sample(
+            transitions = self.buffer.sample(
                 self.learning_config.batch_size
             )
             states, actions, next_states, rewards = (

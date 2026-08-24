@@ -288,7 +288,7 @@ def test_mappo_buffer_storage_uses_rl_strats_order(base_learning_config):
     act_dim = config["act_dim"]
 
     # Build a fake rollout buffer large enough to hold one fake timestep.
-    learn.buffer = RolloutBuffer(
+    learn.rl_algorithm.buffer = RolloutBuffer( # TODO: probably doesn't work
         buffer_size=4,
         obs_dim=obs_dim,
         act_dim=act_dim,
@@ -344,7 +344,7 @@ def test_mappo_buffer_storage_uses_rl_strats_order(base_learning_config):
         learn._store_to_buffer_and_update_sync(cache, learn.device)
     )
 
-    buf = learn.buffer
+    buf = learn.rl_algorithm.buffer
     # One timestamp -> one row in the buffer.
     assert buf.pos == 1, f"expected 1 transition, got {buf.pos}"
 
