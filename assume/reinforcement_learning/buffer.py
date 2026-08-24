@@ -136,7 +136,7 @@ class ReplayBuffer:
         self.actions[self.pos : self.pos + len_obs] = actions.copy()
         self.rewards[self.pos : self.pos + len_obs] = np.squeeze(
             reward.copy(), axis=-1
-        )  # alsways one reward value per agent and time-step hence squezze
+        )  # always one reward value per agent and time-step hence squezze
 
         self.pos += len_obs
         if self.pos + len_obs >= self.buffer_size:
@@ -169,7 +169,12 @@ class ReplayBuffer:
         )
 
         return ReplayBufferSamples(
-            *tuple(convert_to_tensors(array=x, dtype=self.th_float_type, device=self.device) for x in data)
+            *tuple(
+                convert_to_tensors(
+                    array=x, dtype=self.th_float_type, device=self.device
+                )
+                for x in data
+            )
         )
 
 
@@ -416,7 +421,10 @@ class RolloutBuffer:
         )
 
         return RolloutBufferSamples(
-            *(convert_to_tensors(array=x, dtype=self.float_type, device=self.device) for x in data)
+            *(
+                convert_to_tensors(array=x, dtype=self.float_type, device=self.device)
+                for x in data
+            )
         )
 
     def size(self) -> int:

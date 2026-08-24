@@ -97,8 +97,8 @@ class Learning(Role):
                     self.learning_config.learning_rate
                 )
             else:
-                self.calc_lr_from_progress = (
-                    lambda x: self.learning_config.learning_rate
+                self.calc_lr_from_progress = lambda x: (
+                    self.learning_config.learning_rate
                 )
             # Only set up noise schedule for off-policy algorithms
             if is_off_policy(self.learning_config.algorithm):
@@ -107,8 +107,8 @@ class Learning(Role):
                         self.learning_config.off_policy.noise_dt
                     )
                 else:
-                    self.calc_noise_from_progress = (
-                        lambda x: self.learning_config.off_policy.noise_dt
+                    self.calc_noise_from_progress = lambda x: (
+                        self.learning_config.off_policy.noise_dt
                     )
             # For on-policy algorithms, no noise schedule needed
 
@@ -507,12 +507,8 @@ class Learning(Role):
             unit_id_order = list(self.rl_strats.keys())
             self.buffer.add(
                 obs=transform_buffer_data(cache["obs"], device, unit_id_order),
-                actions=transform_buffer_data(
-                    cache["actions"], device, unit_id_order
-                ),
-                reward=transform_buffer_data(
-                    cache["rewards"], device, unit_id_order
-                ),
+                actions=transform_buffer_data(cache["actions"], device, unit_id_order),
+                reward=transform_buffer_data(cache["rewards"], device, unit_id_order),
             )
 
         # Only update policy after initial experience for off-policy algorithms

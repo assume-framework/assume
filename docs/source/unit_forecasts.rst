@@ -10,6 +10,8 @@ Each unit in ASSUME has an associated **forecaster** that provides it with stati
 availability, fuel prices, or market price predictions. Forecast data is typically provided as time
 series, either loaded from a CSV file or calculated internally from simulation data.
 
+Forecasters can generally be safed via config parameter ``save_forecasts`` to the specified file given by: ``forecast_save_file`` (default: SCENARIO_PATH/saved_forecasts.csv)
+
 ***********************
 Forecaster Types
 ***********************
@@ -27,11 +29,18 @@ Demand Units                  ``DemandForecaster``                      ``demand
 Exchange Units                ``ExchangeForecaster``                    ``volume_import``, ``volume_export``
 DSM Units                     ``DsmUnitForecaster``                     ``congestion_signal``, ``renewable_utilisation_signal``, ``electricity_price``
 Steelplant Units              ``SteelplantForecaster``                  DSM attrs + ``fuel_prices``
+Cement Plant Units            ``CementForecaster``                      DSM attrs + ``fuel_prices``, ``clinker_demand``, ``normalized_load_profile``, ``electricity_price_flex``, ``thermal_storage_schedule``, ``availability_profiles``
 Steam Generation Units        ``SteamgenerationForecaster``             DSM attrs + ``fuel_prices``, ``demand``, ``thermal_demand``, ``thermal_storage_schedule``, ``electricity_price_flex``
 Building Units                ``BuildingForecaster``                    DSM attrs + ``fuel_prices``, ``heat_demand``, ``ev_load_profile``, ``battery_load_profile``, ``pv_profile``, ``load_profile``
 Hydrogen Units                ``HydrogenForecaster``                    DSM attrs + ``hydrogen_demand``, ``seasonal_storage_schedule``
 Custom Units (CSV import)     ``CustomUnitForecaster``                  *(arbitrary keyword attributes)*
 ============================= ========================================= ===========================================
+
+.. note::
+   Unit operators can also own a forecaster, :class:`~assume.common.forecaster.UnitsOperatorForecaster`,
+   giving the operator its own ``price`` and ``residual_load`` forecasts (see :doc:`unit_operator`).
+   It reuses the same lifecycle, algorithms, and registries described below; its algorithms can be set per
+   operator through ``forecast_*`` columns in ``unit_operators.csv``.
 
 ***********************
 Forecast Lifecycle
@@ -114,6 +123,10 @@ is the ``algorithm_id``. (Prefix is empty for initialize algorithms, and ``prepr
    (only when the CSV cell is not empty/None).
 
 If neither CSV nor config specifies a certain algorithm, a default is chosen automatically.
+
+The same ``forecast_{prefix}_{forecast_metric}`` columns can be added to ``unit_operators.csv`` to set the
+algorithms of an operator's :class:`~assume.common.forecaster.UnitsOperatorForecaster` per operator, with the
+same config-fallback behaviour.
 
 ***********************************
 Available Algorithms
@@ -268,6 +281,7 @@ Besides configuring algorithms, there are two additional ways to supply forecast
 1. **Via forecast_df.csv** — create a CSV file with columns matching the expected keys
    (e.g. ``price_EOM``, ``residual_load_EOM``, ``{node}_congestion_signal``).
    Default forecast algorithms will **not** overwrite columns found in this file.
+   To disable the use of / overwriting with ``forecasts_df`` set the flag ``use_forecasts_df`` to false in the config.
 
 2. **Direct instantiation** — when creating a simulation programmatically (without scenario loaders),
    you can pass forecast series directly to the forecaster constructor. In this case, set the

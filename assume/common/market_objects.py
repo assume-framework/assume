@@ -156,8 +156,15 @@ class MarketConfig:
 
     def __post_init__(self):
         """
-        Post-initialization checks for deprecated key "solver" in param_dict.
+        Post-initialization checks for checks on failing initializations.
         """
+
+        if "" in self.additional_fields:
+            warn(
+                "Empty string '' found in 'additional_fields' and will be ignored.",
+                UserWarning,
+            )
+            self.additional_fields = [f for f in self.additional_fields if f != ""]
 
         if "solver" in self.param_dict:
             warn(

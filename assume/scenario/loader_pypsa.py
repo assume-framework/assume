@@ -5,7 +5,6 @@
 import logging
 from datetime import timedelta
 
-import pandas as pd
 import pypsa
 from dateutil import rrule as rr
 
@@ -200,8 +199,12 @@ if __name__ == "__main__":
         case "storage_hvdc":
             network = pypsa.examples.storage_hvdc()
         case _:
-            logger.info(f"invalid studycase: {study_case}")
-            network = pd.DataFrame()
+            msg = f"invalid studycase: {study_case}"
+            logger.error(msg)
+            logger.error(
+                "Available STUDY_CASE options: ac_dc_meshed, scigrid_de, storage_hvdc"
+            )
+            raise ValueError(msg)
 
     study_case = f"{study_case}_{market_mechanism}"
 
@@ -209,7 +212,7 @@ if __name__ == "__main__":
     end = network.snapshots[-1]
     marketdesign = [
         MarketConfig(
-            "EOM",
+            "redispatch" if market_mechanism == "redispatch" else "EOM",
             rr.rrule(rr.HOURLY, interval=1, dtstart=start, until=end),
             timedelta(hours=1),
             market_mechanism,
@@ -256,5 +259,10 @@ if __name__ == "__main__":
         "storage": defaultdict(lambda: default_strategies),
     }
 
-    load_pypsa(world, scenario, study_case, network, marketdesign, bidding_strategies)
-    world.run()
+    try:
+        load_pypsa(
+            world, scenario, study_case, network, marketdesign, bidding_strategies
+        )
+        world.run()
+    except Exception:
+        logger.exception("Failed to load or run PyPSA scenario")

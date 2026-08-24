@@ -423,6 +423,16 @@ class FastSeries:
         """
         return FastSeriesIatIndexer(self)
 
+    def fillna(self, value):
+        result = self.copy()
+        result.data = np.nan_to_num(self.data, value)
+        return result
+
+    def ones_like(self):
+        result = self.copy()
+        result.data = np.ones_like(self.data)
+        return result
+
     def __getitem__(
         self, item: datetime | slice | list | pd.Index | pd.Series | np.ndarray | str
     ):

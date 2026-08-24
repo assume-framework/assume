@@ -29,6 +29,28 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
+def is_elastic_demand(unit, market_config=None) -> bool:
+    """
+    Checks whether a unit as an elastic demand.
+
+    .. note::
+        There is currently not a clear flag whether some demand is elastic.
+        Until then, it is defined via its bidding strategy on a given market.
+        If no market given we use the same criterion the Demand class uses itself:
+        ``unit.elasticity_model != 0``
+    """
+    if market_config is not None:
+        return isinstance(
+            unit.bidding_strategies[market_config.market_id],
+            EnergyHeuristicElasticStrategy,
+        )
+
+    if isinstance(unit, Demand):
+        return unit.elasticity_model != 0
+
+    return False
+
+
 def calculate_max_power(units, index=None):
     """
     Returns: max available power: shape (num_units, forecast_len)
@@ -76,9 +98,17 @@ def calculate_sum_demand(
     Returns summed demand at every timestep (incl. imports and exports)
     Shape: (num_timesteps,)
     """
-    sum_demand = abs(np.array([unit.forecaster.demand for unit in demand_units])).sum(
-        axis=0
-    )
+    sum_demand = np.zeros(len(demand_units[0].forecaster.index))
+
+    sum_demand += abs(
+        np.array(
+            [
+                unit.forecaster.demand
+                for unit in demand_units
+                if not is_elastic_demand(unit)
+            ]
+        )
+    ).sum(axis=0)
 
     return sum_demand + calculate_exchange_volume(exchange_units)
 
@@ -116,11 +146,11 @@ def calculate_naive_price_inelastic(
 
     Steps:
         1. **Sort units** by type, keeping only those with a bidding strategy for the market.
-        2-4. **Build supply and demand curves** — compute per-unit marginal costs and
-            available power, then sum demand (including exchange volumes) for each timestep.
-        5-6. **Merit-order dispatch** — sort supply by ascending marginal cost, stack capacity
-            until demand is met, and set the clearing price to the marginal unit's cost
-            (defaults to 1000 if capacity is insufficient).
+        2. **Build supply and demand curves** — compute per-unit marginal costs and
+           available power, then sum demand (including exchange volumes) for each timestep.
+        3. **Merit-order dispatch** — sort supply by ascending marginal cost, stack capacity
+           until demand is met, and set the clearing price to the marginal unit's cost
+           (defaults to 1000 if capacity is insufficient).
     """
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
@@ -130,27 +160,29 @@ def calculate_naive_price_inelastic(
         units, config.market_id
     )
 
-    # 2. Calculate marginal costs for each unit and time step.
-    #    The resulting DataFrame has rows = time steps and columns = units.
-    #    shape: (index_len, num_pp_units)
+    # 2. Build supply and demand curves
+    # Calculate marginal costs for each unit and time step.
+    # The resulting DataFrame has rows = time steps and columns = units.
+    # shape: (index_len, num_pp_units)
     marginal_costs = pd.DataFrame(
         [unit.marginal_cost for unit in powerplants_units]
     ).T.set_index(index)
 
-    # 3. Compute available power for each unit at each time step.
-    #    shape: (index_len, num_pp_units)
+    # Compute available power for each unit at each time step.
+    # shape: (index_len, num_pp_units)
     power = calculate_max_power(powerplants_units).T.set_index(index)
 
-    # 4. Process the demand.
-    #    Filter demand units with a bidding strategy and sum their forecasts for each time step.
+    # Process the demand.
+    # Filter demand units with a bidding strategy and sum their forecasts for each time step.
     sum_demand = pd.DataFrame(
         calculate_sum_demand(demand_units, exchange_units), index=index
     )
 
-    # 5. Initialize the price forecast series.
+    # 3. Merit-order dispatch
+    # Initialize the price forecast series.
     price_forecast = pd.Series(index=index, data=0.0)
 
-    # 6. Loop over each time step
+    # Loop over each time step
     for t in index:
         # Get marginal costs and available power for time t (both are Series indexed by unit)
         mc_t = marginal_costs.loc[t]
@@ -192,12 +224,12 @@ def calculate_naive_price_elastic(
 
     Steps:
         1. **Sort units and collect elastic bids** — classify units by type and compute
-            demand bids from elastic demand units for the first product interval.
-        2-4. **Build supply and demand curves** — compute per-unit marginal costs and
-            available power, then sum inelastic demand (including exchange volumes).
-        5-6. **Pay-as-clear dispatch** — for each timestep, assemble an orderbook from
-            supply offers, elastic demand bids, and the inelastic demand block, then
-            clear via ``PayAsClearRole`` to obtain the equilibrium price.
+           demand bids from elastic demand units for the first product interval.
+        2. **Build supply and demand curves** — compute per-unit marginal costs and
+           available power, then sum inelastic demand (including exchange volumes).
+        3. **Pay-as-clear dispatch** — for each timestep, assemble an orderbook from
+           supply offers, elastic demand bids, and the inelastic demand block, then
+           clear via ``PayAsClearRole`` to obtain the equilibrium price.
     """
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
@@ -235,24 +267,26 @@ def calculate_naive_price_elastic(
     elastic_demand_prices = all_bids["price"]
     elastic_demand_volumes = all_bids["volume"]
 
-    # 2. Calculate marginal costs for each unit and time step.
-    #    The resulting DataFrame has rows = time steps and columns = units.
-    #    shape: (index_len, num_pp_units)
+    # 2. Build supply and demand curves
+    # Calculate marginal costs for each unit and time step.
+    # The resulting DataFrame has rows = time steps and columns = units.
+    # shape: (index_len, num_pp_units)
     marginal_costs = pd.DataFrame(
         [unit.marginal_cost for unit in powerplants_units]
     ).T.set_index(index)
 
-    # 3. Compute available power for each unit at each time step.
-    #    shape: (index_len, num_pp_units)
+    # Compute available power for each unit at each time step.
+    # shape: (index_len, num_pp_units)
     power = calculate_max_power(powerplants_units).T.set_index(index)
 
-    # 4. Process the demand.
-    #    Filter demand units with a bidding strategy and sum their forecasts for each time step.
+    # Process the inelastic demand.
+    # Filter demand units with a bidding strategy and sum their forecasts for each time step.
     sum_demand = pd.DataFrame(
         calculate_sum_demand(demand_units, exchange_units), index=index
     )
 
-    # 5. Initialize the price forecast series.
+    # 3. Pay-as-clear dispatch
+    # Initialize the price forecast series.
     price_forecast = pd.Series(index=index, data=0.0)
 
     # clear the market forecast including elastic demand bids using the PayAsClearRole
@@ -299,7 +333,7 @@ def calculate_naive_price_elastic(
         orderbook = []
         orderbook.extend(supply_offers.to_dict("records"))
         orderbook.extend(demand_bids.to_dict("records"))
-        if demand_t > 0:
+        if demand_t > 0 and len(inelastic_demand_units) > 0:
             inelastic_price_bid = max(
                 [unit.price[t] for unit in inelastic_demand_units]
             )
@@ -359,11 +393,7 @@ def calculate_naive_price(
     _, demand_units, _, _, _ = sort_units(units, config.market_id)
 
     elastic_demand_units = {
-        unit.id: unit
-        for unit in demand_units
-        if isinstance(
-            unit.bidding_strategies[config.market_id], EnergyHeuristicElasticStrategy
-        )
+        unit.id: unit for unit in demand_units if is_elastic_demand(unit, config)
     }
 
     if len(elastic_demand_units) > 0:
@@ -381,7 +411,11 @@ def calculate_naive_residual_load(
     config: MarketConfig,
     preprocess_information=None,
 ) -> dict[str, ForecastSeries]:
-    """Compute residual load as total demand minus renewable generation for each timestep."""
+    """Compute residual load as total demand minus renewable generation for each timestep.
+
+    NOTE: Elastic demands are ignored in this forecast.
+          This will underestimate the residual load if there are elastic demands present.
+    """
     powerplants_units, demand_units, exchange_units, _, _ = sort_units(
         units, config.market_id
     )
@@ -431,16 +465,22 @@ def calculate_naive_congestion_signal(
 ) -> dict[str, ForecastSeries]:
     """
     Compute per-node congestion severity signals from net load and line capacities.
+    Node congestion forecast resembles::
+        max(line congestion of connected lines)
+        with line congestion = (demand - supply) / line capacity
 
     Steps:
         1. **Net load per node** — for each demand node, subtract local generation from
-            local demand to obtain the net load timeseries.
+           local demand to obtain the net load timeseries.
         2. **Line congestion severity** — for each transmission line, divide the combined
-            net load of its two endpoint nodes by the line's thermal capacity.
+           net load of its two endpoint nodes by the line's thermal capacity.
         3. **Node aggregation** — for each node, take the maximum congestion severity
-            across all connected lines as the node's congestion signal.
+           across all connected lines as the node's congestion signal.
 
     Returns an empty dict if grid data (buses/lines) is unavailable.
+
+    .. note::
+        Elastic demands are ignored currently.
     """
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
@@ -459,6 +499,10 @@ def calculate_naive_congestion_signal(
             "Node-specific congestion signals forecast could not be calculated. "
             "Not all unit nodes are available in buses."
         )
+        return {}
+
+    # Go on if only elastic demand (as they are ignored)
+    if all([is_elastic_demand(unit) for unit in demand_units]):
         return {}
 
     # Step 1: Calculate load for each powerplant based on availability factor and max power

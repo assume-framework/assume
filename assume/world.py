@@ -37,7 +37,7 @@ from assume.common import (
 )
 from assume.common.base import LearningConfig
 from assume.common.forecast_algorithms import get_forecast_registries
-from assume.common.forecaster import UnitForecaster
+from assume.common.forecaster import UnitForecaster, UnitsOperatorForecaster
 from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import (
@@ -59,53 +59,45 @@ logger = logging.getLogger(__name__)
 
 class World:
     """
-    Represents a simulation environment with a specified address, database connection, CSV export path,
-    log level, and optional distributed role settings.
+    Orchestrates ASSUME simulation setup, execution, and output handling.
 
-    If a database URI is provided, the World instance attempts to establish a database connection.
-    It initializes key attributes for market operators, markets, unit operators, bidding strategies,
-    and clearing mechanisms. Additionally, it checks for learning strategy availability and sets up an event loop.
+    ``World`` is the central runtime container for markets, operators, units, and
+    simulation clocks. It coordinates the end-to-end lifecycle: initialize runtime
+    infrastructure in :meth:`setup`, register market and unit entities, initialize
+    forecasts, and execute the simulation loop via :meth:`run`.
+
+    The class supports standalone execution (default) and distributed execution
+    (manager/worker roles). Output can be persisted to a SQL database and/or CSV
+    exports through an output agent; learning/evaluation roles are configured in
+    :meth:`setup` via ``learning_dict``.
 
     Attributes:
-        addr (tuple[str, int] | str, optional): The address of the world, represented as a tuple (host, port) or a string.
-        distributed_role (bool, optional): Defines the world’s role in distributed execution:
-            - `True`: Acts as a manager world that schedules events.
-            - `False`: Acts as a client world receiving schedules from a manager.
-            - `None` (default): Runs independently without subprocesses.
-        export_csv_path (str, optional): Path for exporting CSV data.
-        log_level (str, optional): The logging level for the world instance.
-        db_uri (sqlalchemy.engine.URL, optional): The processed database URI.
-        db (sqlalchemy.engine.base.Engine, optional): The database connection engine.
-        container (mango.Container, optional): The container for the world instance.
-        loop (asyncio.AbstractEventLoop, optional): The event loop for asynchronous operations.
-        clock (Clock, optional): ExternalClock or AsyncioClock instance.
-        start (datetime.datetime, optional): Start datetime for the simulation.
-        end (datetime.datetime, optional): End datetime for the simulation.
-        market_operators (dict[str, mango.RoleAgent], optional): Market operators in the world instance.
-        markets (dict[str, MarketConfig], optional): Market configurations.
-        unit_operators (dict[str, UnitsOperator], optional): Unit operators.
-        unit_types (dict[str, BaseUnit], optional): Available unit types.
-        dst_components (dict[str, DemandSideTechnology], optional): Demand-side technologies.
-        bidding_strategies (dict[str, type[BaseStrategy]], optional): Bidding strategies for the world instance.
-            - If `"powerplant_energy_learning"` is unavailable, learning strategies may be missing due to missing dependencies (e.g., `torch`).
-        clearing_mechanisms (dict[str, MarketRole], optional): Market clearing mechanisms.
-        additional_kpis (dict[str, OutputDef], optional): Additional performance indicators.
-        scenario_data (dict, optional): Dictionary for scenario-specific data.
-        addresses (list[str], optional): Addresses for the world instance.
-        output_agent_addr (tuple[str, str], optional): Address of the output agent.
-        bidding_params (dict, optional): Parameters for bidding.
-        index (pandas.Series, optional): The index for simulation tracking.
-        learning_config (LearningConfig, optional): Configuration for learning-based components.
-        learning_mode (bool, optional): Whether learning mode is enabled.
-        evaluation_mode (bool, optional): Whether evaluation mode is enabled.
-        forecaster (Forecaster, optional): The forecaster used for custom unit types.
+        market_operators (dict[str, RoleAgent]): Registered market operator mango agents in the current world.
+        markets (dict[str, MarketConfig]): Configurations of registered markets available to bidding for UnitOperators.
+        unit_operators (dict[str, UnitsOperator]): Registered unit operator mango agents, responsible for formulating bids,
+            based on the needs of their associated units.
+        units (dict[str, BaseUnit]): All registered unit instances by id.
+        bidding_strategies (dict[str, type]): Strategy registry used when creating
+            unit and portfolio strategies.
+        clearing_mechanisms (dict[str, type[MarketRole]]): Market mechanism
+            mechanism registry used by :meth:`add_market`.
 
     Args:
-        addr (tuple[str, int] | str, optional): The world’s address as a (host, port) tuple or a string. Defaults to `"world"`.
-        database_uri (str, optional): Database URI for establishing a connection. Defaults to `""` (no database).
-        export_csv_path (str, optional): Path for exporting CSV data. Defaults to `""`.
-        log_level (str, optional): Logging level. Defaults to `"INFO"`.
-        distributed_role (bool, optional): Defines the world’s role in distributed execution. Defaults to `None`.
+        addr (tuple[str, int] | str, optional): Address used when creating the
+            Mango container. Use ``"world"`` for local event-container execution,
+            a ``(host, port)`` tuple for TCP-based execution, or a string client id
+            for MQTT-based execution. Defaults to ``"world"``.
+        database_uri (str, optional): SQLAlchemy database URI used by output and
+            learning components. If empty, no database backend is created.
+            Defaults to ``""``.
+        export_csv_path (str, optional): Directory path for CSV output exports.
+            If empty, CSV export is disabled. Defaults to ``""``.
+        log_level (str, optional): Logging level applied to the ``assume`` logger.
+            Defaults to ``"INFO"``.
+        distributed_role (bool | None, optional): Distributed execution role:
+            ``True`` for manager (time distribution), ``False`` for worker
+            (receives distributed clock), ``None`` for standalone execution.
+            Defaults to ``None``.
     """
 
     def __init__(
@@ -406,7 +398,10 @@ class World:
             output_agent.suspendable_tasks = False
 
     def add_unit_operator(
-        self, id: str, strategies: dict[str, UnitOperatorStrategy] = {}
+        self,
+        id: str,
+        strategies: dict[str, UnitOperatorStrategy] = {},
+        forecaster: UnitsOperatorForecaster = None,
     ) -> None:
         """
         Add a unit operator to the simulation, creating a new role agent and applying the role of a unit operator to it.
@@ -415,6 +410,8 @@ class World:
 
         Args:
             id (str): The identifier for the unit operator.
+            strategies (dict[str, UnitOperatorStrategy], optional): Portfolio strategies for the operator.
+            forecaster (UnitsOperatorForecaster, optional): Operator-level forecaster. Defaults to None.
         """
 
         if self.unit_operators.get(id):
@@ -438,6 +435,7 @@ class World:
         units_operator = UnitsOperator(
             available_markets=list(self.markets.values()),
             portfolio_strategies=bidding_strategies,
+            forecaster=forecaster,
         )
 
         # creating a new role agent and apply the role of a units operator
@@ -458,7 +456,11 @@ class World:
             )
 
     def add_units_with_operator_subprocess(
-        self, id: str, units: list[dict], strategies: dict[str, UnitOperatorStrategy]
+        self,
+        id: str,
+        units: list[dict],
+        strategies: dict[str, UnitOperatorStrategy],
+        forecaster: UnitsOperatorForecaster = None,
     ):
         """
         Adds a units operator with given ID in a separate process
@@ -468,6 +470,7 @@ class World:
         Args:
             id (str): the id of the units operator
             units (list[dict]): list of unit dictionaries forwarded to create_unit
+            forecaster (UnitsOperatorForecaster, optional): Operator-level forecaster. Defaults to None.
         """
         clock_agent_name = f"clock_agent_{id}"
         markets = list(self.markets.values())
@@ -479,7 +482,9 @@ class World:
                 market.opening_hours._cache_gen = None
         self.addresses.append(addr(self.addr, clock_agent_name))
         units_operator = UnitsOperator(
-            available_markets=markets, portfolio_strategies=strategies
+            available_markets=markets,
+            portfolio_strategies=strategies,
+            forecaster=forecaster,
         )
 
         for unit in units:
@@ -655,6 +660,9 @@ class World:
             None
         """
 
+        if market_config.market_id in self.markets:
+            raise ValueError(f"Market {market_config.market_id} already exists")
+
         if mm_class := self.clearing_mechanisms.get(market_config.market_mechanism):
             market_role = mm_class(market_config)
         else:
@@ -698,15 +706,17 @@ class World:
                     raise ValueError(msg)
 
         # For each market: Should be referenced by a market strategy.
-        referenced_markets = {
-            market
-            for market in operator.portfolio_strategies.keys()
-            for operator in unit_operators
-        }
+        from collections import defaultdict
+
+        market_participants = defaultdict(int)
+        for operator in unit_operators:
+            for market_id in operator.portfolio_strategies.keys():
+                market_participants[market_id] += 1
+
         for market_id in self.markets.keys():
-            if market_id not in referenced_markets:
-                msg = f"Added market {market_id}, has no bidding participants."
-                warnings.warn(msg)
+            if market_participants[market_id] < 2:
+                msg = f"Added market {market_id} has less than two bidding participants ({market_participants[market_id]})."
+                raise ValueError(msg)
 
         # A Re-Dispatch market can only open if an earlier market closed.
         dispatch_markets = [
@@ -944,4 +954,18 @@ class World:
                 markets,
                 forecast_df,
                 unit,
+            )
+
+        # operator-level forecasters provide market-wide price / residual load
+        # signals, so they initialize against all units and markets, with no
+        # single initializing unit.
+        for operator in self.unit_operators.values():
+            if operator.forecaster is None:
+                continue
+            if operator.forecaster._registries is None:
+                operator.forecaster._registries = registries
+            operator.forecaster.initialize(
+                units,
+                markets,
+                forecast_df,
             )

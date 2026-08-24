@@ -15,29 +15,82 @@ Upcoming Release
 
 **New Features:**
   - **Generic Forecasting Interface**: This interface enables to specify different forecast algorithms for preprocess, initialization and update during runtime. They can be specified in the config.yaml or unit csv files. For more information about currently implemented algorithms and how to specify them please read the documentation on Unit forecasts.
+  - **Operator-level forecaster**: Unit operators can now own a ``UnitsOperatorForecaster`` providing their own market price and residual load forecasts (accessible via ``units_operator.forecaster``), instead of reading them from a managed unit. Forecast algorithms can be set per operator via ``forecast_*`` columns in ``unit_operators.csv``, and the portfolio learning strategy now reads its price/residual-load observations from this operator forecaster.
 
 **Improvements:**
   - **In complex clearing, the solver instance is now created once during initialization of the clearing role and reused for each market clearing**. This improves performance for e.g. year-long simulations.
   - **Added a check for available solvers in redispatch & nodal_clearing**, similar to the check in complex clearing.
   - **Consistently distinguish 'solver' and 'solver_name'**: Users should now use 'solver_name' to specify the solver in the market configs param_dict, as 'solver' now refers to the actual solver instance.
+  - **Added tests for network related functionalities**: grid_utils.py and redispatch.py
+  - **Extended ``min_max_scale`` to support arbitrary output ranges**: Added optional ``out_min`` and ``out_max`` parameters, enabling both forward scaling and inverse rescaling with a single function instead of two separate ones.
+  - **Add test for portfolio learning strategy and ``min_max_scale`` function**: Added a test for the portfolio learning strategy and ``min_max_rescale`` function to ensure its functionality and stability.
+  - **Readme naming of examples/tutorials**: Slight changing of tutorial and example in the read me to make difference clearer and more consistent with the naming of the notebooks and to align with readthedocs.
+  - **Align redispatch mechanism to latest PyPSA version release**: Updated the redispatch formulation to model cleared EOM generator dispatch for ``network.lpf()`` via ``generators_t.p_set`` and consistent generator bounds ``p_min_pu/p_max_pu``, replacing the previous load-based workaround.
+  - **Grafana dashboard improvements**: Added button to automatically update the time range filter to the full simulation horizon.
+  - **Replace GPL-licensed ``pyyaml-include`` dependency**: AMIRIS scenario loading no longer depends on the GPLv3-licensed ``pyyaml-include`` package, which was incompatible with distributing ASSUME under a permissive license. The subset of ``!include`` YAML-tag behavior AMIRIS scenario files rely on is now implemented in-house in ``assume.scenario.yaml_include``.
+
 **Bug Fixes:**
-  - **dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
-  - **fixed a bug in forecasts**, that occurred when using complex clearing
+  - **Dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
+  - **Fix bug in forecasts**, that occurred when using complex clearing
+  - **Fix infeasible power output in PowerPlant**: ``calculate_min_max_power`` now correctly accounts for base load, positive/negative capacity reserves, and heat demand when computing additional power. If reduced availability makes the unit infeasible to run, both min and max power are set to 0. A warning is issued if previous dispatch exceeded available power.
+  - **Fix upward redispatch potential**, so that availabilities are now correctly considered instead of the nominal power output of the unit
+  - **Fix errors in portfolio learning strategies**: The ``min_max_rescale`` function was missing from ``utils.py``, causing an ``ImportError`` in ``portfolio_learning_strategies.py``. Resolved by extending ``min_max_scale`` to cover the rescaling use case. And fix minor construction bug for observation space.
+  - **Skip torch seeding when torch is installed but not used**: Irrelevant seeding was performed and a warning was thrown about deterministic PyTorch behavior, even though simulation does not use RL. This is fixed by only setting the PyTorch seeds when learning is active.
+  - **Fix bug in redispatch mechanism**: Fixed the bug in redispatch evaluation due to PyPSA's version upgrade. In ``PyPSA >= 0.35.2`` (released in February 2025) the sign of load was not taken into account correctly & since the fixed EOM dispatch was modelled as a load with positive sign which was resulting in incorrect redispatch amounts.
+
+0.6.2 - (5th August 2026)
+=========================
+
+**New Features:**
+  - **Cement Plant DSM unit**: Added a ``CementPlant`` unit modelling a fuel-switchable kiln line, each stage independently switchable between electricity, a natural-gas/coal mix, or hydrogen. Optional components include an electrolyser supplying the burners with on-site hydrogen, an electric-heater thermal storage (E-TES) that buffers calciner heat, and a raw material mill / cement mill. Either mill can also run standalone with no kiln line at all, in which case the declared demand targets that mill's own ground tonnage directly. Supports both full-horizon and rolling-horizon optimisation, and all of the existing ``DSMFlex`` flexibility measures. See the Demand Side Agent documentation for details.
+  - **New demand-side technology components in** ``dst_components.py``: Added ``ThermalProcessStage``, a shared base class for fuel-switchable thermal stages, with ``Preheater``, ``Calciner``, and ``Kiln`` subclasses used by the new cement plant. ``Calciner`` tracks process (calcination) CO2 emissions separately from energy emissions; ``Preheater`` accepts recovered waste heat from the kiln. Also added ``GrindingMill``, a generic electric grinding component used for both raw material milling and cement grinding, and a new ``short-term_with_generator`` mode for ``ThermalStorage`` where an electric heater charges the storage from grid power.
+
+**Bug Fixes:**
+  - **Fix ramp constraint at the first time step**: For every ramp-limited DSM component, the first time step was incorrectly capped by ``min(ramp_up, ramp_down)`` instead of just ``ramp_up``, since the ramp-down constraint also applied an absolute cap on the first step even though there is no previous value to decrease from. This could artificially choke off a legitimately high first-step value whenever ``ramp_down`` was tighter than ``ramp_up``. Fixed across all affected components (``GenericStorage``, ``ChargingStation``, ``Boiler``, and the shared ``add_ramping_constraints`` helper used by most other DSM components).
+  - **Fix rolling-horizon min-demand strategy for non-steel-plant units**: The rolling-horizon function's per-timestep demand-strategy detection hard-coded the steel plant's own ``steel_demand_per_timestep`` attribute name, so any other DSM unit using the ``min_demand`` strategy in rolling-horizon mode silently read the wrong (already window-sliced) series. Generalized to use each unit's own demand attribute.
+
+0.6.1 - (25th March 2026)
+=========================
+
+  **Improvements:**
+  - **Extend building units to support multiple sub-assets**: Building units can now include multiple components of the same technology type using prefix-based component handling. This enables configurations with multiple electric vehicles and multiple charging stations within the same building unit.
+  - **Improve building forecast handling**: The building forecasting workflow has been extended to support aggregate building profiles as well as component-specific profiles such as EV availability, EV range, charging-station availability, and flexible electricity-price signals.
+  - **Clarify building forecast naming conventions**: Aggregate building forecast columns now use explicit names such as ``<building_id>_load_profile`` instead of ambiguous bare building identifiers.
+  - **Extend DSM component initialization**: DSM component initialization now supports prefixed component names such as ``electric_vehicle_1`` and ``charging_station_2`` and forwards EV-specific external range data during model construction.
+  - **Expand building test coverage**: Building tests were extended to cover both core building assets and the new EV and charging-station integration logic, including direct-grid fallback when no charging station is present.
+
+  **Bug Fixes:**
+  - **Fix building flexibility initialization under electricity price signals**: Fixed building flexibility initialization so that the ``electricity_price_signal`` flexibility measure works with building-specific flexible electricity-price inputs.
+  - **Fix model switching for flexibility modes**: Fixed the optimization mode switching logic in ``DSMFlex.switch_to_opt()`` so that it no longer assumes the presence of flexibility constraints that are not created for all flexibility measures.
+  - **Fix variable-cost evaluation under flexible electricity-price signals**: Fixed variable-cost calculation when flexible electricity-price signals are activated by rebuilding the relevant cost linkage after replacing the active price parameter.
+  - **Fix malformed example input handling during testing**: Corrected issues caused by malformed or incomplete example forecast and fuel-price input files used for testing and validation.
+
+  **New Features:**
+  - **Electric vehicle model for buildings**: Added an updated ``ElectricVehicle`` DSM component with explicit mobility-related energy use, availability-dependent operation, external range input, bidirectional or unidirectional power flow, and binary non-simultaneity for charging and discharging.
+  - **Charging station model for buildings**: Added a dedicated ``ChargingStation`` DSM component with optional availability profiles, ramp constraints, and support for unidirectional or bidirectional operation.
+  - **Integrated EV and charging-station building topology**: Buildings now support two connection modes:
+
+    - If no charging station is included, EVs connect directly to the building/grid balance.
+    - If charging stations are included, charging stations connect to the building/grid and EVs connect to the charging stations through assignment variables.
+
+  - **Building-specific flexible electricity-price support**: Added support for ``electricity_price_flex`` in ``BuildingForecaster`` for use with the ``electricity_price_signal`` flexibility measure.
 
 0.6.0 - (18th March 2026)
 =========================
 
-  **Improvements:**
-  - **Deterministic behavior with seed setting**: Simulations are now deterministic by default for improved reproducibility. This can be controlled via a seed setting in `config.yaml` files, therefore it only applies for scenarios loaded via `load_scenario_folder`. Note that complete determinism is not guaranteed for all hardware and software configurations, especially with PyTorch-based learning strategies. It may also decrease performance of reinforcement learning due to disabled non-deterministic optimizations.
-    - ``seed`` not set in top-level of config: Sets the seed to a fixed default value (42) for deterministic behavior.
-    - ``seed: <int>``: Sets the seed for all random number generators to provided <int>.
-    - ``seed: null``: Disables seed setting, allowing for non-deterministic behavior as before. May improve performance of reinforcement learning.
-  - **Delete environment.yaml**: The environment.yaml file has been removed from the repository to simplify maintenance and was completely redundant with the `pyproject.toml`. Users can as before create their own environment using the provided pip installation instructions, which allows for more flexibility and easier updates.
-  - **Add validation for simulation setup**: Added checks to validate the simulation setup for common issues, such as missing bidding strategies or inconsistent market configurations. Warnings are issued to inform users of potential problems that could affect simulation results.
-  - **Added reward calculation for unit operators**: Unit operators have now the opportunity to calculate rewards based on the returned orderbooks for their own purposes. This enables learning strategies on unit operator level / portfolio learning strategies.
-  - **Structured Validation Error**: Introduces the new ValidationError to represent a failing validation. Since it derives from the base ValidationError, all existing error handling remains compatible, but users can now also catch this specific error type to handle validation errors separately if desired.
-  - **Add support for Pandas 3**
-  - **Add support for Python 3.14**
+**Improvements:**
+- **Deterministic behavior with seed setting**: Simulations are now deterministic by default for improved reproducibility. This can be controlled via a seed setting in `config.yaml` files, therefore it only applies for scenarios loaded via `load_scenario_folder`. Note that complete determinism is not guaranteed for all hardware and software configurations, especially with PyTorch-based learning strategies. It may also decrease performance of reinforcement learning due to disabled non-deterministic optimizations.
+
+  - ``seed`` not set in top-level of config: Sets the seed to a fixed default value (42) for deterministic behavior.
+  - ``seed: <int>``: Sets the seed for all random number generators to provided <int>.
+  - ``seed: null``: Disables seed setting, allowing for non-deterministic behavior as before. May improve performance of reinforcement learning.
+
+- **Delete environment.yaml**: The environment.yaml file has been removed from the repository to simplify maintenance and was completely redundant with the `pyproject.toml`. Users can as before create their own environment using the provided pip installation instructions, which allows for more flexibility and easier updates.
+- **Add validation for simulation setup**: Added checks to validate the simulation setup for common issues, such as missing bidding strategies or inconsistent market configurations. Warnings are issued to inform users of potential problems that could affect simulation results.
+- **Added reward calculation for unit operators**: Unit operators have now the opportunity to calculate rewards based on the returned orderbooks for their own purposes. This enables learning strategies on unit operator level / portfolio learning strategies.
+- **Structured Validation Error**: Introduces the new ValidationError to represent a failing validation. Since it derives from the base ValidationError, all existing error handling remains compatible, but users can now also catch this specific error type to handle validation errors separately if desired.
+- **Add support for Pandas 3**
+- **Add support for Python 3.14**
 
 **Bug Fixes:**
   - **Fix buffer and update order**: Fixed the order of buffer writing and policy updating in the learning role to ensure that both have the exact same order, which is necessary so that during updates the correct data is used. This bug will have compromised learning with very heterogeneous units after the last release.
@@ -118,8 +171,7 @@ Upcoming Release
   - Tests verify economic cycling (charging at low price, discharging at high price), round-trip efficiency, and no simultaneous charge/discharge.
 - **SeasonalHydrogenStorage:** The framework of SeasonalHydrogenStorage is now consistent with the framework of Thermal storage.
 - **Refactored Learning Strategies:** Much of the code for generating observations and actions was redundant across different unit types. This redundancy has been removed by introducing the function in the common base class, making it easier to extend the learning strategies in the future. As a result, new functions such as `get_individual_observations`, which are specific to each unit type, have been added.
-- **Change energy_cost Observation in Storage Learning:**  The cost of stored energy for the learning storage is now tracked solely based on acquisition cost while charging, independent of discharging revenues. This change prevents negative cost values, ensures a consistent economic interpretation of stored energy, and improves the guiding properties of the observations of reinforcement learning according to shap value experiments.
-    Marginal costs are now included as well. Storage marginal costs currently only consist of additional charge or discharge costs, e.g. to include fixed volumetric grid fees. Revising and comparing the mc logic to the Powerplant implementation resulted in removing the efficiency correction factor of the additional costs for consistency.
+- **Change 'energy_cost' Observation in Storage Learning:** The cost of stored energy for the learning storage is now tracked solely based on acquisition cost while charging, independent of discharging revenues. This change prevents negative cost values, ensures a consistent economic interpretation of stored energy, and improves the guiding properties of the observations of reinforcement learning according to shap value experiments. Marginal costs are now included as well. Storage marginal costs currently only consist of additional charge or discharge costs, e.g. to include fixed volumetric grid fees. Revising and comparing the mc logic to the Powerplant implementation resulted in removing the efficiency correction factor of the additional costs for consistency.
 - **Component connection in hydrogen plant:** Fixed a bug regarding the connection of the components in the hydrogen plant.
 
 
@@ -194,10 +246,10 @@ Upcoming Release
 
 **Code Refactoring**
 
-  - Moved common functions to DSMFlex.
-  - Added tests for the ``Building`` class.
-  - Refactored variable names for better readability and consistency.
-  - Restructured the process sequence for improved efficiency.
+- Moved common functions to DSMFlex.
+- Added tests for the ``Building`` class.
+- Refactored variable names for better readability and consistency.
+- Restructured the process sequence for improved efficiency.
 
 v0.5.1 - (3rd February 2025)
 ===========================================

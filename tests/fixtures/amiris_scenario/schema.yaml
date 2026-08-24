@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# nested !include: resolved relative to the original base_dir, not to
+# this file's own directory
+Version: !include "meta/version.yaml"

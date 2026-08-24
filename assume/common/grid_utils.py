@@ -16,64 +16,6 @@ from assume.common.utils import SUPPORTED_SOLVERS
 logger = logging.getLogger(__name__)
 
 
-def add_generators(
-    network: pypsa.Network,
-    generators: pd.DataFrame,
-) -> None:
-    """
-    Add generators normally to the grid
-
-    Args:
-        network (pypsa.Network): the pypsa network to which the generators are
-        generators (pandas.DataFrame): the generators dataframe
-    """
-    p_set = pd.DataFrame(
-        np.zeros((len(network.snapshots), len(generators.index))),
-        index=network.snapshots,
-        columns=generators.index,
-    )
-
-    if isinstance(generators, dict):
-        gen_c = generators.copy()
-
-        if "p_min_pu" not in gen_c.columns:
-            gen_c["p_min_pu"] = p_set
-        if "p_max_pu" not in gen_c.columns:
-            gen_c["p_max_pu"] = p_set + 1
-        if "marginal_cost" not in gen_c.columns:
-            gen_c["marginal_cost"] = p_set
-
-        network.add(
-            "Generator",
-            name=generators.index,
-            bus=generators["node"],  # bus to which the generator is connected to
-            p_nom=generators[
-                "max_power"
-            ],  # Nominal capacity of the powerplant/generator
-            **gen_c,
-        )
-    else:
-        # add generators
-        generators.drop(
-            ["p_min_pu", "p_max_pu", "marginal_cost"],
-            axis=1,
-            inplace=True,
-            errors="ignore",
-        )
-        network.add(
-            "Generator",
-            name=generators.index,
-            bus=generators["node"],  # bus to which the generator is connected to
-            p_nom=generators[
-                "max_power"
-            ],  # Nominal capacity of the powerplant/generator
-            p_min_pu=p_set,
-            p_max_pu=p_set + 1,
-            marginal_cost=p_set,
-            **generators,
-        )
-
-
 def add_redispatch_generators(
     network: pypsa.Network,
     generators: pd.DataFrame,
@@ -88,18 +30,23 @@ def add_redispatch_generators(
         generators (pandas.DataFrame): the generators dataframe
         backup_marginal_cost (float, optional): The cost of dispatching the backup units in [€/MW]. Defaults to 1e5.
     """
-    p_set = pd.DataFrame(
+    zeros = pd.DataFrame(
         np.zeros((len(network.snapshots), len(generators.index))),
         index=network.snapshots,
         columns=generators.index,
     )
 
-    # add generators and their sold capacities as load with reversed sign to have fixed feed in
+    # add generators and their sold capacities as Generator to have fixed feed in
+    # The actual fixed dispatch is set later in redispatch.py by
+    # p_min_pu=p_max_pu=cleared_dispatch/p_nom
     network.add(
-        "Load",
+        "Generator",
         name=generators.index,
         bus=generators["node"],  # bus to which the generator is connected to
-        p_set=p_set,
+        p_nom=generators["max_power"],
+        p_set=zeros,
+        p_min_pu=zeros,
+        p_max_pu=zeros,
         sign=1,
     )
 
@@ -110,9 +57,9 @@ def add_redispatch_generators(
         suffix="_up",
         bus=generators["node"],  # bus to which the generator is connected to
         p_nom=generators["max_power"],  # Nominal capacity of the powerplant/generator
-        p_min_pu=p_set,
-        p_max_pu=p_set + 1,
-        marginal_cost=p_set,
+        p_min_pu=zeros,
+        p_max_pu=zeros + 1,
+        marginal_cost=zeros,
     )
 
     # add downward redispatch generators
@@ -122,9 +69,9 @@ def add_redispatch_generators(
         suffix="_down",
         bus=generators["node"],  # bus to which the generator is connected to
         p_nom=generators["max_power"],  # Nominal capacity of the powerplant/generator
-        p_min_pu=p_set,
-        p_max_pu=p_set + 1,
-        marginal_cost=p_set,
+        p_min_pu=zeros,
+        p_max_pu=zeros + 1,
+        marginal_cost=zeros,
         sign=-1,
     )
 
@@ -149,57 +96,6 @@ def add_redispatch_generators(
     )
 
 
-def add_backup_generators(
-    network: pypsa.Network,
-    backup_marginal_cost: float = 1e5,
-) -> None:
-    """
-    Add generators normally to the grid
-
-    Args:
-        network (pypsa.Network): the pypsa network to which the generators are
-        generators (pandas.DataFrame): the generators dataframe
-    """
-
-    # add backup generators at each node
-    network.add(
-        "Generator",
-        name=network.buses.index,
-        suffix="_backup",
-        bus=network.buses.index,  # bus to which the generator is connected to
-        p_nom=10e4,
-        marginal_cost=backup_marginal_cost,
-    )
-
-
-def add_loads(
-    network: pypsa.Network,
-    loads: pd.DataFrame,
-) -> None:
-    """
-    Add loads normally to the grid
-
-    Args:
-        network (pypsa.Network): the pypsa network to which the loads are
-        loads (pandas.DataFrame): the loads dataframe
-    """
-
-    # add loads
-    network.add(
-        "Load",
-        name=loads.index,
-        bus=loads["node"],  # bus to which the generator is connected to
-        **loads,
-    )
-
-    if "p_set" not in loads.columns:
-        network.loads_t["p_set"] = pd.DataFrame(
-            np.zeros((len(network.snapshots), len(loads.index))),
-            index=network.snapshots,
-            columns=loads.index,
-        )
-
-
 def add_redispatch_loads(
     network: pypsa.Network,
     loads: pd.DataFrame,
@@ -211,12 +107,11 @@ def add_redispatch_loads(
     if "sign" in loads_c.columns:
         del loads_c["sign"]
 
-    # add loads with opposite sign (default for loads is -1). This is needed to properly model the redispatch
+    # add loads
     network.add(
         "Load",
         name=loads.index,
         bus=loads["node"],  # bus to which the generator is connected to
-        sign=1,
         **loads_c,
     )
 
@@ -226,39 +121,6 @@ def add_redispatch_loads(
             index=network.snapshots,
             columns=loads.index,
         )
-
-
-def add_nodal_loads(
-    network: pypsa.Network,
-    loads: pd.DataFrame,
-) -> None:
-    """
-    This adds loads to the nodal PyPSA network with respective bus data to which they are connected.
-    The loads are added as generators with negative sign so their dispatch can be also curtailed,
-    since regular load in PyPSA represents only an inelastic demand.
-    """
-    p_set = pd.DataFrame(
-        np.zeros((len(network.snapshots), len(loads.index))),
-        index=network.snapshots,
-        columns=loads.index,
-    )
-    loads_c = loads.copy()
-
-    if "sign" in loads_c.columns:
-        del loads_c["sign"]
-
-    # add loads as negative generators
-    network.add(
-        "Generator",
-        name=loads.index,
-        bus=loads["node"],  # bus to which the generator is connected to
-        p_nom=loads["max_power"],  # Nominal capacity of the powerplant/generator
-        p_min_pu=p_set,
-        p_max_pu=p_set + 1,
-        marginal_cost=p_set,
-        sign=-1,
-        **loads_c,
-    )
 
 
 def read_pypsa_grid(
@@ -301,23 +163,32 @@ def calculate_network_meta(network, product: MarketProduct, i: int):
 
     meta = []
     duration_hours = (product[1] - product[0]) / timedelta(hours=1)
-    # iterate over buses
+    # Only redispatch-related generator components should enter redispatch meta.
+    redispatch_generator_names = network.generators.index[
+        network.generators.index.str.endswith(("_up", "_down"))
+    ]
+
     for bus in network.buses.index:
-        # add backup dispatch to dispatch
-        # Step 1: Identify generators connected to the specified bus
         generators_connected_to_bus = network.generators[
-            network.generators.bus == bus
+            (network.generators.bus == bus)
+            & (network.generators.index.isin(redispatch_generator_names))
         ].index
 
-        # Step 2: Select dispatch levels for these generators from network.generators_t.p
-        dispatch_for_bus = network.generators_t.p[generators_connected_to_bus].iloc[i]
-        # multiple by network.generators.sign to get the correct sign for dispatch
-        dispatch_for_bus = (
-            dispatch_for_bus * network.generators.sign[generators_connected_to_bus]
-        )
+        if len(generators_connected_to_bus) > 0:
+            dispatch_for_bus = network.generators_t.p.reindex(
+                columns=generators_connected_to_bus,
+                fill_value=0.0,
+            ).iloc[i]
+
+            dispatch_for_bus = (
+                dispatch_for_bus * network.generators.sign[generators_connected_to_bus]
+            )
+        else:
+            dispatch_for_bus = pd.Series(dtype=float)
 
         supply_volume = dispatch_for_bus[dispatch_for_bus > 0].sum()
         demand_volume = -dispatch_for_bus[dispatch_for_bus < 0].sum()
+
         if not network.buses_t.marginal_price.empty:
             price = network.buses_t.marginal_price[str(bus)].iat[i]
         else:

@@ -44,9 +44,6 @@ services:
       GF_INSTALL_PLUGINS: "marcusolsson-dynamictext-panel,orchestracities-map-panel"
       GF_SECURITY_ADMIN_USER: assume
       GF_SECURITY_ADMIN_PASSWORD: "assume"
-      GF_RENDERING_SERVER_URL: http://renderer:8081/render
-      GF_RENDERING_CALLBACK_URL: http://grafana:3000/
-      GF_LOG_FILTERS: rendering:debug
       GF_USERS_DEFAULT_THEME: light
     volumes:
       - ./docker_configs/grafana.ini:/etc/grafana/grafana.ini
@@ -59,16 +56,6 @@ services:
       replicas: 1
       placement:
         constraints: [node.role == manager]
-
-  # to enable rendering png screenshots directly from grafana
-  # for example to embed them in an iframe, you can use this
-  renderer:
-    image: grafana/grafana-image-renderer:latest
-    container_name: renderer
-    profiles: ["renderer"]
-    ports:
-      - 8081
-
 
   # to run a single simulation in
   simulation:
