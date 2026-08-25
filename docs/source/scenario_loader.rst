@@ -10,6 +10,7 @@ For compatibility with other simulation tools, ASSUME provides a variety of scen
 - :ref:`csv` - File based scenarios (most flexible)
 - :ref:`amiris` - used to create comparative studies
 - :ref:`oeds` - create scenarios with the Open Energy Data Server
+- :ref:`entsoe` - create country-level scenarios from the ENTSO-E API
 - :ref:`pypsa_loader_doc` - create scenarios from imported PyPSA networks
 
 
@@ -150,6 +151,94 @@ An example configuration of how this can be used is shown here:
 
 This creates operators each per NUTS areas and creates a single EOM market, just as the `DMAS simulation <https://github.com/NOWUM/dmas/>`_ from FH Aachen.
 For more information consult the methods documentation :py:meth:`assume.scenario.loader_oeds.load_oeds`.
+
+.. _entsoe:
+
+ENTSO-E
+-------
+
+The ENTSO-E loader queries the `ENTSO-E Transparency Platform <https://transparency.entsoe.eu/>`_ directly.
+It creates country-level scenarios from actual load, actual generation per production type
+and installed generation capacity without requiring a local Open-Energy-Data-Server.
+
+Install the optional dependency with ``pip install 'assume-framework[entsoe]'``
+and register for an API key at the ENTSO-E transparency platform.
+Set the environment variable ``ENTSOE_API_KEY`` before running a scenario.
+
+Coal, gas and EU ETS prices are fetched from `energy.instrat.pl` by default.
+The loader creates one node per country without network constraints.
+
+.. code-block:: python
+
+    from datetime import datetime, timedelta
+    from dateutil import rrule as rr
+
+    from assume import World
+    from assume.common.market_objects import MarketConfig, MarketProduct
+    from assume.scenario.loader_entsoe import load_entsoe
+
+    db_uri = "postgresql://assume:assume@localhost:5432/assume"
+    world = World(database_uri=db_uri)
+
+    start = datetime(2024, 1, 1)
+    end = datetime(2024, 12, 31) - timedelta(hours=1)
+    marketdesign = [
+        MarketConfig(
+            "EOM",
+            rr.rrule(rr.HOURLY, interval=24, dtstart=start, until=end),
+            timedelta(hours=1),
+            "pay_as_clear",
+            [MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))],
+            additional_fields=["block_id", "link", "exclusive_id"],
+            maximum_bid_volume=1e9,
+            maximum_bid_price=1e9,
+        )
+    ]
+
+    default_strategy = {mc.market_id: "powerplant_energy_naive" for mc in marketdesign}
+    default_demand_strategy = {mc.market_id: "demand_energy_naive" for mc in marketdesign}
+    default_storage_strategy = {
+        mc.market_id: "storage_energy_heuristic_flexable" for mc in marketdesign
+    }
+
+    bidding_strategies = {
+        "hard coal": default_strategy,
+        "lignite": default_strategy,
+        "oil": default_strategy,
+        "gas": default_strategy,
+        "biomass": default_strategy,
+        "hydro": default_strategy,
+        "nuclear": default_strategy,
+        "wind": default_strategy,
+        "solar": default_strategy,
+        "storage": default_storage_strategy,
+        "demand": default_demand_strategy,
+    }
+
+    load_entsoe(
+        world,
+        "entsoe",
+        "DE_2024",
+        start,
+        end,
+        ["DE"],
+        marketdesign,
+        bidding_strategies,
+        fuel_price_ranges={
+            "gas": (32.0, 22.0),
+            "hard coal": (13.0, 10.0),
+        },
+        block_sizes_mw={
+            "gas": 400,
+            "hard coal": 500,
+            "nuclear": 1000,
+        },
+    )
+
+    world.run()
+
+API responses are cached under ``~/.assume/entsoe`` to avoid repeated downloads.
+For more information consult the methods documentation :py:meth:`assume.scenario.loader_entsoe.load_entsoe`.
 
 .. _pypsa_loader_doc:
 
