@@ -27,8 +27,9 @@ Upcoming Release
   - **Readme naming of examples/tutorials**: Slight changing of tutorial and example in the read me to make difference clearer and more consistent with the naming of the notebooks and to align with readthedocs.
   - **Align redispatch mechanism to latest PyPSA version release**: Updated the redispatch formulation to model cleared EOM generator dispatch for ``network.lpf()`` via ``generators_t.p_set`` and consistent generator bounds ``p_min_pu/p_max_pu``, replacing the previous load-based workaround.
   - **Grafana dashboard improvements**: Added button to automatically update the time range filter to the full simulation horizon.
+  - **Replace GPL-licensed ``pyyaml-include`` dependency**: AMIRIS scenario loading no longer depends on the GPLv3-licensed ``pyyaml-include`` package, which was incompatible with distributing ASSUME under a permissive license. The subset of ``!include`` YAML-tag behavior AMIRIS scenario files rely on is now implemented in-house in ``assume.scenario.yaml_include``.
   - **Rework the redispatch use case in the DSU & flexibility tutorial**: The redispatch example in ``examples/notebooks/10_DSU_and_flexibility.ipynb`` now places the renewable surplus in the north and the load plus dispatchable plants in the south, so the redispatch is balanced (total upward volume equals total downward volume) and clearly demonstrates renewable curtailment on the congested side together with dispatchable ramp-up on the other. A summary table of the redispatch volumes per energy source was added below the redispatch plot, and the explanatory text was updated accordingly.
-
+  
 **Bug Fixes:**
   - **Dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
   - **Fix bug in forecasts**, that occurred when using complex clearing
@@ -37,6 +38,17 @@ Upcoming Release
   - **Fix errors in portfolio learning strategies**: The ``min_max_rescale`` function was missing from ``utils.py``, causing an ``ImportError`` in ``portfolio_learning_strategies.py``. Resolved by extending ``min_max_scale`` to cover the rescaling use case. And fix minor construction bug for observation space.
   - **Skip torch seeding when torch is installed but not used**: Irrelevant seeding was performed and a warning was thrown about deterministic PyTorch behavior, even though simulation does not use RL. This is fixed by only setting the PyTorch seeds when learning is active.
   - **Fix bug in redispatch mechanism**: Fixed the bug in redispatch evaluation due to PyPSA's version upgrade. In ``PyPSA >= 0.35.2`` (released in February 2025) the sign of load was not taken into account correctly & since the fixed EOM dispatch was modelled as a load with positive sign which was resulting in incorrect redispatch amounts.
+
+0.6.2 - (5th August 2026)
+=========================
+
+**New Features:**
+  - **Cement Plant DSM unit**: Added a ``CementPlant`` unit modelling a fuel-switchable kiln line, each stage independently switchable between electricity, a natural-gas/coal mix, or hydrogen. Optional components include an electrolyser supplying the burners with on-site hydrogen, an electric-heater thermal storage (E-TES) that buffers calciner heat, and a raw material mill / cement mill. Either mill can also run standalone with no kiln line at all, in which case the declared demand targets that mill's own ground tonnage directly. Supports both full-horizon and rolling-horizon optimisation, and all of the existing ``DSMFlex`` flexibility measures. See the Demand Side Agent documentation for details.
+  - **New demand-side technology components in** ``dst_components.py``: Added ``ThermalProcessStage``, a shared base class for fuel-switchable thermal stages, with ``Preheater``, ``Calciner``, and ``Kiln`` subclasses used by the new cement plant. ``Calciner`` tracks process (calcination) CO2 emissions separately from energy emissions; ``Preheater`` accepts recovered waste heat from the kiln. Also added ``GrindingMill``, a generic electric grinding component used for both raw material milling and cement grinding, and a new ``short-term_with_generator`` mode for ``ThermalStorage`` where an electric heater charges the storage from grid power.
+
+**Bug Fixes:**
+  - **Fix ramp constraint at the first time step**: For every ramp-limited DSM component, the first time step was incorrectly capped by ``min(ramp_up, ramp_down)`` instead of just ``ramp_up``, since the ramp-down constraint also applied an absolute cap on the first step even though there is no previous value to decrease from. This could artificially choke off a legitimately high first-step value whenever ``ramp_down`` was tighter than ``ramp_up``. Fixed across all affected components (``GenericStorage``, ``ChargingStation``, ``Boiler``, and the shared ``add_ramping_constraints`` helper used by most other DSM components).
+  - **Fix rolling-horizon min-demand strategy for non-steel-plant units**: The rolling-horizon function's per-timestep demand-strategy detection hard-coded the steel plant's own ``steel_demand_per_timestep`` attribute name, so any other DSM unit using the ``min_demand`` strategy in rolling-horizon mode silently read the wrong (already window-sliced) series. Generalized to use each unit's own demand attribute.
 
 0.6.1 - (25th March 2026)
 =========================

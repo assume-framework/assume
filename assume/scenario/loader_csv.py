@@ -20,6 +20,7 @@ from assume.common.exceptions import AssumeException
 from assume.common.fast_pandas import FastIndex
 from assume.common.forecaster import (
     BuildingForecaster,
+    CementForecaster,
     CustomUnitForecaster,
     DemandForecaster,
     DsmUnitForecaster,
@@ -813,6 +814,42 @@ def load_config_and_create_forecaster(
                         fuel_prices=fuel_prices_df,
                         normalized_load_profile=normalized_profile,
                         steel_demand=steel_demand,
+                    )
+                if type == "cement_plant":
+                    storage_schedule = get_unit_forecast_column(
+                        forecasts_df, id, "thermal_storage_schedule"
+                    )
+                    unit_forecasts[id] = CementForecaster(
+                        index=shared_unit_index,
+                        availability=availability.get(
+                            id, pd.Series(1.0, index, name=id)
+                        ),
+                        market_prices=unit.get("market_prices"),
+                        forecast_algorithms=unit_forecast_algorithms,
+                        forecast_registries=None,
+                        fuel_prices=fuel_prices_df,
+                        normalized_load_profile=get_unit_forecast_column(
+                            forecasts_df, id, "normalized_load_profile"
+                        ),
+                        clinker_demand=get_unit_forecast_column(
+                            forecasts_df, id, "clinker_demand"
+                        ),
+                        electricity_price_flex=get_unit_forecast_column(
+                            forecasts_df, id, "electricity_price_flex"
+                        ),
+                        thermal_storage_schedule=(
+                            storage_schedule if storage_schedule is not None else 0
+                        ),
+                        availability_profiles={
+                            tech: get_unit_forecast_column(
+                                forecasts_df, id, f"{tech}_availability"
+                            )
+                            for tech in (
+                                "preheater",
+                                "calciner",
+                                "kiln",
+                            )
+                        },
                     )
                 if type == "hydrogen_plant":
                     unit_forecasts[id] = HydrogenForecaster(
