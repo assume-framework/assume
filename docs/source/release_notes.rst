@@ -14,10 +14,25 @@ Upcoming Release
 
 
 **New Features:**
+  - **Cement Plant DSM unit**: Added a ``CementPlant`` unit modelling a fuel-switchable kiln line, each stage independently switchable between electricity, a natural-gas/coal mix, or hydrogen. Optional components include an electrolyser supplying the burners with on-site hydrogen, an electric-heater thermal storage (E-TES) that buffers calciner heat, and a raw material mill / cement mill. Either mill can also run standalone with no kiln line at all, in which case the declared demand targets that mill's own ground tonnage directly. Supports both full-horizon and rolling-horizon optimisation, and all of the existing ``DSMFlex`` flexibility measures. See the Demand Side Agent documentation for details.
+  - **New demand-side technology components in** ``dst_components.py``: Added ``ThermalProcessStage``, a shared base class for fuel-switchable thermal stages, with ``Preheater``, ``Calciner``, and ``Kiln`` subclasses used by the new cement plant. ``Calciner`` tracks process (calcination) CO2 emissions separately from energy emissions; ``Preheater`` accepts recovered waste heat from the kiln. Also added ``GrindingMill``, a generic electric grinding component used for both raw material milling and cement grinding, and a new ``short-term_with_generator`` mode for ``ThermalStorage`` where an electric heater charges the storage from grid power.
+  - **Electric vehicle model for buildings**: Added an updated ``ElectricVehicle`` DSM component with explicit mobility-related energy use, availability-dependent operation, external range input, bidirectional or unidirectional power flow, and binary non-simultaneity for charging and discharging.
+  - **Charging station model for buildings**: Added a dedicated ``ChargingStation`` DSM component with optional availability profiles, ramp constraints, and support for unidirectional or bidirectional operation.
+  - **Integrated EV and charging-station building topology**: Buildings now support two connection modes:
+
+    - If no charging station is included, EVs connect directly to the building/grid balance.
+    - If charging stations are included, charging stations connect to the building/grid and EVs connect to the charging stations through assignment variables.
+
+  - **Building-specific flexible electricity-price support**: Added support for ``electricity_price_flex`` in ``BuildingForecaster`` for use with the ``electricity_price_signal`` flexibility measure.
   - **Generic Forecasting Interface**: This interface enables to specify different forecast algorithms for preprocess, initialization and update during runtime. They can be specified in the config.yaml or unit csv files. For more information about currently implemented algorithms and how to specify them please read the documentation on Unit forecasts.
   - **Operator-level forecaster**: Unit operators can now own a ``UnitsOperatorForecaster`` providing their own market price and residual load forecasts (accessible via ``units_operator.forecaster``), instead of reading them from a managed unit. Forecast algorithms can be set per operator via ``forecast_*`` columns in ``unit_operators.csv``, and the portfolio learning strategy now reads its price/residual-load observations from this operator forecaster.
 
 **Improvements:**
+  - **Extend building units to support multiple sub-assets**: Building units can now include multiple components of the same technology type using prefix-based component handling. This enables configurations with multiple electric vehicles and multiple charging stations within the same building unit.
+  - **Improve building forecast handling**: The building forecasting workflow has been extended to support aggregate building profiles as well as component-specific profiles such as EV availability, EV range, charging-station availability, and flexible electricity-price signals.
+  - **Clarify building forecast naming conventions**: Aggregate building forecast columns now use explicit names such as ``<building_id>_load_profile`` instead of ambiguous bare building identifiers.
+  - **Extend DSM component initialization**: DSM component initialization now supports prefixed component names such as ``electric_vehicle_1`` and ``charging_station_2`` and forwards EV-specific external range data during model construction.
+  - **Expand building test coverage**: Building tests were extended to cover both core building assets and the new EV and charging-station integration logic, including direct-grid fallback when no charging station is present.
   - **In complex clearing, the solver instance is now created once during initialization of the clearing role and reused for each market clearing**. This improves performance for e.g. year-long simulations.
   - **Added a check for available solvers in redispatch & nodal_clearing**, similar to the check in complex clearing.
   - **Consistently distinguish 'solver' and 'solver_name'**: Users should now use 'solver_name' to specify the solver in the market configs param_dict, as 'solver' now refers to the actual solver instance.
@@ -31,6 +46,12 @@ Upcoming Release
   - **Rework the redispatch use case in the DSU & flexibility tutorial**: The redispatch example in ``examples/notebooks/10_DSU_and_flexibility.ipynb`` now places the renewable surplus in the north and the load plus dispatchable plants in the south, so the redispatch is balanced (total upward volume equals total downward volume) and clearly demonstrates renewable curtailment on the congested side together with dispatchable ramp-up on the other. A summary table of the redispatch volumes per energy source was added below the redispatch plot, and the explanatory text was updated accordingly.
 
 **Bug Fixes:**
+  - **Fix ramp constraint at the first time step**: For every ramp-limited DSM component, the first time step was incorrectly capped by ``min(ramp_up, ramp_down)`` instead of just ``ramp_up``, since the ramp-down constraint also applied an absolute cap on the first step even though there is no previous value to decrease from. This could artificially choke off a legitimately high first-step value whenever ``ramp_down`` was tighter than ``ramp_up``. Fixed across all affected components (``GenericStorage``, ``ChargingStation``, ``Boiler``, and the shared ``add_ramping_constraints`` helper used by most other DSM components).
+  - **Fix rolling-horizon min-demand strategy for non-steel-plant units**: The rolling-horizon function's per-timestep demand-strategy detection hard-coded the steel plant's own ``steel_demand_per_timestep`` attribute name, so any other DSM unit using the ``min_demand`` strategy in rolling-horizon mode silently read the wrong (already window-sliced) series. Generalized to use each unit's own demand attribute.
+  - **Fix building flexibility initialization under electricity price signals**: Fixed building flexibility initialization so that the ``electricity_price_signal`` flexibility measure works with building-specific flexible electricity-price inputs.
+  - **Fix model switching for flexibility modes**: Fixed the optimization mode switching logic in ``DSMFlex.switch_to_opt()`` so that it no longer assumes the presence of flexibility constraints that are not created for all flexibility measures.
+  - **Fix variable-cost evaluation under flexible electricity-price signals**: Fixed variable-cost calculation when flexible electricity-price signals are activated by rebuilding the relevant cost linkage after replacing the active price parameter.
+  - **Fix malformed example input handling during testing**: Corrected issues caused by malformed or incomplete example forecast and fuel-price input files used for testing and validation.
   - **Dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
   - **Fix bug in forecasts**, that occurred when using complex clearing
   - **Fix infeasible power output in PowerPlant**: ``calculate_min_max_power`` now correctly accounts for base load, positive/negative capacity reserves, and heat demand when computing additional power. If reduced availability makes the unit infeasible to run, both min and max power are set to 0. A warning is issued if previous dispatch exceeded available power.
@@ -38,43 +59,6 @@ Upcoming Release
   - **Fix errors in portfolio learning strategies**: The ``min_max_rescale`` function was missing from ``utils.py``, causing an ``ImportError`` in ``portfolio_learning_strategies.py``. Resolved by extending ``min_max_scale`` to cover the rescaling use case. And fix minor construction bug for observation space.
   - **Skip torch seeding when torch is installed but not used**: Irrelevant seeding was performed and a warning was thrown about deterministic PyTorch behavior, even though simulation does not use RL. This is fixed by only setting the PyTorch seeds when learning is active.
   - **Fix bug in redispatch mechanism**: Fixed the bug in redispatch evaluation due to PyPSA's version upgrade. In ``PyPSA >= 0.35.2`` (released in February 2025) the sign of load was not taken into account correctly & since the fixed EOM dispatch was modelled as a load with positive sign which was resulting in incorrect redispatch amounts.
-
-0.6.2 - (5th August 2026)
-=========================
-
-**New Features:**
-  - **Cement Plant DSM unit**: Added a ``CementPlant`` unit modelling a fuel-switchable kiln line, each stage independently switchable between electricity, a natural-gas/coal mix, or hydrogen. Optional components include an electrolyser supplying the burners with on-site hydrogen, an electric-heater thermal storage (E-TES) that buffers calciner heat, and a raw material mill / cement mill. Either mill can also run standalone with no kiln line at all, in which case the declared demand targets that mill's own ground tonnage directly. Supports both full-horizon and rolling-horizon optimisation, and all of the existing ``DSMFlex`` flexibility measures. See the Demand Side Agent documentation for details.
-  - **New demand-side technology components in** ``dst_components.py``: Added ``ThermalProcessStage``, a shared base class for fuel-switchable thermal stages, with ``Preheater``, ``Calciner``, and ``Kiln`` subclasses used by the new cement plant. ``Calciner`` tracks process (calcination) CO2 emissions separately from energy emissions; ``Preheater`` accepts recovered waste heat from the kiln. Also added ``GrindingMill``, a generic electric grinding component used for both raw material milling and cement grinding, and a new ``short-term_with_generator`` mode for ``ThermalStorage`` where an electric heater charges the storage from grid power.
-
-**Bug Fixes:**
-  - **Fix ramp constraint at the first time step**: For every ramp-limited DSM component, the first time step was incorrectly capped by ``min(ramp_up, ramp_down)`` instead of just ``ramp_up``, since the ramp-down constraint also applied an absolute cap on the first step even though there is no previous value to decrease from. This could artificially choke off a legitimately high first-step value whenever ``ramp_down`` was tighter than ``ramp_up``. Fixed across all affected components (``GenericStorage``, ``ChargingStation``, ``Boiler``, and the shared ``add_ramping_constraints`` helper used by most other DSM components).
-  - **Fix rolling-horizon min-demand strategy for non-steel-plant units**: The rolling-horizon function's per-timestep demand-strategy detection hard-coded the steel plant's own ``steel_demand_per_timestep`` attribute name, so any other DSM unit using the ``min_demand`` strategy in rolling-horizon mode silently read the wrong (already window-sliced) series. Generalized to use each unit's own demand attribute.
-
-0.6.1 - (25th March 2026)
-=========================
-
-  **Improvements:**
-  - **Extend building units to support multiple sub-assets**: Building units can now include multiple components of the same technology type using prefix-based component handling. This enables configurations with multiple electric vehicles and multiple charging stations within the same building unit.
-  - **Improve building forecast handling**: The building forecasting workflow has been extended to support aggregate building profiles as well as component-specific profiles such as EV availability, EV range, charging-station availability, and flexible electricity-price signals.
-  - **Clarify building forecast naming conventions**: Aggregate building forecast columns now use explicit names such as ``<building_id>_load_profile`` instead of ambiguous bare building identifiers.
-  - **Extend DSM component initialization**: DSM component initialization now supports prefixed component names such as ``electric_vehicle_1`` and ``charging_station_2`` and forwards EV-specific external range data during model construction.
-  - **Expand building test coverage**: Building tests were extended to cover both core building assets and the new EV and charging-station integration logic, including direct-grid fallback when no charging station is present.
-
-  **Bug Fixes:**
-  - **Fix building flexibility initialization under electricity price signals**: Fixed building flexibility initialization so that the ``electricity_price_signal`` flexibility measure works with building-specific flexible electricity-price inputs.
-  - **Fix model switching for flexibility modes**: Fixed the optimization mode switching logic in ``DSMFlex.switch_to_opt()`` so that it no longer assumes the presence of flexibility constraints that are not created for all flexibility measures.
-  - **Fix variable-cost evaluation under flexible electricity-price signals**: Fixed variable-cost calculation when flexible electricity-price signals are activated by rebuilding the relevant cost linkage after replacing the active price parameter.
-  - **Fix malformed example input handling during testing**: Corrected issues caused by malformed or incomplete example forecast and fuel-price input files used for testing and validation.
-
-  **New Features:**
-  - **Electric vehicle model for buildings**: Added an updated ``ElectricVehicle`` DSM component with explicit mobility-related energy use, availability-dependent operation, external range input, bidirectional or unidirectional power flow, and binary non-simultaneity for charging and discharging.
-  - **Charging station model for buildings**: Added a dedicated ``ChargingStation`` DSM component with optional availability profiles, ramp constraints, and support for unidirectional or bidirectional operation.
-  - **Integrated EV and charging-station building topology**: Buildings now support two connection modes:
-
-    - If no charging station is included, EVs connect directly to the building/grid balance.
-    - If charging stations are included, charging stations connect to the building/grid and EVs connect to the charging stations through assignment variables.
-
-  - **Building-specific flexible electricity-price support**: Added support for ``electricity_price_flex`` in ``BuildingForecaster`` for use with the ``electricity_price_signal`` flexibility measure.
 
 0.6.0 - (18th March 2026)
 =========================
