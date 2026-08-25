@@ -66,6 +66,7 @@ class WriteOutput(Role):
         episode: int = None,
         eval_episode: int = None,
         additional_kpis: dict[str, OutputDef] = {},
+        units: dict = None,
     ):
         super().__init__()
 
@@ -87,6 +88,10 @@ class WriteOutput(Role):
 
         self.learning_mode = learning_mode
         self.evaluation_mode = evaluation_mode
+
+        # used by the exploitability calculation in on_stop() to look up
+        # per-unit marginal cost; may be None when no unit registry is shared
+        self.units = units or {}
 
         # get episode number if in learning or evaluation mode
         self.episode = episode
@@ -154,10 +159,14 @@ class WriteOutput(Role):
             # ignore spatial_ref_sys table
             if table_name == "spatial_ref_sys":
                 continue
-            # only delete rl_params and rl_meta during the first episode of learning
-            if table_name in ["rl_params", "rl_grad_params", "rl_meta"] and not (
-                self.learning_mode and self.episode == 1
-            ):
+            # delete cross-episode learning tables only during the first episode
+            if table_name in [
+                "rl_params",
+                "rl_grad_params",
+                "rl_meta",
+                "rl_market_orders",
+                "rl_exploitability",
+            ] and not (self.learning_mode and self.episode == 1):
                 continue
             try:
                 with self.db.begin() as db:
@@ -229,6 +238,21 @@ class WriteOutput(Role):
         if content_data is None or len(content_data) == 0:
             return
 
+        # A learning run's evaluation episode writes market output for one
+        # reason: exploitability reads the orderbook back
+        # (``World.add_market_operator`` hands the market operator an output
+        # address for plain runs and eval episodes, not training ones). It
+        # reads the episode-tagged mirror below, never the plain tables -- and
+        # delete_db_scenario wipes those at the next episode's setup, so they
+        # were converted and inserted for nothing. Skipping them is worth 2.8 s
+        # of a 15.6 s evaluation episode at 35 units, most of it the second
+        # conversion of the same 40k-row orderbook.
+        #
+        # Only the training loop is affected. The final simulation runs with
+        # learning_mode cleared (setup_world(terminate_learning=True)), as does
+        # any non-learning scenario, and both write these tables as before.
+        plain_market_output = not (self.learning_mode and self.evaluation_mode)
+
         if content_type in [
             "market_meta",
             "market_dispatch",
@@ -236,6 +260,10 @@ class WriteOutput(Role):
             "rl_params",
             "rl_grad_params",
         ]:
+            # nothing is buffered for this one, so it returns before the size
+            # accounting rather than charging the buffer for absent rows
+            if content_type == "market_meta" and not plain_market_output:
+                return
             # these can be processed as a single dataframe
             self.write_buffers[content_type].extend(content_data)
         elif content_type == "store_units":
@@ -246,8 +274,20 @@ class WriteOutput(Role):
             # these need to be converted to df individually
             self.write_buffers[content_type].append(content_data)
         elif content_type in ["market_orders", "grid_topology"]:
-            # here we need an additional market_id
-            self.write_buffers[content_type].append((content_data, market_id))
+            # During eval episodes, mirror the orderbook to an episode-tagged
+            # table that persists across the learning loop. The regular
+            # market_orders table is wiped per-episode by delete_db_scenario,
+            # so it cannot hold a multi-episode time series.
+            if content_type == "market_orders" and self.evaluation_mode:
+                self.write_buffers["rl_market_orders"].append(
+                    (content_data, market_id, self.evaluation_mode, self.eval_episode)
+                )
+            # here we need an additional market_id. The mirror above already
+            # holds this orderbook, so the size accounting below must still run
+            # -- returning early here would hide the buffer's growth from the
+            # flush trigger and let it run to the episode's end unbounded.
+            if plain_market_output or content_type == "grid_topology":
+                self.write_buffers[content_type].append((content_data, market_id))
 
         # keep track of the memory usage of the data
         self.current_dfs_size_bytes += calculate_content_size(content_data)
@@ -492,6 +532,19 @@ class WriteOutput(Role):
                             df = self.convert_market_orders(market_data, market_id)
                             dfs.append(df)
                         df = pd.concat(dfs, axis=0, join="outer")
+                    case "rl_market_orders":
+                        # eval-only mirror of market_orders, tagged with
+                        # episode/evaluation_mode so multi-episode runs are
+                        # distinguishable in the database
+                        dfs = []
+                        for market_data, market_id, mode, episode in data_list:
+                            sub = self.convert_market_orders(market_data, market_id)
+                            if sub is None:
+                                continue
+                            sub["evaluation_mode"] = mode
+                            sub["episode"] = episode
+                            dfs.append(sub)
+                        df = pd.concat(dfs, axis=0, join="outer") if dfs else None
                     case _:
                         # store_units has the name of the units_meta
                         dfs = []
@@ -688,26 +741,155 @@ class WriteOutput(Role):
 
         # remove all empty dataframes
         dfs = [df for df in dfs if not df.empty and df["value"].notna().all()]
-        if not dfs:
+        if dfs:
+            df = pd.concat(dfs)
+            df.reset_index()
+            df["simulation"] = self.simulation_id
+
+            if self.export_csv_path:
+                kpi_data_path = self.export_csv_path / "kpis.csv"
+                df.to_csv(
+                    kpi_data_path,
+                    mode="a",
+                    header=not kpi_data_path.exists(),
+                    index=None,
+                    float_format="%.5g",
+                )
+
+            if self.db is not None and not df.empty:
+                with self.db.begin() as db:
+                    df.to_sql("kpis", db, if_exists="append", index=None)
+
+        # Exploitability cadence:
+        #   non-learning sim      → run once from market_orders (single run)
+        #   learning, eval episode → run from rl_market_orders for this eval episode
+        #   learning, training    → skip (overhead, no episode-tagged data)
+        if self.learning_mode and not self.evaluation_mode:
+            return
+        await self._write_exploitability()
+
+    async def _write_exploitability(self):
+        """Compute per-(timestep, unit) exploitability from the orderbook of
+        the current simulation and write it to the ``exploitability`` table
+        (``rl_exploitability`` for the evaluation episodes of a learning run).
+
+        The result is only a correct exploitability for a scenario with a
+        **single day-ahead (energy-only, pay-as-clear) market and no storage
+        units** — see the SCOPE note in
+        ``assume.reinforcement_learning.exploitability``. Two limits bite here
+        in particular:
+
+        * the query below selects the whole orderbook of the simulation and is
+          **not filtered by market**, so in a multi-market scenario (e.g. the
+          inc-dec redispatch cases) bids from every market are grouped by
+          ``start_time`` and cleared together as if they were one auction. The
+          numbers written are then meaningless, not merely a lower bound;
+        * storage units are scored by the volume-preserving Tier-1 rule, which
+          holds the state-of-charge path fixed and is therefore not a best
+          response — and it is not comparable with the thermal units it would
+          be averaged against.
+
+        On anything outside that scope, do not read the ``exploitability``
+        table.
+        """
+        if self.db is None or not self.units:
             return
 
-        df = pd.concat(dfs)
-        df.reset_index()
+        try:
+            from assume.reinforcement_learning.exploitability import FastClearing
+        except ImportError as e:
+            logger.debug("exploitability calculation skipped: %s", e)
+            return
+
+        # Source table: eval episodes use rl_market_orders (episode-tagged,
+        # persists across the loop); one-shot runs use market_orders.
+        if self.evaluation_mode:
+            query = (
+                "SELECT start_time, unit_id, price, volume, accepted_price, "
+                "accepted_volume FROM rl_market_orders "
+                f"WHERE simulation = '{self.simulation_id}' "
+                f"AND episode = {self.eval_episode}"
+            )
+        else:
+            query = (
+                "SELECT start_time, unit_id, price, volume, accepted_price, "
+                "accepted_volume FROM market_orders "
+                f"WHERE simulation = '{self.simulation_id}'"
+            )
+        try:
+            orders_df = pd.read_sql(query, self.db)
+        except Exception as e:
+            logger.error("could not read orderbook for exploitability: %s", e)
+            return
+
+        if orders_df.empty:
+            logger.warning("No orders found to calculcate exploitability")
+            return
+
+        # Some backends hand back ``start_time`` as text. That value is then
+        # used two ways downstream -- as the ``groupby`` key in ``FastClearing``
+        # and, more expensively, as the index into each unit's ``marginal_cost``
+        # in ``calculate_exploitability`` -- and a ``FastSeries`` lookup on a
+        # string key resolves to the *correct* value through a slow path:
+        # measured at 605 us per lookup against ~2 us for a Timestamp.
+        # Converting once here took a 720-hour, 8-unit episode from 1.95 s to
+        # 0.135 s (14x), the grouping included. Nothing about the result moves --
+        # the values are identical and the stored text is byte-identical, since
+        # pandas serialises a Timestamp back to the same ISO string.
+        orders_df["start_time"] = pd.to_datetime(orders_df["start_time"])
+
+        try:
+            fc = FastClearing(orders_df)
+            results = fc.run_all_probes()
+            per_unit = fc.calculate_exploitability(self.units, results)
+        except Exception:
+            logger.exception("exploitability calculation failed")
+            return
+
+        if not per_unit:
+            return
+
+        # mirror the rl_params storage layout: datetime as index, always-set
+        # simulation / evaluation_mode / episode columns
+        df = pd.DataFrame.from_records(
+            [
+                {
+                    "datetime": t,
+                    "unit_id": u,
+                    "exploitability": e,
+                    "best_profit": b,
+                    "original_profit": o,
+                }
+                for (t, u), (e, b, o) in per_unit.items()
+            ],
+            index="datetime",
+        )
         df["simulation"] = self.simulation_id
+        df["evaluation_mode"] = self.evaluation_mode
+        df["episode"] = self.episode if not self.evaluation_mode else self.eval_episode
 
         if self.export_csv_path:
-            kpi_data_path = self.export_csv_path / "kpis.csv"
+            path = self.export_csv_path / "exploitability.csv"
             df.to_csv(
-                kpi_data_path,
+                path,
                 mode="a",
-                header=not kpi_data_path.exists(),
-                index=None,
+                header=not path.exists(),
                 float_format="%.5g",
             )
 
-        if self.db is not None and not df.empty:
+        table_name = "rl_exploitability" if self.evaluation_mode else "exploitability"
+        try:
             with self.db.begin() as db:
-                df.to_sql("kpis", db, if_exists="append", index=None)
+                df.to_sql(table_name, db, if_exists="append")
+        except (
+            ProgrammingError,
+            OperationalError,
+            DataError,
+            pd.errors.DatabaseError,
+        ):
+            self.check_columns(table_name, df)
+            with self.db.begin() as db:
+                df.to_sql(table_name, db, if_exists="append")
 
     def get_sum_reward(self, episode: int, evaluation_mode=True):
         """
