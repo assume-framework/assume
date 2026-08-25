@@ -29,7 +29,7 @@ Upcoming Release
   - **Grafana dashboard improvements**: Added button to automatically update the time range filter to the full simulation horizon.
   - **Replace GPL-licensed ``pyyaml-include`` dependency**: AMIRIS scenario loading no longer depends on the GPLv3-licensed ``pyyaml-include`` package, which was incompatible with distributing ASSUME under a permissive license. The subset of ``!include`` YAML-tag behavior AMIRIS scenario files rely on is now implemented in-house in ``assume.scenario.yaml_include``.
   - **Rework the redispatch use case in the DSU & flexibility tutorial**: The redispatch example in ``examples/notebooks/10_DSU_and_flexibility.ipynb`` now places the renewable surplus in the north and the load plus dispatchable plants in the south, so the redispatch is balanced (total upward volume equals total downward volume) and clearly demonstrates renewable curtailment on the congested side together with dispatchable ramp-up on the other. A summary table of the redispatch volumes per energy source was added below the redispatch plot, and the explanatory text was updated accordingly.
-  
+
 **Bug Fixes:**
   - **Dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
   - **Fix bug in forecasts**, that occurred when using complex clearing
