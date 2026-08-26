@@ -11,11 +11,9 @@ from torch.optim import AdamW
 
 from assume.common.base import LearningStrategy
 from assume.common.utils import timestamp2datetime
+from assume.reinforcement_learning.algorithms import actor_architecture_aliases
 from assume.reinforcement_learning.learning_utils import (
     transfer_weights,
-)
-from assume.reinforcement_learning.neural_network_architecture import (
-    actor_architecture_aliases,
 )
 
 logger = logging.getLogger(__name__)

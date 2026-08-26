@@ -647,12 +647,3 @@ class LSTMActorPPO(ActorPPO):
         log_prob = self._compute_log_prob(actions, mean, std)
         entropy = 0.5 * (1.0 + th.log(2 * th.pi * std.pow(2))).sum(dim=-1)
         return log_prob, entropy
-
-
-#: Maps the `actor_architecture` config value to the corresponding actor class.
-#: Lives here (rather than in algorithms/__init__.py) so base_algorithm.py can
-#: import it without triggering a circular import with the algorithms package.
-actor_architecture_aliases: dict[str, type[nn.Module]] = {
-    "mlp": MLPActor,
-    "lstm": LSTMActor,
-}

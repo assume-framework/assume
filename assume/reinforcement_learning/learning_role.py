@@ -84,6 +84,7 @@ class Learning(Role):
 
         self.datetime = None
         if self.learning_config.learning_mode:
+            # only in learning mode, where policies are updated
             # configure additional learning parameters if we are in learning or evaluation mode
             if self.learning_config.learning_rate_schedule == "linear":
                 self.calc_lr_from_progress = linear_schedule_func(
@@ -96,9 +97,6 @@ class Learning(Role):
 
             self.eval_episodes_done = 0
 
-            # function that initializes learning, needs to be an extra function so that it can be called after buffer is given to Role
-            self.create_learning_algorithm(self.learning_config.algorithm)
-
             # store evaluation values
             self.max_eval = defaultdict(lambda: -1e9)
             self.rl_eval = defaultdict(list)
@@ -107,6 +105,11 @@ class Learning(Role):
 
             self.tensor_board_logger = None
             self.update_steps = None
+
+        if self.learning_config.learning_mode or self.learning_config.evaluation_mode:
+            # either in leanring or eval mode
+            # function that initializes learning, needs to be an extra function so that it can be called after buffer is given to Role
+            self.create_learning_algorithm(self.learning_config.algorithm)
 
             # init the cache dict for all learning instances in this role.
             # Which fields are collected per time-step is determined by the chosen algorithm (see RLAlgorithm.buffer_fields), so e.g. only
@@ -475,7 +478,9 @@ class Learning(Role):
         elif algorithm == "mappo":
             self.rl_algorithm = PPO(learning_role=self)
         else:
-            logger.error(f"Learning algorithm {algorithm} not implemented!")
+            raise ValueError(
+                f"Learning algorithm {algorithm} not implemented! Please go back to the config and configure a know algorithm"
+            )
 
     def initialize_policy(self, actors_and_critics: dict = None) -> None:
         """

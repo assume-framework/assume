@@ -321,7 +321,7 @@ class PPO(ActorCriticAlgorithm):
             >>> ppo.create_actors()
             >>> # Creates actor network and optimizer for each strategy
         """
-        actor_architecture = self.learning_config.on_policy.actor_architecture
+        actor_architecture = self.learning_config.actor_architecture
 
         for strategy in self.learning_role.rl_strats.values():
             # Create PPO Actor

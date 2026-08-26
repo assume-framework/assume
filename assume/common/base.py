@@ -755,23 +755,6 @@ class BaseStrategy:
         unit.forecaster.update(*args, **kwargs)
 
 
-@dataclass
-class AlgorithmConfig:
-    """
-    Base configuration for algorithm-specific parameters.
-
-    Parameters:
-        batch_size (int): The batch size of experiences sampled from the replay buffer for each training update.
-            Larger batches provide more stable gradients but require more memory. Default is 128.
-        gamma (float): The discount factor for future rewards, ranging from 0 to 1. Default is 0.99.
-        train_freq (str): Defines the frequency at which networks are updated. Default is "24h".
-    """
-
-    batch_size: int = 128
-    gamma: float = 0.99
-    train_freq: str = "24h"
-
-
 # Algorithm category mapping
 ALGORITHM_CATEGORIES = {
     "mappo": "on-policy",
@@ -791,7 +774,7 @@ def is_off_policy(algorithm_name: str) -> bool:
 
 
 @dataclass
-class OffPolicyConfig(AlgorithmConfig):
+class OffPolicyConfig:
     """
     Configuration for off-policy algorithms (MATD3/MADDPG) hyperparameters.
 
@@ -802,8 +785,6 @@ class OffPolicyConfig(AlgorithmConfig):
         episodes_collecting_initial_experience (int): The number of episodes at the start during which random
             actions are chosen instead of using the actor network. Default is 5.
         gradient_steps (int): The number of gradient descent steps performed during each training update. Default is 100.
-        actor_architecture (str): The architecture of the neural networks used for the actors. Options include
-            "mlp" (Multi-Layer Perceptron) and "lstm" (Long Short-Term Memory). Default is "mlp".
         replay_buffer_size (int): The maximum number of transitions stored in the replay buffer. Default is 50000.
         policy_delay (int): The frequency (in gradient steps) at which the actor policy is updated.
             Some algorithms update the critic more frequently than the actor to stabilize training. Default is 2.
@@ -828,7 +809,6 @@ class OffPolicyConfig(AlgorithmConfig):
     noise_dt: int = 1
     noise_scale: int = 1
     noise_sigma: float = 0.1
-    actor_architecture: str = "mlp"
     action_noise_schedule: str | None = None
     policy_delay: int = 2
     tau: float = 0.005
@@ -854,7 +834,7 @@ class OffPolicyConfig(AlgorithmConfig):
 
 
 @dataclass
-class OnPolicyConfig(AlgorithmConfig):
+class OnPolicyConfig:
     """
     Configuration for on-policy algorithms (PPO/MAPPO) hyperparameters.
 
@@ -868,8 +848,6 @@ class OnPolicyConfig(AlgorithmConfig):
         max_grad_norm (float): Maximum gradient norm for clipping. Default is 0.5.
         vf_coef (float): Coefficient for value function term in loss. Default is 0.5.
         n_epochs (int): Number of optimization epochs per rollout. Default is 10.
-        actor_architecture (str): The architecture of the neural networks used for the actors. Options include
-            "mlp" (Multi-Layer Perceptron) and "lstm" (Long Short-Term Memory). Default is "mlp".
     """
 
     clip_ratio: float = 0.1
@@ -878,7 +856,6 @@ class OnPolicyConfig(AlgorithmConfig):
     max_grad_norm: float = 0.5
     vf_coef: float = 0.5
     n_epochs: int = 10
-    actor_architecture: str = "mlp"
 
 
 @dataclass
@@ -974,15 +951,6 @@ class LearningConfig:
             self.off_policy = OffPolicyConfig(**self.off_policy)
         if isinstance(self.on_policy, dict):
             self.on_policy = OnPolicyConfig(**self.on_policy)
-
-        for config in [self.off_policy, self.on_policy]:
-            if config:
-                config.batch_size = self.batch_size
-                config.gamma = self.gamma
-                config.train_freq = self.train_freq
-
-        self.off_policy.actor_architecture = self.actor_architecture
-        self.on_policy.actor_architecture = self.actor_architecture
 
         if self.early_stopping_steps is None:
             self.early_stopping_steps = int(
