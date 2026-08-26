@@ -501,6 +501,16 @@ class SupportsMinMaxCharge(BaseUnit):
             if not isinstance(strategy, MinMaxChargeStrategy):
                 raise ValueError(f"strategy {strategy} is not a MinMaxChargeStrategy!")
 
+        # outputs["soc"] holds a meaningful value on index[0] .. _soc_valid_until
+        # (inclusive) only - beyond it the series still carries the pre-filled
+        # initial_soc, which is indistinguishable from a propagated value.
+        # See ensure_soc for how the frontier is moved.
+        self._soc_valid_until = self.index[0]
+        # what the unit could actually run at, derived alongside the SOC.
+        # Deliberately not an output: outputs["energy"] holds the *planned*
+        # volumes until execute_current_dispatch delivers them.
+        self._feasible_energy = FastSeries(value=0.0, index=self.index)
+
     def calculate_min_max_charge(
         self, start: datetime, end: datetime, soc: float = None
     ) -> tuple[np.ndarray, np.ndarray]:
@@ -627,58 +637,236 @@ class SupportsMinMaxCharge(BaseUnit):
             power_charge = min(power_charge, minimum_required - current_power, 0)
         return power_charge
 
+    def feasible_power(self, current_power: float, soc: float) -> float:
+        """
+        Clips a planned power to what the unit can actually run at.
+
+        Both limits apply: the power limits of the unit, and what the current
+        SOC can back. The result is what a following SOC has to be derived from.
+
+        Args:
+            current_power (float): The planned power, negative when charging.
+            soc (float): The state of charge the power would run from.
+
+        Returns:
+            float: The power the unit can actually run at.
+        """
+        current_power = self.apply_power_limits(current_power)
+
+        if current_power > 0:
+            return min(current_power, self.calculate_soc_max_discharge(soc))
+        if current_power < 0:
+            return max(current_power, self.calculate_soc_max_charge(soc))
+        return current_power
+
+    def delta_soc(self, current_power: float) -> float:
+        """
+        The change in state of charge caused by running at ``current_power``.
+
+        Args:
+            current_power (float): A feasible power, negative when charging.
+
+        Returns:
+            float: The change in state of charge.
+        """
+        time_delta = self.index.freq / timedelta(hours=1)
+        if current_power > 0:
+            return (
+                -current_power * time_delta / self.efficiency_discharge
+            ) / self.capacity
+        if current_power < 0:
+            return (
+                -current_power * time_delta * self.efficiency_charge
+            ) / self.capacity
+        return 0.0
+
+    def _align_to_index(self, t: datetime) -> datetime:
+        """
+        Rounds ``t`` up to the first time step of the index at or after it.
+
+        The SOC frontier has to sit on the index grid, because slicing the index
+        rounds a start up: an off-grid frontier would skip the time step it
+        falls inside, and that step's energy would never move the SOC. Rounding
+        up rather than down keeps a time step which was already walked from
+        being walked a second time.
+
+        Args:
+            t (datetime.datetime): The time to align.
+
+        Returns:
+            datetime.datetime: The first time step of the index at or after ``t``.
+        """
+        remainder = (t - self.index[0]) % self.index.freq
+        if remainder:
+            t += self.index.freq - remainder
+        return t
+
+    def apply_power_limits(self, current_power: float) -> float:
+        """
+        Clips a planned power to the power limits of the unit.
+
+        A power between the two minimum powers - but not zero - cannot be run
+        at all and therefore becomes zero.
+
+        Args:
+            current_power (float): The planned power, negative when charging.
+
+        Returns:
+            float: The power the unit can actually run at.
+        """
+        if current_power > self.max_power_discharge:
+            return self.max_power_discharge
+        if current_power < self.max_power_charge:
+            return self.max_power_charge
+        if (
+            self.min_power_discharge > current_power > self.min_power_charge
+            and current_power != 0
+        ):
+            return 0
+        return current_power
+
+    def ensure_soc(self, until: datetime) -> None:
+        """
+        Propagates the state of charge forward until ``until`` is covered.
+
+        ``outputs["soc"]`` is only meaningful up to ``_soc_valid_until``; past
+        that point it still holds the ``initial_soc`` the series was created
+        with, which is indistinguishable from a propagated value. This walks the
+        SOC recurrence from the frontier to ``until`` and moves the frontier.
+
+        The walk derives the SOC from what the unit could actually run at, not
+        from the planned volume, since a plan the unit cannot deliver would move
+        the SOC to a value it will never reach. Those feasible values are kept
+        in ``_feasible_energy`` and are *not* written back into
+        ``outputs["energy"]``: while planning, the committed volumes are still
+        only a plan, and clipping them here would make the recorded dispatch
+        depend on when a strategy happened to read the SOC. They become the
+        actual dispatch in ``execute_current_dispatch``, at delivery.
+
+        Calling it for an already covered point is a no-op, so the cost is
+        amortized O(1) per time step. The propagated range is
+        ``[frontier, until]`` and therefore contiguous by construction,
+        independent of which markets cleared which products when.
+
+        Args:
+            until (datetime.datetime): The point in time the SOC is needed for.
+        """
+        # the SOC of the very last time step cannot be moved any further
+        last = self.index[-1]
+        until = min(self._align_to_index(until), last)
+        if until <= self._soc_valid_until:
+            return
+
+        for t in self.index[self._soc_valid_until : until - self.index.freq]:
+            soc = self.outputs["soc"].at[t]
+            current_power = self.feasible_power(self.outputs["energy"].at[t], soc)
+
+            self._feasible_energy.at[t] = current_power
+            self.outputs["soc"].at[t + self.index.freq] = soc + self.delta_soc(
+                current_power
+            )
+
+        self._soc_valid_until = until
+
+    def get_feasible_energy(self, start: datetime, end: datetime) -> np.ndarray:
+        """
+        Returns the energy the unit can actually run at over ``[start, end]``.
+
+        ``outputs["energy"]`` holds the volumes markets committed, which the
+        unit cannot necessarily deliver - it is only made feasible at delivery,
+        in ``execute_current_dispatch``. Anything which has to reason about the
+        real dispatch *before* that, such as a reward, has to ask for it here.
+
+        Args:
+            start (datetime.datetime): The start of the range.
+            end (datetime.datetime): The end of the range, inclusive.
+
+        Returns:
+            numpy.ndarray: The feasible energy over the range.
+        """
+        # the energy at `end` is derived while moving the SOC to the step after it
+        aligned_end = min(self._align_to_index(end), self.index[-1])
+        self.ensure_soc(end + self.index.freq)
+
+        # ensure_soc stops before the last step because no subsequent SoC exists;
+        # derive feasible energy for the final step explicitly
+        if aligned_end == self.index[-1]:
+            soc = self.outputs["soc"].at[aligned_end]
+            self._feasible_energy.at[aligned_end] = self.feasible_power(
+                self.outputs["energy"].at[aligned_end], soc
+            )
+
+        return self._feasible_energy.loc[start:end]
+
+    def set_soc(self, t: datetime, soc: float) -> None:
+        """
+        Sets a known state of charge at ``t`` and marks it valid up to there.
+
+        Every SOC value after ``t`` is derived from this one and is therefore
+        invalidated, so the frontier is moved to ``t``. Everything *before* it
+        has to be propagated first: moving the frontier forward over a range
+        which was never walked would mark the pre-filled ``initial_soc`` in it
+        as a valid SOC.
+
+        Args:
+            t (datetime.datetime): The time to set the SOC at.
+            soc (float): The state of charge (between 0 and 1).
+        """
+        t = self._align_to_index(t)
+        self.ensure_soc(t)
+        self.outputs["soc"].at[t] = soc
+        self._soc_valid_until = t
+
+    def get_soc(self, t: datetime) -> float:
+        """
+        Returns the state of charge at ``t``, propagating it there if needed.
+
+        This is the only supported way to read the SOC: reading
+        ``outputs["soc"]`` directly returns the pre-filled ``initial_soc`` for
+        any point past the frontier.
+
+        Args:
+            t (datetime.datetime): The time to read the SOC at.
+
+        Returns:
+            float: The state of charge at ``t``.
+        """
+        if t > self._soc_valid_until:
+            self.ensure_soc(t)
+        return self.outputs["soc"].at[t]
+
     def set_dispatch_plan(
         self, marketconfig: MarketConfig, orderbook: Orderbook
     ) -> None:
-        """Updates the SOC for storage units."""
+        """
+        Adds the accepted volumes and invalidates the SOC from there on.
+
+        Committing energy at ``t`` makes every SOC value from ``t`` onwards
+        stale, so the frontier is pulled back to the earliest committed time
+        step. It is deliberately *not* re-propagated here - whoever reads the
+        SOC next does that, over exactly the range they need (see ensure_soc).
+        The committed volume itself is left untouched - it is a plan until
+        ``execute_current_dispatch`` delivers it - so the recorded dispatch does
+        not depend on in which order several markets clear into a time step.
+
+        An empty orderbook writes no volume and therefore invalidates nothing:
+        a unit which did not participate in a market needs no repair, whether
+        it submitted nothing or ``remove_empty_bids`` dropped all its bids.
+        Capacity products are reservations rather than energy flows and do not
+        move the SOC either. Note that this is only true as long as the
+        reservation does not constrain the *energy* available to other markets -
+        once reserved capacity raises the SOC floor, a capacity clearing changes
+        the trajectory too and has to invalidate like an energy one.
+        """
         super().set_dispatch_plan(marketconfig, orderbook)
 
-        if not orderbook:
+        if marketconfig.product_type != "energy" or not orderbook:
             return
 
-        # also update the SOC when setting the dispatch plan
-        start = min(order["start_time"] for order in orderbook)
-        end = max(order["end_time"] for order in orderbook)
-        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-        end_excl = end - self.index.freq
-        time_delta = self.index.freq / timedelta(hours=1)
-
-        for t in self.index[start:end_excl]:
-            next_t = t + self.index.freq
-            # continue if it is the last time step
-            if next_t not in self.index:
-                continue
-            current_power = self.outputs["energy"].at[t]
-
-            # calculate the change in state of charge
-            delta_soc = 0
-            soc = self.outputs["soc"].at[t]
-
-            # discharging
-            if current_power > 0:
-                max_soc_discharge = self.calculate_soc_max_discharge(soc)
-
-                if current_power > max_soc_discharge:
-                    current_power = max_soc_discharge
-
-                delta_soc = (
-                    -current_power * time_delta / self.efficiency_discharge
-                ) / self.capacity
-
-            # charging
-            elif current_power < 0:
-                max_soc_charge = self.calculate_soc_max_charge(soc)
-
-                if current_power < max_soc_charge:
-                    current_power = max_soc_charge
-
-                delta_soc = (
-                    -current_power * time_delta * self.efficiency_charge
-                ) / self.capacity
-
-            # update the values of the state of charge and the energy
-            self.outputs["soc"].at[next_t] = soc + delta_soc
-            self.outputs["energy"].at[t] = current_power
+        earliest = min(order["start_time"] for order in orderbook)
+        self._soc_valid_until = min(
+            self._soc_valid_until, self._align_to_index(earliest)
+        )
 
 
 class BaseStrategy:

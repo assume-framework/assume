@@ -890,7 +890,7 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         the agent's action selection.
         """
         # get the current soc and energy cost value
-        soc = unit.outputs["soc"].at[start]
+        soc = unit.get_soc(start)
         cost_stored_energy_scaled = (
             unit.outputs["cost_stored_energy"].at[start] / self.max_bid_price
         )
@@ -1033,10 +1033,15 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         next_time = start + unit.index.freq
         duration_hours = (end - start) / timedelta(hours=1)
 
-        # Calculate marginal and starting costs
-        marginal_cost = unit.calculate_marginal_cost(
-            start, unit.outputs[product_type].at[start]
-        )
+        # Calculate marginal and starting costs. The cost depends on the sign of
+        # the dispatch, so it has to be taken from what the unit can actually
+        # run at - a volume the SOC cannot back is clipped, possibly to zero,
+        # and would otherwise be charged as a discharge it never performs.
+        if product_type == "energy":
+            dispatch = unit.get_feasible_energy(start, start)[0]
+        else:
+            dispatch = unit.outputs[product_type].at[start]
+        marginal_cost = unit.calculate_marginal_cost(start, dispatch)
         marginal_cost += unit.get_starting_costs(int(duration_hours))
 
         accepted_volume = order.get("accepted_volume", 0)
@@ -1048,8 +1053,8 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         order_profit = accepted_price * accepted_volume * duration_hours
         order_cost = abs(marginal_cost * accepted_volume * duration_hours)
 
-        current_soc = unit.outputs["soc"].at[start]
-        next_soc = unit.outputs["soc"].at[next_time]
+        current_soc = unit.get_soc(start)
+        next_soc = unit.get_soc(next_time)
 
         # Calculate and clip the energy cost for the start time
         # cost_stored_energy = average volume-weighted procurement costs of the currently stored energy

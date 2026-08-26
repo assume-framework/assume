@@ -62,7 +62,7 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
         # =============================================================================
         # save a theoretic SOC to calculate the ramping
         start = product_tuples[0][0]
-        theoretic_SOC = unit.outputs["soc"].at[start]
+        theoretic_SOC = unit.get_soc(start)
         previous_power = unit.get_output_before(start)
 
         bids = []
@@ -202,8 +202,14 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
             # end includes the end of the last product, to get the last products' start time we deduct the frequency once
             end_excl = order["end_time"] - unit.index.freq
 
-            # Extract outputs and costs in one step
-            outputs = unit.outputs[product_type].loc[start:end_excl]
+            # Extract outputs and costs in one step. The reward has to reflect
+            # what the unit can actually deliver, not the volume a market
+            # committed to it - outputs["energy"] still holds the latter until
+            # the dispatch is executed.
+            if product_type == "energy":
+                outputs = unit.get_feasible_energy(start, end_excl)
+            else:
+                outputs = unit.outputs[product_type].loc[start:end_excl]
             costs = np.where(
                 outputs != 0,
                 np.abs(outputs)
@@ -265,7 +271,7 @@ class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
         end = product_tuples[-1][1]
 
         previous_power = unit.get_output_before(start)
-        theoretic_SOC = unit.outputs["soc"].at[start]
+        theoretic_SOC = unit.get_soc(start)
 
         _, max_power_discharge_values = unit.calculate_min_max_discharge(
             start, end, soc=theoretic_SOC
@@ -401,7 +407,7 @@ class StorageCapacityHeuristicBalancingNegStrategy(MinMaxChargeStrategy):
 
         previous_power = unit.get_output_before(start)
 
-        theoretic_SOC = unit.outputs["soc"].at[start]
+        theoretic_SOC = unit.get_soc(start)
 
         _, max_power_charge_values = unit.calculate_min_max_charge(start, end)
 
@@ -502,7 +508,7 @@ def get_specific_revenue(unit, marginal_cost, t, foresight, price_forecast):
     """
 
     possible_revenue = 0
-    soc = unit.outputs["soc"][t]
+    soc = unit.get_soc(t)
     theoretic_SOC = soc
 
     if t + foresight > price_forecast.index[-1]:
