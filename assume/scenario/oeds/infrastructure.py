@@ -18,6 +18,7 @@ from tqdm import tqdm
 from windpowerlib import ModelChain, WindTurbine
 
 from assume.scenario.oeds.static import (
+    mastr_fuel_type,
     mastr_solar_azimuth,
     mastr_solar_codes,
     mastr_solar_power_limit,
@@ -76,6 +77,8 @@ class InfrastructureInterface:
                 conn,
                 index_col="code",
             )
+        self.energietraeger_translated = mastr_fuel_type
+        self.mastr_generation_codes = {}
 
     def get_lat_lon(self, plz):
         if not isinstance(plz, int):
@@ -84,8 +87,8 @@ class InfrastructureInterface:
         return latitude, longitude
 
     def get_lat_lon_area(self, area):
-        if not area.startswith("DE"):
-            return self.get_lat_lon(area)
+        if not isinstance(area, str) or not area.startswith("DE"):
+            return self.get_lat_lon(int(area))
         plz_codes = self.get_plz_codes(area)
         if not plz_codes:
             raise ValueError(f"invalid area selected: {area}")
@@ -151,7 +154,8 @@ class InfrastructureInterface:
         df["chi"] = 1.0  # emission factor [t/MWh therm]
         df["start_cost"] = 100 * df["maxPower"]  # starting cost [€/kW Rated]
 
-        df["turbineTyp"] = df["turbineTyp"].replace(self.mastr_generation_codes)
+        if hasattr(self, "mastr_generation_codes") and self.mastr_generation_codes:
+            df["turbineTyp"] = df["turbineTyp"].replace(self.mastr_generation_codes)
 
         df["startDate"] = df["startDate"].fillna(pd.to_datetime("2005-05-05"))
         df["startDate"] = pd.to_datetime(df["startDate"])
@@ -226,7 +230,7 @@ class InfrastructureInterface:
                 FROM "combustion_extended" ev
                 LEFT JOIN "kwk" kwk ON kwk."KwkMastrNummer" = ev."KwkMastrNummer"
                 WHERE ev."Postleitzahl" in {plz_codes_str}
-                AND ev."Energietraeger" = \'{self.energietraeger_translated[fuel_type]}\'
+                AND ev."Energietraeger" = \'{mastr_fuel_type[fuel_type]}\'
                 AND ev."Nettonennleistung" > 5000
                 """
         else:

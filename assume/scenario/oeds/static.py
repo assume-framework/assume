@@ -19,6 +19,22 @@ fuel_translation = {
     "Speicher": "storage",
 }
 
+mastr_fuel_type = {
+    "lignite": "Braunkohle",
+    "hard coal": "Steinkohle",
+    "gas": "Erdgas",
+    "oil": "Mineralölprodukte",
+    "nuclear": "Kernenergie",
+    "biomass": "Biomasse",
+    "hydro": "Wasser",
+    "solar": "Solar",
+    "wind": "Wind",
+    "waste": "nicht biogener Abfall",
+    "geothermal": "Geothermie",
+    "landfill gas": "Grubengas",
+    "storage": "Speicher",
+}
+
 mastr_wind_type = {
     "on_shore": "Windkraft an Land",
     "off_shore": "Windkraft auf See",
