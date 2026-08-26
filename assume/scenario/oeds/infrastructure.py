@@ -735,7 +735,7 @@ WHERE so."Postleitzahl" in {plz_codes_str}
         if created_before:
             query += f"AND so.\"Inbetriebnahmedatum\" < '{created_before.isoformat()}' "
         if stopped_after:
-            query += f'AND (so."DatumEndgueltigeStilllegung" IS NULL OR so."DatumEndgueltigeStilllegung" <= \'{stopped_after.isoformat()}\')'
+            query += f'AND (so."DatumEndgueltigeStilllegung" IS NULL OR so."DatumEndgueltigeStilllegung" > \'{stopped_after.isoformat()}\')'
 
         # Get Data from Postgres
         with self.databases["mastr"].connect() as conn:

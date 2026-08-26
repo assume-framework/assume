@@ -105,3 +105,25 @@ def test_get_lat_lon_area(mock_infrastructure):
     # String postal code
     lat, lon = mock_infrastructure.get_lat_lon_area("52353")
     assert (lat, lon) == (50.0, 6.0)
+
+
+def test_get_solar_storage_systems_in_area_stopped_after(mock_infrastructure):
+    from datetime import datetime
+
+    mock_conn = MagicMock()
+    mock_infrastructure.databases[
+        "mastr"
+    ].connect.return_value.__enter__.return_value = mock_conn
+
+    with patch("pandas.read_sql", return_value=pd.DataFrame()) as mock_read_sql:
+        cutoff = datetime(2023, 1, 1)
+        mock_infrastructure.get_solar_storage_systems_in_area(
+            area=52353, stopped_after=cutoff
+        )
+
+        mock_read_sql.assert_called_once()
+        query = mock_read_sql.call_args[0][0]
+        assert (
+            'AND (so."DatumEndgueltigeStilllegung" IS NULL OR so."DatumEndgueltigeStilllegung" > \'2023-01-01T00:00:00\')'
+            in query
+        )
