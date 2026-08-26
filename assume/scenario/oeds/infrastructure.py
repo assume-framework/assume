@@ -200,7 +200,7 @@ class InfrastructureInterface:
             if not plz_codes:
                 raise Exception("invalid areas")
         else:
-            plz_codes = [area]
+            plz_codes = [int(area)]
 
         for plz in plz_codes:
             if plz not in self.plz_nuts.index:
@@ -239,9 +239,9 @@ class InfrastructureInterface:
                 WHERE ev."Postleitzahl" in {plz_codes_str}
                 """
         if created_before:
-            query += f"AND \"Inbetriebnahmedatum\" < '{created_before.isoformat()}' "
+            query += f"AND ev.\"Inbetriebnahmedatum\" < '{created_before.isoformat()}' "
         if stopped_after:
-            query += f'AND ("DatumEndgueltigeStilllegung" IS NULL OR "DatumEndgueltigeStilllegung"  > \'{stopped_after.isoformat()}\')'
+            query += f'AND (ev."DatumEndgueltigeStilllegung" IS NULL OR ev."DatumEndgueltigeStilllegung"  > \'{stopped_after.isoformat()}\')'
 
         with self.databases["mastr"].connect() as conn:
             df = pd.read_sql(query, conn)
@@ -261,8 +261,9 @@ class InfrastructureInterface:
 
         for line, row in df.iterrows():
             type_year = row["type"]
-            if fuel_type in technical_parameter:
-                tech_params = technical_parameter[fuel_type][type_year]
+            current_fuel = row.get("fuel", fuel_type)
+            if current_fuel in technical_parameter:
+                tech_params = technical_parameter[current_fuel][type_year]
             else:
                 tech_params = technical_parameter["gas_combined"][0]
 
@@ -300,7 +301,7 @@ class InfrastructureInterface:
             if not plz_codes:
                 raise Exception("invalid areas")
         else:
-            plz_codes = [area]
+            plz_codes = [int(area)]
 
         for plz in plz_codes:
             if plz not in self.plz_nuts.index:
@@ -419,7 +420,7 @@ class InfrastructureInterface:
             if not plz_codes:
                 raise Exception("invalid areas")
         else:
-            plz_codes = [area]
+            plz_codes = [int(area)]
 
         for plz in plz_codes:
             if plz not in self.plz_nuts.index:
@@ -498,7 +499,7 @@ class InfrastructureInterface:
             if not plz_codes:
                 raise Exception("invalid areas")
         else:
-            plz_codes = [area]
+            plz_codes = [int(area)]
 
         for plz in plz_codes:
             if plz not in self.plz_nuts.index:
@@ -539,7 +540,7 @@ class InfrastructureInterface:
             if not plz_codes:
                 raise Exception("invalid areas")
         else:
-            plz_codes = [area]
+            plz_codes = [int(area)]
 
         for plz in plz_codes:
             if plz not in self.plz_nuts.index:
@@ -580,7 +581,7 @@ class InfrastructureInterface:
             if not plz_codes:
                 raise Exception("invalid areas")
         else:
-            plz_codes = [area]
+            plz_codes = [int(area)]
 
         for plz in plz_codes:
             if plz not in self.plz_nuts.index:
@@ -705,7 +706,7 @@ class InfrastructureInterface:
             if not plz_codes:
                 raise Exception("invalid areas")
         else:
-            plz_codes = [area]
+            plz_codes = [int(area)]
 
         for plz in plz_codes:
             if plz not in self.plz_nuts.index:

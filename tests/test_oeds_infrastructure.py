@@ -56,21 +56,33 @@ def test_set_default_params(mock_infrastructure):
 
 
 def test_get_power_plant_in_area_queries(mock_infrastructure):
+    from datetime import datetime
+
     mock_conn = MagicMock()
     mock_infrastructure.databases[
         "mastr"
     ].connect.return_value.__enter__.return_value = mock_conn
 
     with patch("pandas.read_sql", return_value=pd.DataFrame()) as mock_read_sql:
-        # Gas
-        mock_infrastructure.get_power_plant_in_area(area=52353, fuel_type="gas")
+        # Gas with created_before and stopped_after date filters
+        mock_infrastructure.get_power_plant_in_area(
+            area=52353,
+            fuel_type="gas",
+            created_before=datetime(2020, 1, 1),
+            stopped_after=datetime(2023, 1, 1),
+        )
         query_gas = mock_read_sql.call_args[0][0]
         assert "ev.\"Energietraeger\" = 'Erdgas'" in query_gas
         assert 'FROM "combustion_extended" ev' in query_gas
+        assert "AND ev.\"Inbetriebnahmedatum\" < '2020-01-01T00:00:00'" in query_gas
+        assert (
+            'AND (ev."DatumEndgueltigeStilllegung" IS NULL OR ev."DatumEndgueltigeStilllegung"  > \'2023-01-01T00:00:00\')'
+            in query_gas
+        )
 
-        # Lignite
+        # Lignite with string postal code
         mock_read_sql.reset_mock()
-        mock_infrastructure.get_power_plant_in_area(area=52353, fuel_type="lignite")
+        mock_infrastructure.get_power_plant_in_area(area="52353", fuel_type="lignite")
         query_lignite = mock_read_sql.call_args[0][0]
         assert "ev.\"Energietraeger\" = 'Braunkohle'" in query_lignite
 
@@ -91,6 +103,64 @@ def test_get_power_plant_in_area_queries(mock_infrastructure):
         mock_infrastructure.get_power_plant_in_area(area=52353, fuel_type="nuclear")
         query_nuclear = mock_read_sql.call_args[0][0]
         assert 'FROM "nuclear_extended" ev' in query_nuclear
+
+
+def test_get_power_plant_in_area_cchp_parameters(mock_infrastructure):
+    # Test that CCHP units receive 'gas_combined' technical parameters instead of standard 'gas'
+    cchp_df = pd.DataFrame(
+        {
+            "unitID": ["SEE1001", "SEE1002"],
+            "fuel": ["gas", "gas"],
+            "lon": [6.0, 6.0],
+            "lat": [50.0, 50.0],
+            "startDate": [pd.to_datetime("2010-01-01"), pd.to_datetime("2010-01-01")],
+            "endDate": [pd.to_datetime("2040-01-01"), pd.to_datetime("2040-01-01")],
+            "maxPower": [20000.0, 30000.0],
+            "turbineTyp": [
+                "Closed Cycle Heat Power",
+                "Kondensationsmaschine ohne Entnahme",
+            ],
+            "generatorID": [10, 0],
+            "kwkPowerTherm": [5000.0, 0.0],
+            "kwkPowerElec": [4000.0, 0.0],
+            "combination": [1, 0],
+        }
+    )
+
+    mock_conn = MagicMock()
+    mock_infrastructure.databases[
+        "mastr"
+    ].connect.return_value.__enter__.return_value = mock_conn
+
+    with patch("pandas.read_sql", return_value=cchp_df):
+        result = mock_infrastructure.get_power_plant_in_area(
+            area=52353, fuel_type="gas"
+        )
+
+        # The aggregated CCHP row should have fuel == 'gas_combined'
+        cchp_row = result[result["fuel"] == "gas_combined"].iloc[0]
+        assert cchp_row["fuel"] == "gas_combined"
+        # Ramp up for gas_combined (2000) is 4% per min -> 4 * 60 / 100 = 2.4 * maxPower
+        # For standard gas (2000), ramp up is 12% per min -> 12 * 60 / 100 = 7.2 * maxPower
+        assert cchp_row["ramp_up"] == pytest.approx(
+            cchp_row["maxPower"] * 4.0 * 60 / 100
+        )
+
+
+def test_asset_queries_with_string_plz(mock_infrastructure):
+    # Verify string postal codes work across all asset query methods without 'invalid plz code' exception
+    mock_conn = MagicMock()
+    mock_infrastructure.databases[
+        "mastr"
+    ].connect.return_value.__enter__.return_value = mock_conn
+
+    with patch("pandas.read_sql", return_value=pd.DataFrame()):
+        assert mock_infrastructure.get_solar_systems_in_area(area="52353").empty
+        assert mock_infrastructure.get_wind_turbines_in_area(area="52353").empty
+        assert mock_infrastructure.get_biomass_systems_in_area(area="52353").empty
+        assert mock_infrastructure.get_run_river_systems_in_area(area="52353").empty
+        assert mock_infrastructure.get_water_storage_systems(area="52353") == []
+        assert mock_infrastructure.get_solar_storage_systems_in_area(area="52353").empty
 
 
 def test_get_lat_lon_area(mock_infrastructure):
