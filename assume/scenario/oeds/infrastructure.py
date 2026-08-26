@@ -391,6 +391,8 @@ class InfrastructureInterface:
             mastr_solar_power_limit[str(code)] for code in df["limited"]
         ]
 
+        installed_power = df["maxPower"].copy()
+
         # apply limit to maxPower
         df["maxPower"] *= df["limit_factor"]
 
@@ -398,7 +400,7 @@ class InfrastructureInterface:
 
         # all PVs with nan and startDate > 2016 and maxPower > 100 kWp have direct marketing
         missing = df["eeg"].isna()
-        power_cap = df["maxPower"] > 100
+        power_cap = installed_power > 100
         deadline = df["startDate"].dt.year > 2016
         eeg = (
             missing & deadline & power_cap

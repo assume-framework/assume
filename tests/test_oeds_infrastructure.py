@@ -127,3 +127,38 @@ def test_get_solar_storage_systems_in_area_stopped_after(mock_infrastructure):
             'AND (so."DatumEndgueltigeStilllegung" IS NULL OR so."DatumEndgueltigeStilllegung" > \'2023-01-01T00:00:00\')'
             in query
         )
+
+
+def test_get_solar_systems_in_area_power_cap_threshold(mock_infrastructure):
+    # A system with 120 kWp installed capacity and 70% limit (84 kWp after limit)
+    # should be classified as > 100 kWp for EEG threshold (power_cap evaluated on installed capacity)
+    raw_df = pd.DataFrame(
+        {
+            "unitID": ["SEE12345"],
+            "maxPower": [120.0],
+            "lon": [6.0],
+            "lat": [50.0],
+            "plzCode": ["52353"],
+            "azimuthCode": ["Süd"],
+            "limited": ["Ja, auf 70%"],
+            "ownConsumption": [0],
+            "tiltCode": ["21 - 40 Grad"],
+            "startDate": [pd.to_datetime("2018-01-01")],
+            "eeg": [None],
+        }
+    )
+
+    mock_conn = MagicMock()
+    mock_infrastructure.databases[
+        "mastr"
+    ].connect.return_value.__enter__.return_value = mock_conn
+
+    with patch("pandas.read_sql", return_value=raw_df):
+        result = mock_infrastructure.get_solar_systems_in_area(area=52353)
+
+        # maxPower should be limited to 120 * 0.7 = 84.0
+        assert result["maxPower"].iloc[0] == pytest.approx(84.0)
+        # demandP should be in W: 84.0 * 1000 = 84000.0
+        assert result["demandP"].iloc[0] == pytest.approx(84000.0)
+        # eeg should be set to 0 (direct marketing) because installed capacity was 120 > 100
+        assert result["eeg"].iloc[0] == 0
