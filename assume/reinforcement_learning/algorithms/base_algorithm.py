@@ -109,6 +109,39 @@ class RLAlgorithm:
             strategy: The learning strategy that registered with the learning role.
         """
 
+    def get_progress_remaining(self) -> float:
+        """Get the remaining learning progress from the simulation run.
+        Per default consider initial experience episodes and training episodes, and the elapsed time within the current episode.
+
+        Returns:
+            The remaining progress as a float between 0 and 1.
+        """
+        total_duration = self.learning_role.end - self.learning_role.start
+        elapsed_duration = (
+            self.learning_role.context.current_timestamp - self.learning_role.start
+        )
+
+        initial_experience_episodes = (
+            self.learning_config.off_policy.episodes_collecting_initial_experience
+        )
+        learning_episodes = (
+            self.learning_config.training_episodes - initial_experience_episodes
+        )
+
+        if self.learning_role.episodes_done < initial_experience_episodes:
+            progress_remaining = 1
+        else:
+            progress_remaining = (
+                1
+                - (
+                    (self.learning_role.episodes_done - initial_experience_episodes)
+                    / learning_episodes
+                )
+                - ((1 / learning_episodes) * (elapsed_duration / total_duration))
+            )
+
+        return progress_remaining
+
     def update_learning_rate(
         self,
         optimizers: list[th.optim.Optimizer] | th.optim.Optimizer,
@@ -166,9 +199,9 @@ class RLAlgorithm:
     def create_buffer(self, time_step):
         """Create the experience buffer this algorithm learns from.
 
-        Called once per training episode (see ``run_learning``), after ``initialize_policy`` 
-        so that obs/act dimensions exist, and after all strategies have registered with 
-        the learning role. 
+        Called once per training episode (see ``run_learning``), after ``initialize_policy``
+        so that obs/act dimensions exist, and after all strategies have registered with
+        the learning role.
 
         Args:
             time_step: The simulation time step. Used by on-policy algorithms to
@@ -187,7 +220,7 @@ class RLAlgorithm:
         """Write one update window of cached experience into ``self.buffer``.
 
         Called from ``Learning._store_to_buffer_and_update_sync`` once the cache
-        has been validated, just before ``update_policy``. 
+        has been validated, just before ``update_policy``.
 
         Args:
             cache: Maps each of ``self.buffer_fields`` to a nested dict of

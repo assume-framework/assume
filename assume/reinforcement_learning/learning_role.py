@@ -14,7 +14,6 @@ from mango import Role
 from assume.common.base import (
     LearningConfig,
     LearningStrategy,
-    is_off_policy,
 )
 from assume.common.utils import (
     create_rrule,
@@ -35,9 +34,9 @@ logger = logging.getLogger(__name__)
 class Learning(Role):
     """Manages the learning process of reinforcement learning agents.
 
-    This class handles the general processes for reinforcement learning, 
-    including the management of learning strategies, handling necessary communication 
-    within the framework and coordinating auxiliary functions. Algorithmic-specific 
+    This class handles the general processes for reinforcement learning,
+    including the management of learning strategies, handling necessary communication
+    within the framework and coordinating auxiliary functions. Algorithmic-specific
     details are delegated to the respective RLAlgorithm class.
 
     Args:
@@ -58,8 +57,8 @@ class Learning(Role):
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
         self.learning_config = learning_config
-        self.critics = {} # TODO: do we still use this?
-        self.target_critics = {} # TODO: do we still use this?
+        self.critics = {}  # TODO: do we still use this?
+        self.target_critics = {}  # TODO: do we still use this?
 
         device = "cpu"
         if self.learning_config:
@@ -223,7 +222,7 @@ class Learning(Role):
         Evaluating a policy is meaningless while the agents are still collecting
         initial experience with random actions, so the first evaluation run is
         pushed back by ``episodes_collecting_initial_experience``
-        
+
         Args:
             validation_interval: The interval as returned by
                 ``determine_validation_interval``.
@@ -331,7 +330,10 @@ class Learning(Role):
         self.rl_algorithm.store_experience(cache, device)
 
         # Only update policy after initial experience episodes, if any.
-        if self.episodes_done >= self.rl_algorithm.episodes_collecting_initial_experience:
+        if (
+            self.episodes_done
+            >= self.rl_algorithm.episodes_collecting_initial_experience
+        ):
             self.rl_algorithm.update_policy()
 
     def add_observation_to_cache(self, unit_id, start, observation) -> None:
@@ -413,7 +415,10 @@ class Learning(Role):
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
         # Disable initial exploration if initial experience collection is complete or not performed.
-        if self.episodes_done >= self.rl_algorithm.episodes_collecting_initial_experience:
+        if (
+            self.episodes_done
+            >= self.rl_algorithm.episodes_collecting_initial_experience
+        ):
             self.turn_off_initial_exploration()
 
         # In continue_learning mode, disable it only for loaded strategies
@@ -452,46 +457,6 @@ class Learning(Role):
                     strategy.collect_initial_experience_mode = False
             else:
                 strategy.collect_initial_experience_mode = False
-
-    def get_progress_remaining(self) -> float:
-        """Get the remaining learning progress from the simulation run.
-
-        Returns:
-            The remaining progress as a float between 0 and 1.
-        """
-        total_duration = self.end - self.start
-        elapsed_duration = self.context.current_timestamp - self.start
-
-        # Only calculate progress for off-policy algorithms
-        if is_off_policy(self.learning_config.algorithm):
-            initial_experience_episodes = (
-                self.learning_config.off_policy.episodes_collecting_initial_experience
-            )
-            learning_episodes = (
-                self.learning_config.training_episodes - initial_experience_episodes
-            )
-
-            if self.episodes_done < initial_experience_episodes:
-                progress_remaining = 1
-            else:
-                progress_remaining = (
-                    1
-                    - (
-                        (self.episodes_done - initial_experience_episodes)
-                        / learning_episodes
-                    )
-                    - ((1 / learning_episodes) * (elapsed_duration / total_duration))
-                )
-        else:
-            # For on-policy algorithms, simpler progress calculation
-            total_episodes = self.learning_config.training_episodes
-            progress_remaining = (
-                1
-                - (self.episodes_done / total_episodes)
-                - (elapsed_duration / total_duration)
-            )
-
-        return progress_remaining
 
     def create_learning_algorithm(self, algorithm: RLAlgorithm):
         """Create and initialize the reinforcement learning algorithm.
@@ -624,10 +589,7 @@ class Learning(Role):
                         decaying = []
                         if self.learning_config.learning_rate_schedule:
                             decaying.append("learning rate")
-                        if (
-                            is_off_policy(self.learning_config.algorithm)
-                            and self.learning_config.off_policy.action_noise_schedule
-                        ):
+                        if self.learning_config.off_policy.action_noise_schedule:
                             decaying.append("action noise")
 
                         if decaying:

@@ -82,11 +82,11 @@ class TD3(DDPG):
 
         # update noise decay and learning rate
         updated_noise_decay = self.calc_noise_from_progress(
-            self.learning_role.get_progress_remaining()
+            self.get_progress_remaining()
         )
 
         learning_rate = self.learning_role.calc_lr_from_progress(
-            self.learning_role.get_progress_remaining()
+            self.get_progress_remaining()
         )
 
         # loop over all units to avoid update call for every gradient step, as it will be ambiguous
@@ -103,9 +103,7 @@ class TD3(DDPG):
         for step in range(self.learning_config.off_policy.gradient_steps):
             self.n_updates += 1
 
-            transitions = self.buffer.sample(
-                self.learning_config.batch_size
-            )
+            transitions = self.buffer.sample(self.learning_config.batch_size)
             states, actions, next_states, rewards = (
                 transitions.observations,
                 transitions.actions,

@@ -208,7 +208,7 @@ class DDPG(ActorCriticAlgorithm):
         ]
 
         # Update noise decay and learning rate based on training progress
-        progress_remaining = self.learning_role.get_progress_remaining()
+        progress_remaining = self.get_progress_remaining()
         updated_noise_decay = self.calc_noise_from_progress(progress_remaining)
         learning_rate = self.learning_role.calc_lr_from_progress(progress_remaining)
 
@@ -225,9 +225,7 @@ class DDPG(ActorCriticAlgorithm):
             self.n_updates += 1
 
             # Sample transition batch from replay buffer
-            transitions = self.buffer.sample(
-                self.learning_config.batch_size
-            )
+            transitions = self.buffer.sample(self.learning_config.batch_size)
 
             states, actions, next_states, rewards = (
                 transitions.observations,

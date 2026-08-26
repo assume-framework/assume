@@ -145,6 +145,28 @@ class PPO(ActorCriticAlgorithm):
         noise = th.zeros_like(action, dtype=strategy.float_type)
         return action, noise, None
 
+    def get_progress_remaining(self) -> float:
+        """Get the remaining learning progress from the simulation run. With Mappo Without initial experience episodes, the progress is calculated based on the number of training episodes completed and the elapsed time within the current episode.
+
+        Returns:
+            The remaining progress as a float between 0 and 1.
+        """
+
+        total_duration = self.learning_role.end - self.learning_role.start
+        elapsed_duration = (
+            self.learning_role.context.current_timestamp - self.learning_role.start
+        )
+
+        # For on-policy algorithms, simpler progress calculation
+        total_episodes = self.learning_config.training_episodes
+        progress_remaining = (
+            1
+            - (self.learning_role.episodes_done / total_episodes)
+            - (elapsed_duration / total_duration)
+        )
+
+        return progress_remaining
+
     def create_buffer(self, time_step) -> RolloutBuffer:
         """Create the rollout buffer holding exactly one update window.
 
@@ -186,7 +208,9 @@ class PPO(ActorCriticAlgorithm):
         unique_obs_all = obs[:, self.obs_dim - self.unique_obs_dim :]
 
         with th.no_grad():
-            for i, strategy in enumerate(strategies): # TODO: does this need to be ordered by unit_id?
+            for i, strategy in enumerate(
+                strategies
+            ):  # TODO: does this need to be ordered by unit_id?
                 other_unique = np.concatenate(
                     (unique_obs_all[:i], unique_obs_all[i + 1 :]), axis=0
                 )
@@ -421,7 +445,7 @@ class PPO(ActorCriticAlgorithm):
             return
 
         # Update learning rate
-        progress_remaining = self.learning_role.get_progress_remaining()
+        progress_remaining = self.get_progress_remaining()
         learning_rate = self.learning_role.calc_lr_from_progress(progress_remaining)
 
         for strategy in strategies:
@@ -462,7 +486,7 @@ class PPO(ActorCriticAlgorithm):
             # Bootstrap value, from the same centralized critics that produced
             # the V(s_t) already stored in the buffer by store_experience.
             last_values = self._centralized_values(last_obs)
-            dones = last_dones.copy() # TODO: is this the correct behavior?
+            dones = last_dones.copy()  # TODO: is this the correct behavior?
 
         # Compute advantages and returns
         rollout_buffer.compute_returns_and_advantages(last_values, dones)
