@@ -1415,6 +1415,7 @@ class DSMFlex:
                     pass
 
         _pending_opr_updates: dict = {}
+        _pending_plan_updates: dict = {}
         window_production = 0.0
 
         try:
@@ -1478,6 +1479,17 @@ class DSMFlex:
             self._log_solver_status(results, window_start, window_end)
 
             n_commit = commit_end - window_start
+            n_window = window_end - window_start
+            # Provisional plan over the whole look-ahead, including the part that
+            # is not committed yet. Only the committed prefix feeds
+            # opt_power_requirement; the rest is exposed separately so strategies
+            # that have to announce a position further ahead than the commit
+            # horizon (e.g. a grid-fee market) can read it.
+            for local_t in range(n_window):
+                _pending_plan_updates[window_start + local_t] = pyo.value(
+                    instance.total_power_input[local_t]
+                )
+
             for local_t in range(n_commit):
                 global_t = window_start + local_t
                 power_val = pyo.value(instance.total_power_input[local_t])
@@ -1516,6 +1528,16 @@ class DSMFlex:
             except (IndexError, KeyError, AttributeError, TypeError) as e:
                 logger.debug(
                     "Could not update opt_power_requirement[%d]: %s", global_t, e
+                )
+
+        if getattr(self, "planned_power_requirement", None) is None:
+            self.planned_power_requirement = FastSeries(index=saved_index, value=0.0)
+        for global_t, power_val in _pending_plan_updates.items():
+            try:
+                self.planned_power_requirement[saved_index[global_t]] = power_val
+            except (IndexError, KeyError, TypeError) as e:
+                logger.debug(
+                    "Could not update planned_power_requirement[%d]: %s", global_t, e
                 )
 
         self._rh_optimized_until_step = commit_end
@@ -1577,6 +1599,8 @@ class DSMFlex:
         self.opt_power_requirement = FastSeries(
             index=self.index, value=opt_power_requirement
         )
+        # Full-horizon solve: the plan and the committed schedule coincide.
+        self.planned_power_requirement = self.opt_power_requirement.copy(deep=True)
 
         # CRITICAL: If rolling horizon is enabled, populate the full-horizon accumulator
         # This ensures the first market call has correct production history

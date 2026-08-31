@@ -17,6 +17,7 @@ from assume.common.utils import get_available_products
 from assume.markets.clearing_algorithms.complex_clearing import ComplexClearingRole
 from assume.markets.clearing_algorithms.simple import PayAsBidRole, PayAsClearRole
 from assume.strategies import EnergyHeuristicElasticStrategy
+from assume.strategies.grid_tariff import ANNOUNCED_FLAG as GRID_FEE_ANNOUNCED_FLAG
 from assume.units.demand import Demand
 from assume.units.dsm_load_shift import DSMFlex
 from assume.units.exchange import Exchange
@@ -699,6 +700,83 @@ def default_update(current_forecast, preprocess_information, *args, **kwargs):
     return current_forecast
 
 
+def effective_grid_fee(outputs, default_fee: float = 0.0) -> np.ndarray:
+    """Per-timestep grid fee a unit should optimise against.
+
+    Hours for which the grid-fee market has already cleared carry the announced
+    fee.  Hours further out in the optimisation horizon - the tariff is only
+    published a few steps ahead, while the look-ahead window is much longer -
+    carry a naive persistence forecast: the most recently announced fee.  Before
+    the very first announcement *default_fee* is used.
+
+    Args:
+        outputs: The unit's ``outputs`` mapping.
+        default_fee: Fee assumed before any announcement has been received.
+
+    Returns:
+        np.ndarray: The fee series over the full simulation horizon.
+    """
+    announced = np.asarray(outputs[GRID_FEE_ANNOUNCED_FLAG].data, dtype=float) > 0
+    fee = np.asarray(outputs["grid_fee_accepted_price"].data, dtype=float)
+
+    if not announced.any():
+        return np.full_like(fee, float(default_fee))
+
+    # forward-fill the announced values over the not-yet-announced hours
+    positions = np.where(announced, np.arange(len(fee)), 0)
+    np.maximum.accumulate(positions, out=positions)
+    filled = fee[positions]
+    # hours before the first announcement fall back to the default
+    filled[: int(np.argmax(announced))] = float(default_fee)
+    return filled
+
+
+def price_plus_grid_fee(
+    current_forecast, preprocess_information, *args, **kwargs
+) -> dict:
+    """Fold the published grid fee into the unit's electricity price forecast.
+
+    Registered as an ``update_price`` algorithm, so it runs inside
+    ``UnitForecaster.update()``.  ``DsmUnitForecaster.update()`` re-derives
+    ``electricity_price`` from ``price["EOM"]`` afterwards, which is the series
+    the DSM Pyomo model reads in ``define_parameters`` - so writing the sum here
+    is what makes the tariff enter the optimisation objective.
+
+    The algorithm is a no-op for units that do not participate in a grid-fee
+    market (the flag output is absent), which lets it be configured globally in
+    ``config.yaml``.  It is idempotent: the untouched price forecast is stashed
+    on first use and the sum is always recomputed from it, never accumulated.
+
+    Configuration (``kwargs`` on the forecaster, optional):
+        - ``grid_fee_price_key``: market id in ``price`` to adjust (default ``EOM``).
+        - ``default_grid_fee``: fee assumed before the first announcement.
+    """
+    unit = kwargs.get("unit")
+    if unit is None:
+        return current_forecast
+
+    outputs = getattr(unit, "outputs", None)
+    if outputs is None or GRID_FEE_ANNOUNCED_FLAG not in outputs:
+        # unit does not take part in a grid-fee market
+        return current_forecast
+
+    forecaster = unit.forecaster
+    market_id = getattr(forecaster, "grid_fee_price_key", "EOM")
+    if market_id not in current_forecast:
+        return current_forecast
+
+    base = getattr(forecaster, "_grid_fee_base_price", None)
+    if base is None:
+        base = current_forecast[market_id].copy(deep=True)
+        forecaster._grid_fee_base_price = base
+
+    fee = effective_grid_fee(
+        outputs, default_fee=getattr(forecaster, "default_grid_fee", 0.0)
+    )
+    current_forecast[market_id] = base + fee
+    return current_forecast
+
+
 def set_preloaded_forecast_by_name(
     current_forecast, preprocess_information, new_forecast_name: str
 ):
@@ -709,6 +787,7 @@ forecast_update_algorithms = {
     "price_default": default_update,
     "residual_load_default": default_update,
     "residual_load_set_preloaded": set_preloaded_forecast_by_name,
+    "price_plus_grid_fee": price_plus_grid_fee,
     "congestion_signal_default": default_update,
     "renewable_utilisation_default": default_update,
 }

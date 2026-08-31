@@ -107,6 +107,20 @@ available_examples = {
     },
     # redispatch example
     "redisp_3_nodes": {"scenario": "example_04a", "study_case": "base"},
+    #
+    # grid-fee market: an EV fleet aggregator (a Building used as a charging hub)
+    # facing a tariff published by a DSO unit on a market ahead of the EOM
+    "lv_tariff_none": {"scenario": "example_lv_tariff", "study_case": "no_tariff"},
+    "lv_tariff_flat": {"scenario": "example_lv_tariff", "study_case": "flat_tariff"},
+    "lv_tariff_tou": {"scenario": "example_lv_tariff", "study_case": "tou_tariff"},
+    "lv_tariff_tou_day_ahead": {
+        "scenario": "example_lv_tariff",
+        "study_case": "tou_tariff_day_ahead",
+    },
+    "lv_tariff_capacity": {
+        "scenario": "example_lv_tariff",
+        "study_case": "capacity_tariff",
+    },
 }
 
 

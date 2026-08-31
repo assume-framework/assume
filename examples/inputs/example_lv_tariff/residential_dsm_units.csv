@@ -1,0 +1,8 @@
+name,unit_type,technology,node,unit_operator,bidding_EOM,bidding_GridTariff,objective,flexibility_measure,cost_tolerance,is_prosumer,horizon_mode,look_ahead_horizon,commit_horizon,rolling_step,capacity,min_soc,max_soc,initial_soc,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,ramp_up,ramp_down,power_flow_directionality
+aggregator,building,,lv_node,aggregator_operator,household_energy_optimization,household_grid_fee_announcement,min_variable_cost,electricity_price_signal,10.0,No,rolling_horizon,48h,1h,1h,,,,,,,,,,,
+aggregator,building,electric_vehicle_EV_0,,,,,,,,,,,,,0.03,0.2,1.0,0.6,0.011,0.011,0.95,0.95,0.011,0.011,bidirectional
+aggregator,building,electric_vehicle_EV_1,,,,,,,,,,,,,0.03,0.2,1.0,0.6,0.011,0.011,0.95,0.95,0.011,0.011,bidirectional
+aggregator,building,electric_vehicle_EV_2,,,,,,,,,,,,,0.03,0.2,1.0,0.6,0.011,0.011,0.95,0.95,0.011,0.011,bidirectional
+aggregator,building,electric_vehicle_EV_3,,,,,,,,,,,,,0.03,0.2,1.0,0.6,0.011,0.011,0.95,0.95,0.011,0.011,bidirectional
+aggregator,building,electric_vehicle_EV_4,,,,,,,,,,,,,0.03,0.2,1.0,0.6,0.011,0.011,0.95,0.95,0.011,0.011,bidirectional
+aggregator,building,electric_vehicle_EV_5,,,,,,,,,,,,,0.03,0.2,1.0,0.6,0.011,0.011,0.95,0.95,0.011,0.011,bidirectional

@@ -1,0 +1,9 @@
+name,technology,fuel_type,emission_factor,max_power,efficiency,additional_cost,unit_operator,min_power,bidding_EOM,bidding_GridTariff
+Solar,solar,renewable,0.0,14000.0,1.0,0.0,renewables_operator,0,powerplant_energy_heuristic_flexable,
+Wind_Onshore,wind_onshore,renewable,0.0,10000.0,1.0,0.0,renewables_operator,0,powerplant_energy_heuristic_flexable,
+Nuclear,nuclear,uranium,0.0,8000.0,0.33,10.3,conv_operator,0,powerplant_energy_heuristic_flexable,
+Lignite,lignite,lignite,0.406,18000.0,0.43,1.65,conv_operator,0,powerplant_energy_heuristic_flexable,
+Hard_Coal,hard coal,hard coal,0.335,20000.0,0.45,1.3,conv_operator,0,powerplant_energy_heuristic_flexable,
+Natural_Gas,open cycle gas turbine,natural gas,0.201,30000.0,0.32,5.5,conv_operator,0,powerplant_energy_heuristic_flexable,
+Oil,oil,oil,0.776,8000.0,0.31,5.5,conv_operator,0,powerplant_energy_heuristic_flexable,
+DSO,grid_operator,natural gas,0.0,0.001,1.0,0.0,dso_operator,0,,powerplant_grid_fee_dso

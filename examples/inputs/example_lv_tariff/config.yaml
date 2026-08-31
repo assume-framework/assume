@@ -1,0 +1,170 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Grid-sensitive control of an EV fleet behind one LV node.
+#
+# A Building is used purely as an EV charging hub (no heat pump, no boiler, no
+# PV): its `total_power_input` is the fleet's net withdrawal at the LV node.
+# A DSO unit publishes a grid fee on a second pay_as_clear market that opens
+# ahead of the EOM; the fee lands in the aggregator's outputs and is folded into
+# its price forecast by the `price_plus_grid_fee` update algorithm, so it enters
+# the rolling-horizon optimisation objective.
+#
+# Timing: EOM delivers 1h after opening, GridTariff 3h after opening. Both close
+# one hour after opening, so the fee for a delivery hour is cleared two market
+# rounds before the EOM round that dispatches it.
+
+# ---------------------------------------------------------------------------
+# Reference: no grid fee at all.
+# ---------------------------------------------------------------------------
+no_tariff:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  residential_dsm_units: residential_dsm_units.csv
+
+  markets_config:
+    EOM: &eom
+      operator: eom_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 1000000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+# ---------------------------------------------------------------------------
+# Flat volumetric fee. Plumbing test only: a fee that is constant over time
+# adds the same amount to charging cost and discharging revenue in every hour,
+# so it must NOT change the schedule relative to `no_tariff`. If it does, the
+# sign convention or the timing is wrong.
+# ---------------------------------------------------------------------------
+flat_tariff:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  residential_dsm_units: residential_dsm_units.csv
+
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+
+  bidding_strategy_params:
+    grid_fee_base: 30.0
+
+  markets_config:
+    EOM: *eom
+    GridTariff: &grid_tariff
+      operator: dso_operator
+      product_type: grid_fee        # must NOT be "energy": announced volumes
+                                    # would otherwise land in energy dispatch
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 3h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      # the DSO's last block must be effectively unlimited so no rationing
+      # happens in tariff mode; validate_orderbook truncates silently above this
+      maximum_bid_volume: 100000
+      # the aggregator bids the cap; keep a wide margin above any tariff tested,
+      # otherwise clipping makes the tie-break in the clearing random
+      maximum_bid_price: 100000
+      minimum_bid_price: 0
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+# ---------------------------------------------------------------------------
+# Time-of-use fee: a static adder on the overnight hours, which is when an
+# unmanaged price-following fleet piles up (the EOM price is lowest there). The
+# first configuration that can actually shift the fleet's schedule.
+# ---------------------------------------------------------------------------
+tou_tariff:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  residential_dsm_units: residential_dsm_units.csv
+
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+
+  bidding_strategy_params:
+    grid_fee_base: 30.0
+    grid_fee_peak_adder: 250.0
+    grid_fee_peak_hours: "23,0,1,2,3,4,5,6"
+
+  markets_config:
+    EOM: *eom
+    GridTariff: *grid_tariff
+
+# ---------------------------------------------------------------------------
+# Capacity-shaped fee: the DSO offers `grid_fee_headroom` MW at the baseline
+# and everything beyond it at a scarcity price. The clearing price is then a
+# function of the aggregate withdrawal the aggregators announced, which is the
+# substance of the mechanism (plan section 4.1).
+# ---------------------------------------------------------------------------
+capacity_tariff:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  residential_dsm_units: residential_dsm_units.csv
+
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+
+  bidding_strategy_params:
+    grid_fee_base: 30.0
+    # one EV charges at 0.011 MW, so anything above a single charger pays the
+    # scarcity price - the fleet peak is 6 x 0.011 = 0.066 MW
+    grid_fee_headroom: 0.012
+    grid_fee_scarcity: 400.0
+
+  markets_config:
+    EOM: *eom
+    GridTariff: *grid_tariff
+
+# ---------------------------------------------------------------------------
+# The same time-of-use fee, but announced 24 hours at a time instead of one.
+# Each GridTariff round now clears 24 hourly products (T+3 .. T+26), so the
+# aggregator's whole planning horizon carries published fees rather than one
+# persisted value. This is what makes the response to the tariff foresighted
+# rather than myopic - compare the two cases.
+#
+# Requires look_ahead_horizon >= first_delivery + count (48h in the unit csv),
+# otherwise the far products are announced against a plan that does not exist.
+# ---------------------------------------------------------------------------
+tou_tariff_day_ahead:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  residential_dsm_units: residential_dsm_units.csv
+
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+
+  bidding_strategy_params:
+    grid_fee_base: 30.0
+    grid_fee_peak_adder: 250.0
+    grid_fee_peak_hours: "23,0,1,2,3,4,5,6"
+
+  markets_config:
+    EOM: *eom
+    GridTariff:
+      <<: *grid_tariff
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 3h

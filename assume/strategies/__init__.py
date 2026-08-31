@@ -28,6 +28,10 @@ from assume.strategies.naive_strategies import (
     EnergyHeuristicElasticStrategy,
     DsmCapacityHeuristicBalancingStrategy,
 )
+from assume.strategies.grid_tariff import (
+    GridFeeAnnouncementStrategy,
+    GridFeeDsoStrategy,
+)
 from assume.strategies.interactive_strategies import EnergyInteractiveStrategy
 from assume.strategies.dmas_powerplant import EnergyOptimizationDmasStrategy
 from assume.strategies.dmas_storage import StorageEnergyOptimizationDmasStrategy
@@ -93,6 +97,9 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "units_operator_direct": UnitsOperatorDirectStrategy,
     "powerplant_energy_naive_profile": EnergyNaiveProfileStrategy,
     "powerplant_energy_interactive": EnergyInteractiveStrategy,
+    "powerplant_grid_fee_dso": GridFeeDsoStrategy,
+    "household_grid_fee_announcement": GridFeeAnnouncementStrategy,
+    "industry_grid_fee_announcement": GridFeeAnnouncementStrategy,
 }
 
 try:
