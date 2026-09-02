@@ -594,6 +594,11 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - unit.index.freq
 
+        # profit_series = (
+        #     unit.outputs[f"{product_type}_cashflow"][start:end]
+        #     - unit.outputs[f"{product_type}_generation_costs"][start:end]
+        # )
+
         # Depending on how the unit calculates marginal costs, retrieve cost values.
         marginal_cost = unit.calculate_marginal_cost(
             start, unit.outputs[product_type].at[start]
@@ -623,17 +628,10 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
             income += order_income
             operational_cost += order_cost
 
-        # Consideration of start-up costs, divided evenly between upward and downward regulation events.
-        if (
-            unit.outputs[product_type].at[start] != 0
-            and unit.outputs[product_type].at[start - unit.index.freq] == 0
-        ):
-            operational_cost += unit.hot_start_cost / 2
-        elif (
-            unit.outputs[product_type].at[start] == 0
-            and unit.outputs[product_type].at[start - unit.index.freq] != 0
-        ):
-            operational_cost += unit.hot_start_cost / 2
+        # Start-up cost is already booked idempotently into
+        # outputs[f"{product_type}_start_costs"] by _book_start_costs in
+        # execute_current_dispatch. Read from there instead of recomputing.
+        operational_cost += unit.outputs[f"{product_type}_start_costs"].at[start]
 
         profit = income - operational_cost
 
@@ -1037,7 +1035,9 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         marginal_cost = unit.calculate_marginal_cost(
             start, unit.outputs[product_type].at[start]
         )
-        marginal_cost += unit.get_starting_costs(int(duration_hours))
+        # Start-up cost is already booked idempotently into
+        # outputs[f"{product_type}_start_costs"] by _book_start_costs.
+        start_cost = unit.outputs[f"{product_type}_start_costs"].at[start]
 
         accepted_volume = order.get("accepted_volume", 0)
         # ignore very small volumes due to calculations
@@ -1046,7 +1046,7 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
 
         # Calculate profit and cost for the order
         order_profit = accepted_price * accepted_volume * duration_hours
-        order_cost = abs(marginal_cost * accepted_volume * duration_hours)
+        order_cost = abs(marginal_cost * accepted_volume * duration_hours) + start_cost
 
         current_soc = unit.outputs["soc"].at[start]
         next_soc = unit.outputs["soc"].at[next_time]
@@ -1262,19 +1262,12 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
             income += order_income
             operational_cost += order_cost
 
-        # Consideration of start-up costs, divided evenly between upward and downward regulation events.
-        if (
-            unit.outputs[product_type].at[start] != 0
-            and unit.outputs[product_type].at[start - unit.index.freq] == 0
-        ):
-            operational_cost += unit.hot_start_cost / 2
-        elif (
-            unit.outputs[product_type].at[start] == 0
-            and unit.outputs[product_type].at[start - unit.index.freq] != 0
-        ):
-            operational_cost += unit.hot_start_cost / 2
+        # Start-up cost is already booked idempotently into
+        # outputs[f"{product_type}_start_costs"] by _book_start_costs in
+        # execute_current_dispatch. Read from there instead of recomputing.
+        start_cost = unit.outputs[f"{product_type}_start_costs"].at[start] / 2
 
-        profit = income - operational_cost
+        profit = income - operational_cost - start_cost
 
         # Stabilizing learning: Limit positive profit to 50% of its absolute value.
         # This reduces variance in rewards and prevents overfitting to extreme profit-seeking behavior.

@@ -175,20 +175,19 @@ class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
             orderbook (Orderbook): An orderbook with accepted and rejected orders for the unit.
 
         Note:
-            The reward is calculated as the profit minus the opportunity cost,
-            which is the loss of income we have because we are not running at full power.
-            The regret is the opportunity cost.
-            Because the regret_scale is set to 0 the reward equals the profit.
-            The profit is the income we have from the accepted bids.
-            The total costs are the running costs and the start-up costs.
-
+            Generation and start-up costs are the ones booked by
+            :meth:`execute_current_dispatch` into
+            ``{product_type}_generation_costs`` and
+            ``{product_type}_start_costs``. Reading them here keeps
+            ``total_costs`` idempotent when several markets clear for the same
+            window, and avoids double-counting start-up cost (which used to be
+            added both here and in the dispatch executor).
         """
         product_type = marketconfig.product_type
         products_index = get_products_index(orderbook)
 
         # Initialize intermediate results as numpy arrays for better performance
         profit = np.zeros(len(products_index))
-        costs = np.zeros(len(products_index))
 
         # Map products_index to their positions for faster updates
         index_map = {time: i for i, time in enumerate(products_index)}
@@ -204,10 +203,6 @@ class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
             for start in order_times:
                 idx = index_map.get(start)
 
-                marginal_cost = unit.calculate_marginal_cost(
-                    start, unit.outputs[product_type].at[start]
-                )
-
                 if isinstance(accepted_volume, dict):
                     accepted_volume = accepted_volume.get(start, 0)
                 else:
@@ -220,17 +215,14 @@ class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
 
                 profit[idx] += accepted_price * accepted_volume
 
-        # consideration of start-up costs
-        for i, start in enumerate(products_index):
-            op_time = unit.get_operation_time(start)
-
-            output = unit.outputs[product_type].at[start]
-            marginal_cost = unit.calculate_marginal_cost(start, output)
-            costs[i] += marginal_cost * output
-
-            if output != 0 and op_time < 0:
-                start_up_cost = unit.get_starting_costs(op_time)
-                costs[i] += start_up_cost
+        #  TODO not available  yet as generation costs are calculated afterwards
+        generation_costs = unit.outputs[f"{product_type}_generation_costs"].loc[
+            products_index[0] : products_index[-1]
+        ]
+        start_costs = unit.outputs[f"{product_type}_start_costs"].loc[
+            products_index[0] : products_index[-1]
+        ]
+        costs = np.asarray(generation_costs) + np.asarray(start_costs)
 
         profit -= costs
 
