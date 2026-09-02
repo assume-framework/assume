@@ -97,6 +97,9 @@ class CriticTD3(Critic):
         # Second Q-network (Q2) for double Q-learning
         self.q2_layers = self._build_q_network()
 
+        # Initialize weights properly
+        self._init_weights()
+
     def forward(
         self, obs: th.Tensor, actions: th.Tensor
     ) -> tuple[th.Tensor, th.Tensor]:
