@@ -15,9 +15,13 @@ import pandas as pd
 from dateutil import rrule as rr
 from mango import Role
 from pandas.api.types import is_bool_dtype, is_numeric_dtype
-from psycopg2.errors import UndefinedColumn
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import bindparam, create_engine, inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
+
+try:
+    from psycopg2.errors import UndefinedColumn
+except ImportError:
+    UndefinedColumn = ()  # type: ignore
 
 from assume.common.market_objects import MetaDict
 from assume.common.utils import (
@@ -84,6 +88,9 @@ class WriteOutput(Role):
 
         self.db = None
         self.db_uri = db_uri
+        # Tracks tables that have already had indexes and hypertable setup applied,
+        # so we only run _ensure_table_setup once per table per process.
+        self._tables_initialized: set[str] = set()
 
         self.learning_mode = learning_mode
         self.evaluation_mode = evaluation_mode
@@ -118,7 +125,7 @@ class WriteOutput(Role):
             },
             "capacity_factor": {
                 "value": "avg(power/max_power)",
-                "from_table": 'market_dispatch ud join power_plant_meta um on ud.unit_id = um."index" and ud.simulation=um.simulation',
+                "from_table": "market_dispatch ud join power_plant_meta um on ud.unit_id = um.unit_id and ud.simulation=um.simulation",
                 "group_bys": ["market_id", "variable"],
                 "simulation_col": "ud.simulation",
             },
@@ -138,6 +145,67 @@ class WriteOutput(Role):
                 }
             ]
 
+    def _ensure_table_setup(self, table: str, conn, time_column: str = None) -> None:
+        """
+        Creates a ``(simulation)`` index on *table* and, if *time_column* is
+        given, attempts to convert the table to a TimescaleDB hypertable.
+
+        Called once on first write to any table so that both SQLite and
+        PostgreSQL get a useful simulation index, and TimescaleDB users get
+        hypertable partitioning automatically — with a silent fallback if
+        TimescaleDB is not installed.
+
+        Args:
+            table (str): Table name to configure.
+            conn: An active SQLAlchemy connection (within an open transaction).
+            time_column (str, optional): Time column for hypertable partitioning.
+                If ``None``, only the simulation index is created.
+        """
+        # Check if table was already set up in a previous run
+        try:
+            existing_indexes = {
+                idx.get("name") for idx in inspect(conn).get_indexes(table)
+            }
+            if f"{table}_simulation_idx" in existing_indexes:
+                return
+        except Exception:
+            pass
+
+        # Always create a simulation index — fast deletes on SQLite and PostgreSQL.
+        try:
+            conn.execute(
+                text(
+                    f'CREATE INDEX IF NOT EXISTS "{table}_simulation_idx"'
+                    f' ON "{table}" (simulation)'
+                )
+            )
+        except Exception:
+            # Hypertable chunk indexes may already cover this — swallow silently.
+            pass
+
+        if time_column:
+            try:
+                conn.execute(
+                    text(
+                        f"SELECT create_hypertable('{table}', '{time_column}',"
+                        f" if_not_exists => TRUE)"
+                    )
+                )
+                # Composite index complements TimescaleDB chunk pruning for
+                # simulation-scoped range queries.
+                conn.execute(
+                    text(
+                        f'CREATE INDEX IF NOT EXISTS "{table}_sim_{time_column}_idx"'
+                        f' ON "{table}" (simulation, {time_column})'
+                    )
+                )
+            except Exception as e:
+                logger.debug(
+                    "Could not create hypertable for %s (plain index used): %s",
+                    table,
+                    e,
+                )
+
     def delete_db_scenario(self, simulation_id: str):
         """
         Deletes all data from the database for the given simulation id.
@@ -149,31 +217,27 @@ class WriteOutput(Role):
         # Loop throuph all database tables
         # Get list of table names in database
         table_names = inspect(self.db).get_table_names()
-        # Iterate through each table
         for table_name in table_names:
-            # ignore spatial_ref_sys table
             if table_name == "spatial_ref_sys":
                 continue
-            # only delete rl_params and rl_meta during the first episode of learning
             if table_name in ["rl_params", "rl_grad_params", "rl_meta"] and not (
                 self.learning_mode and self.episode == 1
             ):
                 continue
             try:
-                with self.db.begin() as db:
-                    # create index on table
-                    query = text(
-                        f'create index if not exists "{table_name}_scenario" on "{table_name}" (simulation)'
-                    )
-                    db.execute(query)
+                with self.db.begin() as conn:
+                    try:
+                        conn.execute(
+                            text(
+                                f'CREATE INDEX IF NOT EXISTS "{table_name}_scenario" ON "{table_name}" (simulation)'
+                            )
+                        )
+                    except Exception:
+                        pass
 
-                    query = text(
-                        f"delete from \"{table_name}\" where simulation = '{simulation_id}'"
-                    )
-                    rowcount = db.execute(query).rowcount
-                    # has to be done manually with raw queries
-                    db.commit()
-                    logger.debug("deleted %s rows from %s", rowcount, table_name)
+                    query = text(f'DELETE FROM "{table_name}" WHERE simulation = :sim')
+                    result = conn.execute(query, {"sim": simulation_id})
+                    logger.debug("deleted %s rows from %s", result.rowcount, table_name)
             except Exception as e:
                 logger.error(
                     f"could not clear old scenarios from table {table_name} - {e}"
@@ -302,6 +366,10 @@ class WriteOutput(Role):
 
         df = pd.DataFrame(market_results)
         df["simulation"] = self.simulation_id
+        if "node" not in df.columns:
+            df["node"] = "node0"
+        else:
+            df["node"] = df["node"].fillna("node0")
         return df
 
     def convert_market_orders(self, market_orders: any, market_id: str):
@@ -340,7 +408,9 @@ class WriteOutput(Role):
         # Add missing columns with defaults
         for col in ["bid_type", "node"]:
             if col not in df.columns:
-                df[col] = None
+                df[col] = "node0" if col == "node" else None
+            elif col == "node":
+                df["node"] = df["node"].fillna("node0")
 
         # Add constant columns
         df["simulation"] = self.simulation_id
@@ -356,12 +426,13 @@ class WriteOutput(Role):
         Args:
             unit_info (dict): The unit information.
         """
-        del unit_info["unit_type"]
-        unit_info["simulation"] = self.simulation_id
-        u_info = {unit_info["id"]: unit_info}
-        del unit_info["id"]
+        info = dict(unit_info)
+        info.pop("unit_type", None)
+        unit_id = info.pop("id", None)
+        info["unit_id"] = unit_id
+        info["simulation"] = self.simulation_id
 
-        return pd.DataFrame(u_info).T
+        return pd.DataFrame([info])
 
     def convert_market_dispatch(self, market_dispatch: list[dict]):
         """
@@ -455,6 +526,19 @@ class WriteOutput(Role):
         if not self.db and not self.export_csv_path:
             return
 
+        # Map of well-known tables to their time column for hypertable/index setup.
+        # Custom output tables get index-only setup (time_column=None).
+        _time_columns: dict[str, str] = {
+            "market_meta": "time",
+            "market_dispatch": "datetime",
+            "market_orders": "start_time",
+            "unit_dispatch": "time",
+            "rl_params": "datetime",
+            "rl_grad_params": "datetime",
+            "grid_flows": "datetime",
+            "kpis": "time",
+        }
+
         for table, data_list in self.write_buffers.items():
             if len(data_list) == 0:
                 continue
@@ -500,16 +584,27 @@ class WriteOutput(Role):
                             dfs.append(df)
                         df = pd.concat(dfs, axis=0, join="outer")
                 data_list.clear()
-            # concat all dataframes
-            # use join='outer' to keep all columns and fill missing values with NaN
             if df is None or df.empty:
                 continue
 
+            if table == "unit_dispatch":
+                idx_name = df.index.name
+                df = df.reset_index().drop_duplicates(
+                    subset=["simulation", "time", "unit"], keep="last"
+                )
+                if idx_name:
+                    df.set_index(idx_name, inplace=True)
+
+            # check and correct dtypes
+            if table == "rl_params":
+                df = df.apply(convert_tensors)
+
+            float_cols = df.select_dtypes(include=["float64"]).columns
+            if len(float_cols):
+                df[float_cols] = df[float_cols].astype("float32")
+
             # sort dataframes by column names for consistent CSVs
             df = df.reindex(sorted(df.columns), axis=1)
-
-            # check for any float64 columns and convert them to floats
-            df = df.map(lambda x: float(x) if isinstance(x, np.float64) else x)
 
             if self.export_csv_path:
                 data_path = self.export_csv_path / f"{table}.csv"
@@ -521,19 +616,36 @@ class WriteOutput(Role):
                 )
 
             if self.db is not None:
+                # Map of well-known tables to their time column for hypertable setup.
+                is_new_table = table not in self._tables_initialized
                 try:
                     with self.db.begin() as db:
-                        df.to_sql(table, db, if_exists="append")
+                        df.to_sql(
+                            table, db, if_exists="append", index=bool(df.index.name)
+                        )
+                        if is_new_table:
+                            self._ensure_table_setup(
+                                table, db, _time_columns.get(table)
+                            )
                 except (
                     ProgrammingError,
                     OperationalError,
                     DataError,
+                    UndefinedColumn,
                     pd.errors.DatabaseError,
                 ):
                     self.check_columns(table, df)
                     # now try again
                     with self.db.begin() as db:
-                        df.to_sql(table, db, if_exists="append")
+                        df.to_sql(
+                            table, db, if_exists="append", index=bool(df.index.name)
+                        )
+                        if is_new_table:
+                            self._ensure_table_setup(
+                                table, db, _time_columns.get(table)
+                            )
+                finally:
+                    self._tables_initialized.add(table)
 
         self.current_dfs_size_bytes = 0
 
@@ -778,6 +890,9 @@ class DatabaseMaintenance:
         for table in table_names:
             if table == "spatial_ref_sys":
                 continue
+            cols = [c["name"] for c in inspector.get_columns(table)]
+            if "simulation" not in cols:
+                continue
             try:
                 query = text(f'SELECT DISTINCT simulation FROM "{table}"')
                 with self.db.begin() as conn:
@@ -789,15 +904,18 @@ class DatabaseMaintenance:
                 logger.error(
                     "Error retrieving simulation ids from table %s: %s", table, e
                 )
-        return list(unique_ids)
+        return sorted(unique_ids)
+
+    def get_simulation_ids(self) -> list[str]:
+        """Alias for get_unique_simulation_ids."""
+        return self.get_unique_simulation_ids()
 
     def delete_simulations(self, simulation_ids: list[str]) -> None:
         """
         Deletes specific simulation records from all tables.
 
         This method deletes rows from every table where the 'simulation' column matches any of the
-        provided simulation IDs. An index is created on the simulation column to optimize the deletion,
-        if one does not already exist.
+        provided simulation IDs.
 
         Args:
             simulation_ids (list[str]): A list of simulation IDs to delete.
@@ -811,18 +929,26 @@ class DatabaseMaintenance:
         for table in table_names:
             if table == "spatial_ref_sys":
                 continue
+            cols = [c["name"] for c in inspector.get_columns(table)]
+            if "simulation" not in cols:
+                continue
             try:
                 with self.db.begin() as conn:
-                    conn.execute(
-                        text(
-                            f'CREATE INDEX IF NOT EXISTS "{table}_simulation_idx" ON "{table}" (simulation)'
+                    try:
+                        conn.execute(
+                            text(
+                                f'CREATE INDEX IF NOT EXISTS "{table}_simulation_idx" ON "{table}" (simulation)'
+                            )
                         )
-                    )
-                    # Safe parameterized query
+                    except Exception:
+                        pass
+
                     delete_query = text(
-                        f'DELETE FROM "{table}" WHERE simulation = ANY(:simulations)'
+                        f'DELETE FROM "{table}" WHERE simulation IN :simulations'
+                    ).bindparams(bindparam("simulations", expanding=True))
+                    result = conn.execute(
+                        delete_query, {"simulations": list(simulation_ids)}
                     )
-                    result = conn.execute(delete_query, {"simulations": simulation_ids})
                     logger.debug("Deleted %s rows from %s", result.rowcount, table)
             except Exception as e:
                 logger.error(
@@ -845,21 +971,28 @@ class DatabaseMaintenance:
         for table in table_names:
             if table == "spatial_ref_sys":
                 continue
+            cols = [c["name"] for c in inspector.get_columns(table)]
+            if "simulation" not in cols:
+                continue
             try:
                 with self.db.begin() as conn:
-                    conn.execute(
-                        text(
-                            f'CREATE INDEX IF NOT EXISTS "{table}_simulation_idx" ON "{table}" (simulation)'
+                    try:
+                        conn.execute(
+                            text(
+                                f'CREATE INDEX IF NOT EXISTS "{table}_simulation_idx" ON "{table}" (simulation)'
+                            )
                         )
-                    )
+                    except Exception:
+                        pass
+
                     if exclude:
-                        exclude_str = ", ".join([f"'{sim}'" for sim in exclude])
                         delete_query = text(
-                            f'DELETE FROM "{table}" WHERE simulation NOT IN ({exclude_str})'
-                        )
+                            f'DELETE FROM "{table}" WHERE simulation NOT IN :exclude'
+                        ).bindparams(bindparam("exclude", expanding=True))
+                        result = conn.execute(delete_query, {"exclude": list(exclude)})
                     else:
                         delete_query = text(f'DELETE FROM "{table}"')
-                    result = conn.execute(delete_query)
+                        result = conn.execute(delete_query)
                     logger.debug("Deleted %s rows from %s", result.rowcount, table)
             except Exception as e:
                 logger.error("Could not delete simulations from table %s: %s", table, e)

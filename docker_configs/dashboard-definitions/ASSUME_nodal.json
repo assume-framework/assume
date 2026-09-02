@@ -25,20 +25,7 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": 4,
-  "links": [
-    {
-      "asDropdown": false,
-      "icon": "dashboard",
-      "includeVars": true,
-      "keepTime": false,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Set time filter to full simulation horizon",
-      "tooltip": "Clicking on the button will update the time range filter. The first and last timestamps of the selected simulation are used. Other filter items are preserved. The dashboard will reload: make sure to save your changes beforehand.",
-      "type": "link",
-      "url": "/d/nodalview?orgId=1&from=${simulation_start}&to=${simulation_end}&timezone=utc"
-    }
-  ],
+  "links": [],
   "panels": [
     {
       "description": "",
@@ -190,7 +177,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime, coalesce(abs(flow),0)/(s_nom * s_max_pu) as \"usage\", l.line as name, bus0, bus1, ST_AsGeoJSON(ST_GeomFromEWKT(wkt_srid_4326)) as geometry, l.simulation\nFROM lines_geo l\nleft join grid_flows g on l.line = g.line and l.simulation = g.simulation\nWHERE\n  $__timeFilter(datetime) AND\nl.simulation = '$simulation'\nORDER BY 1\n",
+          "rawSql": "SELECT\n  datetime, coalesce(abs(flow),0)/s_nom as \"usage\", l.line as name, bus0, bus1, ST_AsGeoJSON(ST_GeomFromEWKT(wkt_srid_4326)) as geometry, l.simulation\nFROM lines_geo l\nleft join grid_flows g on l.line = g.line and l.simulation = g.simulation\nWHERE\n  $__timeFilter(datetime) AND\nl.simulation = '$simulation'\nORDER BY 1\n",
           "refId": "A",
           "select": [
             [
@@ -1037,47 +1024,6 @@
         "regex": "",
         "sort": 1,
         "type": "query"
-      },
-      {
-        "current": {
-          "selected": false,
-          "text": "",
-          "value": ""
-        },
-        "datasource": {
-          "type": "postgres",
-          "uid": "P7B13B9DF907EC40C"
-        },
-        "definition": "SELECT  min(start_time) FROM market_orders WHERE simulation = '$simulation' ",
-        "description": "Epoch ms of the simulation start, used for the full range link",
-        "hide": 2,
-        "includeAll": false,
-        "name": "simulation_start",
-        "options": [],
-        "query": "SELECT  min(start_time) FROM market_orders WHERE simulation = '$simulation' ",
-        "refresh": 1,
-        "regex": "",
-        "type": "query"
-      },
-      {
-        "current": {
-          "text": "",
-          "value": ""
-        },
-        "datasource": {
-          "type": "postgres",
-          "uid": "P7B13B9DF907EC40C"
-        },
-        "definition": "SELECT  max(start_time) FROM market_orders WHERE simulation = '$simulation' ",
-        "description": "Epoch ms of the simulation end, used for the full range link",
-        "hide": 2,
-        "includeAll": false,
-        "name": "simulation_end",
-        "options": [],
-        "query": "SELECT  max(start_time) FROM market_orders WHERE simulation = '$simulation' ",
-        "refresh": 1,
-        "regex": "",
-        "type": "query"
       }
     ]
   },
@@ -1096,7 +1042,7 @@
     ]
   },
   "timezone": "",
-  "title": "ASSUME: Nodal view",
+  "title": "ASSUME - Nodal view",
   "uid": "nodalview",
   "version": 21,
   "weekStart": ""

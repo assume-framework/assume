@@ -27,6 +27,7 @@ from assume.common.utils import (
     timestamp2datetime,
 )
 from assume.strategies import (
+    LearningStrategy,
     UnitOperatorStrategy,
     UnitsOperatorDirectStrategy,
 )
@@ -80,6 +81,8 @@ class UnitsOperator(Role):
         # valid_orders per product_type
         self.valid_orders = defaultdict(list)
         self.units: dict[str, BaseUnit] = {}
+
+        self.rl_operator = False
 
     def setup(self):
         super().setup()
@@ -150,6 +153,14 @@ class UnitsOperator(Role):
             unit (BaseUnit): The unit to be added.
         """
         self.units[unit.id] = unit
+
+        # only check markets if not already marked as rl_operator
+        if not self.rl_operator:
+            for market in self.available_markets:
+                strategy = unit.bidding_strategies.get(market.market_id)
+                if isinstance(strategy, LearningStrategy):
+                    self.rl_operator = True
+                    break
 
     def participate(self, market: MarketConfig) -> bool:
         """

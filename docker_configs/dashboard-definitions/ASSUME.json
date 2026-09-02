@@ -25,25 +25,16 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": 2,
-  "links": [
-    {
-      "asDropdown": false,
-      "icon": "dashboard",
-      "includeVars": true,
-      "keepTime": false,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Set time filter to full simulation horizon",
-      "tooltip": "Clicking on the button will update the time range filter. The first and last timestamps of the selected simulation are used. Other filter items are preserved. The dashboard will reload: make sure to save your changes beforehand.",
-      "type": "link",
-      "url": "/d/aemnxld4ukgsga?orgId=1&from=${simulation_start}&to=${simulation_end}&timezone=utc"
-    }
-  ],
+  "links": [],
   "panels": [
     {
       "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 24,
         "x": 0,
         "y": 0
@@ -55,10 +46,10 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "# Welcome to our ASSUME demo\n\nThis is the Grafana Dashboard which makes interacting with the simulation data very easy.\n\n*IMPORTANT NOTE:* Grafana uses automated aggregation of data into time buckets with large time horizons displayed, e.g. time horizon > 1 month. It will display the average of the selected metric in the time bucket which underestimates the variance of the data and smoothes it. ",
+        "content": "# Welcome to our ASSUME demo\n\nThis is the Grafana Dashboard which makes interacting with the simulation data very easy.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.4.0",
       "title": "Overview Dashboard",
       "type": "text"
     },
@@ -68,7 +59,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 5
+        "y": 4
       },
       "id": 30,
       "panels": [],
@@ -76,11 +67,15 @@
       "type": "row"
     },
     {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 6
+        "y": 5
       },
       "id": 17,
       "options": {
@@ -92,7 +87,8 @@
         "content": "# Market-specific Data\n\nData specific for the market depending on the choice made at te top of the panel\n\n",
         "mode": "markdown"
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.4.0",
+      "title": "",
       "type": "text"
     },
     {
@@ -113,6 +109,7 @@
             "axisLabel": "",
             "axisPlacement": "left",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 1,
             "gradientMode": "none",
@@ -180,7 +177,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 9
+        "y": 8
       },
       "id": 11,
       "maxPerRow": 4,
@@ -277,6 +274,7 @@
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
+            "fillOpacity": 50,
             "hideFrom": {
               "legend": false,
               "tooltip": false,
@@ -285,9 +283,13 @@
             "lineStyle": {
               "fill": "solid"
             },
+            "pointShape": "circle",
             "pointSize": {
-              "fixed": 2
+              "fixed": 2,
+              "max": 20,
+              "min": 1
             },
+            "pointStrokeWidth": 1,
             "scaleDistribution": {
               "type": "linear"
             },
@@ -329,7 +331,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 21
+        "y": 20
       },
       "id": 100,
       "maxPerRow": 4,
@@ -404,9 +406,7 @@
             }
           }
         ],
-        "seriesMapping": "auto",
         "tooltip": {
-          "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
@@ -498,7 +498,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource",
+        "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
       "description": "Dispatch by technology",
@@ -514,6 +514,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 76,
             "gradientMode": "none",
@@ -712,7 +713,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 21
+        "y": 20
       },
       "id": 101,
       "options": {
@@ -756,7 +757,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "select time, sum(volume) as \"volume\", tech FROM \n(\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_volume) AS \"volume\", unit_id, pm.technology as tech\nFROM market_orders mo\njoin power_plant_meta pm on pm.index=mo.unit_id and pm.simulation=mo.simulation\nWHERE\n\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  mo.simulation = '$simulation'\n\nGROUP BY 1, unit_id, bid_id, pm.technology\nORDER BY 1\n\n) a\ngroup by 1, tech\nORDER BY 1, tech desc",
+          "rawSql": "SELECT\n  time,\n  SUM(volume) AS volume,\n  tech\nFROM (\n  SELECT\n    $__timeGroupAlias(mo.start_time, $__interval),\n    SUM(mo.accepted_volume)     AS volume,\n    mo.unit_id                  AS unit_id,\n    pm.technology               AS tech\n  FROM market_orders mo\n  JOIN power_plant_meta pm\n    ON pm.unit_id    = mo.unit_id\n   AND pm.simulation = mo.simulation\n  WHERE\n    $__timeFilter(mo.start_time)\n    AND mo.market_id   = '$market'\n    AND mo.simulation  = '$simulation'\n  GROUP BY 1, mo.unit_id, mo.bid_id, pm.technology\n) AS a\nGROUP BY 1, tech\nORDER BY 1, tech DESC;\n",
           "refId": "A",
           "select": [
             [
@@ -864,6 +865,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -911,7 +913,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 30
+        "y": 29
       },
       "id": 19,
       "options": {
@@ -1063,6 +1065,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -1110,7 +1113,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 30
+        "y": 29
       },
       "id": 20,
       "options": {
@@ -1250,7 +1253,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 39
+        "y": 38
       },
       "id": 74,
       "panels": [],
@@ -1343,7 +1346,7 @@
         "h": 12,
         "w": 10,
         "x": 0,
-        "y": 40
+        "y": 39
       },
       "id": 72,
       "options": {
@@ -1490,10 +1493,10 @@
         ]
       },
       "gridPos": {
-        "h": 6,
+        "h": 12,
         "w": 9,
         "x": 10,
-        "y": 40
+        "y": 39
       },
       "id": 76,
       "options": {
@@ -1514,7 +1517,7 @@
           }
         ]
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1598,7 +1601,7 @@
         "h": 12,
         "w": 5,
         "x": 19,
-        "y": 40
+        "y": 39
       },
       "id": 7,
       "options": {
@@ -1684,127 +1687,12 @@
       "type": "piechart"
     },
     {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "P7B13B9DF907EC40C"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "series",
-            "axisLabel": "Market price €/MWh",
-            "axisPlacement": "auto",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "pointSize": {
-              "fixed": 4
-            },
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "show": "lines"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "percentage_of_time"
-            },
-            "properties": [
-              {
-                "id": "custom.axisLabel",
-                "value": "Percentage of time"
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 9,
-        "x": 10,
-        "y": 46
-      },
-      "id": 102,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "series": [],
-        "seriesMapping": "auto",
-        "tooltip": {
-          "maxHeight": 600,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "WITH ranked_prices AS (\r\n    SELECT\r\n        price, \r\n        ROW_NUMBER() OVER (ORDER BY price DESC) AS ranking,\r\n        COUNT(*) OVER () AS total_hours\r\n    FROM market_meta\r\n    WHERE simulation = '$simulation' and market_id = '$market'\r\n)\r\nSELECT \r\n    (ranking::float / total_hours) AS percentage_of_time, \r\n    price\r\nFROM ranked_prices\r\n \r\nORDER BY percentage_of_time;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Price duration curve",
-      "type": "xychart"
-    },
-    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 52
+        "y": 51
       },
       "id": 41,
       "panels": [],
@@ -1813,11 +1701,15 @@
     },
     {
       "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 53
+        "y": 52
       },
       "id": 22,
       "options": {
@@ -1829,7 +1721,8 @@
         "content": "# Unit Specific Data\n\nFor the chosen market and the chosen unit here the dispatch is displayed.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.4.0",
+      "title": "",
       "type": "text"
     },
     {
@@ -1849,6 +1742,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -1899,7 +1793,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 56
+        "y": 55
       },
       "id": 24,
       "interval": "15m",
@@ -2033,12 +1927,12 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 56
+        "y": 55
       },
       "id": 26,
       "options": {
         "afterRender": "",
-        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
+        "content": "### General Information\n\nName: {{unit_id}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
         "contentPartials": [],
         "defaultContent": "The query didn't return any results.",
         "editor": {
@@ -2054,7 +1948,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "6.2.0",
+      "pluginVersion": "5.7.0",
       "targets": [
         {
           "datasource": {
@@ -2066,7 +1960,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT * FROM power_plant_meta\nWHERE index in ($Gen_Units) and simulation = '$simulation'\n",
+          "rawSql": "SELECT * FROM power_plant_meta\nWHERE unit_id in ($Gen_Units) and simulation = '$simulation'\n",
           "refId": "A",
           "select": [
             [
@@ -2112,7 +2006,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource",
+        "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
       "description": "Bid prices of accepted bids per unit in the chosen market",
@@ -2128,6 +2022,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2188,7 +2083,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 65
+        "y": 64
       },
       "id": 70,
       "options": {
@@ -2215,7 +2110,6 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
-          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "hide": false,
@@ -2233,23 +2127,6 @@
               }
             ]
           ],
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -2360,7 +2237,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource",
+        "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
       "description": "",
@@ -2376,6 +2253,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2451,7 +2329,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 65
+        "y": 64
       },
       "id": 78,
       "options": {
@@ -2478,12 +2356,11 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
-          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_volume) AS \"Accepted volume:\",\r\n  avg(volume) AS \"Bid volume:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1\r\n",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  sum(accepted_volume) AS \"Accepted volume:\",\r\n  avg(volume) AS \"Bid volume:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1\r\n",
           "refId": "A",
           "select": [
             [
@@ -2495,23 +2372,6 @@
               }
             ]
           ],
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -2642,7 +2502,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 73
+        "y": 72
       },
       "id": 93,
       "options": {
@@ -2662,7 +2522,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -2720,7 +2580,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource",
+        "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
       "description": "",
@@ -2736,6 +2596,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2766,8 +2627,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2814,7 +2674,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 82
+        "y": 81
       },
       "id": 99,
       "options": {
@@ -2892,7 +2752,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 87
+        "y": 86
       },
       "id": 39,
       "panels": [],
@@ -2916,6 +2776,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2946,8 +2807,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2963,7 +2823,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 88
+        "y": 87
       },
       "id": 36,
       "options": {
@@ -3101,8 +2961,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3117,12 +2976,12 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 88
+        "y": 87
       },
       "id": 37,
       "options": {
         "afterRender": "",
-        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh_thermal <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
+        "content": "### General Information\n\nName: {{unit_id}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
         "contentPartials": [],
         "defaultContent": "The query didn't return any results.",
         "editor": {
@@ -3138,7 +2997,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "6.2.0",
+      "pluginVersion": "5.6.0",
       "targets": [
         {
           "datasource": {
@@ -3150,7 +3009,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT * FROM demand_meta\nWHERE index in ($Demand_Units) and simulation = '$simulation'\n",
+          "rawSql": "SELECT * FROM demand_meta\nWHERE unit_id in ($Demand_Units) and simulation = '$simulation'\n",
           "refId": "A",
           "select": [
             [
@@ -3196,7 +3055,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource",
+        "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
       "description": "Bid prices of accepted bids per unit in the chosen market",
@@ -3212,6 +3071,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -3242,8 +3102,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3272,7 +3131,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 97
+        "y": 96
       },
       "id": 89,
       "options": {
@@ -3299,7 +3158,6 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
-          "editorMode": "code",
           "format": "time_series",
           "group": [
             {
@@ -3318,7 +3176,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_price::float) AS \"Accepted price:\",\r\n  avg(price) AS \"Bid price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Demand_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id, price\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_price::float) AS \"Accepted price:\",\r\n  price AS \"Bid price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Demand_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id, price\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -3356,23 +3214,6 @@
               }
             ]
           ],
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          },
           "table": "market_orders",
           "timeColumn": "start_time",
           "timeColumnType": "timestamp",
@@ -3423,8 +3264,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3480,7 +3320,7 @@
         "h": 5,
         "w": 4,
         "x": 12,
-        "y": 97
+        "y": 96
       },
       "id": 95,
       "options": {
@@ -3500,7 +3340,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -3559,7 +3399,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource",
+        "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
       "description": "",
@@ -3575,6 +3415,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -3605,8 +3446,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3650,7 +3490,7 @@
         "h": 5,
         "w": 8,
         "x": 16,
-        "y": 97
+        "y": 96
       },
       "id": 90,
       "options": {
@@ -3677,7 +3517,6 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
-          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
@@ -3694,23 +3533,6 @@
               }
             ]
           ],
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -3759,8 +3581,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3776,7 +3597,7 @@
         "h": 4,
         "w": 4,
         "x": 12,
-        "y": 102
+        "y": 101
       },
       "id": 96,
       "options": {
@@ -3796,7 +3617,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -3868,8 +3689,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3885,7 +3705,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 102
+        "y": 101
       },
       "id": 94,
       "options": {
@@ -3905,7 +3725,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -3979,6 +3799,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -4009,8 +3830,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4042,7 +3862,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 106
+        "y": 105
       },
       "id": 86,
       "options": {
@@ -4125,7 +3945,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 115
+        "y": 114
       },
       "id": 44,
       "panels": [],
@@ -4149,6 +3969,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -4179,8 +4000,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4196,7 +4016,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 116
+        "y": 115
       },
       "id": 65,
       "options": {
@@ -4334,8 +4154,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4350,12 +4169,12 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 116
+        "y": 115
       },
       "id": 47,
       "options": {
         "afterRender": "",
-        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\nUnit Operator: {{unit_operator}}\n\n### Technical Specifications\nCapacity: {{capacity}} MWh <br>\nMaximum State of Charge: {{max_soc}} <br>\nMinimum State of Charge: {{min_soc}} <br>\n\nMaximum Power Discharge: {{max_power_discharge}} MW <br>\nMinimum Power Discharge: {{min_power_discharge}} MW <br>\nEfficiency Discharge: {{efficiency_discharge}} <br>\n\nMaximum Power Charge: {{max_power_charge}} MW <br>\nMinimum Power Charge: {{min_power_charge}} MW <br>\nEfficiency Charge: {{efficiency_charge}} % <br>  ",
+        "content": "### General Information\n\nName: {{unit_id}} <br>\nTechnology: {{technology}} <br>\nUnit Operator: {{unit_operator}}\n\n### Technical Specifications\nMaximum Capacity: {{max_soc}} MWh <br>\nMinimum Capacity: {{min_soc}} MWh <br>\n\nMaximum Power Discharge: {{max_power_discharge}} MW <br>\nMinimum Power Discharge: {{min_power_discharge}} MW <br>\nEfficiency Discharge: {{efficiency_discharge}} <br>\n\nMaximum Power Charge: {{max_power_charge}} MW <br>\nMinimum Power Charge: {{min_power_charge}} MW <br>\nEfficiency Charge: {{efficiency_charge}} % <br>  ",
         "contentPartials": [],
         "defaultContent": "The query didn't return any results.",
         "editor": {
@@ -4371,7 +4190,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "6.2.0",
+      "pluginVersion": "5.6.0",
       "targets": [
         {
           "datasource": {
@@ -4382,7 +4201,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT * FROM storage_meta\nWHERE index in ($Storage_Units) and simulation = '$simulation'\n",
+          "rawSql": "SELECT * FROM storage_meta\nWHERE unit_id in ($Storage_Units) and simulation = '$simulation'\n",
           "refId": "A",
           "select": [
             [
@@ -4427,6 +4246,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -4457,8 +4277,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4466,7 +4285,7 @@
               }
             ]
           },
-          "unit": "percentunit"
+          "unit": "mwatth"
         },
         "overrides": []
       },
@@ -4474,7 +4293,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 125
+        "y": 124
       },
       "id": 80,
       "options": {
@@ -4568,6 +4387,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -4598,8 +4418,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4628,7 +4447,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 134
+        "y": 133
       },
       "id": 91,
       "options": {
@@ -4782,6 +4601,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -4812,8 +4632,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4857,7 +4676,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 134
+        "y": 133
       },
       "id": 92,
       "options": {
@@ -5000,8 +4819,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -5048,7 +4866,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 143
+        "y": 142
       },
       "id": 97,
       "options": {
@@ -5068,7 +4886,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -5142,6 +4960,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -5172,8 +4991,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -5220,7 +5038,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 152
+        "y": 151
       },
       "id": 98,
       "options": {
@@ -5293,14 +5111,14 @@
       "type": "timeseries"
     }
   ],
+  "preload": false,
   "refresh": "",
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": false,
           "text": "example_01c_eom_only",
           "value": "example_01c_eom_only"
         },
@@ -5310,21 +5128,17 @@
         },
         "definition": "SELECT simulation\nFROM market_meta",
         "description": "Can choose which simulation we want to show ",
-        "hide": 0,
         "includeAll": false,
-        "multi": false,
         "name": "simulation",
         "options": [],
         "query": "SELECT simulation\nFROM market_meta",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": false,
           "text": "EOM",
           "value": "EOM"
         },
@@ -5334,49 +5148,42 @@
         },
         "definition": "SELECT \n  market_id\nFROM market_meta\nwhere simulation='$simulation'\ngroup by market_id ;",
         "description": "Choose for which market the data is displayed",
-        "hide": 0,
         "includeAll": false,
-        "multi": false,
         "name": "market",
         "options": [],
         "query": "SELECT \n  market_id\nFROM market_meta\nwhere simulation='$simulation'\ngroup by market_id ;",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": true,
           "text": [
-            "Unit 4"
+            "Biomass"
           ],
           "value": [
-            "Unit 4"
+            "Biomass"
           ]
         },
         "datasource": {
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
+        "definition": "SELECT unit_id\nFROM power_plant_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which units we want to display ",
-        "hide": 0,
         "includeAll": false,
         "multi": true,
         "name": "Gen_Units",
         "options": [],
-        "query": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
+        "query": "SELECT unit_id\nFROM power_plant_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": true,
           "text": [
             "demand_EOM"
           ],
@@ -5388,23 +5195,20 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
+        "definition": "SELECT unit_id\nFROM demand_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which units we want to display ",
-        "hide": 0,
         "includeAll": false,
         "multi": true,
         "name": "Demand_Units",
         "options": [],
-        "query": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
+        "query": "SELECT unit_id\nFROM demand_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": true,
           "text": [
             "Storage 1"
           ],
@@ -5416,81 +5220,29 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
+        "definition": "SELECT unit_id\nFROM storage_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which storage units we want to display ",
-        "hide": 0,
         "includeAll": false,
         "multi": true,
         "name": "Storage_Units",
         "options": [],
-        "query": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
+        "query": "SELECT unit_id\nFROM storage_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": false,
-          "text": "2019-01-01 02:00:00",
-          "value": "2019-01-01 02:00:00"
-        },
-        "datasource": {
-          "type": "grafana-postgresql-datasource",
-          "uid": "P7B13B9DF907EC40C"
+          "text": "2019-01-01 01:00:00",
+          "value": "2019-01-01 01:00:00"
         },
         "definition": "select min(start_time)::text from market_orders where market_id = '$market' AND\n      simulation = '$simulation' and $__timeFilter(start_time)",
         "description": "The minimum time we have in the time range.\nUsed for the merit order plot title",
         "hide": 2,
-        "includeAll": false,
-        "multi": false,
         "name": "min_time",
         "options": [],
         "query": "select min(start_time)::text from market_orders where market_id = '$market' AND\n      simulation = '$simulation' and $__timeFilter(start_time)",
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "type": "query"
-      },
-      {
-        "current": {
-          "selected": false,
-          "text": "",
-          "value": ""
-        },
-        "datasource": {
-          "type": "postgres",
-          "uid": "P7B13B9DF907EC40C"
-        },
-        "definition": "SELECT  min(start_time) FROM market_orders WHERE simulation = '$simulation' ",
-        "description": "Epoch ms of the simulation start, used for the full range link",
-        "hide": 2,
-        "includeAll": false,
-        "name": "simulation_start",
-        "options": [],
-        "query": "SELECT  min(start_time) FROM market_orders WHERE simulation = '$simulation' ",
-        "refresh": 1,
-        "regex": "",
-        "type": "query"
-      },
-      {
-        "current": {
-          "text": "",
-          "value": ""
-        },
-        "datasource": {
-          "type": "postgres",
-          "uid": "P7B13B9DF907EC40C"
-        },
-        "definition": "SELECT  max(start_time) FROM market_orders WHERE simulation = '$simulation' ",
-        "description": "Epoch ms of the simulation end, used for the full range link",
-        "hide": 2,
-        "includeAll": false,
-        "name": "simulation_end",
-        "options": [],
-        "query": "SELECT  max(start_time) FROM market_orders WHERE simulation = '$simulation' ",
         "refresh": 1,
         "regex": "",
         "type": "query"
@@ -5498,10 +5250,9 @@
     ]
   },
   "time": {
-    "from": "2019-01-01T01:11:53.495Z",
-    "to": "2019-01-31T18:05:53.940Z"
+    "from": "2019-01-01T00:00:00.000Z",
+    "to": "2019-01-31T23:59:59.000Z"
   },
-  "timeRangeUpdatedDuringEditOrView": false,
   "timepicker": {
     "refresh_intervals": [
       "5s",
@@ -5514,7 +5265,7 @@
   },
   "timezone": "utc",
   "title": "ASSUME: Main overview",
-  "uid": "aemnxld4ukgsga",
-  "version": 5,
+  "uid": "mQ3Lvkr4k",
+  "version": 6,
   "weekStart": ""
 }

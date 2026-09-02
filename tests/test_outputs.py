@@ -6,9 +6,11 @@ import os
 from datetime import datetime
 
 import numpy as np
-from sqlalchemy import create_engine
+import pandas as pd
+import pytest
+from sqlalchemy import create_engine, inspect
 
-from assume.common.outputs import WriteOutput
+from assume.common.outputs import DatabaseMaintenance, WriteOutput
 
 os.makedirs("./examples/local_db", exist_ok=True)
 DB_URI = "sqlite:///./examples/local_db/test_outputs.db"
@@ -168,3 +170,53 @@ def test_output_write_flows():
 
     output_writer.handle_output_message(content, meta)
     assert len(output_writer.write_buffers["grid_flows"]) == 1, "grid_flows"
+
+
+@pytest.mark.asyncio
+async def test_output_store_dfs_and_maintenance(tmp_path):
+    db_path = tmp_path / "test_sim.db"
+    db_uri = f"sqlite:///{db_path}"
+    start = datetime(2020, 1, 1)
+    end = datetime(2020, 1, 2)
+    output_writer = WriteOutput(
+        "sim_1", start, end, save_frequency_hours=24, db_uri=db_uri
+    )
+    output_writer.db = create_engine(db_uri)
+
+    content = {
+        "context": "write_results",
+        "type": "market_meta",
+        "sender": "CRM_pos",
+        "data": [
+            {
+                "supply_volume": 10.0,
+                "demand_volume": 10.0,
+                "demand_volume_energy": 10.0,
+                "supply_volume_energy": 10.0,
+                "price": 50.0,
+                "max_price": 100.0,
+                "min_price": 0.0,
+                "node": "node0",
+                "product_start": datetime(2020, 1, 1, 0),
+                "product_end": datetime(2020, 1, 1, 1),
+                "only_hours": None,
+                "market_id": "CRM_pos",
+                "time": datetime(2020, 1, 1, 0),
+            }
+        ],
+    }
+    output_writer.handle_output_message(content, {"sender_id": None})
+    await output_writer.store_dfs()
+
+    with output_writer.db.begin() as conn:
+        indexes = {idx["name"] for idx in inspect(conn).get_indexes("market_meta")}
+        assert "market_meta_simulation_idx" in indexes
+
+    maintenance = DatabaseMaintenance(db_uri)
+    assert maintenance.get_simulation_ids() == ["sim_1"]
+
+    # Delete simulation
+    maintenance.delete_simulations(["sim_1"])
+    with output_writer.db.begin() as conn:
+        df = pd.read_sql("SELECT * FROM market_meta", conn)
+        assert df.empty

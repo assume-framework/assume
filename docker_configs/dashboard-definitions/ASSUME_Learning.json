@@ -25,21 +25,8 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 3,
-  "links": [
-    {
-      "asDropdown": false,
-      "icon": "dashboard",
-      "includeVars": true,
-      "keepTime": false,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Set time filter to full simulation horizon",
-      "tooltip": "Clicking on the button will update the time range filter. The first and last timestamps of the selected simulation are used. Other filter items are preserved. The dashboard will reload: make sure to save your changes beforehand.",
-      "type": "link",
-      "url": "/d/JKQzx0q4k?orgId=1&from=${simulation_start}&to=${simulation_end}&timezone=utc"
-    }
-  ],
+  "id": 5,
+  "links": [],
   "panels": [
     {
       "description": "",
@@ -63,7 +50,7 @@
         "content": "# Welcome to Learning Dashboard by ASSUME\n",
         "mode": "markdown"
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "11.4.0",
       "title": "",
       "type": "text"
     },
@@ -89,7 +76,7 @@
         "content": "## How to Use the Dashboard  \n\nThis interactive tool provides insights into the learning process of our reinforcement learning (RL) agent. While the TensorBoard integration (compare ReadMe) provides an overview of the general learning performance of all agents, this dashboard gives you the option to inspect **each agent individually or in comparison**. To effectively navigate the dashboard, keep the following key points in mind:  \n\n### 1. Dashboard Structure  \n\nThe dashboard is divided into two main rows and two columns:  \n\n**COLUMNS**  \n- **Training Episode:** Depicts the results of the selected training episodes at the top of the dashboard. Note that training episodes have special properties such as noise added for exploration purposes.  \n- **Evaluation Episode:** Depicts the results of the selected evaluation episodes.  \n\n**ROWS**  \n- **Per Simulation:** Summarizes results across all simulated episodes, distinguishing between \"training\" and \"evaluation\" episodes.  \n- **Per Episode:** Focuses on specific units and episodes, allowing for detailed analysis.  \n\n### 2. Selecting Metrics and Simulations  \n\nAt the top of the dashboard, you can filter data using the following options:  \n\n- **Simulation ID:** Choose the simulation run you want to analyze.  \n- **Unit & Episode:** Select specific units and episodes for detailed insights. You can also select all units, but be cautious—visualizing a large number of agents may cause performance issues.  \n\nThe selected metrics will be displayed in corresponding visualization areas.  \n\n### 3. Interacting with Plots  \n\nThe plots are fully interactive:  \n\n- **Zoom** in and out to explore trends.  \n- **Click** on data points for detailed values.  \n- **Hover** over the upper-left corner of each plot for additional insights.  \n\n### How to Interpret the Data  \n\nTo make the most of the dashboard, follow these key steps:  \n\n1. **Understand Learning Trends:**  \n   - Observe how **reward** and **profitability** metrics evolve over time.  \n   - Look for an upward trend in evaluation runs (where exploration is off). Unlike fluctuating training rewards, evaluation rewards should show a steady increase.  \n\n2. **Analyze Policy & Action Patterns:**  \n   - Examine the agent's learned policy and action distribution.  \n   - Identify patterns and assess whether they align with\n",
         "mode": "markdown"
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "11.4.0",
       "title": "",
       "type": "text"
     },
@@ -115,7 +102,7 @@
         "content": "## Training Episode ",
         "mode": "markdown"
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "11.4.0",
       "title": "",
       "type": "text"
     },
@@ -140,7 +127,7 @@
         "content": "## Evaluation Episode",
         "mode": "markdown"
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "11.4.0",
       "title": "",
       "type": "text"
     },
@@ -195,7 +182,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               }
             ]
           }
@@ -246,13 +233,12 @@
         ],
         "seriesMapping": "auto",
         "tooltip": {
-          "hideZeros": false,
           "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -394,7 +380,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               }
             ]
           }
@@ -445,13 +431,12 @@
         ],
         "seriesMapping": "auto",
         "tooltip": {
-          "hideZeros": false,
           "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -606,7 +591,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               }
             ]
           }
@@ -657,13 +642,12 @@
         ],
         "seriesMapping": "auto",
         "tooltip": {
-          "hideZeros": false,
           "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -805,7 +789,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               }
             ]
           }
@@ -856,13 +840,12 @@
         ],
         "seriesMapping": "auto",
         "tooltip": {
-          "hideZeros": false,
           "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1004,7 +987,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               }
             ]
           }
@@ -1055,13 +1038,12 @@
         ],
         "seriesMapping": "auto",
         "tooltip": {
-          "hideZeros": false,
           "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1203,7 +1185,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               }
             ]
           }
@@ -1254,13 +1236,12 @@
         ],
         "seriesMapping": "auto",
         "tooltip": {
-          "hideZeros": false,
           "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1411,7 +1392,6 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -1427,7 +1407,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               }
             ]
           }
@@ -1467,13 +1447,12 @@
           "showLegend": true
         },
         "tooltip": {
-          "hideZeros": false,
           "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1608,7 +1587,6 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -1624,7 +1602,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               }
             ]
           }
@@ -1664,13 +1642,12 @@
           "showLegend": true
         },
         "tooltip": {
-          "hideZeros": false,
           "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1805,7 +1782,6 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -1821,7 +1797,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               }
             ]
           }
@@ -1861,13 +1837,12 @@
           "showLegend": true
         },
         "tooltip": {
-          "hideZeros": false,
           "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -2002,7 +1977,6 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -2018,7 +1992,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               }
             ]
           }
@@ -2058,13 +2032,12 @@
           "showLegend": true
         },
         "tooltip": {
-          "hideZeros": false,
           "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -2199,7 +2172,6 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -2217,7 +2189,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               }
             ]
           }
@@ -2243,13 +2215,12 @@
           "showLegend": true
         },
         "tooltip": {
-          "hideZeros": false,
           "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -2368,9 +2339,12 @@
       "title": "Training ACTIONS during Episode ${episode}",
       "transformations": [
         {
-          "id": "prepareTimeSeries",
+          "id": "partitionByValues",
           "options": {
-            "format": "multi"
+            "fields": [
+              "unit"
+            ],
+            "keepFields": false
           }
         }
       ],
@@ -2410,7 +2384,6 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -2428,7 +2401,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               }
             ]
           }
@@ -2454,13 +2427,12 @@
           "showLegend": true
         },
         "tooltip": {
-          "hideZeros": false,
           "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -2579,9 +2551,12 @@
       "title": "Evaluation ACTIONS during Eval Episode ${eval_episode}",
       "transformations": [
         {
-          "id": "prepareTimeSeries",
+          "id": "partitionByValues",
           "options": {
-            "format": "multi"
+            "fields": [
+              "unit"
+            ],
+            "keepFields": false
           }
         }
       ],
@@ -2590,7 +2565,7 @@
   ],
   "preload": false,
   "refresh": "",
-  "schemaVersion": 42,
+  "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": [
@@ -2677,47 +2652,6 @@
         "refresh": 2,
         "regex": "",
         "type": "query"
-      },
-      {
-        "current": {
-          "selected": false,
-          "text": "",
-          "value": ""
-        },
-        "datasource": {
-          "type": "postgres",
-          "uid": "P7B13B9DF907EC40C"
-        },
-        "definition": "SELECT  min(start_time) FROM market_orders WHERE simulation = '$simulation' ",
-        "description": "Epoch ms of the simulation start, used for the full range link",
-        "hide": 2,
-        "includeAll": false,
-        "name": "simulation_start",
-        "options": [],
-        "query": "SELECT  min(start_time) FROM market_orders WHERE simulation = '$simulation' ",
-        "refresh": 1,
-        "regex": "",
-        "type": "query"
-      },
-      {
-        "current": {
-          "text": "",
-          "value": ""
-        },
-        "datasource": {
-          "type": "postgres",
-          "uid": "P7B13B9DF907EC40C"
-        },
-        "definition": "SELECT  max(start_time) FROM market_orders WHERE simulation = '$simulation' ",
-        "description": "Epoch ms of the simulation end, used for the full range link",
-        "hide": 2,
-        "includeAll": false,
-        "name": "simulation_end",
-        "options": [],
-        "query": "SELECT  max(start_time) FROM market_orders WHERE simulation = '$simulation' ",
-        "refresh": 1,
-        "regex": "",
-        "type": "query"
       }
     ]
   },
@@ -2739,5 +2673,6 @@
   "timezone": "",
   "title": "ASSUME: Training progress",
   "uid": "JKQzx0q4k",
-  "version": 13
+  "version": 20,
+  "weekStart": ""
 }
