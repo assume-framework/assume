@@ -498,29 +498,69 @@ def calculate_adaptive_merit_order_forecast_inputs(
 
 
 ADAPTIVE_MERIT_ORDER_FEATURES = (
+    # Selected by chronological LASSO screening on example_03, using January
+    # through September 2019 for selection and a separate October--December
+    # holdout for confirmation. Together they model system tightness, daily
+    # persistence, and the weekday/weekend market regime.
     "merit_order_price",
     "wind_availability_factor",
     "solar_availability_factor",
     "residual_load",
-    "lagged_residual",
-    "lagged_price",
-    "hour",
+    "previous_day_same_hour_residual",
+    "previous_day_same_hour_price",
     "weekday",
     "weekend",
 )
 
+ADAPTIVE_MERIT_ORDER_SUPPORTED_FEATURES = (
+    "merit_order_price",
+    "wind_availability_factor",
+    "solar_availability_factor",
+    "residual_load",
+    "previous_day_same_hour_residual",
+    "previous_day_same_hour_price",
+    # Evaluated but not selected as a default: its incremental contribution
+    # was inconsistent once weekday and weekend were included.
+    "hour",
+    "weekday",
+    "weekend",
+    # Optional calendar feature. It remains available when a holiday calendar
+    # is supplied explicitly; it was not included in the 2019 feature screen.
+    "holiday",
+)
+
 ADAPTIVE_MERIT_ORDER_SETTINGS = {
-    "minimum_training_samples": 168,
+    # Number of cleared hourly products collected before the first model fit.
+    "minimum_training_samples": 504,
+    # Weight retained from one online update to the next; lower values forget
+    # older market outcomes more quickly.
     "forgetting_factor": 0.995,
-    "location_l1": 0.01,
-    "location_l2": 0.001,
-    "scale_l1": 0.01,
-    "scale_l2": 0.001,
+    # L1 selects inputs for the expected-residual equation; L2 stabilises
+    # correlated coefficients. The intercept is excluded from both penalties.
+    "residual_mean_l1_regularization": 0.01,
+    "residual_mean_l2_regularization": 0.001,
+    # The same penalties for the log-standard-deviation equation.
+    "residual_scale_l1_regularization": 0.01,
+    "residual_scale_l2_regularization": 0.001,
+    # Predictive distribution used to derive price quantiles.
     "distribution": "gaussian",
+    # Johnson SU shape fitting uses only previous standardised forecast errors.
+    "johnson_su_history_size": 1008,
+    "johnson_su_solver_iterations": 5,
+    "johnson_su_learning_rate": 0.01,
+    # Inputs for the residual-mean model. A None scale feature list reuses these.
     "features": ADAPTIVE_MERIT_ORDER_FEATURES,
     "scale_features": None,
-    "sigma_floor": 0.01,
+    # Enable the holiday input only when dates are supplied by a calendar.
+    "use_holiday_feature": False,
     "holiday_dates": (),
+    # Smallest permitted predicted standard deviation, in price units.
+    "sigma_floor": 0.01,
+    # Outer Fisher-scoring/IRLS convergence limits for the two Gaussian
+    # distributional equations.
+    "irls_max_iterations": 25,
+    "irls_tolerance": 1e-6,
+    # Inner coordinate-descent convergence limits for each weighted fit.
     "solver_max_iterations": 1000,
     "solver_tolerance": 1e-8,
 }
@@ -529,7 +569,7 @@ ADAPTIVE_MERIT_ORDER_SETTINGS = {
 def initialize_adaptive_merit_order_feature_state(features, holiday_dates=()) -> dict:
     """Create feature metadata; scaling is fitted on the initial window later."""
     features = tuple(features)
-    allowed = set(ADAPTIVE_MERIT_ORDER_FEATURES) | {"holiday"}
+    allowed = set(ADAPTIVE_MERIT_ORDER_SUPPORTED_FEATURES)
     unknown = set(features) - allowed
     if unknown:
         raise ValueError(f"Unknown adaptive merit-order features: {sorted(unknown)}")
@@ -545,7 +585,10 @@ def initialize_adaptive_merit_order_feature_state(features, holiday_dates=()) ->
         elif feature == "weekday":
             names.extend(("weekday_sin", "weekday_cos"))
             continuous.extend((True, True))
-        elif feature in ("lagged_residual", "lagged_price"):
+        elif feature in (
+            "previous_day_same_hour_residual",
+            "previous_day_same_hour_price",
+        ):
             names.extend((feature, f"{feature}_missing"))
             continuous.extend((True, False))
         else:
@@ -575,7 +618,10 @@ def build_adaptive_merit_order_feature_vector(
             "residual_load",
         ):
             values.append(inputs[feature])
-        elif feature in ("lagged_residual", "lagged_price"):
+        elif feature in (
+            "previous_day_same_hour_residual",
+            "previous_day_same_hour_price",
+        ):
             value = inputs.get(feature)
             values.extend(
                 (float("nan") if value is None else value, float(value is None))
@@ -633,7 +679,7 @@ def transform_adaptive_merit_order_features(
     return result
 
 
-def initialize_online_elastic_net(
+def initialize_online_regularized_regression(
     n_features: int,
     l1: float,
     l2: float,
@@ -641,9 +687,9 @@ def initialize_online_elastic_net(
     max_iterations: int,
     tolerance: float,
 ) -> dict:
-    """Create discounted Elastic-Net sufficient statistics."""
+    """Create discounted statistics for an online L1/L2 regression."""
     if n_features <= 0 or l1 < 0 or l2 < 0:
-        raise ValueError("Invalid Elastic-Net dimensions or penalties")
+        raise ValueError("Invalid regression dimensions or penalties")
     if not 0 < forgetting_factor <= 1:
         raise ValueError("forgetting_factor must be in (0, 1]")
     return {
@@ -660,8 +706,17 @@ def initialize_online_elastic_net(
     }
 
 
-def solve_online_elastic_net(model: dict) -> None:
-    """Warm-start coordinate descent; the intercept remains unpenalised."""
+def solve_online_regularized_regression(model: dict) -> None:
+    """Solve weighted L1/L2 regression by warm-start coordinate descent.
+
+    The normalised objective is
+
+    ``0.5 * weighted_squared_error + l1 * |beta| + 0.5 * l2 * beta**2``.
+
+    The intercept in column zero is excluded from both penalties.
+    """
+    if model["effective_weight"] <= 0:
+        raise ValueError("Regression requires a positive effective weight")
     gram = model["gram"] / model["effective_weight"]
     target_moment = model["target_moment"] / model["effective_weight"]
     coefficients = model["coefficients"].clone()
@@ -687,36 +742,68 @@ def solve_online_elastic_net(model: dict) -> None:
     model["coefficients"] = coefficients
 
 
-def fit_online_elastic_net(model: dict, features, target) -> None:
-    """Batch-fit the initial chronological Elastic-Net window."""
+def fit_online_regularized_regression(
+    model: dict, features, target, weights=None
+) -> None:
+    """Fit one weighted regression and retain its sufficient statistics."""
     features = th.as_tensor(features, dtype=th.float64)
     target = th.as_tensor(target, dtype=th.float64)
     if features.shape != (target.numel(), model["n_features"]):
         raise ValueError("features or target have the wrong shape")
     if not th.all(th.isfinite(features)) or not th.all(th.isfinite(target)):
         raise ValueError("Training data must be finite")
-    model["gram"] = features.T @ features
-    model["target_moment"] = features.T @ target
-    model["effective_weight"] = float(target.numel())
-    solve_online_elastic_net(model)
+    if weights is None:
+        weights = th.ones(target.numel(), dtype=th.float64)
+    else:
+        weights = th.as_tensor(weights, dtype=th.float64)
+    if weights.shape != target.shape or not th.all(th.isfinite(weights)):
+        raise ValueError("weights have the wrong shape or are not finite")
+    if th.any(weights <= 0):
+        raise ValueError("Regression weights must be positive")
+    model["gram"] = features.T @ (weights[:, None] * features)
+    model["target_moment"] = features.T @ (weights * target)
+    model["effective_weight"] = weights.sum().item()
+    solve_online_regularized_regression(model)
 
 
-def update_online_elastic_net(model: dict, features, target) -> None:
-    """Apply one exponentially discounted online observation."""
+def update_online_regularized_regression(
+    model: dict, features, target, weight=1.0, previous_statistics=None
+) -> None:
+    """Add one weighted observation to discounted sufficient statistics.
+
+    ``previous_statistics`` lets IRLS reconsider the newest observation without
+    counting it repeatedly: every outer iteration starts from the same frozen
+    pre-outcome statistics and commits only its latest working response.
+    """
     features = th.as_tensor(features, dtype=th.float64)
     target = th.as_tensor(target, dtype=th.float64)
+    weight = th.as_tensor(weight, dtype=th.float64)
     if features.shape != (model["n_features"],):
         raise ValueError("features have the wrong shape")
-    if not th.all(th.isfinite(features)) or not th.isfinite(target):
+    if (
+        not th.all(th.isfinite(features))
+        or not th.isfinite(target)
+        or not th.isfinite(weight)
+        or weight <= 0
+    ):
         raise ValueError("Online training data must be finite")
+    if previous_statistics is None:
+        previous_statistics = (
+            model["gram"],
+            model["target_moment"],
+            model["effective_weight"],
+        )
+    previous_gram, previous_target_moment, previous_effective_weight = (
+        previous_statistics
+    )
     gamma = model["forgetting_factor"]
-    model["gram"] = gamma * model["gram"] + th.outer(features, features)
-    model["target_moment"] = gamma * model["target_moment"] + features * target
-    model["effective_weight"] = gamma * model["effective_weight"] + 1
-    solve_online_elastic_net(model)
+    model["gram"] = gamma * previous_gram + weight * th.outer(features, features)
+    model["target_moment"] = gamma * previous_target_moment + weight * features * target
+    model["effective_weight"] = gamma * previous_effective_weight + weight.item()
+    solve_online_regularized_regression(model)
 
 
-def predict_online_elastic_net(model: dict, features):
+def predict_online_regularized_regression(model: dict, features):
     """Predict from one row or a feature matrix."""
     prediction = th.as_tensor(features, dtype=th.float64) @ model["coefficients"]
     return prediction.item() if prediction.ndim == 0 else prediction
@@ -737,25 +824,121 @@ def gaussian_residual_quantile(mean, standard_deviation, probability):
     )
 
 
+def johnson_su_standardised_moments(shape_a, shape_b):
+    """Return mean and standard deviation of a Johnson SU variate."""
+    shape_a = th.as_tensor(shape_a, dtype=th.float64)
+    shape_b = th.as_tensor(shape_b, dtype=th.float64)
+    inverse_shape_b = 1 / shape_b
+    mean = -th.exp(inverse_shape_b.square() / 2) * th.sinh(shape_a * inverse_shape_b)
+    second_moment = (
+        th.exp(2 * inverse_shape_b.square()) * th.cosh(2 * shape_a * inverse_shape_b)
+        - 1
+    ) / 2
+    standard_deviation = th.sqrt(th.clamp(second_moment - mean.square(), min=1e-12))
+    return mean, standard_deviation
+
+
+def johnson_su_residual_quantile(
+    mean, standard_deviation, shape_a, shape_b, probability
+):
+    """Calculate a mean-standardised Johnson SU residual quantile."""
+    if not 0 < probability < 1 or standard_deviation < 0 or shape_b <= 0:
+        raise ValueError("Invalid Johnson SU quantile parameters")
+    normal = th.distributions.Normal(
+        th.tensor(0.0, dtype=th.float64),
+        th.tensor(1.0, dtype=th.float64),
+    )
+    raw_mean, raw_standard_deviation = johnson_su_standardised_moments(shape_a, shape_b)
+    raw_quantile = th.sinh(
+        (normal.icdf(th.tensor(probability, dtype=th.float64)) - shape_a) / shape_b
+    )
+    return (
+        mean
+        + standard_deviation
+        * ((raw_quantile - raw_mean) / raw_standard_deviation).item()
+    )
+
+
+def fit_johnson_su_shape(model: dict) -> None:
+    """Update Johnson SU shape from past standardised forecast errors only."""
+    errors = model["johnson_su_standardised_errors"]
+    if not errors:
+        return
+    config = model["config"]
+    errors = th.tensor(errors[-config["johnson_su_history_size"] :], dtype=th.float64)
+    age = th.arange(len(errors) - 1, -1, -1, dtype=th.float64)
+    weights = th.tensor(config["forgetting_factor"], dtype=th.float64) ** age
+    parameters = th.tensor(
+        [model["johnson_su_shape_a"], model["johnson_su_log_shape_b"]],
+        dtype=th.float64,
+        requires_grad=True,
+    )
+    iterations = config["johnson_su_solver_iterations"]
+    if model["johnson_su_shape"] is None:
+        iterations *= 20
+    for _ in range(iterations):
+        shape_a = th.clamp(parameters[0], min=-5.0, max=5.0)
+        log_shape_b = th.clamp(
+            parameters[1], min=th.log(th.tensor(0.5)), max=th.log(th.tensor(20.0))
+        )
+        shape_b = th.exp(log_shape_b)
+        raw_mean, raw_standard_deviation = johnson_su_standardised_moments(
+            shape_a, shape_b
+        )
+        raw_errors = raw_mean + raw_standard_deviation * errors
+        transformed_errors = shape_a + shape_b * th.asinh(raw_errors)
+        log_density = (
+            log_shape_b
+            - 0.5 * th.log1p(raw_errors.square())
+            - 0.5 * transformed_errors.square()
+        )
+        loss = -(weights * log_density).sum() / weights.sum()
+        gradient = th.autograd.grad(loss, parameters)[0]
+        parameters = (
+            (parameters - config["johnson_su_learning_rate"] * gradient)
+            .detach()
+            .requires_grad_()
+        )
+    model["johnson_su_shape_a"] = th.clamp(parameters[0], min=-5.0, max=5.0).item()
+    model["johnson_su_log_shape_b"] = th.clamp(
+        parameters[1], min=th.log(th.tensor(0.5)), max=th.log(th.tensor(20.0))
+    ).item()
+    model["johnson_su_shape"] = (
+        model["johnson_su_shape_a"],
+        th.exp(th.tensor(model["johnson_su_log_shape_b"])).item(),
+    )
+
+
 def initialize_adaptive_merit_order_model(market_id, forecast_inputs, config) -> dict:
     """Create the online state for one market without fitting future data."""
+    config = config.copy()
+    if config.get("use_holiday_feature"):
+        if not config["holiday_dates"]:
+            raise ValueError("The holiday feature requires at least one holiday date")
+        config["features"] = config["features"] + ("holiday",)
+        if config["scale_features"] is not None:
+            config["scale_features"] = config["scale_features"] + ("holiday",)
     return {
         "market_id": market_id,
         "forecast_inputs": forecast_inputs,
         "config": config,
-        "location_features": initialize_adaptive_merit_order_feature_state(
+        "residual_mean_features": initialize_adaptive_merit_order_feature_state(
             config["features"], config["holiday_dates"]
         ),
-        "scale_features": initialize_adaptive_merit_order_feature_state(
+        "residual_scale_features": initialize_adaptive_merit_order_feature_state(
             config["scale_features"]
             if config["scale_features"] is not None
             else config["features"],
             config["holiday_dates"],
         ),
-        "location_model": None,
-        "scale_model": None,
+        "residual_mean_model": None,
+        "residual_scale_model": None,
         "initial_inputs": [],
         "initial_residuals": [],
+        "johnson_su_standardised_errors": [],
+        "johnson_su_shape_a": 0.0,
+        "johnson_su_log_shape_b": th.log(th.tensor(5.0)).item(),
+        "johnson_su_shape": None,
         "residual_by_product": {},
         "price_by_product": {},
         "residual_history": [],
@@ -802,8 +985,8 @@ def get_adaptive_merit_order_inputs(model: dict, product_start) -> dict:
         "residual_load": float(
             model["forecast_inputs"]["residual_load"].loc[timestamp]
         ),
-        "lagged_residual": model["residual_by_product"].get(lag_time),
-        "lagged_price": model["price_by_product"].get(lag_time),
+        "previous_day_same_hour_residual": model["residual_by_product"].get(lag_time),
+        "previous_day_same_hour_price": model["price_by_product"].get(lag_time),
         "is_holiday": product_start.date() in model["config"]["holiday_dates"],
     }
 
@@ -816,7 +999,10 @@ def issue_adaptive_merit_order_correction(
     if model is None:
         return []
     issued_forecasts = []
-    trained = model["location_model"] is not None and model["scale_model"] is not None
+    trained = (
+        model["residual_mean_model"] is not None
+        and model["residual_scale_model"] is not None
+    )
     for product_start, _, _ in products:
         forecast_id = (
             f"{unit_operator_id}|{market_id}|{issue_time.isoformat()}|"
@@ -833,19 +1019,21 @@ def issue_adaptive_merit_order_correction(
             )
 
         inputs = get_adaptive_merit_order_inputs(model, product_start)
-        location_vector = None
+        residual_mean_vector = None
         scale_vector = None
         if trained:
-            location_vector = transform_adaptive_merit_order_features(
-                model["location_features"], inputs
+            residual_mean_vector = transform_adaptive_merit_order_features(
+                model["residual_mean_features"], inputs
             )
             scale_vector = transform_adaptive_merit_order_features(
-                model["scale_features"], inputs
+                model["residual_scale_features"], inputs
             )
-            residual_mean = predict_online_elastic_net(
-                model["location_model"], location_vector
+            residual_mean = predict_online_regularized_regression(
+                model["residual_mean_model"], residual_mean_vector
             )
-            log_sigma = predict_online_elastic_net(model["scale_model"], scale_vector)
+            log_sigma = predict_online_regularized_regression(
+                model["residual_scale_model"], scale_vector
+            )
             log_sigma = th.clamp(
                 th.tensor(log_sigma, dtype=th.float64),
                 min=th.log(th.tensor(model["config"]["sigma_floor"], dtype=th.float64)),
@@ -878,20 +1066,38 @@ def issue_adaptive_merit_order_correction(
             "residual_mean_forecast": residual_mean,
             "corrected_price_mean_forecast": corrected_mean,
             "residual_std_forecast": residual_std,
-            "price_q10": None
-            if residual_std is None
-            else gaussian_residual_quantile(corrected_mean, residual_std, 0.1),
+            "price_q10": None,
             "price_q50": corrected_mean,
-            "price_q90": None
-            if residual_std is None
-            else gaussian_residual_quantile(corrected_mean, residual_std, 0.9),
+            "price_q90": None,
             "training_status": status,
             "training_sample_count": len(model["residual_history"]),
         }
+        if residual_std is not None:
+            if (
+                model["config"]["distribution"] == "johnson_su"
+                and model["johnson_su_shape"] is not None
+            ):
+                shape_a, shape_b = model["johnson_su_shape"]
+                issued["price_q10"] = johnson_su_residual_quantile(
+                    corrected_mean, residual_std, shape_a, shape_b, 0.1
+                )
+                issued["price_q50"] = johnson_su_residual_quantile(
+                    corrected_mean, residual_std, shape_a, shape_b, 0.5
+                )
+                issued["price_q90"] = johnson_su_residual_quantile(
+                    corrected_mean, residual_std, shape_a, shape_b, 0.9
+                )
+            else:
+                issued["price_q10"] = gaussian_residual_quantile(
+                    corrected_mean, residual_std, 0.1
+                )
+                issued["price_q90"] = gaussian_residual_quantile(
+                    corrected_mean, residual_std, 0.9
+                )
         model["pending"][forecast_id] = {
             "issued": issued.copy(),
             "inputs": inputs,
-            "location_vector": location_vector,
+            "residual_mean_vector": residual_mean_vector,
             "scale_vector": scale_vector,
         }
         model["pending_by_product"][product_start] = forecast_id
@@ -899,65 +1105,136 @@ def issue_adaptive_merit_order_correction(
     return issued_forecasts
 
 
-def adaptive_merit_order_scale_target(error, sigma_floor):
-    """Stable Gaussian scale proxy based on absolute post-forecast error."""
-    error = th.as_tensor(error, dtype=th.float64)
-    sigma_proxy = th.clamp(
-        th.abs(error) * th.sqrt(th.tensor(th.pi / 2, dtype=th.float64)),
-        min=sigma_floor,
-    )
-    return th.log(sigma_proxy)
-
-
 def fit_initial_adaptive_merit_order_models(model: dict) -> None:
-    """Batch-fit location and log-scale on the initial chronological window."""
+    """Fit the initial Gaussian GAMLSS by penalised Fisher scoring/IRLS.
+
+    The residual mean has identity link and working weights ``1 / sigma**2``.
+    The standard deviation has a log link, working weight ``2`` and working
+    response ``log(sigma) + ((error / sigma)**2 - 1) / 2``. Each weighted
+    regression is solved with online-compatible L1/L2 coordinate descent.
+    """
     fit_adaptive_merit_order_feature_scaling(
-        model["location_features"], model["initial_inputs"]
+        model["residual_mean_features"], model["initial_inputs"]
     )
     fit_adaptive_merit_order_feature_scaling(
-        model["scale_features"], model["initial_inputs"]
+        model["residual_scale_features"], model["initial_inputs"]
     )
-    location_matrix = th.stack(
+    residual_mean_matrix = th.stack(
         [
-            transform_adaptive_merit_order_features(model["location_features"], row)
+            transform_adaptive_merit_order_features(
+                model["residual_mean_features"], row
+            )
             for row in model["initial_inputs"]
         ]
     )
     scale_matrix = th.stack(
         [
-            transform_adaptive_merit_order_features(model["scale_features"], row)
+            transform_adaptive_merit_order_features(
+                model["residual_scale_features"], row
+            )
             for row in model["initial_inputs"]
         ]
     )
     residuals = th.tensor(model["initial_residuals"], dtype=th.float64)
     config = model["config"]
-    model["location_model"] = initialize_online_elastic_net(
-        location_matrix.shape[1],
-        config["location_l1"],
-        config["location_l2"],
+    model["residual_mean_model"] = initialize_online_regularized_regression(
+        residual_mean_matrix.shape[1],
+        config["residual_mean_l1_regularization"],
+        config["residual_mean_l2_regularization"],
         config["forgetting_factor"],
         config["solver_max_iterations"],
         config["solver_tolerance"],
     )
-    fit_online_elastic_net(model["location_model"], location_matrix, residuals)
-    errors = residuals - predict_online_elastic_net(
-        model["location_model"], location_matrix
-    )
-    scale_targets = th.stack(
-        [
-            adaptive_merit_order_scale_target(error, config["sigma_floor"])
-            for error in errors
-        ]
-    )
-    model["scale_model"] = initialize_online_elastic_net(
+    model["residual_scale_model"] = initialize_online_regularized_regression(
         scale_matrix.shape[1],
-        config["scale_l1"],
-        config["scale_l2"],
+        config["residual_scale_l1_regularization"],
+        config["residual_scale_l2_regularization"],
         config["forgetting_factor"],
         config["solver_max_iterations"],
         config["solver_tolerance"],
     )
-    fit_online_elastic_net(model["scale_model"], scale_matrix, scale_targets)
+
+    # Stable starting values for the alternating distributional fit.
+    fit_online_regularized_regression(
+        model["residual_mean_model"], residual_mean_matrix, residuals
+    )
+    residual_mean = predict_online_regularized_regression(
+        model["residual_mean_model"], residual_mean_matrix
+    )
+    initial_sigma = th.sqrt(th.mean((residuals - residual_mean).square()))
+    initial_sigma = th.clamp(initial_sigma, min=config["sigma_floor"])
+    model["residual_scale_model"]["coefficients"][0] = th.log(initial_sigma)
+
+    previous_parameters = None
+    for _ in range(config["irls_max_iterations"]):
+        log_sigma = predict_online_regularized_regression(
+            model["residual_scale_model"], scale_matrix
+        )
+        log_sigma = th.clamp(
+            log_sigma,
+            min=th.log(th.tensor(config["sigma_floor"], dtype=th.float64)),
+            max=th.log(th.tensor(1e6, dtype=th.float64)),
+        )
+        sigma = th.exp(log_sigma)
+        fit_online_regularized_regression(
+            model["residual_mean_model"],
+            residual_mean_matrix,
+            residuals,
+            1 / sigma.square(),
+        )
+
+        residual_mean = predict_online_regularized_regression(
+            model["residual_mean_model"], residual_mean_matrix
+        )
+        errors = residuals - residual_mean
+        log_sigma = predict_online_regularized_regression(
+            model["residual_scale_model"], scale_matrix
+        )
+        log_sigma = th.clamp(
+            log_sigma,
+            min=th.log(th.tensor(config["sigma_floor"], dtype=th.float64)),
+            max=th.log(th.tensor(1e6, dtype=th.float64)),
+        )
+        sigma = th.exp(log_sigma)
+        scale_working_response = log_sigma + ((errors / sigma).square() - 1) / 2
+        fit_online_regularized_regression(
+            model["residual_scale_model"],
+            scale_matrix,
+            scale_working_response,
+            th.full_like(residuals, 2.0),
+        )
+
+        parameters = th.cat(
+            (
+                model["residual_mean_model"]["coefficients"],
+                model["residual_scale_model"]["coefficients"],
+            )
+        )
+        if (
+            previous_parameters is not None
+            and th.max(th.abs(parameters - previous_parameters)).item()
+            <= config["irls_tolerance"]
+        ):
+            break
+        previous_parameters = parameters.clone()
+
+    if model["config"]["distribution"] == "johnson_su":
+        initial_standard_deviations = th.exp(
+            th.clamp(
+                predict_online_regularized_regression(
+                    model["residual_scale_model"], scale_matrix
+                ),
+                min=th.log(th.tensor(config["sigma_floor"], dtype=th.float64)),
+                max=th.log(th.tensor(1e6, dtype=th.float64)),
+            )
+        )
+        errors = residuals - predict_online_regularized_regression(
+            model["residual_mean_model"], residual_mean_matrix
+        )
+        model["johnson_su_standardised_errors"] = (
+            errors / initial_standard_deviations
+        ).tolist()
+        fit_johnson_su_shape(model)
 
 
 def update_adaptive_merit_order_correction(state, market_id, market_meta) -> list[dict]:
@@ -1013,7 +1290,8 @@ def update_adaptive_merit_order_correction(state, market_id, market_meta) -> lis
         model["residual_history"].append(realised_residual)
 
         trained = (
-            model["location_model"] is not None and model["scale_model"] is not None
+            model["residual_mean_model"] is not None
+            and model["residual_scale_model"] is not None
         )
         if not trained:
             model["initial_inputs"].append(pending["inputs"])
@@ -1025,26 +1303,90 @@ def update_adaptive_merit_order_correction(state, market_id, market_meta) -> lis
                 fit_initial_adaptive_merit_order_models(model)
             continue
 
-        location_vector = pending["location_vector"]
+        residual_mean_vector = pending["residual_mean_vector"]
         scale_vector = pending["scale_vector"]
-        if location_vector is None:
-            location_vector = transform_adaptive_merit_order_features(
-                model["location_features"], pending["inputs"]
+        if residual_mean_vector is None:
+            residual_mean_vector = transform_adaptive_merit_order_features(
+                model["residual_mean_features"], pending["inputs"]
             )
         if scale_vector is None:
             scale_vector = transform_adaptive_merit_order_features(
-                model["scale_features"], pending["inputs"]
+                model["residual_scale_features"], pending["inputs"]
             )
-        update_online_elastic_net(
-            model["location_model"], location_vector, realised_residual
+        if model["config"]["distribution"] == "johnson_su":
+            model["johnson_su_standardised_errors"].append(
+                post_forecast_residual / issued["residual_std_forecast"]
+            )
+            fit_johnson_su_shape(model)
+        # Freeze the pre-outcome statistics. IRLS may reconsider the current
+        # working weights repeatedly, but the clearing result is committed once.
+        residual_mean_model = model["residual_mean_model"]
+        residual_scale_model = model["residual_scale_model"]
+        mean_statistics = (
+            residual_mean_model["gram"].clone(),
+            residual_mean_model["target_moment"].clone(),
+            residual_mean_model["effective_weight"],
         )
-        update_online_elastic_net(
-            model["scale_model"],
-            scale_vector,
-            adaptive_merit_order_scale_target(
-                post_forecast_residual, model["config"]["sigma_floor"]
-            ),
+        scale_statistics = (
+            residual_scale_model["gram"].clone(),
+            residual_scale_model["target_moment"].clone(),
+            residual_scale_model["effective_weight"],
         )
+        config = model["config"]
+        previous_parameters = None
+        for _ in range(config["irls_max_iterations"]):
+            log_sigma = predict_online_regularized_regression(
+                residual_scale_model, scale_vector
+            )
+            log_sigma = th.clamp(
+                th.tensor(log_sigma, dtype=th.float64),
+                min=th.log(th.tensor(config["sigma_floor"], dtype=th.float64)),
+                max=th.log(th.tensor(1e6, dtype=th.float64)),
+            )
+            sigma = th.exp(log_sigma)
+            update_online_regularized_regression(
+                residual_mean_model,
+                residual_mean_vector,
+                realised_residual,
+                1 / sigma.square(),
+                mean_statistics,
+            )
+
+            residual_mean = predict_online_regularized_regression(
+                residual_mean_model, residual_mean_vector
+            )
+            error = realised_residual - residual_mean
+            log_sigma = predict_online_regularized_regression(
+                residual_scale_model, scale_vector
+            )
+            log_sigma = th.clamp(
+                th.tensor(log_sigma, dtype=th.float64),
+                min=th.log(th.tensor(config["sigma_floor"], dtype=th.float64)),
+                max=th.log(th.tensor(1e6, dtype=th.float64)),
+            )
+            sigma = th.exp(log_sigma)
+            scale_working_response = log_sigma + ((error / sigma).square() - 1) / 2
+            update_online_regularized_regression(
+                residual_scale_model,
+                scale_vector,
+                scale_working_response,
+                2.0,
+                scale_statistics,
+            )
+
+            parameters = th.cat(
+                (
+                    residual_mean_model["coefficients"],
+                    residual_scale_model["coefficients"],
+                )
+            )
+            if (
+                previous_parameters is not None
+                and th.max(th.abs(parameters - previous_parameters)).item()
+                <= config["irls_tolerance"]
+            ):
+                break
+            previous_parameters = parameters.clone()
     return outcomes
 
 
