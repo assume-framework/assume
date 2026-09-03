@@ -223,7 +223,7 @@ class World:
         if not learning_dict:
             self.learning_config: LearningConfig = None
         else:
-            self.learning_config = LearningConfig(**learning_dict)
+            self.learning_config = LearningConfig.from_dict(learning_dict)
 
         # initiate learning if the learning mode is on and hence we want to learn new strategies
         self.learning_mode = learning_dict.get("learning_mode", False)

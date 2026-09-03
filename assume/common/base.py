@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+import warnings
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -943,6 +944,43 @@ class LearningConfig:
     # Nested algorithm configurations
     off_policy: OffPolicyConfig = field(default_factory=OffPolicyConfig)
     on_policy: OnPolicyConfig = field(default_factory=OnPolicyConfig)
+
+    @classmethod
+    def from_dict(cls, config: dict) -> "LearningConfig":
+        config = config.copy()
+        off_policy = config.get("off_policy", {}).copy()
+
+        legacy_keys = {
+            "episodes_collecting_initial_experience",
+            "gradient_steps",
+            "noise_sigma",
+            "noise_scale",
+            "noise_dt",
+            "action_noise_schedule",
+            "tau",
+            "policy_delay",
+            "target_policy_noise",
+            "target_noise_clip",
+            "replay_buffer_size",
+        }
+
+        migrated_keys = []
+
+        for key in legacy_keys:
+            if key in config:
+                # Explicit nested values take precedence.
+                off_policy.setdefault(key, config.pop(key))
+                migrated_keys.append(key)
+
+        if migrated_keys:
+            warnings.warn(
+                f"The following learning_config fields must now be placed under 'off_policy': {', '.join(sorted(migrated_keys))}. Top-level support is deprecated.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            config["off_policy"] = off_policy
+
+        return cls(**config)
 
     def __post_init__(self):
         """Calculate defaults that depend on other fields and validate inputs."""
