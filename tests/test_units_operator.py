@@ -2,7 +2,8 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from datetime import datetime
+from datetime import datetime, timedelta
+from unittest.mock import Mock
 
 import pandas as pd
 import pytest
@@ -143,6 +144,68 @@ async def test_get_actual_dispatch(units_operator: UnitsOperator):
     assert datetime2timestamp(unit_dfs[0]["time"][0]) == clock.time
     assert len(unit_dfs[0]["time"]) == 1
     assert len(market_dispatch) == 0
+
+
+def test_adaptive_merit_order_forecast_lifecycle():
+    marketconfig = MarketConfig(
+        market_id="EOM",
+        opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
+        opening_duration=rd(hours=1),
+        market_mechanism="pay_as_clear",
+        market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
+    )
+    forecaster = Mock()
+    forecaster.update_adaptive_merit_order_forecast.return_value = []
+    units_operator = UnitsOperator([marketconfig], forecaster=forecaster)
+    units_operator.id = "operator"
+    units_operator.registered_markets["EOM"] = marketconfig
+    units_operator._context = Mock()
+    units_operator.context.data = {}
+    units_operator.context.schedule_instant_task.side_effect = lambda coroutine: (
+        coroutine.close()
+    )
+    units_operator.set_unit_dispatch = Mock()
+    units_operator.write_actual_dispatch = Mock()
+    units_operator.calculate_unit_cashflow_and_reward = Mock()
+
+    units_operator.handle_opening(
+        {
+            "market_id": "EOM",
+            "start_time": start,
+            "end_time": start + timedelta(hours=1),
+            "products": [
+                (start + timedelta(hours=1), start + timedelta(hours=2), None)
+            ],
+        },
+        {},
+    )
+
+    forecaster.get_adaptive_merit_order_forecast.assert_called_once_with(
+        "EOM", start, timedelta(hours=1)
+    )
+
+    units_operator.handle_market_feedback(
+        {
+            "market_id": "EOM",
+            "accepted_orders": [
+                {
+                    "start_time": start + timedelta(hours=1),
+                    "accepted_price": 42.0,
+                }
+            ],
+            "rejected_orders": [
+                {
+                    "start_time": start + timedelta(hours=1),
+                    "accepted_price": 0.0,
+                }
+            ],
+        },
+        {},
+    )
+
+    forecaster.update_adaptive_merit_order_forecast.assert_called_once_with(
+        "EOM", [{"product_start": start + timedelta(hours=1), "price": 42.0}]
+    )
 
 
 def test_participate():

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -23,16 +23,17 @@ from assume.common.forecast_algorithms import (
     calculate_naive_residual_load,
     evaluate_adaptive_merit_order_forecasts,
     fit_adaptive_merit_order_feature_scaling,
-    fit_online_elastic_net,
+    fit_online_regularized_regression,
     gaussian_residual_quantile,
     get_forecast_registries,
     initialize_adaptive_merit_order_feature_state,
     initialize_adaptive_merit_order_model,
-    initialize_online_elastic_net,
+    initialize_online_regularized_regression,
     issue_adaptive_merit_order_correction,
+    johnson_su_residual_quantile,
     transform_adaptive_merit_order_features,
     update_adaptive_merit_order_correction,
-    update_online_elastic_net,
+    update_online_regularized_regression,
 )
 from assume.common.forecaster import (
     DemandForecaster,
@@ -581,7 +582,7 @@ def test_adaptive_features_are_separate_missing_safe_and_frozen():
             "merit_order_price",
             "wind_availability_factor",
             "solar_availability_factor",
-            "lagged_residual",
+            "previous_day_same_hour_residual",
         )
     )
     initial = [
@@ -591,7 +592,7 @@ def test_adaptive_features_are_separate_missing_safe_and_frozen():
             "wind_availability_factor": 0.7,
             "solar_availability_factor": 0.3,
             "residual_load": 100,
-            "lagged_residual": None,
+            "previous_day_same_hour_residual": None,
         }
         for hour in range(3)
     ]
@@ -608,13 +609,13 @@ def test_adaptive_features_are_separate_missing_safe_and_frozen():
             "wind_availability_factor": 0.7,
             "solar_availability_factor": 0.3,
             "residual_load": 100,
-            "lagged_residual": None,
+            "previous_day_same_hour_residual": None,
         },
     )
 
     assert "wind_availability_factor" in feature_state["feature_names"]
     assert "solar_availability_factor" in feature_state["feature_names"]
-    assert "lagged_residual_missing" in feature_state["feature_names"]
+    assert "previous_day_same_hour_residual_missing" in feature_state["feature_names"]
     assert "generator_availability" not in initial[0]
     assert isinstance(transformed, th.Tensor)
     assert transformed.dtype == th.float64
@@ -623,23 +624,87 @@ def test_adaptive_features_are_separate_missing_safe_and_frozen():
     assert th.equal(feature_state["scales"], scaling[1])
 
 
-def test_online_elastic_net_sparsity_and_forgetting():
+def test_adaptive_holiday_feature_is_optional():
+    forecast_inputs = _adaptive_merit_order_forecast_inputs()
+    _, model = _adaptive_merit_order_state(
+        forecast_inputs,
+        use_holiday_feature=True,
+        holiday_dates=(date(2025, 1, 1),),
+    )
+
+    assert "holiday" in model["residual_mean_features"]["feature_names"]
+    assert "holiday" in model["residual_scale_features"]["feature_names"]
+
+
+def test_online_regularized_regression_sparsity_l2_and_forgetting():
     generator = th.Generator().manual_seed(7)
     relevant = th.linspace(-2, 2, 200, dtype=th.float64)
     irrelevant = th.randn(200, generator=generator, dtype=th.float64)
     features = th.column_stack((th.ones(200), relevant, irrelevant))
     target = 3 * relevant
-    model = initialize_online_elastic_net(3, 0.2, 0.01, 0.995, 1000, 1e-8)
-    fit_online_elastic_net(model, features, target)
+    model = initialize_online_regularized_regression(3, 0.2, 0.1, 0.995, 1000, 1e-8)
+    fit_online_regularized_regression(model, features, target)
+    without_l2 = initialize_online_regularized_regression(3, 0.2, 0, 0.995, 1000, 1e-8)
+    fit_online_regularized_regression(without_l2, features, target)
     gram_before = model["gram"].clone()
-    update_online_elastic_net(model, th.tensor([1.0, 0.0, 0.0], dtype=th.float64), 0.0)
+    update_online_regularized_regression(
+        model, th.tensor([1.0, 0.0, 0.0], dtype=th.float64), 0.0
+    )
 
     assert isinstance(model["coefficients"], th.Tensor)
     assert model["coefficients"].dtype == th.float64
     assert model["coefficients"][1].item() > 2
+    assert abs(model["coefficients"][1]) < abs(without_l2["coefficients"][1])
     assert model["coefficients"][2].item() == pytest.approx(0, abs=1e-10)
     assert model["gram"][1, 1].item() == pytest.approx(
         model["forgetting_factor"] * gram_before[1, 1].item()
+    )
+
+
+def test_online_irls_reuses_pre_outcome_statistics():
+    model = initialize_online_regularized_regression(1, 0, 0, 0.9, 100, 1e-10)
+    features = th.ones((2, 1), dtype=th.float64)
+    fit_online_regularized_regression(model, features, th.zeros(2))
+    previous_statistics = (
+        model["gram"].clone(),
+        model["target_moment"].clone(),
+        model["effective_weight"],
+    )
+
+    for _ in range(2):
+        update_online_regularized_regression(
+            model,
+            th.ones(1, dtype=th.float64),
+            10,
+            weight=2,
+            previous_statistics=previous_statistics,
+        )
+
+    assert model["gram"].item() == pytest.approx(0.9 * 2 + 2)
+    assert model["target_moment"].item() == pytest.approx(20)
+    assert model["effective_weight"] == pytest.approx(0.9 * 2 + 2)
+
+
+def test_johnson_su_quantiles_allow_asymmetric_uncertainty():
+    q10 = johnson_su_residual_quantile(50, 2, 1, 2, 0.1)
+    q50 = johnson_su_residual_quantile(50, 2, 1, 2, 0.5)
+    q90 = johnson_su_residual_quantile(50, 2, 1, 2, 0.9)
+
+    assert q10 < q50 < q90
+    assert q50 != pytest.approx(50)
+    assert (50 - q10) != pytest.approx(q90 - 50)
+
+
+def test_adaptive_default_features_match_lasso_selection():
+    assert ADAPTIVE_MERIT_ORDER_SETTINGS["features"] == (
+        "merit_order_price",
+        "wind_availability_factor",
+        "solar_availability_factor",
+        "residual_load",
+        "previous_day_same_hour_residual",
+        "previous_day_same_hour_price",
+        "weekday",
+        "weekend",
     )
 
 
@@ -650,8 +715,8 @@ def test_adaptive_fallback_activation_and_no_lookahead():
         minimum_training_samples=2,
         features=(),
         scale_features=(),
-        location_l1=0,
-        location_l2=0,
+        residual_mean_l1_regularization=0,
+        residual_mean_l2_regularization=0,
     )
     first_start, first = _issue_adaptive_merit_order_forecast(state, forecast_inputs, 0)
     update_adaptive_merit_order_correction(
@@ -669,6 +734,8 @@ def test_adaptive_fallback_activation_and_no_lookahead():
     assert second["corrected_price_mean_forecast"] == 55
     assert third["training_status"] == "trained"
     assert third["corrected_price_mean_forecast"] == pytest.approx(49)
+    assert model["residual_scale_model"]["effective_weight"] == pytest.approx(4)
+    assert third["residual_std_forecast"] > 0
     assert (
         update_adaptive_merit_order_correction(
             state, "EOM", [{"product_start": first_start, "price": 500.0}]
@@ -689,10 +756,10 @@ def test_adaptive_empirical_fallback_and_time_varying_scale():
         minimum_training_samples=24,
         features=(),
         scale_features=("residual_load",),
-        location_l1=0,
-        location_l2=0,
-        scale_l1=0,
-        scale_l2=0,
+        residual_mean_l1_regularization=0,
+        residual_mean_l2_regularization=0,
+        residual_scale_l1_regularization=0,
+        residual_scale_l2_regularization=0,
         sigma_floor=0.001,
     )
     for position in range(24):
