@@ -48,6 +48,22 @@ assume.reinforcement\_learning.algorithms.matd3 module
    :undoc-members:
    :show-inheritance:
 
+assume.reinforcement\_learning.algorithms.maddpg module
+-------------------------------------------------------
+
+.. automodule:: assume.reinforcement_learning.algorithms.maddpg
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+assume.reinforcement\_learning.algorithms.mappo module
+------------------------------------------------------
+
+.. automodule:: assume.reinforcement_learning.algorithms.mappo
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Module contents
 ---------------
 

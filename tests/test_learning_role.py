@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 try:
-    from assume.common.base import LearningConfig
+    from assume.common.base import LearningConfig, OffPolicyConfig
     from assume.reinforcement_learning.learning_role import (
         Learning,
         LearningStrategy,
@@ -37,11 +37,13 @@ def test_learning_init():
             learning_mode=True,
             evaluation_mode=False,
             training_episodes=3,
-            episodes_collecting_initial_experience=1,
             continue_learning=False,
             trained_policies_save_path=None,
             early_stopping_steps=10,
             early_stopping_threshold=0.05,
+            off_policy=OffPolicyConfig(
+                episodes_collecting_initial_experience=1,
+            ),
         ),
     }
 
@@ -89,11 +91,13 @@ async def learning_role():
             learning_mode=True,
             evaluation_mode=True,  # evaluation mode to skip buffer/policy update
             training_episodes=3,
-            episodes_collecting_initial_experience=1,
             continue_learning=False,
             trained_policies_save_path=None,
             early_stopping_steps=10,
             early_stopping_threshold=0.05,
+            off_policy=OffPolicyConfig(
+                episodes_collecting_initial_experience=1,
+            ),
         ),
     }
 

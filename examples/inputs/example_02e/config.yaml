@@ -19,17 +19,29 @@ base:
     actor_architecture: mlp
     learning_rate: 0.0003
     training_episodes: 30
-    episodes_collecting_initial_experience: 5
     train_freq: 720h
-    gradient_steps: 720
     batch_size: 256
     gamma: 0.999
     device: cpu
-    # action_noise_schedule: linear
-    noise_sigma: 0.1
-    noise_scale: 1
-    noise_dt: 1
     validation_episodes_interval: 5
+
+    # Off-policy parameters (required for TD3/DDPG algorithms)
+    off_policy:
+      episodes_collecting_initial_experience: 5
+      gradient_steps: 720
+      noise_sigma: 0.1
+      noise_scale: 1
+      # action_noise_schedule: linear
+      noise_dt: 1
+      replay_buffer_size: 10000
+
+    # On-policy parameters (required for PPO/MAPPO algorithms)
+    on_policy:
+      clip_ratio: 0.2
+      entropy_coef: 0.01
+      vf_coef: 0.5
+      gae_lambda: 0.95
+      n_epochs: 25
 
   markets_config:
     EOM:
@@ -65,15 +77,27 @@ tiny:
     learning_rate: 0.001
     training_episodes: 5
     validation_episodes_interval: 2
-    episodes_collecting_initial_experience: 1
     train_freq: 24h
-    gradient_steps: 24
     batch_size: 64
     gamma: 0.99
     device: cpu
-    noise_sigma: 0.1
-    noise_scale: 1
-    noise_dt: 1
+
+    # Off-policy parameters (required for TD3/DDPG algorithms)
+    off_policy:
+      episodes_collecting_initial_experience: 1
+      gradient_steps: 24
+      noise_sigma: 0.1
+      noise_scale: 1
+      noise_dt: 1
+      replay_buffer_size: 10000
+
+    # On-policy parameters (required for PPO/MAPPO algorithms)
+    on_policy:
+      clip_ratio: 0.2
+      entropy_coef: 0.01
+      vf_coef: 0.5
+      gae_lambda: 0.95
+      n_epochs: 25
 
   markets_config:
     EOM:
