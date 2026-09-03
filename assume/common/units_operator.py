@@ -110,6 +110,8 @@ class UnitsOperator(Role):
     def on_ready(self):
         super().on_ready()
         self.id = self.context.aid
+        if self.forecaster:
+            self.forecaster.unit_operator_id = self.id
 
         for market in self.available_markets:
             if self.participate(market):
@@ -220,6 +222,19 @@ class UnitsOperator(Role):
             opening["start_time"],
             opening["end_time"],
         )
+        marketconfig = self.registered_markets.get(opening["market_id"])
+        if (
+            self.forecaster
+            and marketconfig
+            and marketconfig.product_type == "energy"
+            and opening["products"]
+        ):
+            horizon = max(product[1] for product in opening["products"]) - min(
+                product[0] for product in opening["products"]
+            )
+            self.forecaster.get_adaptive_merit_order_forecast(
+                opening["market_id"], opening["start_time"], horizon
+            )
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening, meta))
 
     def handle_market_feedback(self, content: ClearingMessage, meta: MetaDict) -> None:
@@ -239,6 +254,46 @@ class UnitsOperator(Role):
             order["market_id"] = content["market_id"]
 
         marketconfig = self.registered_markets[content["market_id"]]
+        if self.forecaster and marketconfig.product_type == "energy":
+            clearing_prices = {}
+            for order in accepted_orders:
+                accepted_price = order.get("accepted_price")
+                if isinstance(accepted_price, dict):
+                    prices = accepted_price.items()
+                elif accepted_price is not None:
+                    prices = [(order["start_time"], accepted_price)]
+                else:
+                    continue
+
+                for product_start, price in prices:
+                    if (
+                        product_start in clearing_prices
+                        and clearing_prices[product_start] != price
+                    ):
+                        raise ValueError(
+                            "Adaptive merit-order forecasts require one scalar "
+                            "clearing price per product"
+                        )
+                    clearing_prices[product_start] = price
+
+            outcomes = self.forecaster.update_adaptive_merit_order_forecast(
+                content["market_id"],
+                [
+                    {"product_start": product_start, "price": price}
+                    for product_start, price in clearing_prices.items()
+                ],
+            )
+            db_addr = self.context.data.get("output_agent_addr")
+            if db_addr and outcomes:
+                self.context.schedule_instant_message(
+                    receiver_addr=db_addr,
+                    content={
+                        "context": "write_results",
+                        "type": "adaptive_merit_order_forecast",
+                        "market_id": content["market_id"],
+                        "data": outcomes,
+                    },
+                )
         self.valid_orders[marketconfig.product_type].extend(orderbook)
         self.set_unit_dispatch(orderbook, marketconfig)
         self.write_actual_dispatch(marketconfig.product_type)
