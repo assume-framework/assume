@@ -5,7 +5,7 @@
 import logging
 import warnings
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -859,6 +859,13 @@ class OnPolicyConfig:
     n_epochs: int = 10
 
 
+class _Unset:
+    """Distinguishing missing legacy arguments from an explicitly supplied None"""
+
+
+_UNSET = _Unset()
+
+
 @dataclass
 class LearningConfig:
     """
@@ -942,51 +949,67 @@ class LearningConfig:
     actor_architecture: str = "mlp"
 
     # Nested algorithm configurations
-    off_policy: OffPolicyConfig = field(default_factory=OffPolicyConfig)
+    # Keeping the supplied keys until merging the legacy settings
+    off_policy: OffPolicyConfig | dict = field(default_factory=dict)
     on_policy: OnPolicyConfig = field(default_factory=OnPolicyConfig)
 
-    @classmethod
-    def from_dict(cls, config: dict) -> "LearningConfig":
-        config = config.copy()
-        off_policy = config.get("off_policy", {}).copy()
+    # Accepting legacy settings during initialization without storing them twice
+    episodes_collecting_initial_experience: InitVar[int | _Unset] = _UNSET
+    gradient_steps: InitVar[int | _Unset] = _UNSET
+    noise_sigma: InitVar[float | _Unset] = _UNSET
+    noise_scale: InitVar[int | _Unset] = _UNSET
+    noise_dt: InitVar[int | _Unset] = _UNSET
+    action_noise_schedule: InitVar[str | None | _Unset] = _UNSET
+    tau: InitVar[float | _Unset] = _UNSET
+    policy_delay: InitVar[int | _Unset] = _UNSET
+    target_policy_noise: InitVar[float | _Unset] = _UNSET
+    target_noise_clip: InitVar[float | _Unset] = _UNSET
+    replay_buffer_size: InitVar[int | _Unset] = _UNSET
 
-        legacy_keys = {
-            "episodes_collecting_initial_experience",
-            "gradient_steps",
-            "noise_sigma",
-            "noise_scale",
-            "noise_dt",
-            "action_noise_schedule",
-            "tau",
-            "policy_delay",
-            "target_policy_noise",
-            "target_noise_clip",
-            "replay_buffer_size",
+    def __post_init__(
+        self,
+        episodes_collecting_initial_experience,
+        gradient_steps,
+        noise_sigma,
+        noise_scale,
+        noise_dt,
+        action_noise_schedule,
+        tau,
+        policy_delay,
+        target_policy_noise,
+        target_noise_clip,
+        replay_buffer_size,
+    ):
+        """Migrating legacy settings and preparing nested configs with their defaults"""
+        legacy_values = {
+            "episodes_collecting_initial_experience": episodes_collecting_initial_experience,
+            "gradient_steps": gradient_steps,
+            "noise_sigma": noise_sigma,
+            "noise_scale": noise_scale,
+            "noise_dt": noise_dt,
+            "action_noise_schedule": action_noise_schedule,
+            "tau": tau,
+            "policy_delay": policy_delay,
+            "target_policy_noise": target_policy_noise,
+            "target_noise_clip": target_noise_clip,
+            "replay_buffer_size": replay_buffer_size,
         }
-
-        migrated_keys = []
-
-        for key in legacy_keys:
-            if key in config:
-                # Explicit nested values take precedence.
-                off_policy.setdefault(key, config.pop(key))
-                migrated_keys.append(key)
-
-        if migrated_keys:
+        legacy_values = {
+            key: value for key, value in legacy_values.items() if value is not _UNSET
+        }
+        if legacy_values:
             warnings.warn(
-                f"The following learning_config fields must now be placed under 'off_policy': {', '.join(sorted(migrated_keys))}. Top-level support is deprecated.",
+                f"The following learning_config fields must now be placed under 'off_policy': {', '.join(sorted(legacy_values))}. Top-level support is deprecated.",
                 DeprecationWarning,
-                stacklevel=2,
+                stacklevel=3,
             )
-            config["off_policy"] = off_policy
 
-        return cls(**config)
-
-    def __post_init__(self):
-        """Calculate defaults that depend on other fields and validate inputs."""
-        # Convert nested dicts to dataclass instances if necessary
         if isinstance(self.off_policy, dict):
-            self.off_policy = OffPolicyConfig(**self.off_policy)
+            # Merging before creating the config so legacy values are also validated
+            self.off_policy = OffPolicyConfig(**(legacy_values | self.off_policy))
+        elif not isinstance(self.off_policy, OffPolicyConfig):
+            raise TypeError("off_policy must be a dict or OffPolicyConfig instance")
+        # Keeping all values from an existing OffPolicyConfig over legacy settings
         if isinstance(self.on_policy, dict):
             self.on_policy = OnPolicyConfig(**self.on_policy)
 
