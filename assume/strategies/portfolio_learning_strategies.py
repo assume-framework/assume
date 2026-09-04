@@ -498,22 +498,31 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
                 clearing_price = order.get("accepted_price", 0)
                 accepted_volume = order.get("accepted_volume", 0)
 
-                marginal_cost = unit.calculate_marginal_cost(
-                    start, unit.outputs[product_type].at[start]
+                marginal_cost = (
+                    unit.calculate_marginal_cost(  # TODO: check about step-wise mc
+                        start, unit.outputs[product_type].at[start]
+                    )
                 )
 
                 # Compute profits
-                unit_profit = (clearing_price - marginal_cost) * accepted_volume
+                unit_profit = (
+                    clearing_price - marginal_cost
+                ) * accepted_volume  # TODO: maybe move out of loop?
                 tot_profits += unit_profit
 
                 # Compute competitive profits
-                comp_volume = 0 if comp_price < marginal_cost else order["volume"]
+                comp_volume = (
+                    0 if comp_price < marginal_cost else order["volume"]
+                )  # TODO: why not accepted volume?
                 unit_comp_profit = (comp_price - marginal_cost) * comp_volume
                 comp_profits += unit_comp_profit
 
                 scaled_accepted_vol += accepted_volume * scaling_factor
 
         reward = (tot_profits - comp_profits) * scaling_factor
+
+        # TODO: are the unit profits not stored anywhere?
+        # here's no unit.outputs["profit"] and no unit.outputs["total_costs"] or for the unit_operator except for the RL results
 
         if self.learning_mode:
             self.learning_role.add_reward_to_cache(

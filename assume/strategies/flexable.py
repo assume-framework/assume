@@ -226,7 +226,9 @@ class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
 
             output = unit.outputs[product_type].at[start]
             marginal_cost = unit.calculate_marginal_cost(start, output)
-            costs[i] += marginal_cost * output
+            costs[i] += (
+                marginal_cost * output
+            )  # TODO: only base the costs on the actual market contribution (accepted volume)
 
             if output != 0 and op_time < 0:
                 start_up_cost = unit.get_starting_costs(op_time)
@@ -235,11 +237,13 @@ class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
         profit -= costs
 
         # store results in unit outputs which are written to database by unit operator
-        unit.outputs["profit"].loc[products_index] = profit
-        unit.outputs["total_costs"].loc[products_index] = costs
+        unit.outputs["profit"].loc[products_index] += profit
+        unit.outputs["total_costs"].loc[products_index] += costs
 
         # update average operation time
-        update_avg_op_time(unit, product_type, products_index[0], products_index[-1])
+        update_avg_op_time(
+            unit, product_type, products_index[0], products_index[-1]
+        )  # TODO: check if this needs to be moved to the cashflow calculation?
 
 
 class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
