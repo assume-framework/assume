@@ -203,18 +203,21 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
             end_excl = order["end_time"] - unit.index.freq
 
             # Extract outputs and costs in one step
-            outputs = unit.outputs[product_type].loc[start:end_excl]
+            outputs = unit.outputs[product_type].loc[
+                start:end_excl
+            ]  # TODO: use accepted volume (and price?) from orderbook
             costs = np.where(
                 outputs != 0,
                 np.abs(outputs)
                 * np.array([unit.calculate_marginal_cost(start, x) for x in outputs]),
-                0,
+                0,  # TODO: check if this is correct for step-wise marginal costs, shouldn't it be the area under the curve?
             )
 
-            unit.outputs["profit"].loc[start:end_excl] = (
-                unit.outputs[f"{product_type}_cashflow"].loc[start:end_excl] - costs
+            unit.outputs["profit"].loc[start:end_excl] += (
+                unit.outputs[f"{product_type}_cashflow"].loc[start:end_excl]
+                - costs  # TODO: only use market cashflow?
             )
-            unit.outputs["total_costs"].loc[start:end_excl] = costs
+            unit.outputs["total_costs"].loc[start:end_excl] += costs
 
 
 class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
