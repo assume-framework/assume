@@ -36,7 +36,7 @@ from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
     adjust_unit_operator_for_learning,
     confirm_learning_save_path,
-    convert_to_rrule_freq,
+    convert_str_to_rrule_freq,
     load_index_file,
     normalize_availability,
     set_random_seed,
@@ -340,7 +340,7 @@ def make_market_config(
     Returns:
     MarketConfig: The market config.
     """
-    freq, interval = convert_to_rrule_freq(market_params["opening_frequency"])
+    freq, interval = convert_str_to_rrule_freq(market_params["opening_frequency"])
     start = market_params.get("start_date")
     end = market_params.get("end_date")
     if start:

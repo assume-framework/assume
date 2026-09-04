@@ -156,21 +156,21 @@ class BaseUnit:
                 accepted_price
             )
 
-    def calculate_cashflow_and_reward(
+    def calculate_reward(
         self,
         marketconfig: MarketConfig,
         orderbook: Orderbook,
     ) -> None:
         """
-        Calculates the cashflow and the reward for the given unit.
+        Calculates the reward for the given unit.
+
+        This is called once the delivery period of the orders has been executed,
+        so that the reward can be based on the actual dispatch of the unit.
 
         Args:
             marketconfig (MarketConfig): The market configuration.
             orderbook (Orderbook): The orderbook.
         """
-
-        product_type = marketconfig.product_type
-        self.calculate_cashflow(product_type, orderbook)
 
         self.bidding_strategies[marketconfig.market_id].calculate_reward(
             unit=self,
@@ -201,7 +201,9 @@ class BaseUnit:
             self.calculate_marginal_cost(t, product_data[idx])
             for idx, t in enumerate(self.index[start:end])
         ]
-        generation_costs = np.abs(marginal_costs * product_data)
+        generation_costs = np.abs(
+            marginal_costs * product_data
+        )  # TODO: generation costs need to be the integral of the marginal costs over the power output, not just the product of the two. This is a simplification and may not accurately reflect the true generation costs for partial efficiencies or step-wise mc functions.
         self.outputs[f"{product_type}_generation_costs"].loc[start:end] = (
             generation_costs
         )
