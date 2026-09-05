@@ -139,8 +139,8 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
 
             # Fetch reward, profit, costs from learning_role cache
             learning_role = strategy.learning_role
-            reward_cache = learning_role.all_rewards
-            profit_cache = learning_role.all_profits
+            reward_cache = learning_role.cache["rewards"]
+            profit_cache = learning_role.cache["profit"]
 
             # Use the last timestamp
             last_ts = sorted(reward_cache.keys())[-1]
@@ -243,8 +243,8 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
 
             # Fetch reward, profit, costs from learning_role cache
             learning_role = strategy.learning_role
-            reward_cache = learning_role.all_rewards
-            profit_cache = learning_role.all_profits
+            reward_cache = learning_role.cache["rewards"]
+            profit_cache = learning_role.cache["profit"]
 
             # Use the last timestamp
             last_ts = sorted(reward_cache.keys())[-1]

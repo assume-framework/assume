@@ -147,9 +147,9 @@ async def test_atomic_swap_no_data_loss(learning_role):
     # ts2 has no reward yet
 
     # Verify data is in cache before swap
-    assert ts1 in learning_role.all_obs
-    assert ts2 in learning_role.all_obs
-    assert len(learning_role.all_obs) == 2
+    assert ts1 in learning_role.cache["obs"]
+    assert ts2 in learning_role.cache["obs"]
+    assert len(learning_role.cache["obs"]) == 2
 
     # Now call store_to_buffer_and_update (atomic swap happens here)
     # Since we're in evaluation_mode, it won't try to update buffer/policy
@@ -161,8 +161,8 @@ async def test_atomic_swap_no_data_loss(learning_role):
 
     # After swap: ts1 should be processed, ts2 (last timestamp) should be carried over
     # The cache should now only contain ts2's obs/actions/noises (carried over)
-    assert ts2 in learning_role.all_obs, "ts2 should be carried over after swap"
-    assert ts1 not in learning_role.all_obs, (
+    assert ts2 in learning_role.cache["obs"], "ts2 should be carried over after swap"
+    assert ts1 not in learning_role.cache["obs"], (
         "ts1 should have been processed and removed"
     )
 
@@ -179,27 +179,27 @@ async def test_atomic_swap_no_data_loss(learning_role):
     )
 
     # Verify new data is in cache (not lost due to atomic swap)
-    assert ts3 in learning_role.all_obs, "ts3 should be in new cache after swap"
-    assert ts3 in learning_role.all_actions, "ts3 actions should be in new cache"
-    assert ts3 in learning_role.all_rewards, "ts3 rewards should be in new cache"
+    assert ts3 in learning_role.cache["obs"], "ts3 should be in new cache after swap"
+    assert ts3 in learning_role.cache["actions"], "ts3 actions should be in new cache"
+    assert ts3 in learning_role.cache["rewards"], "ts3 rewards should be in new cache"
 
     # Verify ts2 carried-over data is still there
-    assert ts2 in learning_role.all_obs, "ts2 should still be carried over"
-    assert ts2 in learning_role.all_actions, "ts2 actions should still be carried over"
-    assert ts2 in learning_role.all_rewards, "ts2 rewards should still be carried over"
+    assert ts2 in learning_role.cache["obs"], "ts2 should still be carried over"
+    assert ts2 in learning_role.cache["actions"], "ts2 actions should still be carried over"
+    assert ts2 in learning_role.cache["rewards"], "ts2 rewards should still be carried over"
 
     # Verify the actual data content
-    assert len(learning_role.all_obs[ts3]["unit_1"]) == 1
-    assert th.equal(learning_role.all_obs[ts3]["unit_1"][0], obs_ts3)
-    assert len(learning_role.all_actions[ts3]["unit_1"]) == 1
-    assert th.equal(learning_role.all_actions[ts3]["unit_1"][0], action_ts3)
+    assert len(learning_role.cache["obs"][ts3]["unit_1"]) == 1
+    assert th.equal(learning_role.cache["obs"][ts3]["unit_1"][0], obs_ts3)
+    assert len(learning_role.cache["actions"][ts3]["unit_1"]) == 1
+    assert th.equal(learning_role.cache["actions"][ts3]["unit_1"][0], action_ts3)
 
     # all timesteps are complete now, so no carry-over should happen in the next swap
     await learning_role.store_to_buffer_and_update()
-    assert ts2 not in learning_role.all_obs, (
+    assert ts2 not in learning_role.cache["obs"], (
         "ts2 should have been processed in next swap"
     )
-    assert ts3 not in learning_role.all_obs, (
+    assert ts3 not in learning_role.cache["obs"], (
         "ts3 should have been processed in next swap"
     )
 
@@ -241,23 +241,23 @@ async def test_atomic_swap_carries_over_two_incomplete_timesteps(learning_role):
     await learning_role.store_to_buffer_and_update()
 
     # Both incomplete timesteps should remain in cache
-    assert ts3 in learning_role.all_obs, "ts3 should be carried over"
-    assert ts4 in learning_role.all_obs, "ts4 should be carried over"
-    assert ts3 in learning_role.all_actions, "ts3 actions should be carried over"
-    assert ts4 in learning_role.all_actions, "ts4 actions should be carried over"
+    assert ts3 in learning_role.cache["obs"], "ts3 should be carried over"
+    assert ts4 in learning_role.cache["obs"], "ts4 should be carried over"
+    assert ts3 in learning_role.cache["actions"], "ts3 actions should be carried over"
+    assert ts4 in learning_role.cache["actions"], "ts4 actions should be carried over"
 
     # Already complete timesteps should be processed and removed from cache
-    assert ts1 not in learning_role.all_obs, "ts1 should have been processed"
-    assert ts2 not in learning_role.all_obs, "ts2 should have been processed"
+    assert ts1 not in learning_role.cache["obs"], "ts1 should have been processed"
+    assert ts2 not in learning_role.cache["obs"], "ts2 should have been processed"
 
     # Add missing rewards after carry-over and ensure data consistency
     learning_role.add_reward_to_cache("unit_1", ts3, 30.0, regret=0.0, profit=30.0)
     learning_role.add_reward_to_cache("unit_1", ts4, 40.0, regret=0.0, profit=40.0)
 
-    assert ts3 in learning_role.all_obs, (
+    assert ts3 in learning_role.cache["obs"], (
         "ts3 reward should be accepted after carry-over"
     )
-    assert ts4 in learning_role.all_obs, (
+    assert ts4 in learning_role.cache["obs"], (
         "ts4 reward should be accepted after carry-over"
     )
 
@@ -310,26 +310,26 @@ async def test_atomic_swap_concurrent_writes(learning_role):
     )
 
     # Verify concurrent data was NOT lost
-    assert concurrent_data_ts in learning_role.all_obs, (
+    assert concurrent_data_ts in learning_role.cache["obs"], (
         "Concurrent data should be in cache after swap"
     )
-    assert concurrent_data_ts in learning_role.all_actions, (
+    assert concurrent_data_ts in learning_role.cache["actions"], (
         "Concurrent actions should be in cache"
     )
-    assert concurrent_data_ts in learning_role.all_rewards, (
+    assert concurrent_data_ts in learning_role.cache["rewards"], (
         "Concurrent rewards should be in cache"
     )
 
     # Verify that the original data added before swap is cleared (since it should have been processed)
-    assert ts1 not in learning_role.all_obs, (
+    assert ts1 not in learning_role.cache["obs"], (
         "ts1 should have been processed and moved to buffer"
     )
-    assert ts2 not in learning_role.all_obs, (
+    assert ts2 not in learning_role.cache["obs"], (
         "ts2 should have been processed and moved to buffer"
     )
 
     # Verify data content
-    assert len(learning_role.all_obs[concurrent_data_ts]["unit_1"]) == 1
+    assert len(learning_role.cache["obs"][concurrent_data_ts]["unit_1"]) == 1
     assert th.equal(
-        learning_role.all_obs[concurrent_data_ts]["unit_1"][0], concurrent_obs
+        learning_role.cache["obs"][concurrent_data_ts]["unit_1"][0], concurrent_obs
     )
