@@ -167,6 +167,13 @@ class PPO(ActorCriticAlgorithm):
 
         return progress_remaining
 
+    @staticmethod
+    def _normalize_advantages(advantages: th.Tensor) -> th.Tensor:
+        """Normalizing rollout advantages independently for each agent"""
+        advantages_mean = advantages.mean(dim=0, keepdim=True)
+        advantages_std = advantages.std(dim=0, unbiased=False, keepdim=True)
+        return (advantages - advantages_mean) / (advantages_std + 1e-8)
+
     def create_buffer(self, time_step) -> RolloutBuffer:
         """Create the rollout buffer holding exactly one update window.
 
@@ -491,6 +498,16 @@ class PPO(ActorCriticAlgorithm):
         # Compute advantages and returns
         rollout_buffer.compute_returns_and_advantages(last_values, dones)
 
+        # Normalizing once before splitting the rollout into mini batches
+        rollout_advantages = th.as_tensor(
+            rollout_buffer.advantages[: rollout_buffer.pos],
+            dtype=self.float_type,
+            device=self.device,
+        )
+        rollout_buffer.advantages[: rollout_buffer.pos] = (
+            self._normalize_advantages(rollout_advantages).cpu().numpy()
+        )
+
         # Initialize metrics storage
         all_actor_losses = []
         all_critic_losses = []
@@ -558,13 +575,6 @@ class PPO(ActorCriticAlgorithm):
                     advantages_i = batch.advantages[:, i]
                     returns_i = batch.returns[:, i]
                     old_values_i = batch.old_values[:, i]
-
-                    # Normalize advantages across the entire batch, not per-mini-batch
-                    # This provides more stable training
-                    advantages_flat = advantages_i.flatten()
-                    advantages_i = (advantages_i - advantages_flat.mean()) / (
-                        advantages_flat.std() + 1e-8
-                    )
 
                     log_probs, entropy = actor.evaluate_actions(obs_i, actions_i)
                     values = critic(all_states).flatten()
