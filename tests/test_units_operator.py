@@ -91,11 +91,9 @@ async def test_set_unit_dispatch(units_operator: UnitsOperator):
 
 
 async def test_write_market_dispatch(units_operator: UnitsOperator):
-    units_operator.write_market_dispatch("energy")
-    assert units_operator.last_sent_market_dispatch["energy"] > 0
+    units_operator.write_market_dispatch(units_operator.available_markets[0])
+    assert units_operator.last_sent_market_dispatch["EOM"] > 0
     assert units_operator.last_sent_market_dispatch["test"] == 0
-    units_operator.write_market_dispatch("test")
-    assert units_operator.last_sent_market_dispatch["test"] > 0
 
 
 async def test_write_actual_dispatch(units_operator: UnitsOperator):
@@ -303,7 +301,7 @@ async def test_rewarded_order_stays_in_market_dispatch(units_operator: UnitsOper
 
     # the closing delta at end_time is only aggregated by the export after it
     market_dispatch = units_operator.get_market_dispatch(
-        "energy", start + rd(hours=1), start + rd(hours=2)
+        "EOM", start + rd(hours=1), start + rd(hours=2)
     )
     assert len(market_dispatch) == 1
 
@@ -390,7 +388,7 @@ async def test_get_market_dispatch(units_operator: UnitsOperator):
     clock.set_time(clock.time + 3600)
 
     market_dispatch = units_operator.get_market_dispatch(
-        "energy", timestamp2datetime(last), timestamp2datetime(clock.time)
+        "EOM", timestamp2datetime(last), timestamp2datetime(clock.time)
     )
     # no orders were cleared, so nothing is dispatched
     assert len(market_dispatch) == 0
