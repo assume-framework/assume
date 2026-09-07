@@ -154,6 +154,19 @@ class MarketConfig:
             )
         )
 
+    @property
+    def last_opening(self) -> datetime:
+        """
+        The last opening which actually opens, which is the difference between the market
+        end and the length of the longest product plus the delivery time of the products.
+        An opening whose products would be delivered after the market end is skipped.
+        """
+        return self.opening_hours._until - max(
+            market_product.duration * market_product.count
+            + market_product.first_delivery
+            for market_product in self.market_products
+        )
+
     def __post_init__(self):
         """
         Post-initialization checks for checks on failing initializations.

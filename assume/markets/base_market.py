@@ -53,13 +53,7 @@ class MarketMechanism:
     def __init__(self, marketconfig: MarketConfig):
         super().__init__()
         self.marketconfig = marketconfig
-        # calculate last possible market opening as the difference between the market end
-        # and the length of the longest product plus the delivery time of the products
-        self.last_market_opening = marketconfig.opening_hours._until - max(
-            market_product.duration * market_product.count
-            + market_product.first_delivery
-            for market_product in marketconfig.market_products
-        )
+        self.last_market_opening = marketconfig.last_opening
 
     def clear(
         self, orderbook: Orderbook, market_products: list[MarketProduct]
