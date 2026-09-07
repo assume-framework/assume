@@ -58,6 +58,7 @@ class RLAlgorithm:
         "regret",
         "profit",
     )
+    retain_buffer_between_episodes = True
 
     def __init__(self, learning_role):
         """Initialize the RL algorithm.

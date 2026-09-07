@@ -319,6 +319,31 @@ class RolloutBuffer:
         if self.pos >= self.buffer_size:
             self.full = True
 
+    def ensure_capacity(self, required_size: int) -> None:
+        """Grow the buffer without losing transitions already collected."""
+        if required_size <= self.buffer_size:
+            return
+
+        new_size = max(required_size, self.buffer_size * 2)
+        array_names = (
+            "observations",
+            "actions",
+            "rewards",
+            "values",
+            "log_probs",
+            "advantages",
+            "returns",
+        )
+        for name in array_names:
+            current = getattr(self, name)
+            expanded = np.zeros((new_size, *current.shape[1:]), dtype=current.dtype)
+            expanded[: self.pos] = current[: self.pos]
+            setattr(self, name, expanded)
+
+        self.buffer_size = new_size
+        self.full = False
+        self.generator_ready = False
+
     def compute_returns_and_advantages(self, last_values: np.ndarray) -> None:
         """Use Generalized Advantage Estimation to compute the advantage.
 

@@ -147,6 +147,36 @@ def _setup_for_update(learning_role) -> None:
 
 
 @pytest.mark.require_learning
+def test_mappo_discards_rollout_without_bootstrap_observation(learning_role_n):
+    learning_role_n.initialize_policy()
+    learning_role_n.rl_algorithm.buffer = _make_rollout_buffer(
+        obs_dim=learning_role_n.rl_algorithm.obs_dim,
+        act_dim=learning_role_n.rl_algorithm.act_dim,
+        n_agents=len(learning_role_n.rl_strats),
+        n_steps=1,
+    )
+
+    learning_role_n.rl_algorithm.update_policy()
+
+    assert learning_role_n.rl_algorithm.buffer.size() == 0
+
+
+@pytest.mark.require_learning
+def test_mappo_clears_rollout_between_episodes(learning_role_n):
+    learning_role_n.initialize_policy()
+    learning_role_n.rl_algorithm.buffer = _make_rollout_buffer(
+        obs_dim=learning_role_n.rl_algorithm.obs_dim,
+        act_dim=learning_role_n.rl_algorithm.act_dim,
+        n_agents=len(learning_role_n.rl_strats),
+        n_steps=1,
+    )
+
+    inter_episodic_data = learning_role_n.get_inter_episodic_data()
+
+    assert inter_episodic_data["buffer"].size() == 0
+
+
+@pytest.mark.require_learning
 def test_mappo_algorithm_class(learning_role_n):
     """initialize_policy creates a PPO instance as the rl_algorithm."""
     learning_role_n.initialize_policy()
@@ -258,8 +288,6 @@ def test_mappo_buffer_storage_uses_rl_strats_order(base_learning_config):
     already do.
     """
     import asyncio
-    from collections import defaultdict
-
     config = copy(base_learning_config)
 
     learn = Learning(config["learning_config"], start, end)

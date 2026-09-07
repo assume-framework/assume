@@ -435,13 +435,17 @@ class Learning(Role):
             The inter-episodic data to be stored.
         """
 
+        buffer = self.rl_algorithm.buffer
+        if buffer is not None and not self.rl_algorithm.retain_buffer_between_episodes:
+            buffer.reset()
+
         return {
             "episodes_done": self.episodes_done,
             "eval_episodes_done": self.eval_episodes_done,
             "max_eval": self.max_eval,
             "all_eval": self.rl_eval,
             "avg_all_eval": self.avg_rewards,
-            "buffer": self.rl_algorithm.buffer,
+            "buffer": buffer,
             "actors_and_critics": self.rl_algorithm.extract_policy(),
         }
 

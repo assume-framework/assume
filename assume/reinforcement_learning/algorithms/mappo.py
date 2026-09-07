@@ -51,6 +51,7 @@ class PPO(ActorCriticAlgorithm):
 
     # Caching log probabilities needed by the clipped PPO objective
     buffer_fields = RLAlgorithm.buffer_fields + ("log_probs",)
+    retain_buffer_between_episodes = False
 
     def __init__(
         self,
@@ -241,6 +242,7 @@ class PPO(ActorCriticAlgorithm):
         policy's, as PPO requires.
         """
         unit_id_order = list(self.learning_role.rl_strats.keys())
+        self.buffer.ensure_capacity(self.buffer.pos + len(cache["obs"]))
 
         for timestamp in sorted(cache["obs"].keys()):
             missing_units = [
@@ -440,8 +442,10 @@ class PPO(ActorCriticAlgorithm):
         # for bootstrapping V(s_{t+1}) and train on the remaining rollout.
         if rollout_buffer.pos < 2:
             logger.debug(
-                "Rollout buffer has fewer than 2 samples, skipping policy update."
+                "Discarding rollout with fewer than 2 samples; MAPPO needs a "
+                "separate bootstrap observation."
             )
+            rollout_buffer.reset()
             return
 
         # Update learning rate

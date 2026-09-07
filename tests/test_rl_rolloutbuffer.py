@@ -148,6 +148,22 @@ def test_rollout_buffer_add_beyond_capacity_sets_full():
 
 
 @pytest.mark.require_learning
+def test_rollout_buffer_expands_without_losing_transitions():
+    buf = make_rollout_buffer(buffer_size=2, n_rl_units=1, obs_dim=1, act_dim=1)
+    fill_buffer(buf, n_steps=2, seed=7)
+    original_observations = buf.observations.copy()
+    original_rewards = buf.rewards.copy()
+
+    buf.ensure_capacity(3)
+
+    assert buf.buffer_size >= 3
+    assert buf.pos == 2
+    assert buf.full is False
+    np.testing.assert_array_equal(buf.observations[:2], original_observations)
+    np.testing.assert_array_equal(buf.rewards[:2], original_rewards)
+
+
+@pytest.mark.require_learning
 def test_gae_single_step():
     """For 1 step and 1 agent the advantage equals the TD error."""
     gamma, gae_lambda = 0.99, 0.95

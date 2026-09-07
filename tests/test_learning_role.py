@@ -113,6 +113,19 @@ async def learning_role():
 
 
 @pytest.mark.require_learning
+def test_off_policy_buffer_is_retained_between_episodes(learning_role):
+    learning_role, _ = learning_role
+    buffer = MagicMock()
+    learning_role.rl_algorithm.buffer = buffer
+    learning_role.rl_algorithm.extract_policy = MagicMock(return_value={})
+
+    inter_episodic_data = learning_role.get_inter_episodic_data()
+
+    assert inter_episodic_data["buffer"] is buffer
+    buffer.reset.assert_not_called()
+
+
+@pytest.mark.require_learning
 async def test_atomic_swap_no_data_loss(learning_role):
     """
     Test that the atomic swap in store_to_buffer_and_update does not lose data
