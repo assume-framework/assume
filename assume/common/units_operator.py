@@ -46,10 +46,10 @@ class UnitsOperator(Role):
     Attributes:
         available_markets (list[MarketConfig]): The available markets.
         registered_markets (dict[str, MarketConfig]): The registered markets.
-        last_sent_market_dispatch (dict[str, int]): The last sent market dispatch, per product type.
+        last_sent_market_dispatch (dict[str, int]): The time until which the market dispatch was sent, per market.
         last_executed_dispatch (int): The timestamp of the last executed dispatch.
         portfolio_strategies (UnitOperatorStrategy): The portfolio strategy.
-        valid_orders (defaultdict): The valid orders, per product type.
+        valid_orders (defaultdict): The valid orders, per market.
         pending_orders (defaultdict): The orders awaiting the end of their delivery period, per market.
         units (dict[str, BaseUnit]): The units.
         id (str): The id of the agent.
@@ -85,7 +85,7 @@ class UnitsOperator(Role):
                     UnitsOperatorDirectStrategy()
                 )
 
-        # valid_orders per product_type, used for the market dispatch export at clearing (before delivery)
+        # valid_orders per market_id, used for the market dispatch export at clearing (before delivery)
         self.valid_orders = defaultdict(list)
         # pending_orders per market_id awaiting the end of their delivery period to calculate reward based on actual dispatch
         self.pending_orders = defaultdict(list)
@@ -276,7 +276,7 @@ class UnitsOperator(Role):
             order["market_id"] = content["market_id"]
 
         marketconfig = self.registered_markets[content["market_id"]]
-        self.valid_orders[marketconfig.product_type].extend(orderbook)
+        self.valid_orders[marketconfig.market_id].extend(orderbook)
         self.set_unit_dispatch(orderbook, marketconfig)
 
         # the cashflow is fully determined by the clearing result and can be booked now
@@ -285,7 +285,7 @@ class UnitsOperator(Role):
         # the reward, in contrast, depends on the dispatch that is actually realized
         self.pending_orders[marketconfig.market_id].extend(orderbook)
 
-        self.write_market_dispatch(marketconfig.product_type)
+        self.write_market_dispatch(marketconfig)
 
     def handle_registration_feedback(
         self, content: RegistrationMessage, meta: MetaDict
@@ -508,24 +508,24 @@ class UnitsOperator(Role):
         return unit_dispatch
 
     def get_market_dispatch(
-        self, product_type: str, last: datetime, now: datetime
+        self, market_id: str, last: datetime, until: datetime
     ) -> list[tuple[datetime, float, str, str]]:
         """
-        Aggregates the accepted orders of the given product type into the dispatch
-        per market and unit.
+        Aggregates the accepted orders of the given market into the dispatch per unit.
 
         Args:
-            product_type (str): The product type for which this is done.
+            market_id (str): The market for which this is done.
             last (datetime.datetime): The last date until which the dispatch was already sent.
-            now (datetime.datetime): The current time.
+            until (datetime.datetime): The date up to which the dispatch is
+                aggregated, exclusive.
 
         Returns:
             list[tuple[datetime, float, str, str]]: the market_dispatch dataframe
         """
         return aggregate_step_amount(
-            orderbook=self.valid_orders[product_type],
+            orderbook=self.valid_orders[market_id],
             begin=last,
-            end=now,
+            end=until,
             groupby=["market_id", "unit_id"],
         )
 
@@ -548,32 +548,45 @@ class UnitsOperator(Role):
                 },
             )
 
-    def write_market_dispatch(self, product_type: str) -> None:
+    def write_market_dispatch(self, marketconfig: MarketConfig) -> None:
         """
-        Sends the aggregated market dispatch curve of the given product type to the
-        output agent.
+        Sends the aggregated market dispatch curve of the given market to the output agent.
+        This has to be called at a clearing of the given market, as the dispatch which is
+        final by now is derived from the opening this clearing belongs to.
 
         Args:
-            product_type (str): The type of the product.
+            marketconfig (MarketConfig): The market configuration.
         """
 
-        last = self.last_sent_market_dispatch[product_type]
-        if self.context.current_timestamp == last:  # TODO: do we still need that?
-            # stop if we exported at this time already
-            return
-        self.last_sent_market_dispatch[product_type] = self.context.current_timestamp
-
         now = timestamp2datetime(self.context.current_timestamp)
-        market_dispatch = self.get_market_dispatch(
-            product_type, timestamp2datetime(last), now
+        # the clearing belongs to the opening one opening duration ago, and an opening
+        # after the last possible one is never scheduled by the market
+        next_opening = marketconfig.opening_hours.after(
+            now - marketconfig.opening_duration
         )
+        if next_opening is not None and next_opening <= marketconfig.last_opening:
+            until = now
+        else:
+            # no export follows which could aggregate the rest, so the dispatch is final
+            # until the market end. The closing delta there lies beyond the simulation
+            # and is excluded by the aggregation.
+            until = marketconfig.opening_hours._until
+
+        market_id = marketconfig.market_id
+        last = timestamp2datetime(self.last_sent_market_dispatch[market_id])
+        if until <= last:
+            # stop if nothing became final since the last export
+            return
+        self.last_sent_market_dispatch[market_id] = datetime2timestamp(until)
+
+        market_dispatch = self.get_market_dispatch(market_id, last, until)
 
         # orders have to be kept until their closing delta has been aggregated,
         # which only happens in the export following their end_time
-        self.valid_orders[product_type] = list(
+        self.valid_orders[market_id] = list(
             filter(
-                lambda x: x["end_time"] > now,
-                self.valid_orders[product_type],
+                lambda x: x["end_time"] > until,
+                self.valid_orders[market_id],
             )
         )
 
