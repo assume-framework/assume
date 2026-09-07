@@ -848,6 +848,10 @@ class World:
                     else:
                         self.clock.set_time(end_ts)
                     prev_delta = delta
+
+                # tasks which fire at exactly end_ts need to be awaited before shutdown
+                await asyncio.sleep(0)
+                await tasks_complete_or_sleeping(c, except_sources=[])
             else:
                 # real-time mode
                 while self.clock.time < end_ts:
