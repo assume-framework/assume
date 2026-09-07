@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import asyncio
 import logging
 from collections import defaultdict
 from datetime import datetime
@@ -229,6 +230,9 @@ class Learning(Role):
         self.rl_strats[strategy.unit_id] = strategy
 
     async def store_to_buffer_and_update(self) -> None:
+        # wait for rewards to be added to cache
+        await asyncio.sleep(0)
+
         # Atomic dict operations - create new references
         current_obs = self.all_obs
         current_actions = self.all_actions
