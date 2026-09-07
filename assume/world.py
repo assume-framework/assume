@@ -855,6 +855,11 @@ class World:
                     await asyncio.sleep(1)
                     delta = self.clock.time - time
                     pbar.update(delta)
+
+            # tasks which fire at exactly end_ts need to be awaited before shutdown
+            await asyncio.sleep(0)
+            await tasks_complete_or_sleeping(c, except_sources=[])
+
             pbar.close()
 
     def run(self):
