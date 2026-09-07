@@ -134,7 +134,6 @@ def _make_rollout_buffer(
             obs=rng.random((n_agents, obs_dim)).astype(np.float32),
             action=rng.random((n_agents, act_dim)).astype(np.float32),
             reward=rng.random(n_agents).astype(np.float32),
-            done=np.zeros(n_agents, dtype=np.float32),
             value=rng.random(n_agents).astype(np.float32),
             log_prob=(rng.random(n_agents).astype(np.float32) - 1.0),
         )
@@ -311,9 +310,7 @@ def test_mappo_buffer_storage_uses_rl_strats_order(base_learning_config):
         "noises": {timestamp: {}},
         "regret": {timestamp: {}},
         "profit": {timestamp: {}},
-        "values": {timestamp: defaultdict(list)},
         "log_probs": {timestamp: {}},
-        "dones": {timestamp: {}},
     }
     for i, unit_id in enumerate(insertion_order):
         marker = float(i + 1)
@@ -330,8 +327,6 @@ def test_mappo_buffer_storage_uses_rl_strats_order(base_learning_config):
         cache["regret"][timestamp][unit_id] = [0.0]
         cache["profit"][timestamp][unit_id] = [0.0]
         cache["log_probs"][timestamp][unit_id] = [-marker]
-        cache["dones"][timestamp][unit_id] = [0.0]
-        # leave cache["values"][timestamp] empty - mappo recomputes values
 
     # Stash db_addr/update_steps so the logging path inside the algorithm is
     # safe to call.  We do NOT need an actual policy update for this test, so

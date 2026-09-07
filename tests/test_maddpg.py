@@ -438,29 +438,32 @@ def test_ddpg_transfer_weights_various_orders(new_id_order):
 
 
 @pytest.mark.require_learning
-def test_maddpg_load_corrupted_critic(tmp_path, base_learning_config):
+def test_maddpg_load_corrupted_critic(tmp_path, base_learning_config, caplog):
     config = copy(base_learning_config)
     learning = Learning(config["learning_config"], start, end)
     learning.rl_strats["agent_0"] = LearningStrategy(**config, learning_role=learning)
     learning.initialize_policy()
 
-    original_state = deepcopy(learning.rl_strats["agent_0"].critics.state_dict())
+    strategy = learning.rl_strats["agent_0"]
+    original_critic_state = deepcopy(strategy.critics.state_dict())
+    original_target_state = deepcopy(strategy.target_critics.state_dict())
 
     corrupted_dir = tmp_path / "critics"
     corrupted_dir.mkdir(parents=True, exist_ok=True)
 
     corrupted_obj = {
-        "critic": original_state,
+        "critic": {key: value + 1 for key, value in original_critic_state.items()},
         "critic_target": {
             k: v[:1] if isinstance(v, th.Tensor) and v.ndim > 0 else v
-            for k, v in original_state.items()
+            for k, v in original_target_state.items()
         },
     }
     th.save(corrupted_obj, corrupted_dir / "critic_agent_0.pt")
     learning.rl_algorithm.load_critic_params(directory=str(tmp_path))
 
-    loaded_state = learning.rl_strats["agent_0"].critics.state_dict()
-    assert compare_state_dicts(loaded_state, original_state)
+    assert compare_state_dicts(strategy.critics.state_dict(), original_critic_state)
+    assert compare_state_dicts(strategy.target_critics.state_dict(), original_target_state)
+    assert "Missing critic_optimizer in critic params for agent_0; skipping." in caplog.text
 
 
 @pytest.mark.parametrize(

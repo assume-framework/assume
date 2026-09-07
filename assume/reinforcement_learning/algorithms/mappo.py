@@ -49,9 +49,8 @@ class PPO(ActorCriticAlgorithm):
         >>> ppo.update_policy()
     """
 
-    # On-policy: also cache value estimates, log-probs, and done flags
-    # collected per time-step for GAE computation.
-    buffer_fields = RLAlgorithm.buffer_fields + ("values", "log_probs", "dones")
+    # Caching log probabilities needed by the clipped PPO objective
+    buffer_fields = RLAlgorithm.buffer_fields + ("log_probs",)
 
     def __init__(
         self,
@@ -117,7 +116,7 @@ class PPO(ActorCriticAlgorithm):
         """Sample a stochastic action.
 
         In learning mode the actor's Gaussian policy is sampled and the
-        value estimate and log-probability are returned as `extra_data` for
+        log-probability is returned as `extra_data` for
         the caller to cache alongside the action (see
         ``Learning.add_actions_to_cache``), for later use in
         _store_to_buffer_and_update_sync. In evaluation mode the
@@ -126,9 +125,6 @@ class PPO(ActorCriticAlgorithm):
         PPO does *not* have an initial-exploration phase — the stochastic
         policy provides sufficient exploration from the very first episode.
 
-        Note: the value estimate returned here is a placeholder (``0.0``) —
-        for MAPPO it is recomputed centrally in
-        ``_store_to_buffer_and_update_sync`` using the centralized critic.
         """
         if strategy.learning_mode and not strategy.evaluation_mode:
             action, log_prob = strategy.actor.get_action_and_log_prob(obs.unsqueeze(0))
@@ -137,7 +133,7 @@ class PPO(ActorCriticAlgorithm):
             if hasattr(log_prob, "item"):
                 log_prob = log_prob.item()
             noise = th.zeros_like(action, dtype=strategy.float_type)
-            extra_data = {"values": 0.0, "log_probs": log_prob, "dones": 0.0}
+            extra_data = {"log_probs": log_prob}
             return action, noise, extra_data
 
         # Evaluation
@@ -254,13 +250,12 @@ class PPO(ActorCriticAlgorithm):
                 or u not in cache["actions"][timestamp]
                 or u not in cache["rewards"][timestamp]
                 or u not in cache["log_probs"][timestamp]
-                or u not in cache["dones"][timestamp]
             ]
             if missing_units:
                 logger.warning(
                     "Skipping on-policy rollout step at %s: missing data for units %s. "
                     "This usually means a learning unit failed to report an "
-                    "observation/action/reward/log_prob/done for this timestep, "
+                    "observation/action/reward/log_prob for this timestep, "
                     "and we do not fill the buffer with default values instead.",
                     timestamp,
                     missing_units,
@@ -271,11 +266,10 @@ class PPO(ActorCriticAlgorithm):
                 field: transform_buffer_data(
                     {timestamp: cache[field][timestamp]}, device, unit_id_order
                 )
-                for field in ("obs", "actions", "rewards", "dones", "log_probs")
+                for field in ("obs", "actions", "rewards", "log_probs")
             }
 
-            # Recompute V(s_t) centrally, overriding the placeholder that
-            # get_action cached, and reshape to the buffer's (1, n_agents, 1).
+            # Computing V(s_t) centrally and reshaping it to the buffer layout
             values_data = (
                 self._centralized_values(step["obs"][0])
                 .reshape(1, -1, 1)
@@ -286,7 +280,6 @@ class PPO(ActorCriticAlgorithm):
                 obs=step["obs"],
                 action=step["actions"],
                 reward=step["rewards"],
-                done=step["dones"],
                 value=values_data,
                 log_prob=step["log_probs"],
             )
@@ -463,7 +456,6 @@ class PPO(ActorCriticAlgorithm):
 
         # Get last values for advantage computation
         last_values = np.zeros(n_rl_agents)
-        dones = np.zeros(n_rl_agents)
 
         # Get the buffer size to index into the last stored state
         buffer_size = (
@@ -480,11 +472,6 @@ class PPO(ActorCriticAlgorithm):
             last_idx = buffer_size - 1
             last_obs = rollout_buffer.observations[last_idx]
 
-            if last_idx > 0:
-                last_dones = rollout_buffer.dones[last_idx - 1]
-            else:
-                last_dones = rollout_buffer.dones[last_idx]
-
             # Reduce buffer size by 1 so as to not train on the bootstrap step
             rollout_buffer.pos -= 1
             if rollout_buffer.full:
@@ -493,10 +480,9 @@ class PPO(ActorCriticAlgorithm):
             # Bootstrap value, from the same centralized critics that produced
             # the V(s_t) already stored in the buffer by store_experience.
             last_values = self._centralized_values(last_obs)
-            dones = last_dones.copy()  # TODO: is this the correct behavior?
 
         # Compute advantages and returns
-        rollout_buffer.compute_returns_and_advantages(last_values, dones)
+        rollout_buffer.compute_returns_and_advantages(last_values)
 
         # Normalizing once before splitting the rollout into mini batches
         rollout_advantages = th.as_tensor(

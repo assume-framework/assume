@@ -43,10 +43,9 @@ def fill_buffer(buf, n_steps=None, seed=0):
         obs = rng.random((buf.n_rl_units, buf.obs_dim)).astype(np.float32)
         act = rng.random((buf.n_rl_units, buf.act_dim)).astype(np.float32)
         rew = rng.random(buf.n_rl_units).astype(np.float32)
-        done = np.zeros(buf.n_rl_units, dtype=np.float32)
         val = rng.random(buf.n_rl_units).astype(np.float32)
         lp = rng.random(buf.n_rl_units).astype(np.float32) - 1.0
-        buf.add(obs, act, rew, done, val, lp)
+        buf.add(obs, act, rew, val, lp)
 
 
 @pytest.mark.require_learning
@@ -57,7 +56,6 @@ def test_rollout_buffer_init_shapes():
     assert buf.rewards.shape == (10, 4)
     assert buf.values.shape == (10, 4)
     assert buf.log_probs.shape == (10, 4)
-    assert buf.dones.shape == (10, 4)
     assert buf.advantages.shape == (10, 4)
     assert buf.returns.shape == (10, 4)
 
@@ -93,12 +91,11 @@ def test_rollout_buffer_add_increments_pos():
     obs = np.ones((buf.n_rl_units, buf.obs_dim), dtype=np.float32)
     act = np.ones((buf.n_rl_units, buf.act_dim), dtype=np.float32)
     rew = np.ones(buf.n_rl_units, dtype=np.float32)
-    done = np.zeros(buf.n_rl_units, dtype=np.float32)
     val = np.ones(buf.n_rl_units, dtype=np.float32)
     lp = np.zeros(buf.n_rl_units, dtype=np.float32)
 
     for i in range(1, 6):
-        buf.add(obs, act, rew, done, val, lp)
+        buf.add(obs, act, rew, val, lp)
         assert buf.pos == i
         assert buf.size() == i
 
@@ -109,16 +106,14 @@ def test_rollout_buffer_add_stores_correct_values():
     obs = np.array([[1.0, 2.0]], dtype=np.float32)
     act = np.array([[0.5, -0.5]], dtype=np.float32)
     rew = np.array([3.0], dtype=np.float32)
-    done = np.array([0.0], dtype=np.float32)
     val = np.array([0.7], dtype=np.float32)
     lp = np.array([-1.2], dtype=np.float32)
 
-    buf.add(obs, act, rew, done, val, lp)
+    buf.add(obs, act, rew, val, lp)
 
     np.testing.assert_array_almost_equal(buf.observations[0, 0], [1.0, 2.0])
     np.testing.assert_array_almost_equal(buf.actions[0, 0], [0.5, -0.5])
     assert buf.rewards[0, 0] == pytest.approx(3.0)
-    assert buf.dones[0, 0] == pytest.approx(0.0)
     assert buf.values[0, 0] == pytest.approx(0.7)
     assert buf.log_probs[0, 0] == pytest.approx(-1.2)
 
@@ -136,26 +131,25 @@ def test_rollout_buffer_add_beyond_capacity_sets_full():
     obs = np.zeros((buf.n_rl_units, buf.obs_dim), dtype=np.float32)
     act = np.zeros((buf.n_rl_units, buf.act_dim), dtype=np.float32)
     rew = np.zeros(buf.n_rl_units, dtype=np.float32)
-    done = np.zeros(buf.n_rl_units, dtype=np.float32)
     val = np.zeros(buf.n_rl_units, dtype=np.float32)
     lp = np.zeros(buf.n_rl_units, dtype=np.float32)
 
     for _ in range(3):
-        buf.add(obs, act, rew, done, val, lp)
+        buf.add(obs, act, rew, val, lp)
 
     assert buf.pos == 3
     assert buf.size() == 3
     assert buf.full is True
 
     with pytest.raises(OverflowError):
-        buf.add(obs, act, rew, done, val, lp)
+        buf.add(obs, act, rew, val, lp)
     assert buf.full is True
     assert buf.size() == 3
 
 
 @pytest.mark.require_learning
-def test_gae_single_step_non_terminal():
-    """For 1 step, 1 agent, non-terminal: advantage = TD error."""
+def test_gae_single_step():
+    """For 1 step and 1 agent the advantage equals the TD error."""
     gamma, gae_lambda = 0.99, 0.95
     buf = make_rollout_buffer(
         buffer_size=1,
@@ -170,53 +164,14 @@ def test_gae_single_step_non_terminal():
         obs=np.array([[0.0]]),
         action=np.array([[0.0]]),
         reward=np.array([r]),
-        done=np.array([0.0]),
         value=np.array([v]),
         log_prob=np.array([0.0]),
     )
 
-    buf.compute_returns_and_advantages(
-        last_values=np.array([v_next]),
-        dones=np.array([0.0]),
-    )
+    buf.compute_returns_and_advantages(last_values=np.array([v_next]))
 
     expected_advantage = r + gamma * v_next - v
     expected_return = expected_advantage + v
-
-    assert buf.advantages[0, 0] == pytest.approx(expected_advantage, abs=1e-5)
-    assert buf.returns[0, 0] == pytest.approx(expected_return, abs=1e-5)
-
-
-@pytest.mark.require_learning
-def test_gae_single_step_terminal():
-    """For a terminal episode end, bootstrap value must not propagate."""
-    gamma, gae_lambda = 0.99, 0.95
-    buf = make_rollout_buffer(
-        buffer_size=1,
-        obs_dim=1,
-        act_dim=1,
-        n_rl_units=1,
-        gamma=gamma,
-        gae_lambda=gae_lambda,
-    )
-    r, v = 2.0, 1.0
-    buf.add(
-        obs=np.array([[0.0]]),
-        action=np.array([[0.0]]),
-        reward=np.array([r]),
-        done=np.array([0.0]),
-        value=np.array([v]),
-        log_prob=np.array([0.0]),
-    )
-
-    # done=1 — so no bootstrapping from last_values
-    buf.compute_returns_and_advantages(
-        last_values=np.array([999.0]),
-        dones=np.array([1.0]),
-    )
-
-    expected_advantage = r - v
-    expected_return = expected_advantage + v  # = r
 
     assert buf.advantages[0, 0] == pytest.approx(expected_advantage, abs=1e-5)
     assert buf.returns[0, 0] == pytest.approx(expected_return, abs=1e-5)
@@ -243,15 +198,11 @@ def test_gae_multi_step_manual():
             obs=np.array([[0.0]]),
             action=np.array([[0.0]]),
             reward=np.array([r]),
-            done=np.array([0.0]),
             value=np.array([v]),
             log_prob=np.array([0.0]),
         )
 
-    buf.compute_returns_and_advantages(
-        last_values=np.array([v_next]),
-        dones=np.array([0.0]),
-    )
+    buf.compute_returns_and_advantages(last_values=np.array([v_next]))
 
     delta_1 = r1 + gamma * v_next - v1
     gae_1 = delta_1
@@ -286,15 +237,11 @@ def test_gae_lambda_zero_equals_td_error():
             obs=np.array([[0.0]]),
             action=np.array([[0.0]]),
             reward=np.array([r]),
-            done=np.array([0.0]),
             value=np.array([v]),
             log_prob=np.array([0.0]),
         )
 
-    buf.compute_returns_and_advantages(
-        last_values=np.array([v_next]),
-        dones=np.array([0.0]),
-    )
+    buf.compute_returns_and_advantages(last_values=np.array([v_next]))
 
     next_vals = [values[1], values[2], v_next]
     for step, (r, v, nv) in enumerate(zip(rewards, values, next_vals)):
@@ -304,7 +251,7 @@ def test_gae_lambda_zero_equals_td_error():
 
 @pytest.mark.require_learning
 def test_gae_lambda_one_gamma_one_monte_carlo():
-    """with gamma=1, gae_lambda=1, terminal, should return equal undiscounted reward sums."""
+    """With gamma and gae_lambda at 1 returns equal undiscounted reward sums."""
     gamma, gae_lambda = 1.0, 1.0
     T = 4
     buf = make_rollout_buffer(
@@ -323,15 +270,11 @@ def test_gae_lambda_one_gamma_one_monte_carlo():
             obs=np.array([[0.0]]),
             action=np.array([[0.0]]),
             reward=np.array([r]),
-            done=np.array([0.0]),
             value=np.array([v]),
             log_prob=np.array([0.0]),
         )
 
-    buf.compute_returns_and_advantages(
-        last_values=np.array([0.0]),
-        dones=np.array([1.0]),
-    )
+    buf.compute_returns_and_advantages(last_values=np.array([0.0]))
 
     for t in range(T):
         assert buf.returns[t, 0] == pytest.approx(float(T - t), abs=1e-5)
@@ -355,15 +298,11 @@ def test_gae_multi_agent_independence():
             obs=np.zeros((2, 1), dtype=np.float32),
             action=np.zeros((2, 1), dtype=np.float32),
             reward=np.array([1.0, 0.0]),
-            done=np.zeros(2, dtype=np.float32),
             value=np.array([0.5, 0.5]),
             log_prob=np.zeros(2, dtype=np.float32),
         )
 
-    buf.compute_returns_and_advantages(
-        last_values=np.array([0.5, 0.5]),
-        dones=np.zeros(2),
-    )
+    buf.compute_returns_and_advantages(last_values=np.array([0.5, 0.5]))
 
     for t in range(3):
         assert abs(buf.advantages[t, 1]) < abs(buf.advantages[t, 0]), (
@@ -379,7 +318,7 @@ def test_gae_returns_equal_advantages_plus_values():
     fill_buffer(buf, n_steps=6)
 
     last_values = np.random.rand(3).astype(np.float32)
-    buf.compute_returns_and_advantages(last_values, dones=np.zeros(3, dtype=np.float32))
+    buf.compute_returns_and_advantages(last_values)
 
     np.testing.assert_array_almost_equal(
         buf.returns[: buf.pos],
@@ -403,10 +342,7 @@ def test_rollout_buffer_get_full_batch():
     """get(batch_size=None) yields one batch with all steps and correct shapes."""
     buf = make_rollout_buffer(buffer_size=5, obs_dim=3, act_dim=2, n_rl_units=2)
     fill_buffer(buf, n_steps=5)
-    buf.compute_returns_and_advantages(
-        last_values=np.zeros(2, dtype=np.float32),
-        dones=np.zeros(2, dtype=np.float32),
-    )
+    buf.compute_returns_and_advantages(last_values=np.zeros(2, dtype=np.float32))
 
     batches = list(buf.get(batch_size=None))
     assert len(batches) == 1
@@ -427,10 +363,7 @@ def test_rollout_buffer_get_mini_batches_cover_all_steps():
     T = 8
     buf = make_rollout_buffer(buffer_size=T, obs_dim=2, act_dim=1, n_rl_units=1)
     fill_buffer(buf, n_steps=T)
-    buf.compute_returns_and_advantages(
-        last_values=np.zeros(1, dtype=np.float32),
-        dones=np.zeros(1, dtype=np.float32),
-    )
+    buf.compute_returns_and_advantages(last_values=np.zeros(1, dtype=np.float32))
 
     total_samples = 0
     for batch in buf.get(batch_size=2):
@@ -445,10 +378,7 @@ def test_rollout_buffer_get_partial_fill():
     """A partially-filled buffer must only yield the filled steps."""
     buf = make_rollout_buffer(buffer_size=10, obs_dim=2, act_dim=1, n_rl_units=1)
     fill_buffer(buf, n_steps=4)
-    buf.compute_returns_and_advantages(
-        last_values=np.zeros(1, dtype=np.float32),
-        dones=np.zeros(1, dtype=np.float32),
-    )
+    buf.compute_returns_and_advantages(last_values=np.zeros(1, dtype=np.float32))
 
     batches = list(buf.get(batch_size=None))
     assert batches[0].observations.shape[0] == 4
@@ -473,7 +403,6 @@ def test_full_episode_rollout():
             obs=rng.random((n_agents, obs_dim)).astype(np.float32),
             action=rng.random((n_agents, act_dim)).astype(np.float32),
             reward=rng.random(n_agents).astype(np.float32),
-            done=np.zeros(n_agents, dtype=np.float32),
             value=rng.random(n_agents).astype(np.float32),
             log_prob=-rng.random(n_agents).astype(np.float32),
         )
@@ -481,7 +410,7 @@ def test_full_episode_rollout():
     assert buf.size() == T
 
     last_values = rng.random(n_agents).astype(np.float32)
-    buf.compute_returns_and_advantages(last_values, dones=np.zeros(n_agents))
+    buf.compute_returns_and_advantages(last_values)
 
     # returns == advantages + values
     np.testing.assert_array_almost_equal(

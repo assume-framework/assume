@@ -263,7 +263,6 @@ class RolloutBuffer:
         self.rewards = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
         self.values = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
         self.log_probs = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
-        self.dones = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
 
         # Computed after rollout
         self.advantages = np.zeros(
@@ -280,7 +279,6 @@ class RolloutBuffer:
         obs: np.ndarray,
         action: np.ndarray,
         reward: np.ndarray,
-        done: np.ndarray,
         value: np.ndarray,
         log_prob: np.ndarray,
     ) -> None:
@@ -290,7 +288,6 @@ class RolloutBuffer:
             obs: Observation of the agents.
             action: Action taken by the agents.
             reward: Reward obtained.
-            done: Whether the episode ended.
             value: Value estimate from the critic.
             log_prob: Log probability of the action.
 
@@ -314,30 +311,24 @@ class RolloutBuffer:
         self.observations[self.pos] = np.array(obs).copy()
         self.actions[self.pos] = np.array(action).copy()
         self.rewards[self.pos] = np.array(reward).flatten().copy()
-        self.dones[self.pos] = np.array(done).flatten().copy()
         self.values[self.pos] = np.array(value).flatten().copy()
         self.log_probs[self.pos] = np.array(log_prob).flatten().copy()
-        # flattening the rewards, dones, values, log_probs array to (n_units,) size
+        # flattening rewards, values and log_probs to (n_units,) size
 
         self.pos += 1
         if self.pos >= self.buffer_size:
             self.full = True
 
-    def compute_returns_and_advantages(
-        self, last_values: np.ndarray, dones: np.ndarray
-    ) -> None:
+    def compute_returns_and_advantages(self, last_values: np.ndarray) -> None:
         """Use Generalized Advantage Estimation to compute the advantage.
 
         To obtain the lambda-return, the advantage is added to the value estimate.
 
         Args:
             last_values: Value estimation for the last step.
-            dones: Whether the last step was terminal.
         """
-        # taking the final value estimates and episode-end flags,
-        # and making them flat arrays providing one number per agent.
+        # taking the final value estimates and making them flat
         last_values = np.array(last_values).flatten()
-        dones = np.array(dones).flatten()
 
         # GAE computation
         # starting with running total of zero for each agent.
@@ -348,24 +339,16 @@ class RolloutBuffer:
         for step in reversed(range(buffer_size)):
             if step == buffer_size - 1:
                 # if at the last step, use the last_vlaues given as input
-                next_non_terminal = 1.0 - dones
                 next_values = last_values
             else:
-                # for all the other steps, get the next value and next episode flag.
-                next_non_terminal = 1.0 - self.dones[step + 1]
+                # for all the other steps, get the next value
                 next_values = self.values[step + 1]
 
             # TD error
-            delta = (
-                self.rewards[step]
-                + self.gamma * next_values * next_non_terminal
-                - self.values[step]
-            )
+            delta = self.rewards[step] + self.gamma * next_values - self.values[step]
 
             # GAE advantage
-            last_gae_lam = (
-                delta + self.gamma * self.gae_lambda * next_non_terminal * last_gae_lam
-            )
+            last_gae_lam = delta + self.gamma * self.gae_lambda * last_gae_lam
             self.advantages[step] = last_gae_lam
 
         # Returns = advantages + values

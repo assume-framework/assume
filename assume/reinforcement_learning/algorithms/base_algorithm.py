@@ -48,8 +48,8 @@ class RLAlgorithm:
     """
 
     # Per-timestep fields this algorithm caches in the learning role before they are written to the buffer (see ``Learning.cache`` in
-    # learning_role.py). Subclasses extend this tuple with whatever extra data their update step needs, e.g. PPO/MAPPO add value estimates,
-    # log-probs, and done flags for GAE.
+    # learning_role.py). Subclasses extend this tuple with whatever extra data
+    # their update step needs, e.g. PPO/MAPPO add log probabilities.
     buffer_fields: tuple[str, ...] = (
         "obs",
         "actions",
@@ -534,12 +534,13 @@ class ActorCriticAlgorithm(RLAlgorithm):
                 if self.uses_target_networks:
                     required_keys.append("critic_target")
 
-                for key in required_keys:
-                    if key not in critic_params:
-                        logger.warning(
-                            f"Missing {key} in critic params for {u_id}; skipping."
-                        )
-                        continue
+                missing_keys = [key for key in required_keys if key not in critic_params]
+                if missing_keys:
+                    logger.warning(
+                        f"Missing {', '.join(missing_keys)} in critic params for "
+                        f"{u_id}; skipping."
+                    )
+                    continue
 
                 if direct_load:
                     strategy.critics.load_state_dict(critic_params["critic"])

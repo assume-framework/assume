@@ -113,7 +113,7 @@ class Learning(Role):
 
             # init the cache dict for all learning instances in this role.
             # Which fields are collected per time-step is determined by the chosen algorithm (see RLAlgorithm.buffer_fields), so e.g. only
-            # on-policy algorithms (PPO/MAPPO) end up caching value estimates,log-probs, and done flags for GAE computation.
+            # on-policy algorithms (PPO/MAPPO) end up caching log-probs for GAE computation.
             # Note: we use atomic-swaps later to ensure no overwrites while we write the data into the buffer
             # this works since we do not use multi-threading, otherwise threading.locks would be needed here.
             self.buffer_fields = self.rl_algorithm.buffer_fields
