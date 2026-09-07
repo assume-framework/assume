@@ -87,7 +87,11 @@ class PPO(ActorCriticAlgorithm):
         self.clip_range = (
             clip_range if clip_range is not None else on_policy_config.clip_ratio
         )
-        self.clip_range_vf = clip_range_vf
+        self.clip_range_vf = (
+            clip_range_vf
+            if clip_range_vf is not None
+            else on_policy_config.clip_range_vf
+        )
         self.n_epochs = n_epochs if n_epochs is not None else on_policy_config.n_epochs
         self.entropy_coef = (
             entropy_coef if entropy_coef is not None else on_policy_config.entropy_coef

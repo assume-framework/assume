@@ -205,8 +205,6 @@ and policy updates occur in :func:`assume.reinforcement_learning.algorithms.mapp
 The rollout buffer enables efficient multi-pass training over the same batch of experiences, improving sample efficiency.
 For more details on how the rollout buffer works, see :ref:`rollout-buffer`.
 
-.. _buffer:
-
 ##############
 Buffer
 ##############
@@ -267,8 +265,8 @@ The key characteristics of a rollout buffer are:
 
 This design makes rollout buffers particularly suitable for policy gradient methods that require fresh, on-policy data for stable learning.
 
-The rollout buffer for PPO is implemented as a fixed-size circular buffer that stores one complete rollout of experiences.
-Unlike the replay buffer, it is completely reset after each training update to ensure only on-policy data is used.
+The rollout buffer for PPO stores one rollout of experiences and grows when delayed rewards require additional capacity.
+It does not overwrite old transitions. The buffer is reset after each training update and at episode boundaries to ensure only on-policy data is used.
 
 The buffer stores the following information for each timestep:
 
@@ -285,8 +283,8 @@ After a complete rollout is collected (determined by the ``train_freq`` paramete
 * **Advantages**: GAE-based advantage estimates that guide policy improvement
 
 The learning role collects experiences after each environment step by calling the buffer's add function.
-Once the buffer accumulates enough data (specified by ``batch_size``), the PPO algorithm's update function
-is triggered, which retrieves mini-batches from the buffer for multiple training epochs (specified by ``on_policy.n_epochs``).
+The PPO update is triggered by the recurrent task configured through ``train_freq``. During an update,
+``batch_size`` determines the size of the mini-batches processed over multiple training epochs (specified by ``on_policy.n_epochs``).
 
 After training is complete, the buffer is reset, and the cycle begins again with the updated policy.
 This ensures that PPO always learns from fresh, on-policy experiences, which is critical for the algorithm's stability and performance.

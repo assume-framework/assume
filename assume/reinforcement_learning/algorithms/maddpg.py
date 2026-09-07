@@ -238,7 +238,10 @@ class DDPG(ActorCriticAlgorithm):
             with th.no_grad():
                 next_actions = th.stack(
                     [
-                        strategy.actor_target(next_states[:, i, :]).clamp(-1, 1)
+                        strategy.actor_target(next_states[:, i, :]).clamp(
+                            strategy.actor_target.min_output,
+                            strategy.actor_target.max_output,
+                        )
                         for i, strategy in enumerate(strategies)
                     ]
                 )
@@ -322,7 +325,10 @@ class DDPG(ActorCriticAlgorithm):
 
             for strategy in strategies:
                 parameters = list(strategy.critics.parameters())
-                max_grad_norm = max(p.grad.norm() for p in parameters)
+                max_grad_norm = max(
+                    (p.grad.norm() for p in parameters if p.grad is not None),
+                    default=th.tensor(0.0, device=self.device),
+                )
                 total_norm = th.nn.utils.clip_grad_norm_(
                     parameters, max_norm=self.grad_clip_norm
                 )
@@ -379,7 +385,10 @@ class DDPG(ActorCriticAlgorithm):
 
             for strategy in strategies:
                 parameters = list(strategy.actor.parameters())
-                max_grad_norm = max(p.grad.norm() for p in parameters)
+                max_grad_norm = max(
+                    (p.grad.norm() for p in parameters if p.grad is not None),
+                    default=th.tensor(0.0, device=self.device),
+                )
                 total_norm = th.nn.utils.clip_grad_norm_(
                     parameters, max_norm=self.grad_clip_norm
                 )

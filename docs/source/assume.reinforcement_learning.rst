@@ -32,6 +32,22 @@ assume.reinforcement\_learning.learning\_utils module
    :undoc-members:
    :show-inheritance:
 
+assume.reinforcement\_learning.neural\_network\_architecture module
+--------------------------------------------------------------------
+
+.. automodule:: assume.reinforcement_learning.neural_network_architecture
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+assume.reinforcement\_learning.tensorboard\_logger module
+----------------------------------------------------------
+
+.. automodule:: assume.reinforcement_learning.tensorboard_logger
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 assume.reinforcement\_learning.algorithms.base_algorithm module
 ---------------------------------------------------------------
 

@@ -528,7 +528,9 @@ class ActorCriticAlgorithm(RLAlgorithm):
                 continue
 
             try:
-                critic_params = th.load(critic_path, weights_only=True)
+                critic_params = th.load(
+                    critic_path, weights_only=True, map_location=self.device
+                )
 
                 # Required keys depend on whether algorithm uses target networks
                 required_keys = ["critic", "critic_optimizer"]
@@ -563,6 +565,7 @@ class ActorCriticAlgorithm(RLAlgorithm):
                         obs_base=strategy.obs_dim,
                         act_dim=strategy.act_dim,
                         unique_obs=strategy.unique_obs_dim,
+                        current_id=str(u_id),
                     )
 
                     if critic_weights is None:
@@ -571,9 +574,8 @@ class ActorCriticAlgorithm(RLAlgorithm):
                         )
                         continue
 
-                    strategy.critics.load_state_dict(critic_weights)
-
                     # Only transfer target critic weights if this algorithm uses target networks
+                    target_critic_weights = None
                     if self.uses_target_networks and "critic_target" in critic_params:
                         target_critic_weights = transfer_weights(
                             model=strategy.target_critics,
@@ -583,6 +585,7 @@ class ActorCriticAlgorithm(RLAlgorithm):
                             obs_base=strategy.obs_dim,
                             act_dim=strategy.act_dim,
                             unique_obs=strategy.unique_obs_dim,
+                            current_id=str(u_id),
                         )
 
                         if target_critic_weights is None:
@@ -591,6 +594,8 @@ class ActorCriticAlgorithm(RLAlgorithm):
                             )
                             continue
 
+                    strategy.critics.load_state_dict(critic_weights)
+                    if target_critic_weights is not None:
                         strategy.target_critics.load_state_dict(target_critic_weights)
 
                     logger.debug(f"Critic weights transferred for {u_id}.")
@@ -622,13 +627,26 @@ class ActorCriticAlgorithm(RLAlgorithm):
                 actor_params = self.load_obj(
                     directory=f"{directory}/actors/actor_{str(u_id)}.pt"
                 )
+
+                required_keys = {"actor", "actor_optimizer"}
+                if self.uses_target_networks:
+                    required_keys.add("actor_target")
+                missing_keys = required_keys.difference(actor_params)
+                if missing_keys:
+                    logger.warning(
+                        "Actor checkpoint for agent %s is missing required keys: %s",
+                        u_id,
+                        ", ".join(sorted(missing_keys)),
+                    )
+                    continue
+
                 strategy.actor.load_state_dict(actor_params["actor"])
                 strategy.actor.optimizer.load_state_dict(
                     actor_params["actor_optimizer"]
                 )
 
                 # Only load target actor if this algorithm uses target networks
-                if self.uses_target_networks and "actor_target" in actor_params:
+                if self.uses_target_networks:
                     strategy.actor_target.load_state_dict(actor_params["actor_target"])
 
                 # add a tag to the strategy to indicate that the actor was loaded

@@ -844,6 +844,7 @@ class OnPolicyConfig:
 
     Parameters:
         clip_ratio (float): The clipping ratio for the PPO surrogate objective. Default is 0.1.
+        clip_range_vf (float | None): The clipping range for PPO value updates. Disabled by default.
         entropy_coef (float): Coefficient for entropy term in loss. Default is 0.01.
         gae_lambda (float): Lambda parameter for Generalized Advantage Estimation (GAE). Default is 0.95.
         max_grad_norm (float): Maximum gradient norm for clipping. Default is 0.5.
@@ -852,6 +853,7 @@ class OnPolicyConfig:
     """
 
     clip_ratio: float = 0.1
+    clip_range_vf: float | None = None
     entropy_coef: float = 0.01
     gae_lambda: float = 0.95
     max_grad_norm: float = 0.5

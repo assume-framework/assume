@@ -184,18 +184,26 @@ def constant_schedule(val: float) -> Schedule:
 
 
 def get_hidden_sizes(state_dict: dict, prefix: str) -> list[int]:
-    sizes = []
-    i = 0
-    while f"{prefix}.{i}.weight" in state_dict:
-        weight = state_dict[f"{prefix}.{i}.weight"]
-        out_dim = weight.shape[0]
-        sizes.append(out_dim)
-        i += 1
+    sizes = [
+        state_dict[f"{prefix}.{index}.weight"].shape[0]
+        for index in _get_linear_layer_indices(state_dict, prefix)
+    ]
     return sizes[:-1]  # exclude the final output layer if needed
 
 
-def _get_q_prefixes(state_dict: dict) -> list[str]:
-    known = ("q_layers", "q1_layers", "q2_layers")
+def _get_linear_layer_indices(state_dict: dict, prefix: str) -> list[int]:
+    indices = {
+        int(key.split(".")[1])
+        for key in state_dict
+        if key.startswith(f"{prefix}.")
+        and key.endswith(".weight")
+        and key.split(".")[1].isdigit()
+    }
+    return sorted(indices)
+
+
+def _get_network_prefixes(state_dict: dict) -> list[str]:
+    known = ("q_layers", "q1_layers", "q2_layers", "v_layers")
     return [p for p in known if f"{p}.0.weight" in state_dict]
 
 
@@ -265,6 +273,7 @@ def transfer_weights(
     obs_base: int,
     act_dim: int,
     unique_obs: int,
+    current_id: str | None = None,
 ) -> dict | None:
     """
     Transfer weights from loaded model to new model. Copy only those obs- and action-slices for matching IDs.
@@ -278,6 +287,8 @@ def transfer_weights(
         obs_base (int): The base observation size.
         act_dim (int): The action dimension size.
         unique_obs (int): The unique observation size per agent, smaller than obs_base as these include also shared observation values.
+        current_id: Agent whose centralized critic is being transferred. Its own
+            observation occupies the shared ``obs_base`` block.
 
     Returns:
         dict | None: The updated state dictionary with transferred weights, or None if architecture mismatch.
@@ -285,11 +296,11 @@ def transfer_weights(
 
     # 1) Architecture check
     new_state = model.state_dict()
-    prefixes = _get_q_prefixes(loaded_state)
+    prefixes = _get_network_prefixes(loaded_state)
     if not prefixes:
         logger.warning(
-            "Cannot transfer weights: no recognised Q-network prefix "
-            "(q_layers / q1_layers / q2_layers) found in loaded state dict."
+            "Cannot transfer weights: no recognised critic network prefix found "
+            "in loaded state dict."
         )
         return None
 
@@ -314,53 +325,60 @@ def transfer_weights(
     new_state_copy = {k: v.clone() for k, v in new_state.items()}
 
     for prefix in prefixes:
-        w_loaded = loaded_state[f"{prefix}.0.weight"]
-        b_loaded = loaded_state[f"{prefix}.0.bias"]
-        w_new = new_state_copy[f"{prefix}.0.weight"]
-        b_new = new_state_copy[f"{prefix}.0.bias"]
-        w_loaded_random = new_state[f"{prefix}.0.weight"].clone()
+        loaded_indices = _get_linear_layer_indices(loaded_state, prefix)
+        new_indices = _get_linear_layer_indices(new_state, prefix)
+        if loaded_indices != new_indices:
+            logger.warning(
+                "Cannot transfer weights: critic layer structure mismatch for %s.",
+                prefix,
+            )
+            return None
+
+        input_index = new_indices[0]
+        w_loaded = loaded_state[f"{prefix}.{input_index}.weight"]
+        b_loaded = loaded_state[f"{prefix}.{input_index}.bias"]
+        w_new = new_state_copy[f"{prefix}.{input_index}.weight"]
+        b_new = new_state_copy[f"{prefix}.{input_index}.bias"]
 
         # a) shared obs_base
         w_new[:, :obs_base] = w_loaded[:, :obs_base]
 
         # b) matched agents’ ID
         # copy weights from loaded to new model
-        for new_idx, u in enumerate(new_id_order):
-            if u not in loaded_id_order:
-                continue
-            loaded_idx = loaded_id_order.index(u)
+        if current_id is None:
+            loaded_other_ids = loaded_id_order[1:]
+            new_other_ids = new_id_order[1:]
+        else:
+            loaded_other_ids = [u for u in loaded_id_order if u != current_id]
+            new_other_ids = [u for u in new_id_order if u != current_id]
 
-            # unique_obs for agents beyond the first
-            if new_idx > 0 and loaded_idx > 0:
-                ns = obs_base + unique_obs * (new_idx - 1)
-                os_ = obs_base + unique_obs * (loaded_idx - 1)
+        for new_idx, unit_id in enumerate(new_other_ids):
+            if unit_id in loaded_other_ids:
+                loaded_idx = loaded_other_ids.index(unit_id)
+                ns = obs_base + unique_obs * new_idx
+                os_ = obs_base + unique_obs * loaded_idx
                 w_new[:, ns : ns + unique_obs] = w_loaded[:, os_ : os_ + unique_obs]
 
-            # action blocks for every agent
-            new_act = new_obs_tot + act_dim * new_idx
-            loaded_act = loaded_obs_tot + act_dim * loaded_idx
-            w_new[:, new_act : new_act + act_dim] = w_loaded[
-                :, loaded_act : loaded_act + act_dim
-            ]
+        if act_dim:
+            for new_idx, unit_id in enumerate(new_id_order):
+                if unit_id not in loaded_id_order:
+                    continue
+                loaded_idx = loaded_id_order.index(unit_id)
+                new_act = new_obs_tot + act_dim * new_idx
+                loaded_act = loaded_obs_tot + act_dim * loaded_idx
+                w_new[:, new_act : new_act + act_dim] = w_loaded[
+                    :, loaded_act : loaded_act + act_dim
+                ]
 
-        # c) unmatched agents’ ID
-        # use randomly initialized weights for unmatched agents
-        for new_idx, u in enumerate(new_id_order):
-            if new_idx == 0 or u in loaded_id_order:
-                continue
-            ns = obs_base + unique_obs * (new_idx - 1)
-            w_new[:, ns : ns + unique_obs] = w_loaded_random[:, ns : ns + unique_obs]
-            # actions untouched
-
-        # d) bias and deeper layers
+        # c) bias and deeper layers
         # copy all other weights and biases (besides input layer) from loaded to new model
         b_new.copy_(b_loaded)
-        for i in range(1, len(new_hidden) + 1):
-            new_state_copy[f"{prefix}.{i}.weight"].copy_(
-                loaded_state[f"{prefix}.{i}.weight"]
+        for index in new_indices[1:]:
+            new_state_copy[f"{prefix}.{index}.weight"].copy_(
+                loaded_state[f"{prefix}.{index}.weight"]
             )
-            new_state_copy[f"{prefix}.{i}.bias"].copy_(
-                loaded_state[f"{prefix}.{i}.bias"]
+            new_state_copy[f"{prefix}.{index}.bias"].copy_(
+                loaded_state[f"{prefix}.{index}.bias"]
             )
 
     return new_state_copy

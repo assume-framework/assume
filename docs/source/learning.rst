@@ -103,7 +103,7 @@ Meanwhile, during both training and execution, the actor has access only to its 
 
 For each agent :math:`i`, MATD3 and MADDPG train centralized critics together with target critic networks.
 In MATD3 and MADDPG, the critics are used to calculate the target :math:`y_i,k`. In MATD3, two critics per agent are maintained and the minimum value is used (twin-critic trick) to address overestimation bias.
-In MADDPG, a single critic per agent is used. In MAPPO, a single centralized value network is used across all agents, updated via GAE-based advantage estimates rather than Bellman targets.
+In MADDPG, a single critic per agent is used. In MAPPO, each agent has its own centralized value network, updated via GAE-based advantage estimates rather than Bellman targets.
 
 For MATD3, the target uses the twin-critic minimum:
 

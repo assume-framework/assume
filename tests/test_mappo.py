@@ -56,6 +56,7 @@ def base_learning_config() -> dict:
             gamma=0.99,
             on_policy=OnPolicyConfig(
                 clip_ratio=0.2,
+                clip_range_vf=0.15,
                 entropy_coef=0.01,
                 gae_lambda=0.95,
                 max_grad_norm=0.5,
@@ -181,6 +182,7 @@ def test_mappo_algorithm_class(learning_role_n):
     """initialize_policy creates a PPO instance as the rl_algorithm."""
     learning_role_n.initialize_policy()
     assert isinstance(learning_role_n.rl_algorithm, PPO)
+    assert learning_role_n.rl_algorithm.clip_range_vf == 0.15
 
 
 @pytest.mark.require_learning
@@ -235,6 +237,50 @@ def test_mappo_load_matching_n(base_learning_config, saved_n_agent_model):
         deepcopy(original_states["optimizer_actor"]),
         deepcopy(agent.actor.optimizer.state_dict()),
     )
+
+
+@pytest.mark.require_learning
+def test_mappo_transfers_critics_when_agent_order_changes(
+    learning_role_n, base_learning_config, tmp_path
+):
+    learning_role_n.initialize_policy()
+    save_dir = tmp_path / "saved_mappo"
+    learning_role_n.rl_algorithm.save_params(directory=str(save_dir))
+    saved_states = {
+        unit_id: deepcopy(strategy.critics.state_dict())
+        for unit_id, strategy in learning_role_n.rl_strats.items()
+    }
+
+    config = copy(base_learning_config)
+    new_learning = Learning(config["learning_config"], start, end)
+    for agent_id in ("agent_1", "agent_0", "agent_2"):
+        strategy = LearningStrategy(**config, learning_role=new_learning)
+        strategy.unit_id = agent_id
+        new_learning.rl_strats[agent_id] = strategy
+    new_learning.initialize_policy()
+    initial_new_agent_slices = {
+        unit_id: strategy.critics.state_dict()["v_layers.0.weight"][
+            :, -strategy.unique_obs_dim :
+        ].clone()
+        for unit_id, strategy in new_learning.rl_strats.items()
+        if unit_id != "agent_2"
+    }
+
+    new_learning.rl_algorithm.load_critic_params(str(save_dir))
+
+    for unit_id in ("agent_0", "agent_1"):
+        loaded = new_learning.rl_strats[unit_id].critics.state_dict()
+        saved = saved_states[unit_id]
+        assert th.equal(
+            loaded["v_layers.0.weight"][:, : config["obs_dim"]],
+            saved["v_layers.0.weight"][:, : config["obs_dim"]],
+        )
+        assert th.equal(loaded["v_layers.2.weight"], saved["v_layers.2.weight"])
+        assert th.equal(loaded["v_layers.4.weight"], saved["v_layers.4.weight"])
+        assert th.equal(
+            loaded["v_layers.0.weight"][:, -config["unique_obs_dim"] :],
+            initial_new_agent_slices[unit_id],
+        )
 
 
 @pytest.mark.require_learning

@@ -6,6 +6,7 @@ import json
 import os
 from copy import copy, deepcopy
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
@@ -464,6 +465,55 @@ def test_maddpg_load_corrupted_critic(tmp_path, base_learning_config, caplog):
     assert compare_state_dicts(strategy.critics.state_dict(), original_critic_state)
     assert compare_state_dicts(strategy.target_critics.state_dict(), original_target_state)
     assert "Missing critic_optimizer in critic params for agent_0; skipping." in caplog.text
+
+
+@pytest.mark.require_learning
+def test_maddpg_does_not_load_actor_without_target(
+    learning_role_n, tmp_path, caplog
+):
+    learning_role_n.initialize_policy()
+    strategy = learning_role_n.rl_strats["agent_0"]
+    original_actor_state = deepcopy(strategy.actor.state_dict())
+
+    actor_dir = tmp_path / "actors"
+    actor_dir.mkdir(parents=True, exist_ok=True)
+    actor_checkpoint = {
+        "actor": {key: value + 1 for key, value in original_actor_state.items()},
+        "actor_optimizer": strategy.actor.optimizer.state_dict(),
+    }
+    th.save(actor_checkpoint, actor_dir / "actor_agent_0.pt")
+
+    learning_role_n.rl_algorithm.load_actor_params(directory=str(tmp_path))
+
+    assert compare_state_dicts(strategy.actor.state_dict(), original_actor_state)
+    assert not strategy.actor.loaded
+    assert "missing required keys: actor_target" in caplog.text
+
+
+@pytest.mark.require_learning
+def test_maddpg_critic_transfer_is_atomic(
+    saved_n_agent_model, base_learning_config
+):
+    save_dir, _ = saved_n_agent_model
+    critic_path = Path(save_dir) / "critics" / "critic_agent_0.pt"
+    checkpoint = th.load(critic_path, weights_only=True)
+    checkpoint["critic_target"]["q_layers.2.weight"] = checkpoint[
+        "critic_target"
+    ]["q_layers.2.weight"][:1]
+    th.save(checkpoint, critic_path)
+
+    config = copy(base_learning_config)
+    learning = Learning(config["learning_config"], start, end)
+    learning.rl_strats["agent_0"] = LearningStrategy(**config, learning_role=learning)
+    learning.initialize_policy()
+    strategy = learning.rl_strats["agent_0"]
+    original_critic = deepcopy(strategy.critics.state_dict())
+    original_target = deepcopy(strategy.target_critics.state_dict())
+
+    learning.rl_algorithm.load_critic_params(directory=save_dir)
+
+    assert compare_state_dicts(strategy.critics.state_dict(), original_critic)
+    assert compare_state_dicts(strategy.target_critics.state_dict(), original_target)
 
 
 @pytest.mark.parametrize(

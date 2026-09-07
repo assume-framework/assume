@@ -31,7 +31,6 @@ base:
       noise_scale: 1
       # action_noise_schedule: linear
       noise_dt: 1
-      replay_buffer_size: 10000
 
   markets_config:
     EOM:
@@ -76,7 +75,6 @@ tiny:
       noise_sigma: 0.1
       noise_scale: 1
       noise_dt: 1
-      replay_buffer_size: 10000
 
   markets_config:
     EOM:
