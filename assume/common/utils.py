@@ -440,8 +440,11 @@ def datetime2timestamp(datetime: datetime):
     return calendar.timegm(datetime.utctimetuple())
 
 
-def create_rrule(start, end, freq):
-    freq, interval = convert_to_rrule_freq(freq)
+def create_rrule(start, end, freq: str | timedelta):
+    if isinstance(freq, timedelta):
+        freq, interval = convert_timedelta_to_rrule_freq(freq)
+    else:
+        freq, interval = convert_str_to_rrule_freq(freq)
 
     recurrency_rule = rr.rrule(
         freq=freq,
@@ -454,7 +457,32 @@ def create_rrule(start, end, freq):
     return recurrency_rule
 
 
-def convert_to_rrule_freq(string: str) -> tuple[int, int]:
+def convert_timedelta_to_rrule_freq(freq: timedelta) -> tuple[int, int]:
+    """
+    Convert a timedelta to a rrule frequency and interval.
+
+    The coarsest matching unit is used, as a SECONDLY rule with a large interval
+    is far more expensive for dateutil to iterate than an equivalent HOURLY one.
+
+    Args:
+        freq (timedelta): The frequency to be converted. Must be positive.
+
+    Returns:
+        tuple[int, int]: The rrule frequency and interval.
+    """
+
+    seconds = int(freq.total_seconds())
+    if seconds <= 0:
+        raise ValueError(f"Frequency '{freq}' must be a positive timedelta.")
+
+    if seconds % 3600 == 0:
+        return rr.HOURLY, seconds // 3600
+    if seconds % 60 == 0:
+        return rr.MINUTELY, seconds // 60
+    return rr.SECONDLY, seconds
+
+
+def convert_str_to_rrule_freq(string: str) -> tuple[int, int]:
     """
     Convert a string to a rrule frequency and interval.
 

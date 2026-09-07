@@ -595,7 +595,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         end_excl = end - unit.index.freq
 
         # Depending on how the unit calculates marginal costs, retrieve cost values.
-        marginal_cost = unit.calculate_marginal_cost(
+        marginal_cost = unit.calculate_marginal_cost(  # TODO: check what about step-wise mc or partial efficiencies?
             start, unit.outputs[product_type].at[start]
         )
         market_clearing_price = orderbook[0]["accepted_price"]
@@ -617,13 +617,16 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
 
             # Calculate profit as income minus operational cost for this event.
             order_income = market_clearing_price * accepted_volume * duration
-            order_cost = marginal_cost * accepted_volume * duration
+            order_cost = (
+                marginal_cost * accepted_volume * duration
+            )  # TODO: move outside loop, because costs are overall and need to be attributed to markets
 
             # Accumulate income and operational cost for all orders.
             income += order_income
             operational_cost += order_cost
 
         # Consideration of start-up costs, divided evenly between upward and downward regulation events.
+        # TODO: Finer grade (warm, hot, cold start costs) and allocation based on overall dispatch across multiple markets?
         if (
             unit.outputs[product_type].at[start] != 0
             and unit.outputs[product_type].at[start - unit.index.freq] == 0
@@ -648,7 +651,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         # profit_scale= 0.1
 
         profit_scale = 1
-        profit = min(profit, profit_scale * abs(profit))
+        reward = min(profit, profit_scale * abs(profit))
 
         # Opportunity cost: The income lost due to not operating at full capacity.
         opportunity_cost = (
@@ -673,7 +676,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         # scaling factor to normalize the reward to the range [-1,1]
         scaling = 1 / (self.max_bid_price * unit.max_power)
         regret = regret_scale * opportunity_cost
-        reward = scaling * (profit - regret)
+        reward = scaling * (reward - regret)
 
         # Store results in unit outputs
         # Note: these are not learning-specific results but stored for all units for analysis
