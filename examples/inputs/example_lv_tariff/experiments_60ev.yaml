@@ -1,0 +1,29 @@
+# Smoke-test config: 60 EVs. Grid quantities scaled 10x from the 6-EV baseline
+# in experiments.yaml (connection limits, background load, contracted capacity);
+# all EUR rates unchanged. Purpose is a timing / feasibility overview only, not
+# a calibrated scenario. Money EUR; power MW; energy MWh; peak rates cover the
+# whole run.
+n_evs: 60
+n_aggregators: 1
+seed: 42
+v2g: true
+connection_import_limit_mw: 0.25
+connection_export_limit_mw: 0.25
+background_load_mw: 0.05
+static_fee_eur_per_mwh: 30.0
+tou_adder_eur_per_mwh: 250.0
+tou_hours: [23, 0, 1, 2, 3, 4, 5, 6]
+dynamic_adder_eur_per_mwh: 250.0
+peak_price_eur_per_mw: 1000.0
+contracted_capacity_mw: 0.2
+capacity_excess_price_eur_per_mw: 2000.0
+cases:
+  - independent
+  - aggregated
+  - constrained
+  - static
+  - tou
+  - dynamic
+  - peak
+  - capacity
+  - ex_post_peak

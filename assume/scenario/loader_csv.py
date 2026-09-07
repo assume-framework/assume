@@ -619,6 +619,9 @@ def load_config_and_create_forecaster(
     unit_operators = load_file(path=path, config=config, file_name="unit_operators")
     powerplant_units = load_file(path=path, config=config, file_name="powerplant_units")
     storage_units = load_file(path=path, config=config, file_name="storage_units")
+    electric_vehicle_units = load_file(
+        path=path, config=config, file_name="electric_vehicle_units"
+    )
     demand_units = load_file(path=path, config=config, file_name="demand_units")
     exchange_units = load_file(path=path, config=config, file_name="exchange_units")
 
@@ -705,6 +708,22 @@ def load_config_and_create_forecaster(
         start=index[0], end=index[-1], freq=pd.infer_freq(index)
     )
     unit_forecasts: dict[str, UnitForecaster] = {}
+    if electric_vehicle_units is not None:
+        for id, ev in electric_vehicle_units.iterrows():
+            plug = get_unit_forecast_column(forecasts_df, id, "availability_profile")
+            trip = get_unit_forecast_column(forecasts_df, id, "trip_energy_consumption")
+            if plug is None or trip is None:
+                raise ValueError(
+                    f"EV {id} requires availability_profile and trip_energy_consumption forecasts"
+                )
+            unit_forecasts[id] = UnitForecaster(
+                index=shared_unit_index,
+                availability=plug,
+                forecast_algorithms=get_unit_forecast_algorithms(
+                    forecast_algorithms, ev
+                ),
+            )
+            unit_forecasts[id].trip_energy_consumption = trip
     if powerplant_units is not None:
         for id, plant in powerplant_units.iterrows():
             unit_forecasts[id] = PowerplantForecaster(
@@ -890,6 +909,7 @@ def load_config_and_create_forecaster(
         "unit_operators": unit_operators,
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
+        "electric_vehicle_units": electric_vehicle_units,
         "demand_units": demand_units,
         "exchange_units": exchange_units,
         "dsm_units": dsm_units,
@@ -933,6 +953,7 @@ def setup_world(
     unit_operators = scenario_data["unit_operators"]
     powerplant_units = scenario_data["powerplant_units"]
     storage_units = scenario_data["storage_units"]
+    electric_vehicle_units = scenario_data.get("electric_vehicle_units")
     demand_units = scenario_data["demand_units"]
     exchange_units = scenario_data["exchange_units"]
     dsm_units = scenario_data["dsm_units"]
@@ -1068,6 +1089,14 @@ def setup_world(
         learning_mode=learning_mode,
     )
 
+    electric_vehicle_units = read_units(
+        units_df=electric_vehicle_units,
+        unit_type="electric_vehicle",
+        forecaster=unit_forecasts,
+        world_bidding_strategies=world.bidding_strategies,
+        learning_mode=learning_mode,
+    )
+
     exchange_units = read_units(
         units_df=exchange_units,
         unit_type="exchange",
@@ -1090,6 +1119,8 @@ def setup_world(
     for op, op_units in powerplant_units.items():
         units[op].extend(op_units)
     for op, op_units in storage_units.items():
+        units[op].extend(op_units)
+    for op, op_units in electric_vehicle_units.items():
         units[op].extend(op_units)
     for op, op_units in demand_units.items():
         units[op].extend(op_units)

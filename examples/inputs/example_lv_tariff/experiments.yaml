@@ -1,0 +1,26 @@
+# All money is EUR; power MW; energy MWh. Peak rates cover this whole run,
+# not an annual rate. Defaults are synthetic experiment parameters.
+n_evs: 6
+n_aggregators: 1
+seed: 42
+v2g: true
+connection_import_limit_mw: 0.025
+connection_export_limit_mw: 0.025
+background_load_mw: 0.005
+static_fee_eur_per_mwh: 30.0
+tou_adder_eur_per_mwh: 250.0
+tou_hours: [23, 0, 1, 2, 3, 4, 5, 6]
+dynamic_adder_eur_per_mwh: 250.0
+peak_price_eur_per_mw: 1000.0
+contracted_capacity_mw: 0.02
+capacity_excess_price_eur_per_mw: 2000.0
+cases:
+  - independent
+  - aggregated
+  - constrained
+  - static
+  - tou
+  - dynamic
+  - peak
+  - capacity
+  - ex_post_peak

@@ -1,0 +1,7 @@
+name,technology,node,unit_operator,bidding_EOM,bidding_GridTariff,capacity,min_soc,max_soc,initial_soc,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge
+EV_0,electric_vehicle,lv_node,aggregator_operator,ev_portfolio_member,ev_portfolio_member,0.03,0.2,1.0,0.6,-0.011,0.011,0.95,0.95
+EV_1,electric_vehicle,lv_node,aggregator_operator,ev_portfolio_member,ev_portfolio_member,0.03,0.2,1.0,0.6,-0.011,0.011,0.95,0.95
+EV_2,electric_vehicle,lv_node,aggregator_operator,ev_portfolio_member,ev_portfolio_member,0.03,0.2,1.0,0.6,-0.011,0.011,0.95,0.95
+EV_3,electric_vehicle,lv_node,aggregator_operator,ev_portfolio_member,ev_portfolio_member,0.03,0.2,1.0,0.6,-0.011,0.011,0.95,0.95
+EV_4,electric_vehicle,lv_node,aggregator_operator,ev_portfolio_member,ev_portfolio_member,0.03,0.2,1.0,0.6,-0.011,0.011,0.95,0.95
+EV_5,electric_vehicle,lv_node,aggregator_operator,ev_portfolio_member,ev_portfolio_member,0.03,0.2,1.0,0.6,-0.011,0.011,0.95,0.95

@@ -7,6 +7,7 @@ from assume.units.demand import Demand
 from assume.units.exchange import Exchange
 from assume.units.powerplant import PowerPlant
 from assume.units.storage import Storage
+from assume.units.electric_vehicle import ElectricVehicleUnit
 from assume.units.steel_plant import SteelPlant
 from assume.units.cement_plant import CementPlant
 from assume.units.steam_generation_plant import SteamPlant
@@ -19,6 +20,7 @@ unit_types: dict[str, type[BaseUnit]] = {
     "demand": Demand,
     "exchange": Exchange,
     "storage": Storage,
+    "electric_vehicle": ElectricVehicleUnit,
     "steel_plant": SteelPlant,
     "cement_plant": CementPlant,
     "hydrogen_plant": HydrogenPlant,
