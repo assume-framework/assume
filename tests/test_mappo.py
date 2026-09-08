@@ -19,6 +19,12 @@ try:
     from assume.reinforcement_learning.algorithms.mappo import PPO
     from assume.reinforcement_learning.buffer import RolloutBuffer
     from assume.reinforcement_learning.learning_role import Learning
+    from assume.reinforcement_learning.neural_network_architecture import (
+        ActorPPO,
+        CriticPPO,
+        LSTMActor,
+        LSTMActorPPO,
+    )
 
 
 except ImportError:
@@ -183,6 +189,77 @@ def test_mappo_algorithm_class(learning_role_n):
     learning_role_n.initialize_policy()
     assert isinstance(learning_role_n.rl_algorithm, PPO)
     assert learning_role_n.rl_algorithm.clip_range_vf == 0.15
+
+
+@pytest.mark.require_learning
+def test_mappo_value_head_uses_separate_initialization_gain():
+    critic = CriticPPO(
+        n_agents=1,
+        obs_dim=3,
+        float_type=th.float32,
+        unique_obs_dim=1,
+    )
+    critic.v_layers = th.nn.ModuleList(
+        [th.nn.Linear(3, 1), th.nn.ReLU(), th.nn.Linear(1, 1)]
+    )
+
+    critic._init_weights()
+
+    assert th.isclose(
+        critic.v_layers[0].weight.norm(),
+        critic.v_layers[0].weight.new_tensor(np.sqrt(2)),
+    )
+    assert th.isclose(
+        critic.v_layers[2].weight.norm(),
+        critic.v_layers[2].weight.new_tensor(1.0),
+    )
+    assert th.count_nonzero(critic.v_layers[0].bias) == 0
+    assert th.count_nonzero(critic.v_layers[2].bias) == 0
+
+
+@pytest.mark.require_learning
+def test_mappo_actors_use_consistent_squashed_gaussian_log_probs():
+    actors = [
+        ActorPPO(obs_dim=10, act_dim=3, float_type=th.float32),
+        LSTMActorPPO(
+            obs_dim=10,
+            act_dim=3,
+            float_type=th.float32,
+            unique_obs_dim=2,
+            num_timeseries_obs_dim=4,
+        ),
+    ]
+    observations = th.randn(512, 10)
+
+    for actor in actors:
+        activation_input = th.tensor([-1.0, 0.0, 1.0])
+        assert th.equal(actor.activation_function(activation_input), th.tanh(activation_input))
+
+        th.manual_seed(42)
+        actions, sampled_log_probs = actor.get_action_and_log_prob(observations)
+        evaluated_log_probs, entropy = actor.evaluate_actions(observations, actions)
+
+        assert th.all(actions > -1.0)
+        assert th.all(actions < 1.0)
+        assert th.all(th.isfinite(sampled_log_probs))
+        assert th.allclose(sampled_log_probs, evaluated_log_probs, atol=1e-5)
+        assert th.allclose(entropy, -evaluated_log_probs)
+
+
+@pytest.mark.require_learning
+def test_lstm_actor_supports_non_default_unique_observation_dimension():
+    actor = LSTMActor(
+        obs_dim=11,
+        act_dim=2,
+        float_type=th.float32,
+        unique_obs_dim=3,
+        num_timeseries_obs_dim=4,
+    )
+
+    actions = actor(th.randn(5, 11))
+
+    assert actor.FC1.in_features == 35
+    assert actions.shape == (5, 2)
 
 
 @pytest.mark.require_learning

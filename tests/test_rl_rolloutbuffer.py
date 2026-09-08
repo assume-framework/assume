@@ -298,8 +298,8 @@ def test_gae_lambda_one_gamma_one_monte_carlo():
 
 @pytest.mark.require_learning
 def test_gae_multi_agent_independence():
-    """One agent's rewards must not cause issue with another agent's advantages."""
-    gamma, gae_lambda = 0.99, 0.95
+    """Verify hand-calculated GAE independently for two agents."""
+    gamma, gae_lambda = 0.9, 0.8
     buf = make_rollout_buffer(
         buffer_size=3,
         obs_dim=1,
@@ -309,38 +309,27 @@ def test_gae_multi_agent_independence():
         gae_lambda=gae_lambda,
     )
 
-    for _ in range(3):
+    rewards = [[1.0, 0.0], [2.0, -1.0], [3.0, 0.5]]
+    values = [[0.5, 0.2], [0.4, 0.1], [0.3, -0.2]]
+    for reward, value in zip(rewards, values):
         buf.add(
             obs=np.zeros((2, 1), dtype=np.float32),
             action=np.zeros((2, 1), dtype=np.float32),
-            reward=np.array([1.0, 0.0]),
-            value=np.array([0.5, 0.5]),
+            reward=np.array(reward),
+            value=np.array(value),
             log_prob=np.zeros(2, dtype=np.float32),
         )
 
-    buf.compute_returns_and_advantages(last_values=np.array([0.5, 0.5]))
+    buf.compute_returns_and_advantages(last_values=np.array([0.25, 0.4]))
 
-    for t in range(3):
-        assert abs(buf.advantages[t, 1]) < abs(buf.advantages[t, 0]), (
-            f"step {t}: agent-1 advantage {buf.advantages[t, 1]:.4f} should be "
-            f"smaller than agent-0 advantage {buf.advantages[t, 0]:.4f}"
-        )
-
-
-@pytest.mark.require_learning
-def test_gae_returns_equal_advantages_plus_values():
-    """returns == advantages + values for every step and agent."""
-    buf = make_rollout_buffer(buffer_size=6, n_rl_units=3)
-    fill_buffer(buf, n_steps=6)
-
-    last_values = np.random.rand(3).astype(np.float32)
-    buf.compute_returns_and_advantages(last_values)
-
-    np.testing.assert_array_almost_equal(
-        buf.returns[: buf.pos],
-        buf.advantages[: buf.pos] + buf.values[: buf.pos],
-        decimal=5,
+    expected_advantages = np.array(
+        [[3.72272, -0.482096], [3.976, -0.5168], [2.925, 1.06]]
     )
+    expected_returns = np.array(
+        [[4.22272, -0.282096], [4.376, -0.4168], [3.225, 0.86]]
+    )
+    np.testing.assert_allclose(buf.advantages, expected_advantages, atol=1e-5)
+    np.testing.assert_allclose(buf.returns, expected_returns, atol=1e-5)
 
 
 @pytest.mark.require_learning
@@ -427,11 +416,6 @@ def test_full_episode_rollout():
 
     last_values = rng.random(n_agents).astype(np.float32)
     buf.compute_returns_and_advantages(last_values)
-
-    # returns == advantages + values
-    np.testing.assert_array_almost_equal(
-        buf.returns, buf.advantages + buf.values, decimal=5
-    )
 
     # Two PPO epochs over mini-batches of size 4
     for _epoch in range(2):

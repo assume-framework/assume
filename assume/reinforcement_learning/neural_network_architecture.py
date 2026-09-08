@@ -199,10 +199,10 @@ class CriticPPO(Critic):
 
     def _init_weights(self) -> None:
         """Apply orthogonal initialisation: sqrt(2) gain for hidden layers, 1.0 for the value head."""
-        for layer in self.v_layers:
-            if isinstance(layer, nn.Linear):
-                gain = 0.01 if layer.out_features == 1 else np.sqrt(2)
-                orthogonal_init_weights(layer, gain=gain)
+        linear_layers = [layer for layer in self.v_layers if isinstance(layer, nn.Linear)]
+        for layer in linear_layers[:-1]:
+            orthogonal_init_weights(layer, gain=np.sqrt(2))
+        orthogonal_init_weights(linear_layers[-1], gain=1.0)
 
     def forward(self, obs: th.Tensor) -> th.Tensor:
         """Returns V value."""
@@ -296,8 +296,8 @@ class LSTMActor(Actor):
         self.LSTM1 = nn.LSTMCell(num_timeseries_obs_dim, 8, dtype=float_type)
         self.LSTM2 = nn.LSTMCell(8, 16, dtype=float_type)
 
-        # input size defined by forecast horizon and concatenated with capacity and marginal cost values
-        self.FC1 = nn.Linear(self.timeseries_len * 16 + 2, 128, dtype=float_type)
+        # Concatenating all recurrent outputs with the agent-specific observations.
+        self.FC1 = nn.Linear(self.timeseries_len * 16 + unique_obs_dim, 128, dtype=float_type)
         self.FC2 = nn.Linear(128, act_dim, dtype=float_type)
 
     def forward(self, obs):
@@ -367,6 +367,7 @@ class ActorPPO(nn.Module):
 
         self.min_output = activation_function_limit[self.activation]["min"]
         self.max_output = activation_function_limit[self.activation]["max"]
+        self.activation_function = activation_function_limit[self.activation]["func"]
 
         # Policy network (outputs mean)
         self.FC1 = nn.Linear(obs_dim, 256, dtype=float_type)
@@ -386,27 +387,20 @@ class ActorPPO(nn.Module):
 
     def forward(self, obs: th.Tensor, deterministic: bool = False) -> th.Tensor:
         """Forward pass"""
-        x = F.relu(self.FC1(obs))
-        x = F.relu(self.FC2(x))
-        mean = th.tanh(self.mean_layer(x))  # Bounded to [-1, 1]
+        mean, log_std = self.get_distribution(obs)
 
         if deterministic:
-            return mean
+            return th.tanh(mean)
 
-        # Sample from Gaussian during training
-        log_std = self.log_std.expand_as(mean)
         std = log_std.exp()
-        noise = th.randn_like(mean)
-        action = mean + std * noise
-
-        # Clamp to valid range
-        return th.clamp(action, -1.0, 1.0)
+        latent_action = mean + std * th.randn_like(mean)
+        return th.tanh(latent_action)
 
     def get_distribution(self, obs: th.Tensor) -> tuple[th.Tensor, th.Tensor]:
         """Get the policy distribution parameters."""
         x = F.relu(self.FC1(obs))
         x = F.relu(self.FC2(x))
-        mean = th.tanh(self.mean_layer(x))  # Bounded to [-1, 1]
+        mean = self.mean_layer(x)
         log_std = self.log_std.expand_as(mean)
 
         return mean, log_std
@@ -429,17 +423,12 @@ class ActorPPO(nn.Module):
         std = log_std.exp()
 
         if deterministic:
-            action = mean
+            latent_action = mean
         else:
-            # Sample from Gaussian
-            noise = th.randn_like(mean)
-            action = mean + std * noise
+            latent_action = mean + std * th.randn_like(mean)
 
-        # Clamp action to valid range
-        action = th.clamp(action, -1.0, 1.0)
-
-        # Compute log probability
-        log_prob = self._compute_log_prob(action, mean, std)
+        action = th.tanh(latent_action)
+        log_prob = self._compute_squashed_log_prob(latent_action, mean, std)
 
         return action, log_prob
 
@@ -447,7 +436,7 @@ class ActorPPO(nn.Module):
         self,
         obs: th.Tensor,
         actions: th.Tensor,
-    ) -> tuple[th.Tensor, th.Tensor, th.Tensor]:
+    ) -> tuple[th.Tensor, th.Tensor]:
         """Evaluate log probability and entropy for given actions.
 
         Used during PPO update to compute importance ratio.
@@ -457,16 +446,13 @@ class ActorPPO(nn.Module):
             actions: Actions to evaluate.
 
         Returns:
-            Tuple of (log_prob, entropy, values).
+            Tuple of (log_prob, entropy).
         """
         mean, log_std = self.get_distribution(obs)
         std = log_std.exp()
 
-        # Log probability
         log_prob = self._compute_log_prob(actions, mean, std)
-
-        # Entropy for exploration bonus
-        entropy = 0.5 * (1.0 + th.log(2 * th.pi * std.pow(2))).sum(dim=-1)
+        entropy = -log_prob
 
         return log_prob, entropy
 
@@ -476,9 +462,23 @@ class ActorPPO(nn.Module):
         mean: th.Tensor,
         std: th.Tensor,
     ) -> th.Tensor:
-        """Compute log probability of actions under Gaussian distribution."""
+        """Compute log probability under the tanh-squashed Gaussian policy."""
+        epsilon = th.finfo(actions.dtype).eps
+        bounded_actions = actions.clamp(-1.0 + epsilon, 1.0 - epsilon)
+        latent_actions = th.atanh(bounded_actions)
+        return self._compute_squashed_log_prob(latent_actions, mean, std)
+
+    @staticmethod
+    def _compute_squashed_log_prob(
+        latent_actions: th.Tensor,
+        mean: th.Tensor,
+        std: th.Tensor,
+    ) -> th.Tensor:
+        """Apply the tanh change-of-variables correction to Gaussian log-probability."""
         distribution = th.distributions.Normal(mean, std)
-        return distribution.log_prob(actions).sum(dim=-1)
+        gaussian_log_prob = distribution.log_prob(latent_actions)
+        log_squash_derivative = 2 * (np.log(2.0) - latent_actions - F.softplus(-2 * latent_actions))
+        return (gaussian_log_prob - log_squash_derivative).sum(dim=-1)
 
 
 class LSTMActorPPO(ActorPPO):
@@ -588,65 +588,15 @@ class LSTMActorPPO(ActorPPO):
 
         # FC Layers
         x = F.relu(self.FC1(x))
-        mean = th.tanh(self.mean_layer(x))  # Bounded to [-1, 1]
+        mean = self.mean_layer(x)
 
         if not is_batched:
             mean = mean.squeeze(0)
 
         return mean
 
-    def forward(self, obs: th.Tensor, deterministic: bool = False) -> th.Tensor:
-        """Forward pass"""
-        mean = self._compute_mean(obs)
-
-        if deterministic:
-            return mean
-
-        # Sample from Gaussian during training
-        log_std = self.log_std.expand_as(mean)
-        std = log_std.exp()  # Ensure positive
-        # Add small epsilon for numerical stability
-        std = std + 1e-6
-        noise = th.randn_like(mean)
-        action = mean + std * noise
-
-        # Clamp to valid range
-        return th.clamp(action, -1.0, 1.0)
-
     def get_distribution(self, obs: th.Tensor) -> tuple[th.Tensor, th.Tensor]:
         """Get policy distribution parameters from LSTM path."""
         mean = self._compute_mean(obs)
         log_std = self.log_std.expand_as(mean)
         return mean, log_std
-
-    def get_action_and_log_prob(
-        self,
-        obs: th.Tensor,
-        deterministic: bool = False,
-    ) -> tuple[th.Tensor, th.Tensor]:
-        """Sample action and compute log probability for LSTM PPO."""
-        mean, log_std = self.get_distribution(obs)
-        std = log_std.exp() + 1e-6
-
-        if deterministic:
-            action = mean
-        else:
-            noise = th.randn_like(mean)
-            action = mean + std * noise
-
-        action = th.clamp(action, -1.0, 1.0)
-        log_prob = self._compute_log_prob(action, mean, std)
-
-        return action, log_prob
-
-    def evaluate_actions(
-        self,
-        obs: th.Tensor,
-        actions: th.Tensor,
-    ) -> tuple[th.Tensor, th.Tensor]:
-        """Evaluate log prob and entropy for provided actions."""
-        mean, log_std = self.get_distribution(obs)
-        std = log_std.exp() + 1e-6
-        log_prob = self._compute_log_prob(actions, mean, std)
-        entropy = 0.5 * (1.0 + th.log(2 * th.pi * std.pow(2))).sum(dim=-1)
-        return log_prob, entropy
