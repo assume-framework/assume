@@ -6,6 +6,7 @@ import json
 import os
 from copy import copy, deepcopy
 from datetime import datetime
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -151,6 +152,7 @@ def _setup_for_update(learning_role) -> None:
     """Setting minimal attributes needed."""
     learning_role.update_steps = 0
     learning_role.db_addr = None  # disables the context.schedule_instant_message path
+    learning_role._context = SimpleNamespace(current_timestamp=learning_role.start)
 
 
 @pytest.mark.require_learning
@@ -166,6 +168,47 @@ def test_mappo_discards_rollout_without_bootstrap_observation(learning_role_n):
     learning_role_n.rl_algorithm.update_policy()
 
     assert learning_role_n.rl_algorithm.buffer.size() == 0
+
+
+@pytest.mark.require_learning
+def test_mappo_complete_policy_update_changes_actor_and_critic(learning_role_n):
+    learning_role_n.initialize_policy()
+    _setup_for_update(learning_role_n)
+    algorithm = learning_role_n.rl_algorithm
+    algorithm.buffer = _make_rollout_buffer(
+        obs_dim=algorithm.obs_dim,
+        act_dim=algorithm.act_dim,
+        n_agents=len(learning_role_n.rl_strats),
+        n_steps=6,
+    )
+
+    actor_before = {
+        unit_id: [parameter.detach().clone() for parameter in strategy.actor.parameters()]
+        for unit_id, strategy in learning_role_n.rl_strats.items()
+    }
+    critic_before = {
+        unit_id: [
+            parameter.detach().clone() for parameter in strategy.critics.parameters()
+        ]
+        for unit_id, strategy in learning_role_n.rl_strats.items()
+    }
+
+    algorithm.update_policy()
+
+    for unit_id, strategy in learning_role_n.rl_strats.items():
+        assert any(
+            not th.equal(before, after)
+            for before, after in zip(actor_before[unit_id], strategy.actor.parameters())
+        )
+        assert any(
+            not th.equal(before, after)
+            for before, after in zip(
+                critic_before[unit_id], strategy.critics.parameters()
+            )
+        )
+    assert algorithm.n_updates == 1
+    assert learning_role_n.update_steps == 1
+    assert algorithm.buffer.size() == 0
 
 
 @pytest.mark.require_learning
@@ -189,6 +232,18 @@ def test_mappo_algorithm_class(learning_role_n):
     learning_role_n.initialize_policy()
     assert isinstance(learning_role_n.rl_algorithm, PPO)
     assert learning_role_n.rl_algorithm.clip_range_vf == 0.15
+
+
+@pytest.mark.require_learning
+def test_mappo_progress_spans_all_training_episodes(learning_role_n):
+    learning_role_n.episodes_done = 2
+    learning_role_n._context = SimpleNamespace(
+        current_timestamp=(learning_role_n.start + learning_role_n.end) / 2
+    )
+
+    progress_remaining = learning_role_n.rl_algorithm.get_progress_remaining()
+
+    assert progress_remaining == pytest.approx(0.75)
 
 
 @pytest.mark.require_learning

@@ -95,9 +95,15 @@ class DDPG(ActorCriticAlgorithm):
         unit_id_order = list(self.learning_role.rl_strats.keys())
 
         self.buffer.add(
-            obs=transform_buffer_data(cache["obs"], device, unit_id_order),
-            actions=transform_buffer_data(cache["actions"], device, unit_id_order),
-            reward=transform_buffer_data(cache["rewards"], device, unit_id_order),
+            obs=transform_buffer_data(
+                cache["obs"], device, unit_id_order, self.float_type
+            ),
+            actions=transform_buffer_data(
+                cache["actions"], device, unit_id_order, self.float_type
+            ),
+            reward=transform_buffer_data(
+                cache["rewards"], device, unit_id_order, self.float_type
+            ),
         )
 
     def setup_action_noise_schedule(self) -> None:

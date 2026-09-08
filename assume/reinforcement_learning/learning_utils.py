@@ -214,7 +214,10 @@ def copy_layer_data(dst, src):
 
 
 def transform_buffer_data(
-    nested_dict: dict, device: th.device, keys_unit_order: list
+    nested_dict: dict,
+    device: th.device,
+    keys_unit_order: list,
+    float_type: th.dtype = th.float32,
 ) -> np.ndarray:
     """
     Transform nested dict {datetime -> {unit_id -> [values]}} into
@@ -226,11 +229,20 @@ def transform_buffer_data(
         device: PyTorch device config.
         keys_unit_order: Ordered iterable of unit ids defining the agent
             axis of the returned tensor.
+        float_type: PyTorch dtype for the returned data.
 
     Returns:
         np.ndarray: Shape (n_timesteps, n_powerplants, feature_dim).
     """
     all_times = sorted(nested_dict.keys())
+
+    for timestamp, unit_data in nested_dict.items():
+        for unit_id, values in unit_data.items():
+            if len(values) > 1:
+                raise ValueError(
+                    "Expected one cached value per unit and timestamp, got "
+                    f"{len(values)} for unit {unit_id!r} at {timestamp!r}."
+                )
 
     feature_dim = None
     for unit_data in nested_dict.values():
@@ -253,7 +265,9 @@ def transform_buffer_data(
         )
 
     result = th.zeros(
-        (len(all_times), len(keys_unit_order), feature_dim), device=device
+        (len(all_times), len(keys_unit_order), feature_dim),
+        device=device,
+        dtype=float_type,
     )
 
     for t, timestamp in enumerate(all_times):

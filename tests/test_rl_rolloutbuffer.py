@@ -23,14 +23,16 @@ def make_rollout_buffer(
     n_rl_units=2,
     gamma=0.99,
     gae_lambda=0.95,
+    float_type=None,
 ):
+    float_type = float_type or th.float32
     return RolloutBuffer(
         buffer_size=buffer_size,
         obs_dim=obs_dim,
         act_dim=act_dim,
         n_rl_units=n_rl_units,
         device=th.device("cpu"),
-        float_type=th.float32,
+        float_type=float_type,
         gamma=gamma,
         gae_lambda=gae_lambda,
     )
@@ -67,6 +69,40 @@ def test_rollout_buffer_init_state():
     assert buf.full is False
     assert buf.generator_ready is False
     assert buf.size() == 0
+
+
+@pytest.mark.require_learning
+def test_rollout_buffer_uses_configured_float_type():
+    buf = make_rollout_buffer(
+        buffer_size=2,
+        obs_dim=1,
+        act_dim=1,
+        n_rl_units=1,
+        float_type=th.float16,
+    )
+    buf.add(
+        obs=np.array([[1.0]]),
+        action=np.array([[2.0]]),
+        reward=np.array([3.0]),
+        value=np.array([4.0]),
+        log_prob=np.array([5.0]),
+    )
+    buf.compute_returns_and_advantages(last_values=np.array([6.0]))
+
+    for array in (
+        buf.observations,
+        buf.actions,
+        buf.rewards,
+        buf.values,
+        buf.log_probs,
+        buf.advantages,
+        buf.returns,
+    ):
+        assert array.dtype == np.float16
+
+    batch = next(buf.get())
+    assert batch.observations.dtype == th.float16
+    assert batch.returns.dtype == th.float16
 
 
 @pytest.mark.require_learning
@@ -363,19 +399,47 @@ def test_rollout_buffer_get_full_batch():
 
 
 @pytest.mark.require_learning
-def test_rollout_buffer_get_mini_batches_cover_all_steps():
-    """Mini-batch iteration must cover every step exactly once."""
-    T = 8
-    buf = make_rollout_buffer(buffer_size=T, obs_dim=2, act_dim=1, n_rl_units=1)
-    fill_buffer(buf, n_steps=T)
-    buf.compute_returns_and_advantages(last_values=np.zeros(1, dtype=np.float32))
+def test_rollout_buffer_mini_batches_preserve_rows_and_cover_all_steps():
+    """Shuffling must keep fields aligned and yield every transition once."""
+    n_steps = 8
+    buf = make_rollout_buffer(
+        buffer_size=n_steps, obs_dim=2, act_dim=1, n_rl_units=2
+    )
+    for step in range(n_steps):
+        marker = float(step)
+        buf.add(
+            obs=np.array(
+                [[marker, marker + 10], [marker + 20, marker + 30]],
+                dtype=np.float32,
+            ),
+            action=np.array([[marker + 40], [marker + 50]], dtype=np.float32),
+            reward=np.zeros(2, dtype=np.float32),
+            value=np.array([marker + 60, marker + 70], dtype=np.float32),
+            log_prob=np.array([marker + 80, marker + 90], dtype=np.float32),
+        )
+    buf.compute_returns_and_advantages(last_values=np.zeros(2, dtype=np.float32))
 
-    total_samples = 0
+    seen_steps = []
     for batch in buf.get(batch_size=2):
         assert isinstance(batch, RolloutBufferSamples)
-        total_samples += batch.observations.shape[0]
+        for row in range(batch.observations.shape[0]):
+            marker = batch.observations[row, 0, 0].item()
+            seen_steps.append(int(marker))
+            th.testing.assert_close(
+                batch.observations[row],
+                th.tensor([[marker, marker + 10], [marker + 20, marker + 30]]),
+            )
+            th.testing.assert_close(
+                batch.actions[row], th.tensor([[marker + 40], [marker + 50]])
+            )
+            th.testing.assert_close(
+                batch.old_values[row], th.tensor([marker + 60, marker + 70])
+            )
+            th.testing.assert_close(
+                batch.old_log_probs[row], th.tensor([marker + 80, marker + 90])
+            )
 
-    assert total_samples == T
+    assert sorted(seen_steps) == list(range(n_steps))
 
 
 @pytest.mark.require_learning

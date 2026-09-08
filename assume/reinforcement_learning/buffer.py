@@ -238,6 +238,7 @@ class RolloutBuffer:
         self.n_rl_units = n_rl_units
         self.device = device
         self.float_type = float_type
+        self.np_float_type = np.float16 if float_type == th.float16 else np.float32
         self.gamma = gamma
         self.gae_lambda = gae_lambda
 
@@ -255,20 +256,30 @@ class RolloutBuffer:
         Clearing the buffer and allocating new storage.
         """
         self.observations = np.zeros(
-            (self.buffer_size, self.n_rl_units, self.obs_dim), dtype=np.float32
+            (self.buffer_size, self.n_rl_units, self.obs_dim),
+            dtype=self.np_float_type,
         )
         self.actions = np.zeros(
-            (self.buffer_size, self.n_rl_units, self.act_dim), dtype=np.float32
+            (self.buffer_size, self.n_rl_units, self.act_dim),
+            dtype=self.np_float_type,
         )
-        self.rewards = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
-        self.values = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
-        self.log_probs = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
+        self.rewards = np.zeros(
+            (self.buffer_size, self.n_rl_units), dtype=self.np_float_type
+        )
+        self.values = np.zeros(
+            (self.buffer_size, self.n_rl_units), dtype=self.np_float_type
+        )
+        self.log_probs = np.zeros(
+            (self.buffer_size, self.n_rl_units), dtype=self.np_float_type
+        )
 
         # Computed after rollout
         self.advantages = np.zeros(
-            (self.buffer_size, self.n_rl_units), dtype=np.float32
+            (self.buffer_size, self.n_rl_units), dtype=self.np_float_type
         )
-        self.returns = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
+        self.returns = np.zeros(
+            (self.buffer_size, self.n_rl_units), dtype=self.np_float_type
+        )
 
         self.pos = 0
         self.full = False
@@ -353,11 +364,11 @@ class RolloutBuffer:
             last_values: Value estimation for the last step.
         """
         # taking the final value estimates and making them flat
-        last_values = np.array(last_values).flatten()
+        last_values = np.asarray(last_values, dtype=self.np_float_type).flatten()
 
         # GAE computation
         # starting with running total of zero for each agent.
-        last_gae_lam = np.zeros(self.n_rl_units, dtype=np.float32)
+        last_gae_lam = np.zeros(self.n_rl_units, dtype=self.np_float_type)
         buffer_size = self.pos if not self.full else self.buffer_size
 
         # backward loop
