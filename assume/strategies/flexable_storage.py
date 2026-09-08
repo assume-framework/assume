@@ -298,7 +298,7 @@ class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
                 marginal_cost=marginal_cost,
                 t=start,
                 foresight=self.foresight,
-                price_forecast=unit.forecaster.price[market_config.market_id],
+                price_forecast=unit.forecaster.price["EOM"],
             )
 
             # if specific revenue is positive, bid specific_revenue
