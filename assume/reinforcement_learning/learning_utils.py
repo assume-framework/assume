@@ -240,8 +240,7 @@ def transform_buffer_data(
         for unit_id, values in unit_data.items():
             if len(values) > 1:
                 raise ValueError(
-                    "Expected one cached value per unit and timestamp, got "
-                    f"{len(values)} for unit {unit_id!r} at {timestamp!r}."
+                    f"Expected one cached value per unit and timestamp, got {len(values)} for unit {unit_id!r} at {timestamp!r}."
                 )
 
     feature_dim = None
