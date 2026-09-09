@@ -1193,6 +1193,7 @@ class UnitsOperatorForecaster(UnitForecaster):
             residual_load=residual_load,
         )
         self.adaptive_merit_order_state: dict = {"markets": {}}
+        self.adaptive_merit_order_settings: dict = {}
         self._adaptive_merit_order_units: tuple[BaseUnit, ...] = ()
         self._adaptive_merit_order_markets: dict[str, MarketConfig] = {}
         self.unit_operator_id = "operator"
@@ -1222,6 +1223,39 @@ class UnitsOperatorForecaster(UnitForecaster):
             market.market_id: market for market in market_configs
         }
 
+    def set_adaptive_merit_order_uncertainty_model(
+        self, uncertainty_model: str, **settings
+    ) -> None:
+        """Select the uncertainty model before adaptive forecasts are issued.
+
+        Supported distributions are ``gaussian`` (the default), ``johnson_su``
+        and ``nonlinear_quantile``. Additional keyword settings can tune the
+        selected method without adding simulation YAML configuration.
+        """
+        if self.adaptive_merit_order_state["markets"]:
+            raise RuntimeError(
+                "The adaptive uncertainty model cannot change after forecasts "
+                "have been issued"
+            )
+        from assume.common.forecast_algorithms import (
+            ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS,
+            ADAPTIVE_MERIT_ORDER_SETTINGS,
+        )
+
+        if uncertainty_model not in ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS:
+            raise ValueError(
+                "Adaptive merit-order distribution must be one of "
+                f"{ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS}"
+            )
+        unknown = set(settings) - set(ADAPTIVE_MERIT_ORDER_SETTINGS)
+        if unknown:
+            raise ValueError(
+                f"Unknown adaptive merit-order settings: {sorted(unknown)}"
+            )
+        self.adaptive_merit_order_settings = settings | {
+            "distribution": uncertainty_model
+        }
+
     def get_adaptive_merit_order_forecast(
         self,
         market_id: str,
@@ -1243,7 +1277,10 @@ class UnitsOperatorForecaster(UnitForecaster):
 
             self.adaptive_merit_order_state["markets"].update(
                 initialize_adaptive_merit_order_correction(
-                    self.index, self._adaptive_merit_order_units, market
+                    self.index,
+                    self._adaptive_merit_order_units,
+                    market,
+                    self.adaptive_merit_order_settings,
                 )["markets"]
             )
 
