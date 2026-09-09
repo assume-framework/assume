@@ -542,12 +542,24 @@ ADAPTIVE_MERIT_ORDER_SETTINGS = {
     # The same penalties for the log-standard-deviation equation.
     "residual_scale_l1_regularization": 0.01,
     "residual_scale_l2_regularization": 0.001,
-    # Predictive distribution used to derive price quantiles.
+    # Uncertainty method used to derive price quantiles. ``nonlinear_quantile``
+    # learns asymmetric quantiles of the error around the unchanged corrected
+    # mean forecast; Gaussian and Johnson SU retain their existing behaviour.
     "distribution": "gaussian",
     # Johnson SU shape fitting uses only previous standardised forecast errors.
     "johnson_su_history_size": 1008,
     "johnson_su_solver_iterations": 5,
     "johnson_su_learning_rate": 0.01,
+    # Small nonlinear PyTorch model for direct q10/q50/q90 error forecasts.
+    # Its ordered output layer prevents quantile crossing by construction.
+    "quantile_hidden_size": 16,
+    "quantile_initial_iterations": 500,
+    "quantile_update_iterations": 20,
+    "quantile_learning_rate": 0.01,
+    "quantile_l1_regularization": 1e-5,
+    "quantile_l2_regularization": 1e-5,
+    "quantile_history_size": 2160,
+    "quantile_random_seed": 0,
     # Inputs for the residual-mean model. A None scale feature list reuses these.
     "features": ADAPTIVE_MERIT_ORDER_FEATURES,
     "scale_features": None,
@@ -564,6 +576,12 @@ ADAPTIVE_MERIT_ORDER_SETTINGS = {
     "solver_max_iterations": 1000,
     "solver_tolerance": 1e-8,
 }
+
+ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS = (
+    "gaussian",
+    "johnson_su",
+    "nonlinear_quantile",
+)
 
 
 def initialize_adaptive_merit_order_feature_state(features, holiday_dates=()) -> dict:
@@ -909,9 +927,100 @@ def fit_johnson_su_shape(model: dict) -> None:
     )
 
 
+def initialize_nonlinear_quantile_model(n_features: int, config: dict) -> dict:
+    """Create the nonlinear non-crossing residual-error quantile model."""
+    if (
+        n_features <= 0
+        or config["quantile_hidden_size"] <= 0
+        or config["quantile_history_size"] <= 0
+        or config["quantile_learning_rate"] <= 0
+        or config["quantile_l1_regularization"] < 0
+        or config["quantile_l2_regularization"] < 0
+        or config["quantile_initial_iterations"] < 0
+        or config["quantile_update_iterations"] < 0
+    ):
+        raise ValueError("Invalid nonlinear quantile model settings")
+    with th.random.fork_rng():
+        th.manual_seed(config["quantile_random_seed"])
+        network = th.nn.Sequential(
+            th.nn.Linear(n_features, config["quantile_hidden_size"]),
+            th.nn.Tanh(),
+            th.nn.Linear(config["quantile_hidden_size"], 3),
+        ).double()
+    optimizer = th.optim.Adam(
+        network.parameters(),
+        lr=config["quantile_learning_rate"],
+        weight_decay=config["quantile_l2_regularization"],
+    )
+    return {
+        "network": network,
+        "optimizer": optimizer,
+        "features": [],
+        "targets": [],
+        "forgetting_factor": config["forgetting_factor"],
+        "l1": config["quantile_l1_regularization"],
+        "history_size": config["quantile_history_size"],
+    }
+
+
+def predict_nonlinear_quantiles(model: dict, features) -> th.Tensor:
+    """Predict ordered q10, q50 and q90 post-forecast residuals."""
+    features = th.as_tensor(features, dtype=th.float64)
+    raw = model["network"](features)
+    median = raw[..., 0]
+    lower = median - th.nn.functional.softplus(raw[..., 1])
+    upper = median + th.nn.functional.softplus(raw[..., 2])
+    return th.stack((lower, median, upper), dim=-1)
+
+
+def fit_nonlinear_quantile_model(model: dict, iterations: int) -> None:
+    """Fit all three quantiles with discounted pinball loss."""
+    if not model["targets"] or iterations <= 0:
+        return
+    features = th.stack(model["features"])
+    targets = th.tensor(model["targets"], dtype=th.float64)
+    age = th.arange(len(targets) - 1, -1, -1, dtype=th.float64)
+    weights = th.tensor(model["forgetting_factor"], dtype=th.float64) ** age
+    probabilities = th.tensor((0.1, 0.5, 0.9), dtype=th.float64)
+
+    for _ in range(iterations):
+        model["optimizer"].zero_grad()
+        predictions = predict_nonlinear_quantiles(model, features)
+        errors = targets[:, None] - predictions
+        pinball = th.maximum(probabilities * errors, (probabilities - 1) * errors)
+        loss = (weights[:, None] * pinball).sum() / (weights.sum() * 3)
+        if model["l1"]:
+            loss = loss + model["l1"] * sum(
+                parameter.abs().sum()
+                for name, parameter in model["network"].named_parameters()
+                if "weight" in name
+            )
+        loss.backward()
+        model["optimizer"].step()
+
+
+def add_nonlinear_quantile_observations(
+    model: dict, features, targets, iterations: int
+) -> None:
+    """Append chronological errors, retain the configured history, and update."""
+    model["features"].extend(
+        th.as_tensor(row, dtype=th.float64).clone() for row in features
+    )
+    model["targets"].extend(float(target) for target in targets)
+    history_size = model["history_size"]
+    model["features"] = model["features"][-history_size:]
+    model["targets"] = model["targets"][-history_size:]
+    fit_nonlinear_quantile_model(model, iterations)
+
+
 def initialize_adaptive_merit_order_model(market_id, forecast_inputs, config) -> dict:
     """Create the online state for one market without fitting future data."""
     config = config.copy()
+    if config["distribution"] not in ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS:
+        raise ValueError(
+            "Adaptive merit-order distribution must be one of "
+            f"{ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS}"
+        )
     if config.get("use_holiday_feature"):
         if not config["holiday_dates"]:
             raise ValueError("The holiday feature requires at least one holiday date")
@@ -933,6 +1042,7 @@ def initialize_adaptive_merit_order_model(market_id, forecast_inputs, config) ->
         ),
         "residual_mean_model": None,
         "residual_scale_model": None,
+        "residual_quantile_model": None,
         "initial_inputs": [],
         "initial_residuals": [],
         "johnson_su_standardised_errors": [],
@@ -950,12 +1060,18 @@ def initialize_adaptive_merit_order_model(market_id, forecast_inputs, config) ->
     }
 
 
-def initialize_adaptive_merit_order_correction(index, units, market) -> dict:
+def initialize_adaptive_merit_order_correction(
+    index, units, market, settings=None
+) -> dict:
     """Initialize the adaptive model for one market with built-in defaults."""
     units = tuple(units)
     if not units:
         raise ValueError("Adaptive merit-order forecasts require loaded market units")
-    config = ADAPTIVE_MERIT_ORDER_SETTINGS.copy()
+    settings = settings or {}
+    unknown = set(settings) - set(ADAPTIVE_MERIT_ORDER_SETTINGS)
+    if unknown:
+        raise ValueError(f"Unknown adaptive merit-order settings: {sorted(unknown)}")
+    config = ADAPTIVE_MERIT_ORDER_SETTINGS | settings
     return {
         "markets": {
             market.market_id: initialize_adaptive_merit_order_model(
@@ -1069,6 +1185,7 @@ def issue_adaptive_merit_order_correction(
             "price_q10": None,
             "price_q50": corrected_mean,
             "price_q90": None,
+            "uncertainty_model": model["config"]["distribution"],
             "training_status": status,
             "training_sample_count": len(model["residual_history"]),
         }
@@ -1087,6 +1204,16 @@ def issue_adaptive_merit_order_correction(
                 issued["price_q90"] = johnson_su_residual_quantile(
                     corrected_mean, residual_std, shape_a, shape_b, 0.9
                 )
+            elif (
+                model["config"]["distribution"] == "nonlinear_quantile"
+                and model["residual_quantile_model"] is not None
+            ):
+                error_quantiles = predict_nonlinear_quantiles(
+                    model["residual_quantile_model"], scale_vector
+                )
+                issued["price_q10"] = corrected_mean + error_quantiles[0].item()
+                issued["price_q50"] = corrected_mean + error_quantiles[1].item()
+                issued["price_q90"] = corrected_mean + error_quantiles[2].item()
             else:
                 issued["price_q10"] = gaussian_residual_quantile(
                     corrected_mean, residual_std, 0.1
@@ -1218,6 +1345,20 @@ def fit_initial_adaptive_merit_order_models(model: dict) -> None:
             break
         previous_parameters = parameters.clone()
 
+    if model["config"]["distribution"] == "nonlinear_quantile":
+        model["residual_quantile_model"] = initialize_nonlinear_quantile_model(
+            scale_matrix.shape[1], config
+        )
+        residual_errors = residuals - predict_online_regularized_regression(
+            model["residual_mean_model"], residual_mean_matrix
+        )
+        add_nonlinear_quantile_observations(
+            model["residual_quantile_model"],
+            scale_matrix,
+            residual_errors,
+            config["quantile_initial_iterations"],
+        )
+
     if model["config"]["distribution"] == "johnson_su":
         initial_standard_deviations = th.exp(
             th.clamp(
@@ -1251,6 +1392,8 @@ def update_adaptive_merit_order_correction(state, market_id, market_meta) -> lis
         )
 
     outcomes = []
+    quantile_features = []
+    quantile_targets = []
     for row in rows:
         product_start = row["product_start"]
         price = row["price"]
@@ -1318,6 +1461,9 @@ def update_adaptive_merit_order_correction(state, market_id, market_meta) -> lis
                 post_forecast_residual / issued["residual_std_forecast"]
             )
             fit_johnson_su_shape(model)
+        elif model["config"]["distribution"] == "nonlinear_quantile":
+            quantile_features.append(scale_vector)
+            quantile_targets.append(post_forecast_residual)
         # Freeze the pre-outcome statistics. IRLS may reconsider the current
         # working weights repeatedly, but the clearing result is committed once.
         residual_mean_model = model["residual_mean_model"]
@@ -1387,6 +1533,13 @@ def update_adaptive_merit_order_correction(state, market_id, market_meta) -> lis
             ):
                 break
             previous_parameters = parameters.clone()
+    if quantile_targets:
+        add_nonlinear_quantile_observations(
+            model["residual_quantile_model"],
+            quantile_features,
+            quantile_targets,
+            model["config"]["quantile_update_iterations"],
+        )
     return outcomes
 
 
