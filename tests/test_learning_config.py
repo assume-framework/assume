@@ -13,6 +13,19 @@ import yaml
 from assume.common.base import LearningConfig, OffPolicyConfig, OnPolicyConfig
 
 
+@pytest.mark.parametrize("std", [0.0, -0.1, float("nan"), float("inf")])
+def test_on_policy_rejects_invalid_initial_action_std(std):
+    with pytest.raises(ValueError, match="action_std_init"):
+        LearningConfig(algorithm="mappo", on_policy={"action_std_init": std})
+
+
+def test_on_policy_initial_action_std_survives_config_roundtrip():
+    config = LearningConfig(algorithm="mappo", on_policy={"action_std_init": 0.2})
+    restored = LearningConfig(**yaml.safe_load(yaml.safe_dump(asdict(config))))
+    assert restored.on_policy.action_std_init == 0.2
+    assert OnPolicyConfig().action_std_init == 1.0
+
+
 @pytest.fixture
 def all_off_policy_values():
     return {

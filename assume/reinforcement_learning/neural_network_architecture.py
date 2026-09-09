@@ -409,15 +409,17 @@ class ActorPPO(nn.Module):
         self,
         obs: th.Tensor,
         deterministic: bool = False,
-    ) -> tuple[th.Tensor, th.Tensor]:
+        return_latent: bool = False,
+    ) -> tuple[th.Tensor, th.Tensor] | tuple[th.Tensor, th.Tensor, th.Tensor]:
         """Sample action and compute log probability.
 
         Args:
             obs: Observations.
             deterministic: If True, return mean action.
+            return_latent: Also return the pre-tanh sample for rollout storage.
 
         Returns:
-            Tuple of (action, log_prob).
+            Tuple of (action, log_prob), with the latent sample when requested.
         """
         mean, log_std = self.get_distribution(obs)
         std = log_std.exp()
@@ -430,12 +432,15 @@ class ActorPPO(nn.Module):
         action = th.tanh(latent_action)
         log_prob = self._compute_squashed_log_prob(latent_action, mean, std)
 
+        if return_latent:
+            return action, log_prob, latent_action
         return action, log_prob
 
     def evaluate_actions(
         self,
         obs: th.Tensor,
         actions: th.Tensor,
+        latent_actions: th.Tensor | None = None,
     ) -> tuple[th.Tensor, th.Tensor]:
         """Evaluate log probability and entropy for given actions.
 
@@ -444,6 +449,7 @@ class ActorPPO(nn.Module):
         Args:
             obs: Observations.
             actions: Actions to evaluate.
+            latent_actions: Stored pre-tanh samples, preserving saturated actions.
 
         Returns:
             Tuple of (log_prob, entropy).
@@ -451,8 +457,15 @@ class ActorPPO(nn.Module):
         mean, log_std = self.get_distribution(obs)
         std = log_std.exp()
 
-        log_prob = self._compute_log_prob(actions, mean, std)
-        entropy = -log_prob
+        if latent_actions is None:
+            log_prob = self._compute_log_prob(actions, mean, std)
+        else:
+            log_prob = self._compute_squashed_log_prob(latent_actions, mean, std)
+
+        # Reparameterized samples give the current policy's entropy gradient;
+        # fixed rollout actions would instead differentiate cross-entropy.
+        entropy_sample = mean + std * th.randn_like(mean)
+        entropy = -self._compute_squashed_log_prob(entropy_sample, mean, std)
 
         return log_prob, entropy
 

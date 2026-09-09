@@ -190,6 +190,7 @@ class RolloutBufferSamples(NamedTuple):
         old_log_probs: Log_probability of taking each action.
         advantages: Generalized advantage estimates.
         returns: Expected returns.
+        latent_actions: Gaussian samples before tanh squashing.
     """
 
     observations: th.Tensor  # states/observations the agent saw
@@ -198,6 +199,7 @@ class RolloutBufferSamples(NamedTuple):
     old_log_probs: th.Tensor  # log_probability of taking each action
     advantages: th.Tensor  # generalized advantage estimates
     returns: th.Tensor  # expected returns
+    latent_actions: th.Tensor | None = None
 
 
 class RolloutBuffer:
@@ -263,6 +265,7 @@ class RolloutBuffer:
             (self.buffer_size, self.n_rl_units, self.act_dim),
             dtype=self.np_float_type,
         )
+        self.latent_actions = np.zeros_like(self.actions)
         self.rewards = np.zeros(
             (self.buffer_size, self.n_rl_units), dtype=self.np_float_type
         )
@@ -292,6 +295,7 @@ class RolloutBuffer:
         reward: np.ndarray,
         value: np.ndarray,
         log_prob: np.ndarray,
+        latent_action: np.ndarray | None = None,
     ) -> None:
         """Add a transition to the buffer.
 
@@ -301,6 +305,7 @@ class RolloutBuffer:
             reward: Reward obtained.
             value: Value estimate from the critic.
             log_prob: Log probability of the action.
+            latent_action: Original Gaussian sample. Required for exact ratios at saturated actions.
 
         Raises:
             OverflowError: If the buffer is already full.  The buffer must be either
@@ -321,6 +326,12 @@ class RolloutBuffer:
 
         self.observations[self.pos] = np.array(obs).copy()
         self.actions[self.pos] = np.array(action).copy()
+        if latent_action is None:
+            epsilon = np.finfo(self.np_float_type).eps
+            latent_action = np.arctanh(
+                np.clip(self.actions[self.pos], -1 + epsilon, 1 - epsilon)
+            )
+        self.latent_actions[self.pos] = np.array(latent_action).copy()
         self.rewards[self.pos] = np.array(reward).flatten().copy()
         self.values[self.pos] = np.array(value).flatten().copy()
         self.log_probs[self.pos] = np.array(log_prob).flatten().copy()
@@ -339,6 +350,7 @@ class RolloutBuffer:
         array_names = (
             "observations",
             "actions",
+            "latent_actions",
             "rewards",
             "values",
             "log_probs",
@@ -437,6 +449,7 @@ class RolloutBuffer:
             self.log_probs[indices],
             self.advantages[indices],
             self.returns[indices],
+            self.latent_actions[indices],
         )
 
         return RolloutBufferSamples(

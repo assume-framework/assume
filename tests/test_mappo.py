@@ -2,10 +2,11 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import asyncio
 import json
 import os
 from copy import copy, deepcopy
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 
 import numpy as np
@@ -298,7 +299,8 @@ def test_mappo_actors_use_consistent_squashed_gaussian_log_probs():
         assert th.all(actions < 1.0)
         assert th.all(th.isfinite(sampled_log_probs))
         assert th.allclose(sampled_log_probs, evaluated_log_probs, atol=1e-5)
-        assert th.allclose(entropy, -evaluated_log_probs)
+        assert entropy.shape == evaluated_log_probs.shape
+        assert th.all(th.isfinite(entropy))
 
 
 @pytest.mark.require_learning
@@ -317,6 +319,184 @@ def test_lstm_actor_supports_non_default_unique_observation_dimension():
     assert actions.shape == (5, 2)
 
 
+@pytest.fixture(params=["mlp", "lstm"])
+def constant_ppo_actor(request):
+    actor_type = ActorPPO if request.param == "mlp" else LSTMActorPPO
+    actor = actor_type(
+        obs_dim=10,
+        act_dim=1,
+        float_type=th.float32,
+        unique_obs_dim=2,
+        num_timeseries_obs_dim=4,
+    )
+    with th.no_grad():
+        for parameter in actor.parameters():
+            parameter.zero_()
+    return actor
+
+
+@pytest.mark.require_learning
+@pytest.mark.parametrize("mean", [-10.0, 10.0])
+def test_saturated_ppo_ratios_preserve_latent_samples(constant_ppo_actor, mean):
+    actor = constant_ppo_actor
+    with th.no_grad():
+        actor.mean_layer.bias.fill_(mean)
+        observations = th.zeros(16, 10)
+        th.manual_seed(42)
+        actions, old_log_probs, latents = actor.get_action_and_log_prob(
+            observations, return_latent=True
+        )
+    assert (actions.abs() == 1).any()
+
+    buffer = RolloutBuffer(
+        buffer_size=1, obs_dim=10, act_dim=1, n_rl_units=1,
+        device="cpu", float_type=th.float32,
+    )
+    for index in range(len(observations)):
+        buffer.ensure_capacity(index + 1)
+        buffer.add(
+            observations[index].numpy(), actions[index].numpy(),
+            np.zeros(1), np.zeros(1), old_log_probs[index].numpy(),
+            latent_action=latents[index].numpy(),
+        )
+    # Growth and shuffled sampling must retain the original sample/log-prob pair.
+    indices = np.random.default_rng(42).permutation(len(observations))
+    batch = buffer.sample(indices)
+    th.testing.assert_close(batch.latent_actions[:, 0], latents[indices])
+    log_probs, _ = actor.evaluate_actions(
+        batch.observations[:, 0], batch.actions[:, 0], batch.latent_actions[:, 0]
+    )
+    th.testing.assert_close(
+        (log_probs - batch.old_log_probs[:, 0]).exp(), th.ones(16)
+    )
+
+    with th.no_grad():
+        actor.mean_layer.bias.add_(0.2)
+    changed_log_probs, _ = actor.evaluate_actions(
+        batch.observations[:, 0], batch.actions[:, 0], batch.latent_actions[:, 0]
+    )
+    # The tanh Jacobian cancels from the importance ratio at the same sample.
+    samples = batch.latent_actions[:, 0, 0]
+    expected_log_ratio = -0.5 * ((samples - (mean + 0.2)) ** 2 - (samples - mean) ** 2)
+    th.testing.assert_close(
+        changed_log_probs - batch.old_log_probs[:, 0], expected_log_ratio,
+        atol=3e-6, rtol=1e-5,
+    )
+
+
+@pytest.mark.require_learning
+def test_squashed_entropy_gradient_matches_current_policy(constant_ppo_actor):
+    actor = constant_ppo_actor
+    with th.no_grad():
+        actor.mean_layer.bias.fill_(2.0)
+        actor.log_std.fill_(np.log(0.5))
+    observations = th.zeros(2048, 10)
+    fixed_old_actions = th.full((2048, 1), 0.1)
+    th.manual_seed(42)
+    noise = th.randn(2048, 1)
+    samples = 2.0 + 0.5 * noise
+    expected_mean_gradient = (-2 * samples.tanh()).mean()
+    expected_log_std_gradient = (1 - 2 * samples.tanh() * (0.5 * noise)).mean()
+
+    th.manual_seed(42)
+    _, entropy = actor.evaluate_actions(observations, fixed_old_actions)
+    mean_gradient, log_std_gradient = th.autograd.grad(
+        entropy.mean(), (actor.mean_layer.bias, actor.log_std)
+    )
+    th.testing.assert_close(mean_gradient.squeeze(), expected_mean_gradient)
+    th.testing.assert_close(log_std_gradient.squeeze(), expected_log_std_gradient)
+
+
+@pytest.mark.require_learning
+@pytest.mark.parametrize("clip_range, expected_loss", [(0.2, 0.445), (None, 0.125)])
+def test_mappo_value_clipping_selects_loss_per_sample(
+    learning_role_n, clip_range, expected_loss
+):
+    algorithm = learning_role_n.rl_algorithm
+    algorithm.clip_range_vf = clip_range
+    values = th.tensor([1.0, 0.5], requires_grad=True)
+    loss = algorithm._compute_value_loss(values, th.zeros(2), th.tensor([1.0, 0.0]))
+    loss.backward()
+    assert loss.item() == pytest.approx(expected_loss)
+    th.testing.assert_close(values.grad, th.tensor([0.0, 0.5]))
+
+
+@pytest.mark.require_learning
+def test_mappo_excludes_late_rewards_from_old_policy(learning_role_n, monkeypatch):
+    learn = learning_role_n
+    learn.initialize_policy()
+    _setup_for_update(learn)
+    algorithm = learn.rl_algorithm
+    algorithm.buffer = algorithm.create_buffer("1h")
+    for strategy in learn.rl_strats.values():
+        strategy.learning_mode = True
+        strategy.evaluation_mode = False
+        strategy.float_type = learn.float_type
+
+    stored_hours = []
+    logged_hours = []
+    original_store = algorithm.store_experience
+    original_output = learn.write_rl_params_to_output
+
+    def record_store(cache, device):
+        original_store(cache, device)
+        buffer = algorithm.buffer
+        stored_hours.append(buffer.observations[:buffer.pos, 0, 0].tolist())
+        batch = buffer.sample(np.arange(buffer.pos))
+        for index, strategy in enumerate(learn.rl_strats.values()):
+            log_probs, _ = strategy.actor.evaluate_actions(
+                batch.observations[:, index], batch.actions[:, index],
+                batch.latent_actions[:, index],
+            )
+            th.testing.assert_close(
+                (log_probs - batch.old_log_probs[:, index]).exp(),
+                th.ones(buffer.pos), atol=1e-5, rtol=1e-5,
+            )
+
+    def record_output(cache):
+        logged_hours.append([timestamp.hour for timestamp in cache["rewards"]])
+        original_output(cache)
+
+    monkeypatch.setattr(algorithm, "store_experience", record_store)
+    monkeypatch.setattr(learn, "write_rl_params_to_output", record_output)
+
+    def add_actions(hour):
+        timestamp = start + timedelta(hours=hour)
+        for unit_id, strategy in learn.rl_strats.items():
+            observation = th.full((algorithm.obs_dim,), float(hour))
+            learn.add_observation_to_cache(unit_id, timestamp, observation)
+            action, noise, extra = algorithm.get_action(strategy, observation)
+            learn.add_actions_to_cache(unit_id, timestamp, action, noise, extra)
+
+    def add_rewards(hour):
+        for unit_id in learn.rl_strats:
+            learn.add_reward_to_cache(unit_id, start + timedelta(hours=hour), 1.0, 0.0, 1.0)
+
+    for hour in range(1, 5):
+        add_actions(hour)
+        if hour < 4:
+            add_rewards(hour)
+    pending_time = start + timedelta(hours=4)
+    pending_latent = learn.cache["latent_actions"][pending_time]["agent_0"][0].clone()
+    asyncio.run(learn.store_to_buffer_and_update())
+    assert algorithm.n_updates == 1
+    assert learn.cache["policy_versions"][pending_time]["agent_0"] == [0]
+    th.testing.assert_close(
+        learn.cache["latent_actions"][pending_time]["agent_0"][0], pending_latent
+    )
+
+    add_rewards(4)
+    for hour in range(5, 9):
+        add_actions(hour)
+        if hour < 8:
+            add_rewards(hour)
+    asyncio.run(learn.store_to_buffer_and_update())
+    assert algorithm.n_updates == 2
+    assert stored_hours == [[1.0, 2.0, 3.0], [5.0, 6.0, 7.0]]
+    assert logged_hours == [[1, 2, 3], [4, 5, 6, 7]]
+    assert algorithm.buffer.pos == 0
+
+
 @pytest.mark.require_learning
 def test_mappo_save_params_creates_files(learning_role_n, tmp_path):
     learning_role_n.initialize_policy()
@@ -328,6 +508,34 @@ def test_mappo_save_params_creates_files(learning_role_n, tmp_path):
     assert os.path.exists(save_dir / "critics" / "critic_agent_1.pt")
     assert os.path.exists(save_dir / "actors" / "actor_agent_0.pt")
     assert os.path.exists(save_dir / "actors" / "actor_agent_1.pt")
+
+
+@pytest.mark.require_learning
+@pytest.mark.parametrize("architecture", ["mlp", "lstm"])
+def test_mappo_uses_configured_initial_std_and_restores_learned_std(
+    learning_role_n, tmp_path, architecture
+):
+    learn = learning_role_n
+    learn.learning_config.actor_architecture = architecture
+    learn.learning_config.on_policy.action_std_init = 0.2
+    learn.initialize_policy()
+
+    for strategy in learn.rl_strats.values():
+        mean, log_std = strategy.actor.get_distribution(th.zeros(2, strategy.obs_dim))
+        th.testing.assert_close(log_std.exp(), th.full_like(mean, 0.2))
+        assert strategy.actor.log_std.requires_grad
+        # A checkpoint's learned variance must take precedence over initialization.
+        with th.no_grad():
+            strategy.actor.log_std.fill_(np.log(0.35))
+
+    learn.rl_algorithm.save_params(str(tmp_path))
+    learn.learning_config.on_policy.action_std_init = 0.1
+    learn.initialize_policy()
+    learn.rl_algorithm.load_params(str(tmp_path))
+    for strategy in learn.rl_strats.values():
+        th.testing.assert_close(
+            strategy.actor.log_std.exp(), th.full_like(strategy.actor.log_std, 0.35)
+        )
 
 
 @pytest.mark.require_learning
@@ -517,6 +725,8 @@ def test_mappo_buffer_storage_uses_rl_strats_order(base_learning_config):
         "regret": {timestamp: {}},
         "profit": {timestamp: {}},
         "log_probs": {timestamp: {}},
+        "latent_actions": {timestamp: {}},
+        "policy_versions": {timestamp: {}},
     }
     for i, unit_id in enumerate(insertion_order):
         marker = float(i + 1)
@@ -533,6 +743,10 @@ def test_mappo_buffer_storage_uses_rl_strats_order(base_learning_config):
         cache["regret"][timestamp][unit_id] = [0.0]
         cache["profit"][timestamp][unit_id] = [0.0]
         cache["log_probs"][timestamp][unit_id] = [-marker]
+        cache["latent_actions"][timestamp][unit_id] = [
+            th.full((act_dim,), marker, dtype=th.float32)
+        ]
+        cache["policy_versions"][timestamp][unit_id] = [0]
 
     # Stash db_addr/update_steps so the logging path inside the algorithm is
     # safe to call.  We do NOT need an actual policy update for this test, so

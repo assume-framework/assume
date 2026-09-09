@@ -850,6 +850,8 @@ class OnPolicyConfig:
         max_grad_norm (float): Maximum gradient norm for clipping. Default is 0.5.
         vf_coef (float): Coefficient for value function term in loss. Default is 0.5.
         n_epochs (int): Number of optimization epochs per rollout. Default is 10.
+        action_std_init (float): Initial Gaussian standard deviation before tanh squashing.
+            Remains learnable during training. Default is 1.0.
     """
 
     clip_ratio: float = 0.1
@@ -859,6 +861,11 @@ class OnPolicyConfig:
     max_grad_norm: float = 0.5
     vf_coef: float = 0.5
     n_epochs: int = 10
+    action_std_init: float = 1.0
+
+    def __post_init__(self):
+        if not np.isfinite(self.action_std_init) or self.action_std_init <= 0:
+            raise ValueError("action_std_init must be finite and greater than zero")
 
 
 class _Unset:

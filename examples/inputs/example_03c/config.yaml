@@ -73,6 +73,7 @@ base_case_2019_with_storage_mappo:
     trained_policies_load_path: null
     actor_architecture: mlp
     on_policy:
+      action_std_init: 0.2
       clip_ratio: 0.2
       entropy_coef: 0.01
       vf_coef: 0.5

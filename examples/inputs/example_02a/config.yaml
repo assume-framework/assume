@@ -171,6 +171,7 @@ base_mappo:
     validation_episodes_interval: 5
 
     on_policy:
+      action_std_init: 0.2
       clip_ratio: 0.2
       entropy_coef: 0.01
       vf_coef: 0.5
@@ -221,6 +222,7 @@ base_lstm_mappo:
     actor_architecture: lstm
 
     on_policy:
+      action_std_init: 0.2
       clip_ratio: 0.2
       entropy_coef: 0.01
       vf_coef: 0.5
@@ -269,6 +271,7 @@ tiny_mappo:
     actor_architecture: mlp
 
     on_policy:
+      action_std_init: 0.2
       clip_ratio: 0.2
       entropy_coef: 0.01
       vf_coef: 0.5

@@ -50,7 +50,11 @@ class PPO(ActorCriticAlgorithm):
     """
 
     # Caching log probabilities needed by the clipped PPO objective
-    buffer_fields = RLAlgorithm.buffer_fields + ("log_probs",)
+    buffer_fields = RLAlgorithm.buffer_fields + (
+        "log_probs",
+        "latent_actions",
+        "policy_versions",
+    )
     retain_buffer_between_episodes = False
 
     def __init__(
@@ -132,13 +136,19 @@ class PPO(ActorCriticAlgorithm):
 
         """
         if strategy.learning_mode and not strategy.evaluation_mode:
-            action, log_prob = strategy.actor.get_action_and_log_prob(obs.unsqueeze(0))
+            action, log_prob, latent_action = strategy.actor.get_action_and_log_prob(
+                obs.unsqueeze(0), return_latent=True
+            )
             action = action.squeeze(0).detach()
             log_prob = log_prob.squeeze(0).detach()
             if hasattr(log_prob, "item"):
                 log_prob = log_prob.item()
             noise = th.zeros_like(action, dtype=strategy.float_type)
-            extra_data = {"log_probs": log_prob}
+            extra_data = {
+                "log_probs": log_prob,
+                "latent_actions": latent_action.squeeze(0).detach(),
+                "policy_versions": self.n_updates,
+            }
             return action, noise, extra_data
 
         # Evaluation
@@ -236,13 +246,10 @@ class PPO(ActorCriticAlgorithm):
 
         Unlike the replay buffer, the rollout buffer stores single transitions,
         and each of them needs a value estimate V(s_t) from the centralized
-        critic. That value cannot be produced at action time — a centralized
-        value needs *all* agents' observations for the same timestep, and an
-        agent only has its own — so ``get_action`` caches a placeholder and the
-        real value is computed here, where the joint observation first exists.
-        The critic is unchanged over the whole window (``update_policy`` runs
-        only after this method), so these values are still the behaviour
-        policy's, as PPO requires.
+        critic. The joint observation first exists here, so values are computed
+        centrally before the update. Late transitions from an earlier policy
+        version are excluded from training, their rewards are still logged by
+        the learning role. This keeps the rollout under one unchanged policy.
         """
         unit_id_order = list(self.learning_role.rl_strats.keys())
         self.buffer.ensure_capacity(self.buffer.pos + len(cache["obs"]))
@@ -251,10 +258,17 @@ class PPO(ActorCriticAlgorithm):
             missing_units = [
                 u
                 for u in unit_id_order
-                if u not in cache["obs"][timestamp]
-                or u not in cache["actions"][timestamp]
-                or u not in cache["rewards"][timestamp]
-                or u not in cache["log_probs"][timestamp]
+                if any(
+                    not cache.get(field, {}).get(timestamp, {}).get(u)
+                    for field in (
+                        "obs",
+                        "actions",
+                        "rewards",
+                        "log_probs",
+                        "latent_actions",
+                        "policy_versions",
+                    )
+                )
             ]
             if missing_units:
                 logger.warning(
@@ -267,6 +281,17 @@ class PPO(ActorCriticAlgorithm):
                 )
                 continue
 
+            if any(
+                cache["policy_versions"][timestamp][u] != [self.n_updates]
+                for u in unit_id_order
+            ):
+                logger.debug(
+                    "Excluding late MAPPO transition at %s from policy update %d.",
+                    timestamp,
+                    self.n_updates,
+                )
+                continue
+
             step = {
                 field: transform_buffer_data(
                     {timestamp: cache[field][timestamp]},
@@ -274,7 +299,7 @@ class PPO(ActorCriticAlgorithm):
                     unit_id_order,
                     self.float_type,
                 )
-                for field in ("obs", "actions", "rewards", "log_probs")
+                for field in ("obs", "actions", "rewards", "log_probs", "latent_actions")
             }
 
             # Computing V(s_t) centrally and reshaping it to the buffer layout
@@ -290,6 +315,7 @@ class PPO(ActorCriticAlgorithm):
                 reward=step["rewards"],
                 value=values_data,
                 log_prob=step["log_probs"],
+                latent_action=step["latent_actions"],
             )
 
     def compute_gradient_step_range(
@@ -330,6 +356,7 @@ class PPO(ActorCriticAlgorithm):
             >>> # Creates actor network and optimizer for each strategy
         """
         actor_architecture = self.learning_config.actor_architecture
+        log_std_init = np.log(self.learning_config.on_policy.action_std_init)
 
         for strategy in self.learning_role.rl_strats.values():
             # Create PPO Actor
@@ -340,12 +367,14 @@ class PPO(ActorCriticAlgorithm):
                     float_type=self.float_type,
                     unique_obs_dim=self.unique_obs_dim,
                     num_timeseries_obs_dim=strategy.num_timeseries_obs_dim,
+                    log_std_init=log_std_init,
                 ).to(self.device)
             else:
                 strategy.actor = ActorPPO(
                     obs_dim=self.obs_dim,
                     act_dim=self.act_dim,
                     float_type=self.float_type,
+                    log_std_init=log_std_init,
                 ).to(self.device)
 
             # Create Optimizer
@@ -417,6 +446,19 @@ class PPO(ActorCriticAlgorithm):
     # =========================================================================
     # CORE TRAINING: POLICY UPDATE
     # =========================================================================
+
+    def _compute_value_loss(
+        self, values: th.Tensor, old_values: th.Tensor, returns: th.Tensor
+    ) -> th.Tensor:
+        if self.clip_range_vf is None:
+            return F.mse_loss(values, returns)
+
+        values_clipped = old_values + th.clamp(
+            values - old_values, -self.clip_range_vf, self.clip_range_vf
+        )
+        loss = F.mse_loss(values, returns, reduction="none")
+        loss_clipped = F.mse_loss(values_clipped, returns, reduction="none")
+        return th.maximum(loss, loss_clipped).mean()
 
     def update_policy(self) -> None:
         """Update actor and critic networks using Proximal Policy Optimization (PPO).
@@ -572,7 +614,14 @@ class PPO(ActorCriticAlgorithm):
                     returns_i = batch.returns[:, i]
                     old_values_i = batch.old_values[:, i]
 
-                    log_probs, entropy = actor.evaluate_actions(obs_i, actions_i)
+                    latent_actions_i = (
+                        batch.latent_actions[:, i, :]
+                        if batch.latent_actions is not None
+                        else None
+                    )
+                    log_probs, entropy = actor.evaluate_actions(
+                        obs_i, actions_i, latent_actions=latent_actions_i
+                    )
                     values = critic(all_states).flatten()
 
                     # Importance sampling ratio
@@ -588,18 +637,9 @@ class PPO(ActorCriticAlgorithm):
                     # Entropy loss
                     entropy_loss = -self.entropy_coef * entropy.mean()
 
-                    if self.clip_range_vf is not None:
-                        # Clipped value function loss
-                        values_clipped = old_values_i + th.clamp(
-                            values - old_values_i,
-                            -self.clip_range_vf,
-                            self.clip_range_vf,
-                        )
-                        value_loss_1 = F.mse_loss(values, returns_i)
-                        value_loss_2 = F.mse_loss(values_clipped, returns_i)
-                        value_loss = th.max(value_loss_1, value_loss_2)
-                    else:
-                        value_loss = F.mse_loss(values, returns_i)
+                    value_loss = self._compute_value_loss(
+                        values, old_values_i, returns_i
+                    )
 
                     loss = policy_loss + entropy_loss + self.vf_coef * value_loss
 

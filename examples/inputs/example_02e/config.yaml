@@ -116,6 +116,7 @@ base_mappo:
     device: cpu
     validation_episodes_interval: 5
     on_policy:
+      action_std_init: 0.2
       clip_ratio: 0.2
       entropy_coef: 0.01
       vf_coef: 0.5
@@ -208,6 +209,7 @@ tiny_mappo:
     gamma: 0.99
     device: cpu
     on_policy:
+      action_std_init: 0.2
       clip_ratio: 0.2
       entropy_coef: 0.01
       vf_coef: 0.5
