@@ -16,10 +16,10 @@ base_case_2019:
       start_date: 2019-01-01 00:00
       products:
         - duration: 1h
-          count: 1
-          first_delivery: 1h
-      opening_frequency: 1h
-      opening_duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
       volume_unit: MWh
       maximum_bid_volume: 100000
       maximum_bid_price: 3000
