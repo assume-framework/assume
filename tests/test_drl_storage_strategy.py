@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from assume.common.base import LearningConfig
+from assume.common.base import ALGORITHM_CATEGORIES, LearningConfig, is_on_policy
 from assume.common.forecaster import UnitForecaster
 
 try:
@@ -23,8 +23,8 @@ from assume.common.market_objects import MarketConfig
 from assume.units import Storage
 
 
-@pytest.fixture
-def storage_unit() -> Storage:
+@pytest.fixture(params=ALGORITHM_CATEGORIES)
+def storage_unit(request) -> Storage:
     """
     Fixture to create a Storage unit instance with example parameters.
     """
@@ -34,7 +34,7 @@ def storage_unit() -> Storage:
         "act_dim": 2,
         "unit_id": "test_storage",
         "learning_config": LearningConfig(
-            algorithm="matd3",
+            algorithm=request.param,
             learning_mode=True,
             training_episodes=3,
             max_bid_price=100,
@@ -65,6 +65,19 @@ def storage_unit() -> Storage:
         additional_cost_discharge=5,
         forecaster=ff,
     )
+
+
+def get_extra_data(strategy):
+    algorithm = strategy.learning_role.learning_config.algorithm
+    if not is_on_policy(algorithm):
+        return None
+
+    standard_fields = {"obs", "actions", "noises", "rewards", "regret", "profit"}
+    return {
+        field: 0.0
+        for field in strategy.learning_role.buffer_fields
+        if field not in standard_fields
+    }
 
 
 @pytest.fixture
@@ -101,7 +114,11 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
     with patch.object(
         StorageEnergyLearningStrategy,
         "get_actions",
-        return_value=(th.tensor(sell_action), th.tensor(0.0)),
+        return_value=(
+            th.tensor(sell_action),
+            th.tensor(0.0),
+            get_extra_data(strategy),
+        ),
     ):
         # Mock the calculate_marginal_cost method to return a fixed marginal cost
         with patch.object(Storage, "calculate_marginal_cost", return_value=10.0):
@@ -139,8 +156,8 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
 
             # Fetch reward, profit, costs from learning_role cache
             learning_role = strategy.learning_role
-            reward_cache = learning_role.all_rewards
-            profit_cache = learning_role.all_profits
+            reward_cache = learning_role.cache["rewards"]
+            profit_cache = learning_role.cache["profit"]
 
             # Use the last timestamp
             last_ts = sorted(reward_cache.keys())[-1]
@@ -207,7 +224,11 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
     with patch.object(
         StorageEnergyLearningStrategy,
         "get_actions",
-        return_value=(th.tensor(buy_action), th.tensor(0.0)),
+        return_value=(
+            th.tensor(buy_action),
+            th.tensor(0.0),
+            get_extra_data(strategy),
+        ),
     ):
         # Mock the calculate_marginal_cost method to return a fixed marginal cost
         with patch.object(Storage, "calculate_marginal_cost", return_value=15.0):
@@ -243,8 +264,8 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
 
             # Fetch reward, profit, costs from learning_role cache
             learning_role = strategy.learning_role
-            reward_cache = learning_role.all_rewards
-            profit_cache = learning_role.all_profits
+            reward_cache = learning_role.cache["rewards"]
+            profit_cache = learning_role.cache["profit"]
 
             # Use the last timestamp
             last_ts = sorted(reward_cache.keys())[-1]
@@ -320,7 +341,10 @@ def test_storage_rl_strategy_soc_and_cost_stored_energy(
 
     with get_actions_patch as mock_get_actions, calc_cost_patch as mock_cost:
         # Set up side effects for each call
-        mock_get_actions.side_effect = [(th.tensor(a), th.tensor(0.0)) for a in actions]
+        extra_data = get_extra_data(strategy)
+        mock_get_actions.side_effect = [
+            (th.tensor(action), th.tensor(0.0), extra_data) for action in actions
+        ]
         mock_cost.side_effect = [5.0, 15.0, 25.0]
 
         all_bids = []

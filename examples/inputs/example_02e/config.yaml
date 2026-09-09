@@ -19,26 +19,27 @@ base:
     actor_architecture: mlp
     learning_rate: 0.0003
     training_episodes: 30
-    episodes_collecting_initial_experience: 5
     train_freq: 720h
-    gradient_steps: 720
     batch_size: 256
     gamma: 0.999
     device: cpu
-    # action_noise_schedule: linear
-    noise_sigma: 0.1
-    noise_scale: 1
-    noise_dt: 1
     validation_episodes_interval: 5
+    off_policy:
+      episodes_collecting_initial_experience: 5
+      gradient_steps: 720
+      noise_sigma: 0.1
+      noise_scale: 1
+      # action_noise_schedule: linear
+      noise_dt: 1
 
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
       products:
-        - duration: 1h
-          count: 1
-          first_delivery: 1h
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
@@ -47,7 +48,6 @@ base:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
-
 
 tiny:
   start_date: 2019-01-01 00:00
@@ -65,24 +65,213 @@ tiny:
     learning_rate: 0.001
     training_episodes: 5
     validation_episodes_interval: 2
-    episodes_collecting_initial_experience: 1
     train_freq: 24h
-    gradient_steps: 24
     batch_size: 64
     gamma: 0.99
     device: cpu
-    noise_sigma: 0.1
-    noise_scale: 1
-    noise_dt: 1
+    off_policy:
+      episodes_collecting_initial_experience: 1
+      gradient_steps: 24
+      noise_sigma: 0.1
+      noise_scale: 1
+      noise_dt: 1
 
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
       products:
-        - duration: 1h
-          count: 1
-          first_delivery: 1h
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+base_mappo:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-04-30 00:00
+  time_step: 1h
+  save_frequency_hours: null
+  seed: null
+
+  learning_config:
+    learning_mode: true
+    continue_learning: false
+    trained_policies_save_path: null
+    trained_policies_load_path: null
+    max_bid_price: 100
+    algorithm: mappo
+    actor_architecture: mlp
+    learning_rate: 0.0003
+    training_episodes: 30
+    train_freq: 720h
+    batch_size: 256
+    gamma: 0.999
+    device: cpu
+    validation_episodes_interval: 5
+    on_policy:
+      action_std_init: 0.2
+      clip_ratio: 0.2
+      entropy_coef: 0.01
+      vf_coef: 0.5
+      gae_lambda: 0.95
+      n_epochs: 4
+      max_grad_norm: 0.5
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+base_maddpg:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-04-30 00:00
+  time_step: 1h
+  save_frequency_hours: null
+  seed: null
+
+  learning_config:
+    learning_mode: true
+    continue_learning: false
+    trained_policies_save_path: null
+    trained_policies_load_path: null
+    max_bid_price: 100
+    algorithm: maddpg
+    actor_architecture: mlp
+    learning_rate: 0.0003
+    training_episodes: 30
+    train_freq: 720h
+    batch_size: 256
+    gamma: 0.999
+    device: cpu
+    validation_episodes_interval: 5
+    off_policy:
+      episodes_collecting_initial_experience: 5
+      gradient_steps: 720
+      noise_sigma: 0.1
+      noise_scale: 1
+      noise_dt: 1
+      replay_buffer_size: 10000
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+tiny_mappo:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-05 00:00
+  time_step: 1h
+  save_frequency_hours: null
+
+  learning_config:
+    learning_mode: true
+    continue_learning: false
+    trained_policies_save_path: null
+    max_bid_price: 50
+    algorithm: mappo
+    actor_architecture: mlp
+    learning_rate: 0.001
+    training_episodes: 5
+    validation_episodes_interval: 2
+    train_freq: 24h
+    batch_size: 64
+    gamma: 0.99
+    device: cpu
+    on_policy:
+      action_std_init: 0.2
+      clip_ratio: 0.2
+      entropy_coef: 0.01
+      vf_coef: 0.5
+      gae_lambda: 0.95
+      n_epochs: 4
+      max_grad_norm: 0.5
+    trained_policies_load_path: null
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+tiny_maddpg:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-05 00:00
+  time_step: 1h
+  save_frequency_hours: null
+
+  learning_config:
+    learning_mode: true
+    continue_learning: false
+    trained_policies_save_path: null
+    max_bid_price: 50
+    algorithm: maddpg
+    actor_architecture: mlp
+    learning_rate: 0.001
+    training_episodes: 5
+    validation_episodes_interval: 2
+    train_freq: 24h
+    batch_size: 64
+    gamma: 0.99
+    device: cpu
+    off_policy:
+      episodes_collecting_initial_experience: 1
+      gradient_steps: 24
+      noise_sigma: 0.1
+      noise_scale: 1
+      noise_dt: 1
+      replay_buffer_size: 10000
+    trained_policies_load_path: null
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
