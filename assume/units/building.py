@@ -17,6 +17,26 @@ logger = logging.getLogger(__name__)
 logging.getLogger("pyomo").setLevel(logging.WARNING)
 
 
+def _profile_at(profile, t: int, default: float = 0.0) -> float:
+    """Positional lookup in a Series, list, or array-like profile."""
+    if t >= len(profile):
+        return default
+    if hasattr(profile, "iloc"):
+        return profile.iloc[t]
+    return profile[t]
+
+
+def _profile_to_dict(profile, time_steps, default=0, cast=None) -> dict:
+    """Convert a profile (Series, list, ndarray) to a {t: val} dict over time_steps."""
+    vals = profile.iloc if hasattr(profile, "iloc") else profile
+    n = len(profile)
+    res = {}
+    for t in time_steps:
+        val = vals[t] if t < n else default
+        res[t] = cast(val) if cast is not None else val
+    return res
+
+
 class Building(DSMFlex, SupportsMinMax):
     """
     Represents a building unit within an energy system, modeling its energy consumption,
@@ -220,21 +240,12 @@ class Building(DSMFlex, SupportsMinMax):
 
             if availability is not None and trip_distance is not None:
                 # Check for physical inconsistencies: availability=1 and trip>0 in same timestep
-                conflicts = []
-                for t in range(min(len(availability), len(trip_distance))):
-                    avail = (
-                        availability.iloc[t]
-                        if hasattr(availability, "iloc")
-                        else availability[t]
-                    )
-                    trip = (
-                        trip_distance.iloc[t]
-                        if hasattr(trip_distance, "iloc")
-                        else trip_distance[t]
-                    )
-                    if avail > 0 and trip > 0:
-                        conflicts.append(t)
-
+                conflicts = [
+                    t
+                    for t in range(min(len(availability), len(trip_distance)))
+                    if _profile_at(availability, t) > 0
+                    and _profile_at(trip_distance, t) > 0
+                ]
                 if conflicts:
                     logger.warning(
                         f"EV '{ev_key}' has conflicting profiles: availability=1 and trip_distance>0 "
@@ -244,21 +255,12 @@ class Building(DSMFlex, SupportsMinMax):
 
             if availability is not None and trip_energy is not None:
                 # Check for physical inconsistencies: availability=1 and trip_energy>0 in same timestep
-                conflicts = []
-                for t in range(min(len(availability), len(trip_energy))):
-                    avail = (
-                        availability.iloc[t]
-                        if hasattr(availability, "iloc")
-                        else availability[t]
-                    )
-                    energy = (
-                        trip_energy.iloc[t]
-                        if hasattr(trip_energy, "iloc")
-                        else trip_energy[t]
-                    )
-                    if avail > 0 and energy > 0:
-                        conflicts.append(t)
-
+                conflicts = [
+                    t
+                    for t in range(min(len(availability), len(trip_energy)))
+                    if _profile_at(availability, t) > 0
+                    and _profile_at(trip_energy, t) > 0
+                ]
                 if conflicts:
                     logger.warning(
                         f"EV '{ev_key}' has conflicting profiles: availability=1 and trip_energy_consumption>0 "
@@ -334,24 +336,13 @@ class Building(DSMFlex, SupportsMinMax):
             if ev_trip_distance is None:
                 continue
 
-            # Normalize trip distance data to a dictionary keyed by time step
-            # Handle both pandas Series (with .iloc) and array-like objects (list, numpy array)
-            if hasattr(ev_trip_distance, "iloc"):
-                trip_distance_init = {
-                    t: ev_trip_distance.iloc[t] if t < len(ev_trip_distance) else 0
-                    for t in self.model.time_steps
-                }
-            else:
-                trip_distance_init = {
-                    t: ev_trip_distance[t] if t < len(ev_trip_distance) else 0
-                    for t in self.model.time_steps
-                }
-
             self.model.add_component(
                 f"{ev_key}_trip_distance",
                 pyo.Param(
                     self.model.time_steps,
-                    initialize=trip_distance_init,
+                    initialize=_profile_to_dict(
+                        ev_trip_distance, self.model.time_steps, default=0
+                    ),
                     doc=f"Trip distance profile for {ev_key} (in km or user-defined units)",
                 ),
             )
@@ -367,24 +358,13 @@ class Building(DSMFlex, SupportsMinMax):
             if ev_trip_energy is None:
                 continue
 
-            # Normalize trip energy data to a dictionary keyed by time step
-            # Handle both pandas Series (with .iloc) and array-like objects (list, numpy array)
-            if hasattr(ev_trip_energy, "iloc"):
-                trip_energy_init = {
-                    t: ev_trip_energy.iloc[t] if t < len(ev_trip_energy) else 0
-                    for t in self.model.time_steps
-                }
-            else:
-                trip_energy_init = {
-                    t: ev_trip_energy[t] if t < len(ev_trip_energy) else 0
-                    for t in self.model.time_steps
-                }
-
             self.model.add_component(
                 f"{ev_key}_trip_energy_consumption",
                 pyo.Param(
                     self.model.time_steps,
-                    initialize=trip_energy_init,
+                    initialize=_profile_to_dict(
+                        ev_trip_energy, self.model.time_steps, default=0
+                    ),
                     doc=f"Trip energy consumption profile for {ev_key} (in kWh or energy units)",
                 ),
             )
@@ -408,24 +388,13 @@ class Building(DSMFlex, SupportsMinMax):
             if profile_data is None:
                 continue
 
-            # Normalize profile data to a dictionary keyed by time step
-            # Handle both pandas Series (with .iloc) and array-like objects (list, numpy array)
-            if hasattr(profile_data, "iloc"):
-                profile_init = {
-                    t: int(profile_data.iloc[t]) if t < len(profile_data) else 0
-                    for t in self.model.time_steps
-                }
-            else:
-                profile_init = {
-                    t: int(profile_data[t]) if t < len(profile_data) else 0
-                    for t in self.model.time_steps
-                }
-
             self.model.add_component(
                 f"{ev_key}_availability",
                 pyo.Param(
                     self.model.time_steps,
-                    initialize=profile_init,
+                    initialize=_profile_to_dict(
+                        profile_data, self.model.time_steps, default=0, cast=int
+                    ),
                     within=pyo.Binary,
                     doc=f"Availability profile for {ev_key} (binary: 1 if available, 0 otherwise)",
                 ),
@@ -558,16 +527,14 @@ class Building(DSMFlex, SupportsMinMax):
                 total_power += m.dsm_blocks[hp].power_in[t]
 
             for boiler in self.boilers:
-                if hasattr(m.dsm_blocks[boiler], "power_in"):
-                    total_power += m.dsm_blocks[boiler].power_in[t]
+                total_power += m.dsm_blocks[boiler].power_in[t]
 
             # EV / charging station topology
             if self.has_ev and self.has_charging_station:
                 # charging stations connect to grid/building
                 for cs in self.charging_stations:
                     total_power += m.dsm_blocks[cs].charge[t]
-                    if hasattr(m.dsm_blocks[cs], "discharge"):
-                        total_power -= m.dsm_blocks[cs].discharge[t]
+                    total_power -= m.dsm_blocks[cs].discharge[t]
             elif self.has_ev:
                 # no charging station -> EVs directly connect to grid
                 for ev in self.evs:
