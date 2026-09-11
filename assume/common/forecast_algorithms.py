@@ -777,6 +777,35 @@ def price_plus_grid_fee(
     return current_forecast
 
 
+def grid_fee_free_price(forecaster, market_id: str = "EOM"):
+    """Price forecast for *market_id* with any folded-in grid fee removed.
+
+    :func:`price_plus_grid_fee` rewrites ``forecaster.price[market_id]`` to
+    ``base + fee``, which is the right thing for optimisers that treat the
+    tariff as part of the energy price - it then applies symmetrically to
+    consumption and to feed-in.  A volumetric grid fee is levied on *withdrawal*
+    only, so an optimiser that models the fee explicitly on net import (as
+    :class:`~assume.strategies.ev_aggregator.EVPortfolioStrategy` does) must
+    charge it once, on the import side, and read the untouched price here
+    instead - otherwise feed-in earns a fee credit that no tariff pays.
+
+    Returns the stashed pre-fee series when the fee has been folded in, and the
+    current forecast unchanged otherwise, so it is safe to call either way.
+
+    Args:
+        forecaster: The unit's forecaster.
+        market_id: Market id in ``price`` to read.
+
+    Returns:
+        The price series without the grid fee.
+    """
+    base = getattr(forecaster, "_grid_fee_base_price", None)
+    stashed_for = getattr(forecaster, "grid_fee_price_key", "EOM")
+    if base is not None and stashed_for == market_id:
+        return base
+    return forecaster.price[market_id]
+
+
 def set_preloaded_forecast_by_name(
     current_forecast, preprocess_information, new_forecast_name: str
 ):

@@ -207,12 +207,22 @@ def test_negative_prices_cannot_create_simultaneous_losses():
     assert np.allclose(list(plan.values()), unit.outputs["energy"])
 
 
-def test_infeasible_trip_is_reported():
+def test_impossible_trip_degrades_instead_of_raising():
+    """A trip the battery cannot cover is reported, not raised.
+
+    The vehicle itself floors at min_soc and books unmet_driving_energy, so the
+    aggregator has to plan the same way - a hard constraint would turn one
+    under-charged car into an unsolvable portfolio.
+    """
     unit = vehicle(trips=(0, 0, 2, 0))
-    with pytest.raises(RuntimeError, match="infeasible"):
-        EVPortfolioStrategy().optimize(
-            [unit], unit.index[0], unit.index[-1] + unit.index.freq
-        )
+    plan = EVPortfolioStrategy().optimize(
+        [unit], unit.index[0], unit.index[-1] + unit.index.freq
+    )
+    assert unit.id in plan
+    unmet = unit.outputs["ev_planned_unmet_energy"]
+    assert unmet.at[unit.index[2]] > 0
+    # The vehicle still charges as hard as it can beforehand.
+    assert plan[unit.id][unit.index[0]] < 0
 
 
 @pytest.mark.parametrize("mode", ["rolling_horizon", "perfect_foresight"])
@@ -307,7 +317,13 @@ def test_short_horizon_differs_from_perfect_foresight():
         operator, market, product
     )
     assert rolling[0]["volume"] == pytest.approx(0)
-    assert perfect[0]["volume"] > 0
+    # Hours 0 and 1 are both priced at 50, so which of them carries the early
+    # discharge is an arbitrary tie-break; assert the behaviour that matters,
+    # namely that foresight makes the vehicle trade the 1 -> 100 spread at all.
+    planned = unit.outputs["ev_planned_energy"]
+    assert planned.at[unit.index[2]] < 0
+    assert planned.at[unit.index[3]] > 0
+    assert planned.at[unit.index[0]] + planned.at[unit.index[1]] > 0
 
 
 def test_rolling_window_extends_through_return_and_recharge():
@@ -361,3 +377,307 @@ def test_published_products_beyond_simulation_are_ignored():
         ],
     )
     assert bids == []
+
+
+# ---------------------------------------------------------------------------
+# Regression tests for the portfolio fixes
+# ---------------------------------------------------------------------------
+
+
+def _operator(units, now):
+    return SimpleNamespace(
+        units={u.id: u for u in units},
+        context=SimpleNamespace(current_timestamp=datetime2timestamp(now), addr="op"),
+    )
+
+
+def test_shared_horizon_stays_feasible_for_every_vehicle():
+    """The terminal SOC is imposed at one shared horizon end, so that end has to
+    suit every vehicle - not just the one that asked for the longest window."""
+    idx = pd.date_range("2020-01-01", periods=8, freq="1h")
+
+    def ev(uid, availability, trips, mpc):
+        return ElectricVehicleUnit(
+            id=uid,
+            unit_operator="agg",
+            technology="electric_vehicle",
+            bidding_strategies={},
+            forecaster=UnitForecaster(
+                idx, market_prices={"EOM": [50.0] * 8}, availability=list(availability)
+            ),
+            capacity=1,
+            max_power_charge=mpc,
+            max_power_discharge=0,
+            initial_soc=0.5,
+            trip_energy_consumption=list(trips),
+        )
+
+    # A is a slow charger away early, so it drags the shared horizon outwards;
+    # B is away at the far end and used to be handed an impossible terminal SOC.
+    a = ev("A", (1, 0, 0, 1, 1, 1, 1, 1), (0, 0.3, 0.3, 0, 0, 0, 0, 0), -0.12)
+    b = ev("B", (1, 1, 1, 1, 1, 1, 0, 0), (0, 0, 0, 0, 0, 0, 0.25, 0.25), -0.05)
+    bids = EVPortfolioStrategy(ev_look_ahead_horizon="3h").calculate_bids(
+        _operator([a, b], idx[0] - a.index.freq),
+        MarketConfig(market_id="EOM", product_type="energy"),
+        [(idx[0], idx[1], None)],
+    )
+    assert {bid["unit_id"] for bid in bids} == {"A", "B"}
+
+
+def test_grid_fee_is_not_credited_to_v2g_exports():
+    """A volumetric tariff is levied on withdrawal; feed-in must not earn it."""
+    from assume.common.forecast_algorithms import price_plus_grid_fee
+
+    # Lossy round trip, so harvesting a fee credit would have to be strictly
+    # profitable to be worth doing - no break-even tie to hide behind.
+    unit = vehicle(
+        prices=(50, 50, 50, 50),
+        availability=(1, 1, 1, 1),
+        trips=(0,) * 4,
+        efficiency_charge=0.95,
+        efficiency_discharge=0.95,
+    )
+    # Announce a steep fee for the first two hours, nothing afterwards.
+    unit.outputs["grid_fee_announced"].loc[unit.index[0] : unit.index[-1]] = 1
+    unit.outputs["grid_fee_accepted_price"].loc[unit.index[0] : unit.index[1]] = 280.0
+    unit.forecaster.price = price_plus_grid_fee(unit.forecaster.price, {}, unit=unit)
+
+    bids = EVPortfolioStrategy(ev_horizon_mode="perfect_foresight").calculate_bids(
+        _operator([unit], unit.index[0] - unit.index.freq),
+        MarketConfig(market_id="EOM", product_type="energy"),
+        [(unit.index[0], unit.index[1], None)],
+    )
+    planned = unit.outputs["ev_planned_energy"]
+    # With a flat energy price the fee creates no arbitrage at all, so the
+    # vehicle must not discharge into the fee hours to harvest a credit.
+    assert planned.at[unit.index[0]] <= 1e-9
+    assert planned.at[unit.index[1]] <= 1e-9
+    assert bids[0]["volume"] <= 1e-9
+
+
+def test_peak_and_fee_are_billed_on_the_whole_connection():
+    """Background load shares the connection, so it counts towards the peak."""
+    first = vehicle(availability=(1, 1, 1, 1), trips=(0, 0, 0, 0))
+    second = vehicle(availability=(1, 1, 1, 1), trips=(0, 0, 0, 0))
+    second.id = "second"
+    for unit in (first, second):
+        unit.max_power_discharge = 0
+    times = list(first.index)
+    background = 0.1
+    contracted = 0.5
+    plan = EVPortfolioStrategy(
+        ev_peak_price=1e5, ev_observed_peak_mw=contracted
+    ).optimize(
+        [first, second],
+        times[0],
+        times[-1] + first.index.freq,
+        background_load=dict.fromkeys(times, background),
+    )
+    total = [-sum(plan[u.id][t] for u in (first, second)) + background for t in times]
+    # The fleet may fill the contracted capacity, but not exceed it once the
+    # background load is counted in - which is what the DSO actually meters.
+    assert max(total) <= contracted + 1e-6
+
+
+def test_realised_peak_carries_across_rolling_rounds():
+    """A rolling plan must not re-buy a peak it has already been billed for."""
+    unit = vehicle(prices=(10, 10, 10, 10), availability=(1, 1, 1, 1), trips=(0,) * 4)
+    unit.max_power_discharge = 0
+    strategy = EVPortfolioStrategy(ev_peak_price=1e4)
+    assert strategy._realised_peak([unit], unit.index[0]) == 0.0
+    unit.outputs["energy"].at[unit.index[0]] = -0.4
+    assert strategy._realised_peak([unit], unit.index[2]) == pytest.approx(0.4)
+
+
+def test_relaxation_and_milp_agree_on_the_plan():
+    """The LP-first path is a speed-up, not a different model."""
+    units = [vehicle(), vehicle(availability=(0, 1, 1, 1), trips=(0.1, 0, 0, 0))]
+    units[1].id = "other"
+    start, end = units[0].index[0], units[0].index[-1] + units[0].index.freq
+    relaxed = EVPortfolioStrategy().optimize(units, start, end)
+    forced = EVPortfolioStrategy(ev_force_milp=True).optimize(units, start, end)
+
+    def cost(plan):
+        return sum(
+            -power * u.forecaster.price["EOM"].at[t]
+            for u in units
+            for t, power in plan[u.id].items()
+        )
+
+    assert cost(relaxed) == pytest.approx(cost(forced))
+
+
+def test_negative_prices_still_force_the_milp():
+    """Relaxing the disjunction under negative prices would invent free energy."""
+    unit = vehicle(
+        prices=(-100, -100, -100, -100),
+        availability=(1, 1, 1, 1),
+        trips=(0, 0, 0, 0),
+        efficiency_charge=0.8,
+        efficiency_discharge=0.8,
+    )
+    plan = EVPortfolioStrategy().optimize(
+        [unit], unit.index[0], unit.index[-1] + unit.index.freq
+    )[unit.id]
+    for t, power in plan.items():
+        unit.outputs["energy"].at[t] = power
+    unit.execute_current_dispatch(unit.index[0], unit.index[-1])
+    # The realised dispatch must match the plan: nothing was clipped away.
+    assert np.allclose(list(plan.values()), unit.outputs["energy"])
+
+
+def test_typo_in_an_ev_parameter_is_rejected():
+    with pytest.raises(ValueError, match="Unknown EV portfolio parameters"):
+        EVPortfolioStrategy(ev_look_ahead_horizen="24h")
+    # Parameters belonging to other strategies are left alone.
+    EVPortfolioStrategy(grid_fee_base=30.0)
+
+
+@pytest.mark.parametrize(
+    "params",
+    [{"min_power_charge": -0.5}, {"ramp_up_discharge": 0.5}],
+)
+def test_unmodelled_storage_limits_are_rejected(params):
+    with pytest.raises(ValueError, match="minimum power or ramp limits"):
+        vehicle(**params)
+
+
+def test_declared_background_load_reaches_the_simulation_path():
+    """`ev_background_load_mw` has to bind in calculate_bids, not only in a
+    direct optimize() call from the offline harness.
+
+    A connection limit that the vehicles alone can respect, but that the whole
+    connection cannot, is the case that tells the two apart.
+    """
+    unit = vehicle(prices=(10, 10, 10, 10), availability=(1, 1, 1, 1), trips=(0,) * 4)
+    unit.max_power_discharge = 0
+    limit, background = 0.5, 0.2
+    market = MarketConfig(
+        market_id="EOM",
+        product_type="energy",
+        maximum_bid_price=3000,
+        minimum_bid_price=-500,
+    )
+    products = [(t, t + unit.index.freq, None) for t in unit.index[1:]]
+    strategy = EVPortfolioStrategy(
+        ev_horizon_mode="perfect_foresight",
+        ev_import_limit_mw=limit,
+        ev_background_load_mw=background,
+    )
+    bids = strategy.calculate_bids(_operator([unit], unit.index[0]), market, products)
+    charging = [-b["volume"] for b in bids]
+    assert charging, "the fleet should still charge under the limit"
+    # Without the background load the fleet would be free to draw the full
+    # `limit`; the other load behind the meter has to take its share first.
+    assert max(charging) <= limit - background + 1e-6
+
+
+def test_background_load_raises_the_realised_peak_floor():
+    """The capacity charge is billed on the connection, so the peak already
+    delivered has to include the load behind the same meter."""
+    unit = vehicle(prices=(10, 10, 10, 10), availability=(1, 1, 1, 1), trips=(0,) * 4)
+    unit.max_power_discharge = 0
+    unit.outputs["energy"].at[unit.index[0]] = -0.4
+    bare = EVPortfolioStrategy(ev_peak_price=1e4)
+    metered = EVPortfolioStrategy(ev_peak_price=1e4, ev_background_load_mw=0.1)
+    assert bare._realised_peak([unit], unit.index[2]) == pytest.approx(0.4)
+    assert metered._realised_peak([unit], unit.index[2]) == pytest.approx(0.5)
+
+
+@pytest.mark.parametrize(
+    "case,operators",
+    [("constrained", 1), ("peak_price", 1), ("capacity_charge", 1), ("independent", 6)],
+)
+def test_new_study_cases_load_and_reach_the_strategy(case, operators):
+    """The ported harness cases are ordinary study cases: they must set up, pass
+    world validation, and carry their `ev_*` keys into the portfolio strategy."""
+    from assume.scenario.loader_csv import (
+        load_config_and_create_forecaster,
+        setup_world,
+    )
+    from assume.world import World
+
+    world = World()
+    world.scenario_data = load_config_and_create_forecaster(
+        inputs_path="examples/inputs",
+        scenario="example_lv_tariff",
+        study_case=case,
+    )
+    setup_world(world)
+    world._validate_setup()
+    ev_operators = [
+        op
+        for op in world.unit_operators.values()
+        if op.units
+        and all(isinstance(u, ElectricVehicleUnit) for u in op.units.values())
+    ]
+    assert len(ev_operators) == operators
+    assert sum(len(op.units) for op in ev_operators) == 6
+    strategy = ev_operators[0].portfolio_strategies["EOM"]
+    assert isinstance(strategy, EVPortfolioStrategy)
+    assert strategy.background_load == pytest.approx(0.005)
+    if case == "constrained":
+        assert strategy.import_limit == pytest.approx(0.025)
+        assert strategy.export_limit == pytest.approx(0.025)
+    if case == "peak_price":
+        assert strategy.peak_price == pytest.approx(1000.0)
+    if case == "capacity_charge":
+        assert strategy.peak_price == pytest.approx(2000.0)
+        assert strategy.observed_peak == pytest.approx(0.02)
+
+
+def test_every_tariff_case_announces_the_full_day():
+    """A fee announced for fewer hours than the planning window is flat inside
+    each round, so it cannot reallocate load within one and the response is a
+    controller artefact. `tou_tariff_myopic` is the deliberate exception.
+
+    Also pins the shared background load: peaks are only comparable across cases
+    if every case sits behind the same connection.
+    """
+    import yaml
+
+    cases = yaml.safe_load(
+        open("examples/inputs/example_lv_tariff/config.yaml", encoding="utf-8")
+    )
+    announced = {}
+    for name, case in cases.items():
+        params = case.get("bidding_strategy_params", {})
+        assert params.get("ev_background_load_mw") == 0.005, name
+        # Every case plans over the same window, or the cases are not comparable.
+        assert params.get("ev_look_ahead_horizon") == "27h", name
+        tariff = case["markets_config"].get("GridTariff")
+        if tariff is not None:
+            product = tariff["products"][0]
+            announced[name] = product["count"]
+            # The announcement must reach the end of the planning window: any
+            # shortfall is served by the persisted value instead of a published
+            # fee, which is the defect `tou_tariff_myopic` exists to show.
+            if name != "tou_tariff_myopic":
+                reach = pd.Timedelta(product["first_delivery"]) + pd.Timedelta(
+                    hours=product["count"]
+                )
+                assert reach >= pd.Timedelta(params["ev_look_ahead_horizon"]), name
+
+    assert announced, "the scenario should still have tariff cases"
+    assert announced.pop("tou_tariff_myopic") == 1
+    assert announced and all(count == 24 for count in announced.values()), announced
+
+
+def test_announcement_frequency_ablation_differs_only_in_frequency():
+    """The daily-announcement case is an ablation, so it must differ from
+    `tou_tariff` in `opening_frequency` and in nothing else."""
+    import yaml
+
+    cases = yaml.safe_load(
+        open("examples/inputs/example_lv_tariff/config.yaml", encoding="utf-8")
+    )
+    hourly = cases["tou_tariff"]
+    daily = cases["tou_tariff_daily_announcement"]
+    assert hourly["bidding_strategy_params"] == daily["bidding_strategy_params"]
+    assert hourly["markets_config"]["EOM"] == daily["markets_config"]["EOM"]
+
+    a = dict(hourly["markets_config"]["GridTariff"])
+    b = dict(daily["markets_config"]["GridTariff"])
+    assert a.pop("opening_frequency") == "1h"
+    assert b.pop("opening_frequency") == "24h"
+    assert a == b

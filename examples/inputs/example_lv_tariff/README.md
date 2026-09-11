@@ -44,9 +44,16 @@ case's `bidding_strategy_params`:
 ```yaml
 bidding_strategy_params:
   ev_horizon_mode: rolling_horizon  # or perfect_foresight
-  ev_look_ahead_horizon: 48h
+  ev_look_ahead_horizon: 27h        # the strategy default is 48h; every study
+                                    # case in this scenario overrides it to 27h
+                                    # so the announced fee covers the window
   ev_terminal_soc: 0.6
 ```
+
+All study cases share one `&ev_defaults` block (`ev_look_ahead_horizon`,
+`ev_background_load_mw`) merged in with `<<: *ev_defaults`, so the fleet, the
+connection and the planning window are one physical setup throughout and the
+cases differ only in the mechanism being tested.
 
 Rolling mode replans at every opening. Perfect-foresight mode uses the remaining
 simulation horizon; its prices are still the supplied forecasts, so experiments
@@ -127,17 +134,56 @@ which is a myopic controller artefact, not a response to a known tariff. Under
 is foresighted: the same avoidance of the penalised hours, but at roughly half
 the peak and at no extra EOM cost (see the table below).
 
-Two constraints follow:
+**Every tariff study case therefore announces `count: 24`**, the way a day-ahead
+market publishes a whole day at once, and the EV operator plans over
+`ev_look_ahead_horizon: 27h` — exactly `first_delivery` (3h) + `count` (24h), so
+the announcement covers the planning window end to end and no hour of it falls
+back on the persisted value.
+
+Two constraints drive that arithmetic:
 
 - `look_ahead_horizon >= first_delivery + count`, otherwise the far products are
-  announced against a plan that does not exist yet. The operator strategy defaults to `48h`.
-- Anything beyond the announced range still persists the last published value.
-  To have the *whole* window announced, `count >= look_ahead - first_delivery`.
+  announced against a plan that does not exist yet.
+- Anything beyond the announced range persists the last published value, so for
+  the *whole* window to be announced you also need
+  `count >= look_ahead - first_delivery`.
 
-With `opening_frequency: 1h` and `count: 24` each delivery hour is announced 24
-times and the fee is overwritten each round (`accepted_price` is written by
-assignment). That is a rolling announcement and is self-consistent; use
-`opening_frequency: 24h` instead for a true once-a-day announcement.
+Both hold with equality at 27h / 3h / 24h. A 48h window with `count: 24` would
+satisfy the first and fail the second — the last 21 hours would carry a
+persisted value, which is the same defect as a short `count` moved to the other
+end of the window.
+
+Measured on the EV operator over the four-day run, same 30/280 EUR/MWh fee:
+
+| case | announcement | import in penalised hours | grid fee |
+|---|---|---|---|
+| `no_tariff` | — (reference) | 38.2 % | — |
+| `tou_tariff` | 24h, republished hourly | **11.5 %** | **18.61 EUR** |
+| `tou_tariff_daily_announcement` | 24h, published once a day | 25.2 % | 60.72 EUR |
+| `tou_tariff_myopic` | 1h, republished hourly | 32.3 % | 53.61 EUR |
+
+Read any `count: 1` result as a controller artefact rather than a tariff design.
+
+### Why hourly republication is the default
+
+`opening_frequency` is an ablation in its own right, and the result is not
+obvious. With `count: 24` republished **hourly**, the aggregator always holds a
+fee published for the next 24 hours, so its 27h window is always covered. With
+the same `count: 24` published **once a day**, the announced depth *decays
+through the day*: 26h just after the auction, about 3h just before the next one.
+The window is fully covered only immediately after an auction, and for most of
+the day the aggregator is again optimising against a persisted tail.
+
+That is why the daily case recovers less than half the response of the hourly one
+and pays over three times the fee. Covering a 27h window at all times from a
+once-a-day auction needs `count` near 48, not 24. Hourly is the default because
+it is the setting that keeps the fee current with the plan; the once-a-day case
+is kept as `tou_tariff_daily_announcement` so the cost of not doing so is
+measurable rather than assumed.
+
+Note this is a different question from the announcement-versus-realisation drift
+below: here the fee *schedule* is fully known and static, and the only thing
+varying is how much of it the aggregator can see at the moment it plans.
 
 ## Comparable EV experiment suite
 
@@ -159,9 +205,62 @@ remain the separate hourly market-announcement simulations.
 |---|---|---|
 | `no_tariff` | — | reference |
 | `flat_tariff` | one unlimited block at 30 EUR/MWh | plumbing reference. A flat fee applies to net withdrawal. With lossy V2G, a flat fee can also change arbitrage and total throughput; schedule invariance is not a general correctness test. |
-| `tou_tariff` | 30 EUR/MWh, +250 overnight, `count: 1` | the first case that can shift load - but myopically, see above |
-| `tou_tariff_day_ahead` | same fee, `count: 24` | the same fee announced across the planning horizon |
+| `tou_tariff` | 30 EUR/MWh, +250 overnight | the first case that can shift load, and it does: 11.5 % of import in the penalised hours against 38.2 % unpriced |
 | `capacity_tariff` | 0.012 MW at 30 EUR/MWh, the rest at 430 | the fee becomes a function of the announced aggregate withdrawal |
+| `tou_tariff_myopic` | same fee as `tou_tariff`, but `count: 1` | the deliberate contrast: the announcement is shorter than the planning horizon, so the response is a controller artefact |
+| `tou_tariff_daily_announcement` | same fee and `count: 24`, but `opening_frequency: 24h` | ablation on announcement *frequency*: published once a day instead of republished hourly |
+| `constrained` | — | the connection is physically limited: 0.025 MW rating, 0.005 MW of other load behind the same meter, so 0.020 MW is left for the fleet |
+| `peak_price` | — | 1000 EUR/MW on the single highest hour of the run, no free allowance, so the profile flattens |
+| `capacity_charge` | — | 2000 EUR/MW, but only above a 0.02 MW contracted capacity, so the profile sits flat just under the contract |
+| `independent` | — | the same six EVs, one owner each: no aggregation. The reference the aggregation benefit is measured against |
+
+The last four have no DSO and no `GridTariff` market — the limit or the charge
+is a property of the connection, not something cleared on a market, so it is set
+directly in `bidding_strategy_params`:
+
+```yaml
+bidding_strategy_params:
+  ev_import_limit_mw: 0.025       # the connection's own rating
+  ev_export_limit_mw: 0.025
+  ev_background_load_mw: 0.005    # other load behind the same meter
+  ev_peak_price: 1000.0           # EUR/MW on the peak hour of the run
+  ev_observed_peak_mw: 0.02       # free allowance: only the rise above it is charged
+```
+
+`ev_background_load_mw` is not an EV and is never dispatched, but it occupies the
+connection, so the limits, the grid fee and the capacity charge all see it. Quote
+the connection's real rating in the limits and put the other load here rather
+than netting it off by hand.
+
+**Every study case in this scenario declares the same 0.005 MW**, so the
+connection is one physical thing throughout and peaks are comparable across
+cases. It is not only a reporting quantity: in the tariff cases the fee falls on
+net *connection* import, so the background load makes the fee bite at the margin
+during hours the fleet would otherwise export itself down to zero net import,
+and the DSO bills the whole connection rather than the vehicles alone. In
+`no_tariff` and `independent`, where nothing prices or limits the connection, it
+provably cannot move a single MWh.
+
+`ev_peak_price` steers the schedule through the optimiser's objective, but no
+market settles it — the bill is computed in post-processing by
+`compare_study_cases.py`. The rate is EUR/MW **for these four days**, not an
+annual EUR/kW tariff.
+
+### Comparing the study cases
+
+`compare_study_cases.py` runs the study cases through `World.run()` and reduces
+the output to the same `summary.csv` / `connection.csv` shape `run_experiments.py`
+produces, so the two can be laid side by side:
+
+```bash
+python examples/inputs/example_lv_tariff/compare_study_cases.py
+python examples/inputs/example_lv_tariff/compare_study_cases.py \
+    --cases no_tariff independent constrained --reuse
+```
+
+It also reports `ex_post_peak`: the peak charge applied to `no_tariff` dispatch
+after the fact. That is a settlement of an existing case rather than a case of
+its own — being unanticipated, it cannot have changed anybody's behaviour.
 
 Rebuild the inputs with:
 
@@ -170,8 +269,10 @@ python examples/inputs/example_lv_tariff/generate_inputs.py
 ```
 
 `examples/examples.py` registers the cases as `lv_tariff_none`,
-`lv_tariff_flat`, `lv_tariff_tou` and `lv_tariff_capacity`; set `example` to one
-of them and run `python examples/examples.py`.
+`lv_tariff_flat`, `lv_tariff_tou`, `lv_tariff_tou_myopic`, `lv_tariff_tou_daily`,
+`lv_tariff_capacity`, `lv_tariff_constrained`, `lv_tariff_peak_price`,
+`lv_tariff_capacity_charge` and `lv_tariff_independent`; set `example` to one of
+them and run `python examples/examples.py`.
 
 ## Where the numbers are
 

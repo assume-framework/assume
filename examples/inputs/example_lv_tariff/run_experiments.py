@@ -2,10 +2,11 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-"""Controlled full-horizon EV dispatch experiments (no market clearing loop).
+"""Controlled EV dispatch experiments (no market clearing loop).
 
-Run from the repository root:
+Run from the repository root, either way:
     python -m examples.inputs.example_lv_tariff.run_experiments
+    python examples/inputs/example_lv_tariff/run_experiments.py
 """
 
 import argparse
@@ -19,6 +20,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yaml
+
+# Running the file by path puts this directory on sys.path instead of the
+# repository root, so `assume` is not importable.  Add the root rather than
+# making the caller remember PYTHONPATH.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from assume.scenario.loader_csv import load_config_and_create_forecaster, setup_world
 from assume.strategies.ev_aggregator import EVPortfolioStrategy
@@ -62,6 +69,11 @@ def validate(config):
                 raise ValueError(f"{key} must be finite/nonnegative")
     if any(not isinstance(h, int) or h < 0 or h > 23 for h in config["tou_hours"]):
         raise ValueError("tou_hours must contain integer hours 0..23")
+    if config["horizon_mode"] not in ("perfect_foresight", "rolling_horizon"):
+        raise ValueError("horizon_mode must be perfect_foresight or rolling_horizon")
+    for key in ("look_ahead_horizon", "rolling_step"):
+        if pd.Timedelta(config[key]) <= pd.Timedelta(0):
+            raise ValueError(f"{key} must be positive")
     if (
         not config["cases"]
         or set(config["cases"]) - CASES
@@ -71,6 +83,21 @@ def validate(config):
 
 
 def solve_groups(units, groups, index, config, case, fees):
+    """Solve one plan per portfolio over the full horizon.
+
+    ``horizon_mode`` chooses what the optimiser is allowed to see.  Under
+    ``perfect_foresight`` each portfolio is solved once over the whole run.
+    Under ``rolling_horizon`` it is re-solved every ``rolling_step`` over a
+    window of ``look_ahead_horizon`` and only the first step of each solve is
+    kept, which is how the study cases in ``config.yaml`` plan.  Same fleet,
+    same prices, same fees - only the foresight differs, so the two modes are
+    directly comparable and the gap between them is the cost of not knowing the
+    future.
+    """
+    mode = config["horizon_mode"]
+    look_ahead = pd.Timedelta(config["look_ahead_horizon"])
+    step = pd.Timedelta(config["rolling_step"])
+    end = index[-1] + index.freq
     plans = {}
     for members in groups.values():
         share = len(members) / len(units)
@@ -88,23 +115,72 @@ def solve_groups(units, groups, index, config, case, fees):
             ]
             if case == "capacity":
                 params["ev_observed_peak_mw"] = config["contracted_capacity_mw"] * share
-        strategy = EVPortfolioStrategy(ev_horizon_mode="perfect_foresight", **params)
-        plans.update(
-            strategy.optimize(
-                members,
-                index[0],
-                index[-1] + index.freq,
-                grid_fees=fees,
-                background_load=pd.Series(
-                    config["background_load_mw"] * share, index=index
-                ),
-            )
+        strategy = EVPortfolioStrategy(
+            ev_horizon_mode=mode,
+            ev_look_ahead_horizon=config["look_ahead_horizon"],
+            **params,
         )
+        background = pd.Series(config["background_load_mw"] * share, index=index)
+        if mode == "perfect_foresight":
+            plans.update(
+                strategy.optimize(
+                    members,
+                    index[0],
+                    end,
+                    grid_fees=fees,
+                    background_load=background,
+                )
+            )
+            continue
+        # Rolling: replan every `step`, commit the steps up to the next replan.
+        # The optimiser plans from each vehicle's realised energy, so the
+        # committed dispatch has to be written back before the next solve.
+        committed = {unit.id: {} for unit in members}
+        # A contracted capacity is already-paid-for headroom, so it is where the
+        # billed peak starts, not zero.
+        floor = float(params.get("ev_observed_peak_mw", 0.0))
+        # `index` here is a plain DatetimeIndex; the strategy wants the unit's
+        # own FastIndex, which is the one that slices by timestamp.
+        unit_index = members[0].index
+        for start in pd.date_range(index[0], end - index.freq, freq=step):
+            window = strategy._horizon_end(
+                members, unit_index, start, min(end, start + look_ahead)
+            )
+            plan = strategy.optimize(
+                members,
+                start,
+                window,
+                grid_fees=fees,
+                background_load=background,
+                observed_peak=floor,
+            )
+            keep = list(
+                pd.date_range(
+                    start, min(start + step, end) - index.freq, freq=index.freq
+                )
+            )
+            for unit in members:
+                for t in keep:
+                    power = float(plan[unit.id][t])
+                    committed[unit.id][t] = power
+                    # optimize() reads history back through energy_at(), which
+                    # follows outputs["energy"]; see ElectricVehicleUnit.
+                    unit.outputs["energy"].at[t] = power
+            withdrawal = sum(
+                -unit.outputs["energy"].loc[index[0] : keep[-1]] for unit in members
+            )
+            floor = max(floor, float(max(0.0, withdrawal.max() + background.iloc[0])))
+        plans.update(committed)
     return pd.DataFrame(plans, index=index)
 
 
 def run_suite(config, output_dir):
     """Write a self-contained run; refuse to mix it with an existing directory."""
+    # Configs written before the horizon switch existed could only ever have run
+    # under perfect foresight.
+    config.setdefault("horizon_mode", "perfect_foresight")
+    config.setdefault("look_ahead_horizon", "48h")
+    config.setdefault("rolling_step", "1h")
     validate(config)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=False)
@@ -217,7 +293,13 @@ def run_suite(config, output_dir):
         total_fee, total_energy_cost = 0.0, 0.0
         for op, members in case_groups.items():
             net = -plan[[u.id for u in members]].sum(axis=1)
-            imports, exports = net.clip(lower=0), (-net).clip(lower=0)
+            # The DSO meters the connection, not the vehicles: bill the grid fee
+            # and the capacity charge on the operator's share of the whole
+            # withdrawal, matching what EVPortfolioStrategy optimises against.
+            share = len(members) / len(units)
+            connection_net = net + config["background_load_mw"] * share
+            imports = connection_net.clip(lower=0)
+            exports = (-connection_net).clip(lower=0)
             peak = float(imports.max())
             energy_cost = float((net * prices).sum() * hours)
             volumetric = float((imports * fees).sum() * hours)
@@ -239,6 +321,7 @@ def run_suite(config, output_dir):
                     "operator": op,
                     "n_evs": len(members),
                     "peak_import_mw": peak,
+                    "ev_peak_import_mw": max(0.0, float(net.max())),
                     "import_mwh": imports.sum() * hours,
                     "export_mwh": exports.sum() * hours,
                     "energy_cost_eur": energy_cost,
@@ -308,7 +391,12 @@ def run_suite(config, output_dir):
         },
         "config": config,
         "input_sha256": hashes,
-        "mode": "full_horizon_fixed_forecast_dispatch",
+        "mode": (
+            "full_horizon_fixed_forecast_dispatch"
+            if config["horizon_mode"] == "perfect_foresight"
+            else "rolling_horizon_fixed_forecast_dispatch"
+        ),
+        "horizon_mode": config["horizon_mode"],
         "start": str(index[0]),
         "end_exclusive": str(index[-1] + index.freq),
         "baseline_energy_cost_eur": baseline_cost,
@@ -390,9 +478,29 @@ def main():
     )
     parser.add_argument("--n-evs", type=int)
     parser.add_argument("--n-aggregators", type=int)
+    parser.add_argument(
+        "--horizon-mode",
+        choices=("perfect_foresight", "rolling_horizon"),
+        help="What the optimiser may see. Use rolling_horizon to make these "
+        "numbers comparable with the config.yaml study cases, which roll.",
+    )
+    parser.add_argument(
+        "--look-ahead-horizon",
+        help="Planning window in rolling mode, e.g. 48h.",
+    )
+    parser.add_argument(
+        "--rolling-step",
+        help="How often the plan is redone in rolling mode, e.g. 1h.",
+    )
     args = parser.parse_args()
     config = yaml.safe_load(args.config.read_text())
-    for name in ("n_evs", "n_aggregators"):
+    for name in (
+        "n_evs",
+        "n_aggregators",
+        "horizon_mode",
+        "look_ahead_horizon",
+        "rolling_step",
+    ):
         if getattr(args, name) is not None:
             config[name] = getattr(args, name)
     result = run_suite(config, args.output_dir)

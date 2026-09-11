@@ -18,6 +18,13 @@ python -m examples.inputs.example_lv_tariff.run_experiments
 python -m examples.inputs.example_lv_tariff.run_experiments --n-evs 60 --n-aggregators 3
 ```
 
+Running the file by path works too; it puts the repository root on `sys.path`
+itself, so no `PYTHONPATH=.` is needed:
+
+```powershell
+python examples/inputs/example_lv_tariff/run_experiments.py
+```
+
 Configure all cases together in `experiments.yaml`. `--config PATH` selects a
 different configuration. `--output-dir examples/outputs/lv_ev_experiments/my_run`
 chooses a named run. An existing run directory is refused, so results cannot
@@ -31,6 +38,58 @@ The independent case always solves one portfolio per EV. `v2g: false` disables
 discharging for all cases. Battery sizes, charger ratings, trip consumption and
 dates are central constants in `generate_inputs.py`; change those there and,
 for date changes, keep the baseline dates in `config.yaml` aligned.
+
+## Foresight, and comparing with the study cases
+
+`horizon_mode` decides what the optimiser is allowed to see. `perfect_foresight`
+solves each portfolio once over the whole run; `rolling_horizon` replans every
+`rolling_step` over a `look_ahead_horizon` window and keeps only the steps up to
+the next replan, which is how the `config.yaml` study cases plan. Same fleet,
+same prices, same fees — only the foresight differs, so the gap between the two
+modes is the cost of not knowing the future.
+
+```powershell
+python examples/inputs/example_lv_tariff/run_experiments.py --horizon-mode rolling_horizon
+python examples/inputs/example_lv_tariff/run_experiments.py --horizon-mode rolling_horizon --look-ahead-horizon 24h --rolling-step 1h
+```
+
+Set them in `experiments.yaml` to make a run reproducible; the chosen mode is
+recorded in `manifest.json`. Configs written before the switch existed default
+to `perfect_foresight`, which is the only behaviour they could have had.
+
+Four of these cases now also exist as ordinary ASSUME study cases in
+`config.yaml`, with a real EOM clearing and real agent messaging instead of a
+direct call to `optimize()`:
+
+| harness case | study case | what differs |
+|---|---|---|
+| `independent` | `independent` | one unit operator per EV in both |
+| `constrained` | `constrained` | the study case names the connection rating and the background load separately rather than pre-allocating shares |
+| `peak` | `peak_price` | same 1000 EUR/MW on the run's peak hour |
+| `capacity` | `capacity_charge` | same 2000 EUR/MW above a 0.02 MW contract |
+
+Run the study-case side with `compare_study_cases.py`, which writes the same
+`summary.csv` / `connection.csv` shape. Under `--horizon-mode rolling_horizon`
+the two agree on the physical quantities — the connection peak of `peak_price`
+is 0.0088 MW either way — while the euro figures still differ, because the
+harness settles at the supplied forecast price and the simulation settles at the
+price the EOM actually cleared.
+
+### `dynamic` and `ex_post_peak`
+
+Neither becomes a study case, for the same underlying reason: both are defined
+against a frozen ex-ante baseline the harness computes for itself, which has no
+counterpart once prices are endogenous.
+
+- `dynamic` sets the fee from a no-fee baseline the DSO solves once and freezes.
+  In a live simulation the DSO does not need to guess: `capacity_tariff` already
+  prices the fee off the withdrawal the aggregators actually announced, which is
+  the endogenous version of the same idea and is a market mechanism rather than
+  a frozen forecast. Use `capacity_tariff` as the live counterpart.
+- `ex_post_peak` is unanticipated by construction, so it cannot change
+  behaviour. That makes it a *settlement* of `no_tariff` dispatch, not a case
+  with a scenario of its own, and `compare_study_cases.py` reports it that way —
+  the `no_tariff` run billed at the `peak_price` rate.
 
 The original scenario generator also accepts `--n-evs`, `--seed` and
 `--output-dir`, so fleet growth can be used in the existing market simulations.
@@ -59,7 +118,11 @@ Volumetric grid fees apply to positive net import **at each aggregator meter**;
 exports earn energy revenue but receive no grid-fee credit. Charging by one EV
 can net against V2G from another in the same portfolio. Separate aggregators
 are billed separately. Background consumption contributes to connection loading
-and dynamic fee design, but is not part of EV energy bills or aggregator peaks.
+and dynamic fee design, and — since the fee and the capacity charge are billed on
+the whole connection, which is what the DSO meters — it is also part of the
+volumetric fee and of the aggregator peak. It is *not* part of the EV energy
+bill, which settles only what the vehicles drew on the EOM. The `config.yaml`
+study cases follow the same convention through `ev_background_load_mw`.
 
 Peak rates are EUR/MW **for the entire four-day experiment**, not annual rates.
 Do not compare them with annual EUR/kW tariffs without converting both unit and

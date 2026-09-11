@@ -4,6 +4,12 @@ n_evs: 6
 n_aggregators: 1
 seed: 42
 v2g: true
+# What the optimiser may see. perfect_foresight solves the whole run at once;
+# rolling_horizon replans every rolling_step over a look_ahead_horizon window,
+# which is how the config.yaml study cases plan. Use it to compare the two.
+horizon_mode: perfect_foresight
+look_ahead_horizon: 48h
+rolling_step: 1h
 connection_import_limit_mw: 0.025
 connection_export_limit_mw: 0.025
 background_load_mw: 0.005

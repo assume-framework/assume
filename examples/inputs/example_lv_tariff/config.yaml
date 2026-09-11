@@ -23,6 +23,23 @@ no_tariff:
   residential_dsm_units: null
   electric_vehicle_units: electric_vehicle_units.csv
 
+  # Shared by every study case through `<<: *ev_defaults`, so the fleet, the
+  # connection and the planning window are one physical setup throughout and the
+  # cases differ only in the mechanism being tested.
+  bidding_strategy_params: &ev_defaults
+    # 27h = the GridTariff's first_delivery (3h) + count (24h), so the announced
+    # fee covers the planning window end to end. At the previous 48h default the
+    # last 21 hours of every window carried a persisted value instead of a
+    # published one, which is the same defect as a short `count` - just moved to
+    # the other end. Non-tariff cases keep 27h too: a case that plans over a
+    # different horizon is not comparable with one that does not.
+    ev_look_ahead_horizon: 27h
+    # The other load behind the same meter. In *this* case nothing prices or
+    # limits the connection, so it cannot move a single MWh; it is a reporting
+    # quantity that keeps the peak comparable. In the tariff and capacity cases
+    # below it does change the schedule.
+    ev_background_load_mw: 0.005
+
   markets_config:
     EOM: &eom
       operator: eom_operator
@@ -56,6 +73,7 @@ flat_tariff:
     update_price: price_plus_grid_fee
 
   bidding_strategy_params:
+    <<: *ev_defaults
     grid_fee_base: 30.0
 
   markets_config:
@@ -66,8 +84,25 @@ flat_tariff:
                                     # would otherwise land in energy dispatch
       products:
         - duration: 1h
-          count: 1
+          # 24 hourly products per round (T+3 .. T+26), the way a day-ahead
+          # market publishes a whole day at once. This is the default for every
+          # tariff case on purpose: with `count: 1` only about three hours are
+          # announced and the rest of the planning window persists a single
+          # repeated value, so the fee is flat inside every round and cannot
+          # reallocate anything within it. What moved the dispatch then was the
+          # fee *level* changing between rounds - a myopic controller artefact,
+          # not a response to a known tariff. See `tou_tariff_myopic`.
+          #
+          # 3h + 24h = the 27h `ev_look_ahead_horizon` above, exactly. The
+          # announcement then covers the planning window end to end: no hour of
+          # it falls back on the persisted value.
+          count: 24
           first_delivery: 3h
+      # Rolling announcement: every hour the DSO republishes the next 24, so each
+      # delivery hour is announced 24 times and overwritten each round. A real
+      # day-ahead auction publishes once a day instead - see
+      # `tou_tariff_daily_announcement` for that ablation. Hourly is the default
+      # because it is the one that keeps the fee current with the plan.
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
@@ -98,6 +133,7 @@ tou_tariff:
     update_price: price_plus_grid_fee
 
   bidding_strategy_params:
+    <<: *ev_defaults
     grid_fee_base: 30.0
     grid_fee_peak_adder: 250.0
     grid_fee_peak_hours: "23,0,1,2,3,4,5,6"
@@ -124,6 +160,7 @@ capacity_tariff:
     update_price: price_plus_grid_fee
 
   bidding_strategy_params:
+    <<: *ev_defaults
     grid_fee_base: 30.0
     # one EV charges at 0.011 MW, so anything above a single charger pays the
     # scarcity price - the fleet peak is 6 x 0.011 = 0.066 MW
@@ -135,16 +172,18 @@ capacity_tariff:
     GridTariff: *grid_tariff
 
 # ---------------------------------------------------------------------------
-# The same time-of-use fee, but announced 24 hours at a time instead of one.
-# Each GridTariff round now clears 24 hourly products (T+3 .. T+26), so the
-# aggregator's whole planning horizon carries published fees rather than one
-# persisted value. This is what makes the response to the tariff foresighted
-# rather than myopic - compare the two cases.
+# The same time-of-use fee, but announced one hour at a time instead of a whole
+# day. Only about three hours of each planning window then carry a published
+# fee; the rest persists the most recently published value, so the fee is flat
+# inside every round and cannot reallocate load within it. The dispatch still
+# moves, but only because the fee *level* differs between rounds - that is the
+# controller reacting to its own myopia, not a response to a known tariff.
 #
-# Requires look_ahead_horizon >= first_delivery + count (48h by default in the operator strategy),
-# otherwise the far products are announced against a plan that does not exist.
+# Kept as the explicit contrast to `tou_tariff`, which announces the full 24h.
+# Do not read this case as a tariff design; read it as what goes wrong when the
+# announcement is shorter than the planning horizon.
 # ---------------------------------------------------------------------------
-tou_tariff_day_ahead:
+tou_tariff_myopic:
   start_date: 2019-03-01 00:00
   end_date: 2019-03-05 00:00
   time_step: 1h
@@ -156,6 +195,7 @@ tou_tariff_day_ahead:
     update_price: price_plus_grid_fee
 
   bidding_strategy_params:
+    <<: *ev_defaults
     grid_fee_base: 30.0
     grid_fee_peak_adder: 250.0
     grid_fee_peak_hours: "23,0,1,2,3,4,5,6"
@@ -166,5 +206,152 @@ tou_tariff_day_ahead:
       <<: *grid_tariff
       products:
         - duration: 1h
-          count: 24
+          count: 1
           first_delivery: 3h
+
+# ---------------------------------------------------------------------------
+# Ablation on the announcement *frequency*, not its length. Same 24h time-of-use
+# fee as `tou_tariff`, but published once a day instead of every hour.
+#
+# `tou_tariff` reopens hourly, so a delivery hour is announced 24 times and the
+# fee is overwritten each round - the aggregator always holds a fee computed
+# against a plan close to the one it is about to dispatch. Here the DSO opens
+# once every 24h, so the fee for a whole day is fixed by one round and then left
+# alone, which is what an actual day-ahead auction does.
+#
+# What this isolates: whether the aggregator's response depends on the fee being
+# continuously refreshed. If the two cases agree, the hourly republication is
+# harmless bookkeeping; if they diverge, the hourly case is partly measuring the
+# DSO chasing the aggregator's own plan.
+#
+# The first three hours of the run are never announced (the first round opens at
+# 00:00 and delivers from 03:00), so they fall back on the persisted default.
+# ---------------------------------------------------------------------------
+tou_tariff_daily_announcement:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  residential_dsm_units: null
+  electric_vehicle_units: electric_vehicle_units.csv
+
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+
+  bidding_strategy_params:
+    <<: *ev_defaults
+    grid_fee_base: 30.0
+    grid_fee_peak_adder: 250.0
+    grid_fee_peak_hours: "23,0,1,2,3,4,5,6"
+
+  markets_config:
+    EOM: *eom
+    GridTariff:
+      <<: *grid_tariff
+      opening_frequency: 24h
+
+# ---------------------------------------------------------------------------
+# The connection is physically limited. No fee at all - the aggregator simply
+# may not draw more than the transformer can carry, and may not push more back.
+#
+# `ev_background_load_mw` is the other load behind the same meter (lighting,
+# heat pumps, whatever is not an EV). It is never dispatched, but it occupies
+# the connection, so quote the connection's own rating in the two limits and
+# leave the arithmetic to the optimiser.
+#
+# Six EVs charging together want 6 x 0.011 = 0.066 MW; `no_tariff` peaks around
+# 0.044 MW. A 0.025 MW connection carrying 0.005 MW of other load leaves 0.020 MW
+# for the fleet, so the limit binds and charging has to be spread out.
+# Compare the peak and the energy cost against `no_tariff`.
+# ---------------------------------------------------------------------------
+constrained:
+  unit_operators: unit_operators_no_tariff.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  residential_dsm_units: null
+  electric_vehicle_units: electric_vehicle_units.csv
+
+  bidding_strategy_params:
+    <<: *ev_defaults
+    ev_import_limit_mw: 0.025
+    ev_export_limit_mw: 0.025
+
+  markets_config:
+    EOM: *eom
+
+# ---------------------------------------------------------------------------
+# A capacity charge on the single highest hour of the whole run: every MW on
+# that one hour costs `ev_peak_price`, so the aggregator flattens its profile
+# even into more expensive hours. There is no free allowance and no threshold -
+# the first MW is charged at the same rate as the last.
+#
+# The rate is EUR/MW *for these four days*, not an annual EUR/kW tariff.
+# The charge steers the schedule here; the bill itself is computed in
+# post-processing by compare_study_cases.py, since no market settles it.
+# ---------------------------------------------------------------------------
+peak_price:
+  unit_operators: unit_operators_no_tariff.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  residential_dsm_units: null
+  electric_vehicle_units: electric_vehicle_units.csv
+
+  bidding_strategy_params:
+    <<: *ev_defaults
+    ev_peak_price: 1000.0
+
+  markets_config:
+    EOM: *eom
+
+# ---------------------------------------------------------------------------
+# The same charge, but only on what exceeds a contracted capacity: the first
+# 0.02 MW is already paid for, and anything above it costs `ev_peak_price`.
+# `ev_observed_peak_mw` is that free allowance - the strategy prices only the
+# rise above it, which is exactly how a contracted-capacity charge works.
+#
+# Expect a profile that sits flat just under the contract rather than one that
+# is flattened over the whole run: below the contract the charge is indifferent.
+# ---------------------------------------------------------------------------
+capacity_charge:
+  unit_operators: unit_operators_no_tariff.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  residential_dsm_units: null
+  electric_vehicle_units: electric_vehicle_units.csv
+
+  bidding_strategy_params:
+    <<: *ev_defaults
+    ev_peak_price: 2000.0
+    ev_observed_peak_mw: 0.02
+
+  markets_config:
+    EOM: *eom
+
+# ---------------------------------------------------------------------------
+# The same six vehicles and the same market, but each one belongs to its own
+# owner, so every portfolio has exactly one car and there is nothing to
+# aggregate. This is the reference the aggregation benefit is measured against:
+# run it against `no_tariff` and the difference is what coordination buys.
+#
+# Only the two CSVs change; the strategy, the fleet and the prices are identical.
+# ---------------------------------------------------------------------------
+independent:
+  unit_operators: unit_operators_independent.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  residential_dsm_units: null
+  electric_vehicle_units: electric_vehicle_units_independent.csv
+
+  bidding_strategy_params:
+    <<: *ev_defaults
+
+  markets_config:
+    EOM: *eom

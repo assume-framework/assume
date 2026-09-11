@@ -113,13 +113,39 @@ available_examples = {
     "lv_tariff_none": {"scenario": "example_lv_tariff", "study_case": "no_tariff"},
     "lv_tariff_flat": {"scenario": "example_lv_tariff", "study_case": "flat_tariff"},
     "lv_tariff_tou": {"scenario": "example_lv_tariff", "study_case": "tou_tariff"},
-    "lv_tariff_tou_day_ahead": {
+    # the contrast to lv_tariff_tou: the same fee announced one hour at a time
+    # instead of a full day, so the planning window carries a persisted value
+    "lv_tariff_tou_myopic": {
         "scenario": "example_lv_tariff",
-        "study_case": "tou_tariff_day_ahead",
+        "study_case": "tou_tariff_myopic",
+    },
+    # ablation on announcement frequency: the same 24h fee published once a day
+    # instead of republished every hour
+    "lv_tariff_tou_daily": {
+        "scenario": "example_lv_tariff",
+        "study_case": "tou_tariff_daily_announcement",
     },
     "lv_tariff_capacity": {
         "scenario": "example_lv_tariff",
         "study_case": "capacity_tariff",
+    },
+    # the same fleet against a physical connection limit and two capacity
+    # charges, plus the un-aggregated reference
+    "lv_tariff_constrained": {
+        "scenario": "example_lv_tariff",
+        "study_case": "constrained",
+    },
+    "lv_tariff_peak_price": {
+        "scenario": "example_lv_tariff",
+        "study_case": "peak_price",
+    },
+    "lv_tariff_capacity_charge": {
+        "scenario": "example_lv_tariff",
+        "study_case": "capacity_charge",
+    },
+    "lv_tariff_independent": {
+        "scenario": "example_lv_tariff",
+        "study_case": "independent",
     },
 }
 

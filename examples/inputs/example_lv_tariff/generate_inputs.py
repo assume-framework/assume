@@ -213,6 +213,28 @@ def generate(output_dir=HERE, n_evs=N_EVS, seed=42):
             }
         )
     write("electric_vehicle_units.csv", pd.DataFrame(rows).set_index("name"))
+
+    # The same fleet, but every EV is owned by its own operator, so each one is a
+    # portfolio of one and there is nothing to aggregate.  This is the reference
+    # the aggregation benefit is measured against; see the `independent` study
+    # case in config.yaml.
+    solo = [dict(row, unit_operator=f"owner_{i}") for i, row in enumerate(rows)]
+    write(
+        "electric_vehicle_units_independent.csv",
+        pd.DataFrame(solo).set_index("name"),
+    )
+    # EOM only, like unit_operators_no_tariff.csv: an operator may not name a
+    # market the study case does not create.  Add a bidding_GridTariff column of
+    # "units_operator_ev" to pair independent owners with a tariff case.
+    write(
+        "unit_operators_independent.csv",
+        pd.DataFrame(
+            [
+                {"name": f"owner_{i}", "bidding_EOM": "units_operator_ev"}
+                for i in range(n_evs)
+            ]
+        ).set_index("name"),
+    )
     write(
         "unit_operators_no_tariff.csv",
         pd.DataFrame(
