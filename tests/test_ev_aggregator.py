@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -633,6 +634,10 @@ def test_every_tariff_case_announces_the_full_day():
 
     Also pins the shared background load: peaks are only comparable across cases
     if every case sits behind the same connection.
+
+    Building cases are scheduled by `Building` rather than `EVPortfolioStrategy`
+    and express both quantities elsewhere, so they are checked against the same
+    numbers through their own inputs by the test below.
     """
     import yaml
 
@@ -641,6 +646,8 @@ def test_every_tariff_case_announces_the_full_day():
     )
     announced = {}
     for name, case in cases.items():
+        if case.get("residential_dsm_units"):
+            continue
         params = case.get("bidding_strategy_params", {})
         assert params.get("ev_background_load_mw") == 0.005, name
         # Every case plans over the same window, or the cases are not comparable.
@@ -661,6 +668,69 @@ def test_every_tariff_case_announces_the_full_day():
     assert announced, "the scenario should still have tariff cases"
     assert announced.pop("tou_tariff_myopic") == 1
     assert announced and all(count == 24 for count in announced.values()), announced
+
+
+def test_building_cases_share_the_connection_and_the_planning_window():
+    """The building comparison is only a comparison if both paths sit behind the
+    same connection and plan over the same window.
+
+    The EV cases say so in `bidding_strategy_params`; the building says it in two
+    other places entirely -- its inflexible demand is a forecast column and its
+    look-ahead is a column in residential_dsm_units.csv -- so the same two
+    numbers have to be pinned there, or the two paths quietly drift apart and the
+    run measures the drift.
+    """
+    import yaml
+
+    root = Path("examples/inputs/example_lv_tariff")
+    cases = yaml.safe_load((root / "config.yaml").read_text(encoding="utf-8"))
+    building_cases = {
+        name: case for name, case in cases.items() if case.get("residential_dsm_units")
+    }
+    assert building_cases, "the scenario should still have building cases"
+
+    forecasts = pd.read_csv(root / "forecasts_df.csv", index_col=0)
+    for name, case in building_cases.items():
+        units = pd.read_csv(root / case["residential_dsm_units"])
+        building = units.name.dropna().iloc[0]
+        # Same 27h planning window as ev_look_ahead_horizon above.
+        assert units.look_ahead_horizon.dropna().iloc[0] == "27h", name
+        # Same 0.005 MW of other load behind the same meter as
+        # ev_background_load_mw above, expressed as the building's own demand.
+        load = forecasts[f"{building}_load_profile"]
+        assert (load == 0.005).all(), name
+        # A building case must not also carry EV units, or the fleet is doubled.
+        assert case.get("electric_vehicle_units") is None, name
+
+        # The building's vehicles are the standalone fleet, component for
+        # component; a comparison of two different fleets measures nothing.
+        evs = pd.read_csv(root / "electric_vehicle_units.csv", index_col=0)
+        components = units[units.technology.astype(str).str.startswith("electric_")]
+        components = components.set_index(
+            components.technology.str.removeprefix("electric_vehicle_")
+        )
+        assert sorted(components.index) == sorted(evs.index), name
+        for field in (
+            "capacity",
+            "min_soc",
+            "max_soc",
+            "initial_soc",
+            "max_power_charge",
+            "max_power_discharge",
+            "efficiency_charge",
+            "efficiency_discharge",
+        ):
+            left = evs[field].abs().round(9)
+            assert left.equals(components[field].abs().round(9).reindex(left.index)), (
+                f"{name}: {field}"
+            )
+        # ...driven by the same profiles, written twice under two naming schemes.
+        for ev in evs.index:
+            for kind in ("availability_profile", "trip_energy_consumption"):
+                mirror = f"{building}_electric_vehicle_{ev}_{kind}"
+                assert forecasts[f"{ev}_{kind}"].equals(forecasts[mirror]), (
+                    f"{name}: {mirror}"
+                )
 
 
 def test_announcement_frequency_ablation_differs_only_in_frequency():

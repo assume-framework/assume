@@ -355,3 +355,216 @@ independent:
 
   markets_config:
     EOM: *eom
+
+# ---------------------------------------------------------------------------
+# The Building comparison.
+#
+# The four cases below pair off against `no_tariff` and `tou_tariff` to answer
+# one question: does one MILP over a multi-asset `Building` schedule the same
+# six vehicles the same way a portfolio MILP over six independent
+# `ElectricVehicleUnit`s does?
+#
+# The building holds the same fleet as `dst_components.ElectricVehicle`
+# components (residential_dsm_units.csv: 0.03 MWh, 0.2-1.0 SOC, 0.6 initial,
+# +-0.011 MW, 0.95/0.95, the same availability and trip-energy profiles), so the
+# physics is matched. Two things are not, and they are why the `*_no_export`
+# cases exist:
+#
+#   * `is_prosumer: No` puts `total_power_input[t] >= 0` on the building, i.e. a
+#     hard zero-export limit at the connection. `ev_export_limit_mw: 0.0` is the
+#     same constraint on the EV portfolio. Without it the aggregator is simply
+#     allowed to do something the building cannot, and the comparison measures
+#     the export permission rather than the aggregation.
+#   * `look_ahead_horizon` is 27h on both sides (the CSV was aligned from 48h).
+#
+# What still differs is in the models themselves and cannot be configured away:
+# the building has no terminal-SOC target and treats driving demand as a hard
+# constraint, where `EVPortfolioStrategy` targets the initial SOC at a horizon
+# end it extends to be feasible for every vehicle, and degrades through a
+# penalised slack. See EV_AGGREGATOR_TODO.md section 2.
+# ---------------------------------------------------------------------------
+building_no_tariff:
+  unit_operators: null            # no portfolio strategy: the building bids itself
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  electric_vehicle_units: null    # the same six vehicles, as building components
+  residential_dsm_units: residential_dsm_units.csv
+
+  markets_config:
+    EOM: *eom
+
+# The EV portfolio held to the building's zero-export connection, so the two
+# differ only in how the fleet is optimised.
+no_tariff_no_export:
+  unit_operators: unit_operators_no_tariff.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  residential_dsm_units: null
+  electric_vehicle_units: electric_vehicle_units.csv
+
+  bidding_strategy_params:
+    <<: *ev_defaults
+    ev_export_limit_mw: 0.0
+
+  markets_config:
+    EOM: *eom
+
+# ---------------------------------------------------------------------------
+# The same pair under the reference tariff. The building reads the announced fee
+# through `price_plus_grid_fee`, which folds it into `electricity_price` and so
+# applies it symmetrically to import and export; with `is_prosumer: No` the
+# building cannot export, so the symmetry is masked rather than fixed.
+# ---------------------------------------------------------------------------
+building_tou_tariff:
+  unit_operators: null
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  electric_vehicle_units: null
+  residential_dsm_units: residential_dsm_units.csv
+
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+
+  bidding_strategy_params:
+    grid_fee_base: 30.0
+    grid_fee_peak_adder: 250.0
+    grid_fee_peak_hours: "23,0,1,2,3,4,5,6"
+
+  markets_config:
+    EOM: *eom
+    GridTariff: *grid_tariff
+
+tou_tariff_no_export:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  residential_dsm_units: null
+  electric_vehicle_units: electric_vehicle_units.csv
+
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+
+  bidding_strategy_params:
+    <<: *ev_defaults
+    grid_fee_base: 30.0
+    grid_fee_peak_adder: 250.0
+    grid_fee_peak_hours: "23,0,1,2,3,4,5,6"
+    ev_export_limit_mw: 0.0
+
+  markets_config:
+    EOM: *eom
+    GridTariff: *grid_tariff
+
+# ---------------------------------------------------------------------------
+# The same building allowed to export (`is_prosumer: Yes`), so the V2G the EV
+# aggregator does in `no_tariff` is at least expressible. Two things are being
+# checked here, both of them about the Building path rather than about tariff
+# design:
+#
+#   * `Building.define_constraints` writes `variable_cost[t] == total_power_input[t]
+#     * electricity_price[t]`, and `price_plus_grid_fee` folds the announced fee
+#     into `electricity_price`. The fee is therefore *symmetric*: an exporting
+#     building is credited it. That is the defect EVPortfolioStrategy was moved
+#     off; `is_prosumer: No` masks it rather than fixing it, so this case is
+#     what makes it visible. Run it against `building_tou_tariff_prosumer`.
+#   * `DsmEnergyOptimizationStrategy` bids every hour at price 3000, whatever
+#     the sign of the volume. An exporting building therefore offers *supply* at
+#     the market cap, which cannot clear. Compare the planned dispatch against
+#     the accepted volumes before reading anything else from this case.
+# ---------------------------------------------------------------------------
+building_no_tariff_prosumer:
+  unit_operators: null
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  electric_vehicle_units: null
+  residential_dsm_units: residential_dsm_units_prosumer.csv
+
+  markets_config:
+    EOM: *eom
+
+building_tou_tariff_prosumer:
+  unit_operators: null
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  electric_vehicle_units: null
+  residential_dsm_units: residential_dsm_units_prosumer.csv
+
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+
+  bidding_strategy_params:
+    grid_fee_base: 30.0
+    grid_fee_peak_adder: 250.0
+    grid_fee_peak_hours: "23,0,1,2,3,4,5,6"
+
+  markets_config:
+    EOM: *eom
+    GridTariff: *grid_tariff
+
+# ---------------------------------------------------------------------------
+# Ablation isolating the terminal-SOC target, which is the largest remaining
+# modelling difference between the two optimisers once export is matched.
+#
+# `EVPortfolioStrategy` targets each vehicle's initial SOC at the end of every
+# planning window; the Building MILP has no terminal-SOC term at all, so energy
+# left in a battery is worth exactly zero to it and every window ends by
+# emptying the fleet. `ev_terminal_soc: 0.2` is `min_soc`, i.e. the EV portfolio
+# asked to value end-of-window energy the way the building does.
+#
+# Pair each against its `building_*` twin. If the two then agree hour by hour,
+# the terminal-SOC term is the whole remaining gap and adding one to the
+# Building path would close it. If they still diverge, the rest is the horizon
+# end (`_horizon_end` extends the window to one that is feasible for every
+# vehicle; the building always takes a flat 27 steps) and solver tie-breaking on
+# a degenerate optimal face.
+# ---------------------------------------------------------------------------
+no_tariff_no_export_drain:
+  unit_operators: unit_operators_no_tariff.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  residential_dsm_units: null
+  electric_vehicle_units: electric_vehicle_units.csv
+
+  bidding_strategy_params:
+    <<: *ev_defaults
+    ev_export_limit_mw: 0.0
+    ev_terminal_soc: 0.2
+
+  markets_config:
+    EOM: *eom
+
+tou_tariff_no_export_drain:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-05 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  residential_dsm_units: null
+  electric_vehicle_units: electric_vehicle_units.csv
+
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+
+  bidding_strategy_params:
+    <<: *ev_defaults
+    grid_fee_base: 30.0
+    grid_fee_peak_adder: 250.0
+    grid_fee_peak_hours: "23,0,1,2,3,4,5,6"
+    ev_export_limit_mw: 0.0
+    ev_terminal_soc: 0.2
+
+  markets_config:
+    EOM: *eom
+    GridTariff: *grid_tariff

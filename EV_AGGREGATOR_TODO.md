@@ -42,9 +42,12 @@ announces `count: 24` except the named myopic one; the announcement reaches the
 end of the planning window; the frequency ablation differs from `tou_tariff` in
 exactly one key.
 
-**Next session starts at section 2** (the Building comparison), which is
-untouched and still says "do not implement yet". Section 3 holds the smaller
-loose ends.
+Section 2 is **done** as well: the Building comparison has been run, and the
+two optimisers agree to within 3 % on cost and 2 % on peak once export and
+terminal energy are matched. It left one open defect behind -- exports from a
+`Building` are bid as supply at the price cap and never clear -- which blocks
+the V2G half of that comparison. **Next session starts there, or at section 3**,
+which holds the smaller loose ends.
 
 ---
 
@@ -267,42 +270,137 @@ Follow-up the frequency ablation surfaced:
       as "daily announcement is worse" rather than "a 24-product daily
       announcement leaves a persisted tail for most of the day".
 
-### 2. Compare against the Building class as aggregator
+### 2. ~~Compare against the Building class as aggregator~~ — done
 
-The scaffolding already exists and is simply switched off:
-`examples/inputs/example_lv_tariff/residential_dsm_units.csv` defines a single
-`building` unit named `aggregator` holding six `electric_vehicle` components whose
-parameters match the standalone EVs exactly (0.03 MWh, 0.2-1.0 SOC, 0.6 initial,
-±0.011 MW, 0.95/0.95). Both strategies are registered
-(`household_energy_optimization`, `household_grid_fee_announcement`). Every study
-case in `config.yaml` currently sets `residential_dsm_units: null`.
+Four study cases pair the Building MILP against the portfolio MILP on the same
+six vehicles, and `compare_study_cases.py` runs both paths into one summary.
+Written up in full in EXPERIMENTS.md ("The Building comparison"); the headline:
 
-This is the substantive comparison: **one MILP over a multi-asset building
-(`Building` + `dst_components.ElectricVehicle`, a `GenericStorage` subclass)
-versus a portfolio MILP over independent `ElectricVehicleUnit`s.** Do not
-implement yet.
+```bash
+python examples/inputs/example_lv_tariff/compare_study_cases.py --cases \
+    no_tariff no_tariff_no_export building_no_tariff \
+    tou_tariff tou_tariff_no_export building_tou_tariff
+```
 
-- [ ] Enable `residential_dsm_units` in a parallel set of study cases and confirm
-      the Building path runs against the same EOM and GridTariff markets.
-- [ ] Check the two EV models are actually equivalent before comparing anything:
-      `dst_components.ElectricVehicle` uses `external_trip_distance` and an
-      optional predefined charging profile, where `ElectricVehicleUnit` takes
-      battery-side MWh per step. Establish the mapping, or the comparison measures
-      the input conversion rather than the aggregation.
-- [ ] Confirm the Building MILP also has the non-simultaneity binary and that its
-      objective treats the grid fee asymmetrically. `Building` reads the tariff via
-      `price_plus_grid_fee`, i.e. the **symmetric** path this work just moved the
-      EV strategy off — so a bidirectional building may currently earn the same
-      spurious V2G fee credit. Verify before drawing conclusions; if confirmed it
-      is a genuine defect in the Building path, not just a comparability nuisance.
-- [ ] Align the horizon settings: the CSV sets `horizon_mode: rolling_horizon`,
-      `look_ahead_horizon: 48h`, `commit_horizon: 1h`, `rolling_step: 1h`, which
-      matches `EVPortfolioStrategy`'s defaults — confirm they stay matched.
-- [ ] Decide how the building's connection limit and capacity charge are expressed,
-      since `ev_import_limit_mw` / `ev_peak_price` are portfolio-strategy
-      parameters with no Building equivalent.
-- [ ] Report both against the same metrics: total cost, connection peak, overload
-      hours, unserved driving energy, and solve time.
+**The two optimisers agree on the answer and disagree on the route to it.**
+Once export is matched and terminal energy is priced, total cost differs by 3 %
+without a tariff and 2.5 % with one, and the connection peak by under 2 %. Hour
+by hour the connection profiles correlate at only 0.50 and 0.61, and differ by
+up to 31 kW and 54 kW on connections peaking at 35 kW and 70 kW.
+
+| | `no_tariff_no_export` | `building_no_tariff` | `tou_tariff` | `building_tou_tariff` |
+|---|---|---|---|---|
+| total cost, EUR | 4.15 | 2.57 | 24.18 | 19.48 |
+| **at equal terminal energy** | **4.94** | **4.79** | **23.87** | **23.29** |
+| connection peak, MW | 0.0356 | 0.0353 | 0.0710 | 0.0695 |
+| import in 280 EUR/MWh hours | -- | -- | 0.0 % | 0.0 % |
+| mean terminal SOC | 0.458 | 0.200 | 0.629 | 0.229 |
+| unserved driving, MWh | 0.0 | 0.0 | 0.0 | 0.0 |
+| run wall clock, s | ~9 | ~16 | ~18 | ~19 |
+
+- [x] **The Building path runs against the same EOM and GridTariff markets.**
+      `building_no_tariff` and `building_tou_tariff` set
+      `residential_dsm_units: residential_dsm_units.csv`,
+      `electric_vehicle_units: null` and `unit_operators: null` (no portfolio
+      strategy). `generate_inputs.py` now also writes the building's component
+      profiles and its `aggregator_load_profile`, which is the same 0.005 MW
+      the EV cases declare as `ev_background_load_mw`.
+- [x] **The two EV models are equivalent, and it is now checked rather than
+      assumed.** `dst_components.ElectricVehicle` takes
+      `external_trip_energy_consumption` as well as `external_trip_distance`,
+      and that mode is battery-side energy per step exactly as
+      `ElectricVehicleUnit` wants it, so the mapping is the identity -- no
+      mileage conversion anywhere. `compare_study_cases.fleet()` compares every
+      battery parameter across the two CSVs and `profiles()` compares the two
+      copies of each availability/trip series; either raises rather than
+      reporting a difference that is about the inputs. The `ramp_up`/`ramp_down`
+      columns on the building's components equal its max power, so they never
+      bind -- which is what makes the EV unit's refusal to model ramps
+      equivalent rather than merely different.
+- [x] **The binary is there; the fee asymmetry is real and now demonstrated.**
+      `dst_components.ElectricVehicle` carries the same non-simultaneity binary
+      (`status`, with `charge <= max_power_charge * status` and
+      `discharge <= max_power_discharge * (1 - status)`), and no solved schedule
+      charges and discharges a vehicle at once (0 of 570 vehicle-steps). The fee
+      is a genuine defect: `variable_cost[t] == total_power_input[t] *
+      electricity_price[t]` with the fee folded in by `price_plus_grid_fee` is
+      symmetric, and `building_tou_tariff_prosumer` plans export in 32 hours,
+      23 of them at 280 EUR/MWh, with 111.58 EUR of fee credited to 0.571 MWh
+      of export. `is_prosumer: No` masks it; it does not fix it.
+- [x] **Horizons aligned.** The CSV's `look_ahead_horizon` went from 48h to the
+      scenario's 27h; `commit_horizon` and `rolling_step` were already 1h, which
+      is how `EVPortfolioStrategy` replans.
+- [x] **The connection limit and capacity charge have no Building equivalent,
+      and none was invented.** `ev_import_limit_mw`, `ev_export_limit_mw`,
+      `ev_peak_price` and `ev_observed_peak_mw` are portfolio-strategy
+      parameters. The building's only connection constraint is the binary
+      `is_prosumer` (`total_power_input >= 0`) and it has no peak term at all,
+      so `constrained`, `peak_price` and `capacity_charge` have no counterpart.
+      Giving them one means adding constraints to `Building`, not configuring it.
+- [x] **Reported on the same metrics.** Total cost, connection peak, overload
+      hours, unserved driving energy and solve time, all in `summary.csv`.
+      Unserved driving is measured by replaying *both* paths' schedules through
+      one transcription of `ElectricVehicleUnit._transition`
+      (`compare_study_cases.replay`), so it means the same thing on both sides
+      rather than being taken from the model under test. It is 0.0 MWh
+      everywhere: neither path ever failed a trip, and the building solved every
+      window (0 infeasible), so its hard driving constraint never bit.
+
+Found while doing it, all three in the Building path:
+
+- [x] **Numerical noise in the carried SOC killed the unit** — fixed in
+      `dsm_load_shift._update_init_states`. A solver returning
+      `1.0000000000000007` for a full battery had that handed back as the next
+      window's `initial_soc`, where `GenericStorage` rejects anything above 1.0.
+      The exception was raised inside the bidding strategy, caught by the agent
+      scheduler and logged, so the run *completed* with the building not bidding
+      for its last 92 hours and the CSV output looking like a unit that chose to
+      do nothing. The carried state is now clamped to the bounds it came from.
+      Only reachable when the building actually fills a battery to `max_soc`,
+      which is why the non-prosumer cases never hit it.
+- [x] **`compare_study_cases.py` refuses to summarise a run that logged an
+      error.** The above produced a complete, plausible, entirely wrong summary
+      row before anyone noticed. The harness now watches the root logger -- an
+      exception out of a bidding strategy is reported under the agent
+      framework's logger, not `assume`'s -- and raises instead of reporting.
+- [ ] **`DsmEnergyOptimizationStrategy` bids exports as supply at the price
+      cap.** It prices every order at 3000 EUR/MWh whatever the sign of the
+      volume, so an exporting building offers supply at the cap and never
+      clears: 0 of 32 export offers accepted in either prosumer case. The unit's
+      internal state still advances along the plan it did not get, so schedule
+      and dispatch diverge by up to 61 kW. Until this is fixed no bidirectional
+      Building case is meaningful, and the V2G half of this comparison cannot be
+      run. `EVPortfolioStrategy` avoids it by bidding `minimum_bid_price` when
+      discharging.
+- [x] **`assume/world.py:172` said `import nest_asyncio2` again.** Listed as
+      fixed under "Incidental" below, but the typo was back on disk and broke
+      `World()` construction, so nothing could run at all. Fixed again. Worth
+      checking why it returned before trusting that entry.
+
+**Can the match be improved? No -- it is already at the solver-noise floor.**
+`no_tariff_no_export_drain` and `tou_tariff_no_export_drain` set
+`ev_terminal_soc: 0.2` (`min_soc`), i.e. the EV portfolio asked to value
+end-of-window energy the way the Building MILP already does. That one change
+drops the cost gap from 1.58 to 0.15 EUR without a tariff and from 4.69 to
+0.15 EUR with one, matches terminal energy to four decimals and the fee bill to
+0.0007 EUR. The control -- `tou_tariff` against `tou_tariff_no_export`, the same
+optimiser with a config change that provably does not bind -- still scatters by
+3.76 kW mean / 38.2 kW max at 0.803 correlation, and the matched pairs sit at or
+inside that. Fixing the two open defects would not tighten any of this: both are
+masked by `is_prosumer: No`. See EXPERIMENTS.md, "Could the match be better?".
+
+Left open deliberately:
+
+- [ ] Compare the two under V2G. Blocked on the export-bid pricing above; the
+      `*_prosumer` cases are in `config.yaml` and ready for it.
+- [ ] **Give `dst_components.ElectricVehicle` a terminal-SOC term.** The
+      ablation above shows this is the whole remaining difference between the
+      two optimisers, and it is a defect in its own right rather than a
+      comparability nuisance: over a rolling run the building empties the fleet
+      to `min_soc` and holds it there for 140 of 576 vehicle-hours, ending every
+      run flat with no reserve for an unplanned trip.
+      `cost_at_equal_terminal_energy_eur` prices it after the fact; a building
+      used for longer than a window wants the term itself.
 
 ### 3. Smaller leftovers
 

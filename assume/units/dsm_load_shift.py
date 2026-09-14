@@ -922,7 +922,18 @@ class DSMFlex:
                 block = instance.dsm_blocks[tech_name]
                 state: dict = {}
                 if hasattr(block, "soc"):
-                    state["soc"] = pyo.value(block.soc[commit_local])
+                    # A solver can land a hair outside the SOC bounds it was
+                    # given (1.0 + 6.7e-16 has been observed on a full battery).
+                    # That value is handed straight back as the next window's
+                    # initial_soc, where GenericStorage rejects anything above
+                    # 1.0 - which raises out of the bidding strategy and leaves
+                    # the unit silently not bidding for the rest of the run. The
+                    # carried state has to satisfy the bounds it came from.
+                    low = float(pyo.value(getattr(block, "min_soc", 0.0)))
+                    high = float(pyo.value(getattr(block, "max_soc", 1.0)))
+                    state["soc"] = min(
+                        max(float(pyo.value(block.soc[commit_local])), low), high
+                    )
                 if hasattr(block, "operational_status"):
                     state["operational_status"] = int(
                         round(pyo.value(block.operational_status[commit_local]))

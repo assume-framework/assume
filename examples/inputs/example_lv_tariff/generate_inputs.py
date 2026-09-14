@@ -32,6 +32,15 @@ EV_CAPACITY = 0.03  # MWh
 EV_POWER = 0.011  # MW
 DAILY_TRIP_ENERGY = 0.015  # MWh per EV per weekday
 
+# The `building` unit in residential_dsm_units.csv holds the same fleet as
+# components, so the Building MILP can be compared against the portfolio MILP.
+# Its name is the prefix BuildingForecaster expects on every component profile.
+BUILDING_ID = "aggregator"
+# The other load behind the same meter.  The EV cases declare it as
+# `ev_background_load_mw` in config.yaml; the building reads it as its own
+# inflexible demand, so the two paths have to quote the same number.
+BACKGROUND_LOAD_MW = 0.005
+
 
 def generate(output_dir=HERE, n_evs=N_EVS, seed=42):
     """Generate one reproducible fleet; existing EV profiles survive fleet growth."""
@@ -277,6 +286,23 @@ def generate(output_dir=HERE, n_evs=N_EVS, seed=42):
 
         forecasts[f"EV_{i}_availability_profile"] = availability
         forecasts[f"EV_{i}_trip_energy_consumption"] = trip
+
+        # The same two profiles again under the name the Building path reads:
+        # BuildingForecaster collects every `{building_id}_*` column and
+        # Building looks up `{building_id}_{component}_{profile}`, where the
+        # component key is the `technology` cell in residential_dsm_units.csv.
+        # Same arrays, so any difference between the two runs is the
+        # optimisation and not the input.
+        component = f"{BUILDING_ID}_electric_vehicle_EV_{i}"
+        forecasts[f"{component}_availability_profile"] = availability
+        forecasts[f"{component}_trip_energy_consumption"] = trip
+
+    # Building.inflex_demand. The EV portfolio never bids this load - it only
+    # models it, through `ev_background_load_mw` - whereas the building buys it
+    # on the EOM as part of `total_power_input`. Same physical load either way;
+    # compare_study_cases.py settles both on the connection so the difference in
+    # who buys it does not land in the comparison.
+    forecasts[f"{BUILDING_ID}_load_profile"] = np.full(len(index), BACKGROUND_LOAD_MW)
 
     write("forecasts_df.csv", pd.DataFrame(forecasts, index=index))
 
