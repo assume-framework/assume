@@ -738,6 +738,7 @@ def load_config_and_create_forecaster(
                 index=shared_unit_index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),
                 demand=-demand_df[id].abs(),
+                bid_price=get_unit_forecast_column(forecasts_df, id, "bid_price"),
                 forecast_algorithms=get_unit_forecast_algorithms(
                     forecast_algorithms, demand
                 ),

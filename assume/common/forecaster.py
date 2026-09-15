@@ -419,6 +419,7 @@ class DemandForecaster(UnitForecaster):
         availability: ForecastSeries = 1,
         forecast_algorithms: dict[str, str] = {},
         forecast_registries: dict[str, dict] = None,
+        bid_price: ForecastSeries = None,
     ):
         super().__init__(
             index=index,
@@ -431,6 +432,9 @@ class DemandForecaster(UnitForecaster):
         self.demand = self._to_series(demand)
         if any(self.demand > 0):
             raise ValidationError(message="demand must be negative", field="demand")
+        # optional hourly willingness to pay; a unit's scalar ``price`` cannot
+        # express one. Read by EnergyBidPriceStrategy; None -> marginal cost.
+        self.bid_price = None if bid_price is None else self._to_series(bid_price)
 
 
 class PowerplantForecaster(UnitForecaster):

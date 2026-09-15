@@ -36,6 +36,7 @@ from assume.strategies.naive_strategies import (
     EnergyNaiveProfileStrategy,
     DsmEnergyNaiveRedispatchStrategy,
     EnergyNaiveRedispatchStrategy,
+    EnergyBidPriceStrategy,
     EnergyNaiveStrategy,
     ExchangeEnergyNaiveStrategy,
     ExchangeNaiveRedispatchStrategy,
@@ -77,6 +78,7 @@ deprecated_bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrateg
 bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "powerplant_energy_naive": EnergyNaiveStrategy,
     "demand_energy_naive": EnergyNaiveStrategy,
+    "demand_energy_bid_price": EnergyBidPriceStrategy,
     "powerplant_energy_naive_balancing": EnergyNaiveStrategy,
     "demand_energy_naive_balancing": EnergyNaiveStrategy,
     "demand_energy_heuristic_elastic": EnergyHeuristicElasticStrategy,

@@ -54,9 +54,7 @@ class EnergyNaiveStrategy(MinMaxStrategy):
             current_power = unit.outputs["energy"].at[
                 start
             ]  # power output of the unit at the start time of the current product
-            marginal_cost = unit.calculate_marginal_cost(
-                start, previous_power
-            )  # calculation of the marginal costs
+            marginal_cost = self._bid_price(unit, start, previous_power)
             volume = unit.calculate_ramp(
                 op_time, previous_power, max_power, current_power
             )
@@ -85,6 +83,31 @@ class EnergyNaiveStrategy(MinMaxStrategy):
             return bids
         else:
             return self.remove_empty_bids(bids)
+
+    def _bid_price(self, unit: SupportsMinMax, start, previous_power: float) -> float:
+        """Price used for the bid. Overridden by subclasses that price differently."""
+        return unit.calculate_marginal_cost(start, previous_power)
+
+
+class EnergyBidPriceStrategy(EnergyNaiveStrategy):
+    """
+    Bids the unit's volume at a *time-varying* bid price instead of the unit's
+    constant marginal cost.
+
+    A ``Demand`` unit's ``price`` is a single scalar, so an hourly willingness to
+    pay cannot be expressed through it. The series is supplied per unit via a
+    ``{unit_id}_bid_price`` column in ``forecasts_df.csv`` (the same convention
+    used for e.g. ``steel_demand``), reaching the unit as ``forecaster.bid_price``.
+
+    Falls back to the unit's marginal cost for any unit without that column, so
+    mixing priced and unpriced demand units in one scenario is safe.
+    """
+
+    def _bid_price(self, unit: SupportsMinMax, start, previous_power: float) -> float:
+        bid_price = getattr(unit.forecaster, "bid_price", None)
+        if bid_price is None:
+            return unit.calculate_marginal_cost(start, previous_power)
+        return float(bid_price.at[start])
 
 
 class EnergyNaiveProfileStrategy(MinMaxStrategy):

@@ -146,6 +146,26 @@ assume-repo
 tensorboard
 
 examples/notebooks/inputs
+examples/inputs/archive
+examples/inputs/base
+examples/inputs/cement_base
+examples/inputs/steel_base
+examples/inputs/AktuellePolitiken_RN
+examples/inputs/FokusH2_RN
+examples/inputs/FokusStrom_RN
+examples/inputs/HoheNachfrage_RN
+examples/inputs/NachfrageNiedrig_RN
+examples/inputs/Technologiemix_RN
+examples/inputs/WCMean
+examples/inputs/WCTail
+examples/inputs/AktuellePolitiken_RN_BID
+examples/inputs/FokusH2_RN_BID
+examples/inputs/FokusStrom_RN_BID
+examples/inputs/HoheNachfrage_RN_BID
+examples/inputs/NachfrageNiedrig_RN_BID
+examples/inputs/Technologiemix_RN_BID
+examples/inputs/WCMean_BID
+examples/inputs/WCTail_BID
 examples/notebooks/outputs
 **/scenario/*.csv
 *.pb
