@@ -550,15 +550,20 @@ def create_incidence_matrix(lines, buses, zones_id=None):
     return incidence_matrix
 
 
-def aggregate_line_capacities(
+def sum_line_capacities(
     lines: pd.DataFrame,
     incidence_matrix: pd.DataFrame,
     zones_id: str = None,
     node_mapping: dict = None,
 ) -> pd.DataFrame:
     """
-    Compute forward and reverse capacities for each line (or aggregated edge) used
-    by the transport-model clearing (`complex_clearing`).
+    Compute forward and reverse capacities by summing physical line capacities
+    into the edges/columns identified in `incidence_matrix`.
+
+    NOTE: This function implements a simple summation aggregation (intended for
+    transport-style models). It does NOT compute PTDF-based equivalent
+    capacities or any power-flow-aware aggregation. Values are simply added
+    together for lines mapped to the same aggregated edge.
 
     The function returns a DataFrame indexed by the columns of `incidence_matrix`
     with columns `cap_forward` and `cap_reverse` (absolute MW). If a column in
@@ -570,7 +575,8 @@ def aggregate_line_capacities(
     Directional columns in `lines` take precedence:
       - `s_nom_forward` used for forward (bus0 -> bus1)
       - `s_nom_reverse` used for reverse (bus1 -> bus0)
-    If missing, fallback to `s_nom * s_max_pu` for that direction.
+    The directional capacities are multiplied with s_max_pu (defaults to 1).
+    If directional capacities are missing, fallback to `s_nom * s_max_pu` for that direction.
 
     Args:
         lines: DataFrame of lines (indexed by line id).
