@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 from pandas._testing import assert_series_equal
 
-from assume.common.fast_pandas import FastIndex
+from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecast_algorithms import (
     calculate_naive_congestion_signal,
     calculate_naive_price,
@@ -23,6 +23,7 @@ from assume.common.forecaster import (
     DemandForecaster,
     DsmUnitForecaster,
     PowerplantForecaster,
+    UnitsOperatorForecaster,
 )
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.strategies import EnergyHeuristicElasticStrategy, EnergyNaiveStrategy
@@ -365,7 +366,7 @@ def test_forecast_interface__elastic_demand(index, market_setup, forecast_setup)
     assert np.isclose(list(market_forecast["EOM"]), [8.0] * 7).all()
 
 
-def test_forecast_interface__cache(market_setup, forecast_setup):
+def test_forecast_interface__cache(market_setup, forecast_setup, shared_FastIndex):
     # clear cache uses
     calculate_naive_price.cache_clear()
     calculate_naive_residual_load.cache_clear()
@@ -385,20 +386,29 @@ def test_forecast_interface__cache(market_setup, forecast_setup):
             None,  # forecaster has no unit
         )
 
+    # an operator-level forecaster initializes against the same units/markets
+    # objects, so it shares the price / residual_load cache too
+    operator_forecaster = UnitsOperatorForecaster(
+        index=shared_FastIndex,
+        forecast_registries=get_forecast_registries(),
+    )
+    operator_forecaster.initialize(
+        forecast_setup["units"], market_setup["market_configs"], None
+    )
+
     for unit in forecast_setup["units"]:
         unit.forecaster.initialize(
             forecast_setup["units"], market_setup["market_configs"], None, unit
         )
 
-    # price and residual_load are called by all initializations
-    assert (
-        calculate_naive_price.cache_info().hits == len(forecast_setup["units"]) + n - 1
-    )
+    # price and residual_load are called by all initializations: the n dsm runs,
+    # the operator run, and one per unit. Only the first call misses.
+    assert calculate_naive_price.cache_info().hits == len(forecast_setup["units"]) + n
     assert calculate_naive_price.cache_info().misses == 1
 
     assert (
         calculate_naive_residual_load.cache_info().hits
-        == len(forecast_setup["units"]) + n - 1
+        == len(forecast_setup["units"]) + n
     )
     assert calculate_naive_residual_load.cache_info().misses == 1
 
@@ -412,3 +422,52 @@ def test_forecast_interface__cache(market_setup, forecast_setup):
     # NOTE: only missed once & no hits due to lru_cache also on calculate_naive_price
     assert calculate_naive_price_inelastic.cache_info().hits == 0
     assert calculate_naive_price_inelastic.cache_info().misses == 1
+
+
+def test_units_operator_forecaster__matches_unit_forecasts(
+    index, market_setup, forecast_setup, shared_FastIndex
+):
+    """An operator-level forecaster computes the same market-wide price and
+    residual load as a unit forecaster, since it initializes against all units."""
+    expected_price = pd.read_csv(path / "results/price.csv", **parse_date)
+    expected_load = pd.read_csv(path / "results/load_forecast.csv", **parse_date)
+
+    operator_forecaster = UnitsOperatorForecaster(
+        index=shared_FastIndex,
+        forecast_registries=get_forecast_registries(),
+    )
+
+    # the operator has no single unit, so initialize without an initializing_unit
+    operator_forecaster.initialize(
+        forecast_setup["units"],
+        market_setup["market_configs"],
+        None,  # no forecast_df --> calculate on its own
+    )
+
+    assert_series_equal(
+        expected_price["price"],
+        pd.Series(operator_forecaster.price["EOM"], index),
+        check_names=False,
+        check_dtype=False,
+        check_freq=False,
+    )
+    assert_series_equal(
+        expected_load["load_forecast"],
+        pd.Series(operator_forecaster.residual_load["EOM"], index),
+        check_names=False,
+        check_dtype=False,
+        check_freq=False,
+    )
+
+
+def test_units_operator_forecaster__extra_kwargs(index, shared_FastIndex):
+    """Arbitrary operator-level forecasts passed via kwargs are stored, with
+    pd.Series converted to FastSeries."""
+    custom_series = pd.Series(2.0, index=index)
+    operator_forecaster = UnitsOperatorForecaster(
+        index=shared_FastIndex,
+        custom_forecast=custom_series,
+    )
+
+    assert isinstance(operator_forecaster.custom_forecast, FastSeries)
+    assert list(operator_forecaster.custom_forecast) == [2.0] * len(index)

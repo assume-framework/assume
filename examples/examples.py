@@ -105,6 +105,8 @@ available_examples = {
         "scenario": "example_03c",
         "study_case": "base_case_2019_with_storage",
     },
+    # redispatch example
+    "redisp_3_nodes": {"scenario": "example_04a", "study_case": "base"},
 }
 
 

@@ -122,7 +122,7 @@ eom_crm_case_2019:
 
 base_case_2019_with_DSM:
   start_date: 2019-01-01 00:00
-  end_date: 2019-02-01 00:00
+  end_date: 2019-01-03 00:00
   time_step: 1h
   industrial_dsm_units: industrial_dsm_units.csv
   save_frequency_hours: 720

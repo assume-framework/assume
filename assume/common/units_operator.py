@@ -11,6 +11,7 @@ from operator import itemgetter
 from mango import Role, create_acl, sender_addr
 from mango.messages.message import Performatives
 
+from assume.common.forecaster import UnitsOperatorForecaster
 from assume.common.market_objects import (
     ClearingMessage,
     DataRequestMessage,
@@ -52,18 +53,22 @@ class UnitsOperator(Role):
     Args:
         available_markets (list[MarketConfig]): The available markets.
         portfolio_strategies (dict[str, UnitOperatorStrategy], optional): Optimized portfolio strategy. Defaults to an empty dict.
+        forecaster (UnitsOperatorForecaster, optional): Operator-level forecaster providing market
+            price and residual load forecasts shared across the operator's units. Defaults to None.
     """
 
     def __init__(
         self,
         available_markets: list[MarketConfig],
         portfolio_strategies: dict[str, UnitOperatorStrategy] = {},
+        forecaster: UnitsOperatorForecaster = None,
     ):
         super().__init__()
 
         self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
         self.last_sent_dispatch = defaultdict(lambda: 0)
+        self.forecaster = forecaster
 
         self.portfolio_strategies = portfolio_strategies
         for market in self.available_markets:

@@ -10,7 +10,6 @@ import dateutil.rrule as rr
 import pandas as pd
 import yaml
 from dateutil.relativedelta import relativedelta as rd
-from yaml_include import Constructor
 
 from assume.common.forecaster import (
     DemandForecaster,
@@ -18,6 +17,7 @@ from assume.common.forecaster import (
     UnitForecaster,
 )
 from assume.common.market_objects import MarketConfig, MarketProduct
+from assume.scenario.yaml_include import Constructor
 from assume.strategies.extended import SupportStrategy
 from assume.world import World
 

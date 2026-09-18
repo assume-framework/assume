@@ -12,7 +12,7 @@ Closes #<issue‑number>
 <!-- Summarise the purpose/motivation and the changes of the PR. -->
 
 ## Checklist
-- [ ] Documentation updated (docstrings, READMEs, user guides, inline comments, `doc` folder updates etc.)
+- [ ] Documentation updated (docstrings, READMEs, user guides, inline comments, `docs` folder updates, etc.)
 - [ ] New unit/integration tests added (if applicable)
 - [ ] Changes noted in release notes (if any)
 - [ ] Consent to release this PR's code under the GNU Affero General Public License v3.0

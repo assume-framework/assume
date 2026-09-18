@@ -20,6 +20,7 @@ from assume.common.exceptions import AssumeException
 from assume.common.fast_pandas import FastIndex
 from assume.common.forecaster import (
     BuildingForecaster,
+    CementForecaster,
     CustomUnitForecaster,
     DemandForecaster,
     DsmUnitForecaster,
@@ -29,6 +30,7 @@ from assume.common.forecaster import (
     SteamgenerationForecaster,
     SteelplantForecaster,
     UnitForecaster,
+    UnitsOperatorForecaster,
 )
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
@@ -43,6 +45,22 @@ from assume.strategies import BaseStrategy
 from assume.world import World
 
 logger = logging.getLogger(__name__)
+
+
+def get_unit_forecast_column(
+    forecasts_df: pd.DataFrame | None,
+    unit_id: str,
+    column_name: str,
+) -> pd.Series | None:
+    """Return a forecast column, preferring ``{unit_id}_{column_name}`` over ``column_name``."""
+    if forecasts_df is None:
+        return None
+    prefixed = f"{unit_id}_{column_name}"
+    if prefixed in forecasts_df.columns:
+        return forecasts_df[prefixed]
+    if column_name in forecasts_df.columns:
+        return forecasts_df[column_name]
+    return None
 
 
 def bidding_strategies_from_param_dict(param_dict: dict):
@@ -169,6 +187,9 @@ def load_dsm_units(
         - The CSV file is expected to have columns such as 'name', 'technology', 'unit_type', and other operational parameters.
         - The function assumes that the first non-null value in common and bidding columns is representative if multiple
           entries exist for the same plant.
+        - Rolling-horizon optimisation settings (``horizon_mode``, ``look_ahead_horizon``, ``commit_horizon``,
+          ``rolling_step``) are read as optional per-plant columns. They are assembled into the
+          ``dsm_optimisation_config`` dict passed to the unit constructor.
         - It is crucial that the input CSV file follows the expected structure for the function to process it correctly.
     """
 
@@ -196,12 +217,26 @@ def load_dsm_units(
         "is_prosumer",
         "congestion_threshold",
         "peak_load_cap",
+        "load_profile_deviation",
     ]
     # Filter the common columns to only include those that exist in the DataFrame
     common_columns = [col for col in common_columns if col in dsm_units.columns]
 
     # Get bidding columns dynamically
     bidding_columns = [col for col in dsm_units.columns if col.startswith("bidding_")]
+
+    # Rolling-horizon optimisation columns (per-plant, optional). Filled on the first
+    # technology row of each plant; assembled into a dsm_optimisation_config dict below.
+    dsm_opt_columns = [
+        col
+        for col in [
+            "horizon_mode",
+            "look_ahead_horizon",
+            "commit_horizon",
+            "rolling_step",
+        ]
+        if col in dsm_units.columns
+    ]
 
     # Initialize the dictionary to hold the final structured data
     dsm_units_dict = {}
@@ -219,9 +254,13 @@ def load_dsm_units(
         # Process each technology within the plant
         components = {}
         for tech, tech_data in group.groupby("technology"):
-            # Clean the technology-specific data: drop all-NaN columns and drop 'technology', common, and bidding columns
+            # Clean the technology-specific data: drop all-NaN columns and drop 'technology', common,
+            # bidding, and DSM optimisation columns
             cleaned_data = tech_data.dropna(axis=1, how="all").drop(
-                columns=["technology"] + common_columns + bidding_columns,
+                columns=["technology"]
+                + common_columns
+                + bidding_columns
+                + dsm_opt_columns,
                 errors="ignore",
             )
             # Ensure that there is at least one record before adding to components
@@ -229,6 +268,17 @@ def load_dsm_units(
                 components[tech] = cleaned_data.to_dict(orient="records")[0]
 
         dsm_unit["components"] = components
+
+        # Assemble per-plant rolling-horizon config from CSV columns (if any values present)
+        if dsm_opt_columns:
+            opt_cfg = {}
+            for col in dsm_opt_columns:
+                non_null_values = group[col].dropna()
+                if not non_null_values.empty:
+                    opt_cfg[col] = non_null_values.iloc[0]
+            if opt_cfg:
+                dsm_unit["dsm_optimisation_config"] = opt_cfg
+
         dsm_units_dict[name] = dsm_unit
 
     # Convert the structured dictionary into a DataFrame
@@ -545,9 +595,13 @@ def load_config_and_create_forecaster(
     if not study_case:
         study_case = list(config.keys())[0]
     config = config[study_case]
+    learning_config = config.get("learning_config", {})
+    learning_mode = learning_config.get("learning_mode", False) or learning_config.get(
+        "continue_learning", False
+    )
 
     # Set seed, or disable with `seed: null` in config
-    set_random_seed(config.get("seed", 42))
+    set_random_seed(seed=config.get("seed", 42), learning_mode=learning_mode)
 
     simulation_id = config.get("simulation_id", f"{scenario}_{study_case}")
 
@@ -591,11 +645,7 @@ def load_config_and_create_forecaster(
     # Initialize an empty dictionary to combine the DSM units
     dsm_units = {}
     for unit_type in ["industrial_dsm_units", "residential_dsm_units"]:
-        units = load_dsm_units(
-            path=path,
-            config=config,
-            file_name=unit_type,
-        )
+        units = load_dsm_units(path=path, config=config, file_name=unit_type)
         if units is not None:
             dsm_units.update(units)
 
@@ -746,13 +796,60 @@ def load_config_and_create_forecaster(
                         **extra_building_profiles,
                     )
                 if type == "steel_plant":
+                    normalized_profile = get_unit_forecast_column(
+                        forecasts_df, id, "normalized_load_profile"
+                    )
+                    steel_demand = get_unit_forecast_column(
+                        forecasts_df, id, "steel_demand"
+                    )
+
                     unit_forecasts[id] = SteelplantForecaster(
                         index=shared_unit_index,
                         availability=availability.get(
                             id, pd.Series(1.0, index, name=id)
                         ),
+                        market_prices=unit.get("market_prices"),
                         forecast_algorithms=unit_forecast_algorithms,
+                        forecast_registries=None,
                         fuel_prices=fuel_prices_df,
+                        normalized_load_profile=normalized_profile,
+                        steel_demand=steel_demand,
+                    )
+                if type == "cement_plant":
+                    storage_schedule = get_unit_forecast_column(
+                        forecasts_df, id, "thermal_storage_schedule"
+                    )
+                    unit_forecasts[id] = CementForecaster(
+                        index=shared_unit_index,
+                        availability=availability.get(
+                            id, pd.Series(1.0, index, name=id)
+                        ),
+                        market_prices=unit.get("market_prices"),
+                        forecast_algorithms=unit_forecast_algorithms,
+                        forecast_registries=None,
+                        fuel_prices=fuel_prices_df,
+                        normalized_load_profile=get_unit_forecast_column(
+                            forecasts_df, id, "normalized_load_profile"
+                        ),
+                        clinker_demand=get_unit_forecast_column(
+                            forecasts_df, id, "clinker_demand"
+                        ),
+                        electricity_price_flex=get_unit_forecast_column(
+                            forecasts_df, id, "electricity_price_flex"
+                        ),
+                        thermal_storage_schedule=(
+                            storage_schedule if storage_schedule is not None else 0
+                        ),
+                        availability_profiles={
+                            tech: get_unit_forecast_column(
+                                forecasts_df, id, f"{tech}_availability"
+                            )
+                            for tech in (
+                                "preheater",
+                                "calciner",
+                                "kiln",
+                            )
+                        },
                     )
                 if type == "hydrogen_plant":
                     unit_forecasts[id] = HydrogenForecaster(
@@ -777,6 +874,13 @@ def load_config_and_create_forecaster(
                         thermal_storage_schedule=0,  # TODO
                         thermal_demand=0,  # TODO
                     )
+    # shared inputs used to build one UnitsOperatorForecaster per operator in
+    # setup_world. An operator has no availability of its own (that is a
+    # per-unit concept), so only the index and algorithms are shared here.
+    units_operator_forecast_data = {
+        "shared_unit_index": shared_unit_index,
+        "forecast_algorithms": forecast_algorithms,
+    }
     return {
         "config": config,
         "simulation_id": simulation_id,
@@ -792,6 +896,7 @@ def load_config_and_create_forecaster(
         "unit_forecasts": unit_forecasts,
         "index": index,
         "forecasts_df": forecasts_df,
+        "units_operator_forecast_data": units_operator_forecast_data,
     }
 
 
@@ -833,6 +938,7 @@ def setup_world(
     dsm_units = scenario_data["dsm_units"]
     unit_forecasts = scenario_data["unit_forecasts"]
     forecasts_df = scenario_data["forecasts_df"]
+    units_operator_forecast_data = scenario_data["units_operator_forecast_data"]
 
     # save every thousand steps by default to free up memory
     save_frequency_hours = config.get("save_frequency_hours", 48)
@@ -990,16 +1096,32 @@ def setup_world(
     for op, op_units in exchange_units.items():
         units[op].extend(op_units)
 
+    config_forecast_algorithms = units_operator_forecast_data["forecast_algorithms"]
+    operator_forecast_algorithms: dict[str, dict] = {}
     if unit_operators is not None:
         logger.info("Create unit_operators for portfolio strategies")
         unit_operators_strategies = unit_operators.to_dict("index")
         # remove starting "bidding_" string from market names
         for operator in unit_operators_strategies.keys():
-            raw_strategies = unit_operators_strategies[operator]
-            converted_strategies = bidding_strategies_from_param_dict(raw_strategies)
-            unit_operators_strategies[operator] = converted_strategies
+            raw_params = unit_operators_strategies[operator]
+            operator_forecast_algorithms[operator] = get_unit_forecast_algorithms(
+                config_forecast_algorithms, raw_params
+            )
+            unit_operators_strategies[operator] = bidding_strategies_from_param_dict(
+                raw_params
+            )
     else:
         unit_operators_strategies = {}
+
+    operator_forecasts = {
+        op: UnitsOperatorForecaster(
+            index=units_operator_forecast_data["shared_unit_index"],
+            forecast_algorithms=operator_forecast_algorithms.get(
+                op, config_forecast_algorithms
+            ),
+        )
+        for op in set(units.keys())
+    }
 
     # if distributed_role is true - there is a manager available
     # and we can add each units_operator as a separate process
@@ -1007,12 +1129,18 @@ def setup_world(
         logger.info("Adding unit operators and units - with subprocesses")
         for op, op_units in units.items():
             strategies = unit_operators_strategies.get(op, {})
-            world.add_units_with_operator_subprocess(op, op_units, strategies)
+            world.add_units_with_operator_subprocess(
+                op, op_units, strategies, forecaster=operator_forecasts.get(op)
+            )
     else:
         logger.info("Adding unit operators and units")
         for company_name in set(units.keys()):
             strategies = unit_operators_strategies.get(company_name, {})
-            world.add_unit_operator(id=str(company_name), strategies=strategies)
+            world.add_unit_operator(
+                id=str(company_name),
+                strategies=strategies,
+                forecaster=operator_forecasts.get(company_name),
+            )
 
         # add the units to corresponding unit operators
         for op, op_units in units.items():

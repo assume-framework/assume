@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+Schema: !include "schema.yaml"
+
+GeneralProperties:
+  RunId: 1
+  Simulation:
+    StartTime: 2019-01-01_00:00:00
+    StopTime: 2019-01-02_00:00:00
+    RandomSeed: 1
+
+Agents:
+  - Type: DemandTrader
+    Id: 900
+    Attributes:
+      Loads:
+        - ValueOfLostLoad: 1234.5
+          DemandSeries: "demand.csv"
+
+Contracts: !include ["contracts/*.yaml", "Contracts"]
