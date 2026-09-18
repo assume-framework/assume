@@ -85,7 +85,7 @@ Flows in the network are limited by the Net Transfer Capacity of each line :math
 
   -NTC_{l} \leq F_{l, t} \leq NTC_{l} \quad \forall \: l \in \mathcal{L}, t \in \mathcal{T}
 
-If ``lines.csv`` additionally provides ``s_nom_forward`` and/or ``s_nom_reverse``, the complex clearing uses these directional limits instead. This allows transport constraints to differ by flow direction, which is useful for zonal representations with asymmetric commercial transfer capacities.
+If ``lines.csv`` additionally provides ``s_nom_forward`` and/or ``s_nom_reverse``, the complex clearing uses these directional limits instead, still taking ``s_max_pu`` into account. This allows transport constraints to differ by flow direction, which is useful for zonal representations with asymmetric commercial transfer capacities.
 
 Because with this algorithm, paradoxically accepted bids (PABs) can occur, the objective is solved in an iterative manner:
 
