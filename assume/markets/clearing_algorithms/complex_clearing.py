@@ -201,8 +201,12 @@ def market_clearing_opt_constraints(
                     directional_capacities is not None
                     and line in directional_capacities.index
                 ):
-                    cap_forward = directional_capacities.at[line, "cap_forward"] * s_max_pu
-                    cap_reverse = directional_capacities.at[line, "cap_reverse"] * s_max_pu
+                    cap_forward = (
+                        directional_capacities.at[line, "cap_forward"] * s_max_pu
+                    )
+                    cap_reverse = (
+                        directional_capacities.at[line, "cap_reverse"] * s_max_pu
+                    )
                     model.transmission_constr.add(model.flows[t, line] <= cap_forward)
                     model.transmission_constr.add(model.flows[t, line] >= -cap_reverse)
                 else:
