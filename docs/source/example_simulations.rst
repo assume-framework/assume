@@ -50,6 +50,9 @@ Overview of Example Simulations
    * - small_with_zonal_clearing‡
      - example_01d
      - Implements zonal market clearing.
+   * - small_with_directional_zonal_clearing‡
+     - example_01j
+     - Demonstrates complex clearing with directional transfer capacities between zones.
    * - market_study_eom
      - example_01f
      - Showcases comparison of single market to multi market. Case 1 in [3]_

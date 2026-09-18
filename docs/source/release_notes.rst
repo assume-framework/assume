@@ -25,6 +25,7 @@ Upcoming Release
 
   - **Building-specific flexible electricity-price support**: Added support for ``electricity_price_flex`` in ``BuildingForecaster`` for use with the ``electricity_price_signal`` flexibility measure.
   - **Generic Forecasting Interface**: This interface enables to specify different forecast algorithms for preprocess, initialization and update during runtime. They can be specified in the config.yaml or unit csv files. For more information about currently implemented algorithms and how to specify them please read the documentation on Unit forecasts.
+  - **Directional transfer capacities in complex clearing**: ``complex_clearing`` can now use asymmetric line limits from ``s_nom_forward`` and ``s_nom_reverse`` instead of assuming the same transfer capacity in both directions. ``s_max_pu`` (defaulting to 1) is still applied to scale the directional limits.
   - **Operator-level forecaster**: Unit operators can now own a ``UnitsOperatorForecaster`` providing their own market price and residual load forecasts (accessible via ``units_operator.forecaster``), instead of reading them from a managed unit. Forecast algorithms can be set per operator via ``forecast_*`` columns in ``unit_operators.csv``, and the portfolio learning strategy now reads its price/residual-load observations from this operator forecaster.
 
 **Improvements:**

@@ -1,0 +1,152 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+base:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-04 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+
+  markets_config:
+    EOM:
+      start_date: 2019-01-01 00:00
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 20h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: complex_clearing
+      additional_fields:
+        - node
+        - max_power
+      param_dict:
+        network_path: .
+        solver: highs
+        zones_identifier: zone_id
+        pricing_mechanism: pay_as_clear
+        log_flows: true
+
+    redispatch:
+      start_date: 2019-01-01 21:00
+      operator: network_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 3h
+      opening_frequency: 24h
+      opening_duration: 2h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: redispatch
+      additional_fields:
+        - node
+        - min_power
+        - max_power
+      param_dict:
+        network_path: .
+        solver: highs
+        payment_mechanism: pay_as_bid
+        backup_marginal_cost: 10000
+
+zonal_case:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-06 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+
+  markets_config:
+    DAM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: complex_clearing
+      param_dict:
+        network_path: .
+        solver: highs
+        zones_identifier: zone_id
+        pricing_mechanism: pay_as_clear
+      additional_fields:
+        - bid_type
+        - node
+
+nodal_case:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-04 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+
+  markets_config:
+    nodal:
+      start_date: 2019-01-01 00:00
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 1h
+      opening_frequency: 24h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: nodal_clearing
+      additional_fields:
+        - node
+        - max_power
+      param_dict:
+        network_path: .
+        solver: highs
+        zones_identifier: zone_id
+        pricing_mechanism: pay_as_clear
+        log_flows: true
+
+    redispatch:
+      start_date: 2019-01-01 21:00
+      operator: network_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 3h
+      opening_frequency: 24h
+      opening_duration: 2h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: redispatch
+      additional_fields:
+        - node
+        - min_power
+        - max_power
+      param_dict:
+        network_path: .
+        solver: highs
+        payment_mechanism: pay_as_bid
+        backup_marginal_cost: 10000
