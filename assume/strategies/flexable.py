@@ -248,6 +248,7 @@ class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
 
     Attributes:
         foresight (datetime.timedelta): The foresight of the unit.
+        reference_market (str): The market whose price forecast is used to calculate the specific revenue.
 
     Args:
         *args: Variable length argument list.
@@ -259,6 +260,8 @@ class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
 
         # check if kwargs contains crm_foresight argument
         self.foresight = parse_duration(kwargs.get("crm_foresight", "4h"))
+        # market used as reference for the specific revenue calculation
+        self.reference_market = kwargs.get("reference_market", "EOM")
 
     def calculate_bids(
         self,
@@ -312,7 +315,7 @@ class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
             )
             # Specific revenue if power was offered on the energy market
             specific_revenue = get_specific_revenue(
-                price_forecast=unit.forecaster.price["EOM"],
+                price_forecast=unit.forecaster.price[self.reference_market],
                 marginal_cost=marginal_cost,
                 t=start,
                 foresight=self.foresight,
@@ -363,6 +366,7 @@ class CapacityHeuristicBalancingNegStrategy(MinMaxStrategy):
 
     Attributes:
         foresight (datetime.timedelta): The foresight of the unit.
+        reference_market (str): The market whose price forecast is used to calculate the specific revenue.
 
     Args:
         *args: Variable length argument list.
@@ -374,6 +378,8 @@ class CapacityHeuristicBalancingNegStrategy(MinMaxStrategy):
 
         # check if kwargs contains crm_foresight argument
         self.foresight = parse_duration(kwargs.get("crm_foresight", "4h"))
+        # market used as reference for the specific revenue calculation
+        self.reference_market = kwargs.get("reference_market", "EOM")
 
     def calculate_bids(
         self,
@@ -423,7 +429,7 @@ class CapacityHeuristicBalancingNegStrategy(MinMaxStrategy):
 
             # Specific revenue if power was offered on the energy market
             specific_revenue = get_specific_revenue(
-                price_forecast=unit.forecaster.price["EOM"],
+                price_forecast=unit.forecaster.price[self.reference_market],
                 marginal_cost=marginal_cost,
                 t=start,
                 foresight=self.foresight,
