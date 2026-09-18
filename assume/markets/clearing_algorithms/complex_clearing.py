@@ -13,7 +13,7 @@ from pyomo.opt import OptSolver, SolverFactory, TerminationCondition
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.common.utils import (
-    aggregate_line_capacities,
+    sum_line_capacities,
     create_incidence_matrix,
     get_supported_solver_pyomo,
 )
@@ -411,7 +411,7 @@ class ComplexClearingRole(MarketRole):
                 self.nodes = buses.index.values
             # Pre-compute directional capacities for use in the clearing constraints
             try:
-                self.directional_capacities = aggregate_line_capacities(
+                self.directional_capacities = sum_line_capacities(
                     self.lines,
                     self.incidence_matrix,
                     zones_id=self.zones_id,
