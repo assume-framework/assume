@@ -189,23 +189,23 @@ def market_clearing_opt_constraints(
         model.transmission_constr = pyo.ConstraintList()
         for t in model.T:
             for line in model.lines:
+                # s_max_pu might also be time variant. but for now we assume it is static
+                s_max_pu = (
+                    lines.at[line, "s_max_pu"]
+                    if "s_max_pu" in lines.columns
+                    and not pd.isna(lines.at[line, "s_max_pu"])
+                    else 1.0
+                )
                 # If precomputed directional capacities are provided, use them
                 if (
                     directional_capacities is not None
                     and line in directional_capacities.index
                 ):
-                    cap_forward = directional_capacities.at[line, "cap_forward"]
-                    cap_reverse = directional_capacities.at[line, "cap_reverse"]
+                    cap_forward = directional_capacities.at[line, "cap_forward"] * s_max_pu
+                    cap_reverse = directional_capacities.at[line, "cap_reverse"] * s_max_pu
                     model.transmission_constr.add(model.flows[t, line] <= cap_forward)
                     model.transmission_constr.add(model.flows[t, line] >= -cap_reverse)
                 else:
-                    # s_max_pu might also be time variant. but for now we assume it is static
-                    s_max_pu = (
-                        lines.at[line, "s_max_pu"]
-                        if "s_max_pu" in lines.columns
-                        and not pd.isna(lines.at[line, "s_max_pu"])
-                        else 1.0
-                    )
                     capacity = lines.at[line, "s_nom"] * s_max_pu
                     # Limit the flow on each line (symmetric fallback)
                     model.transmission_constr.add(model.flows[t, line] <= capacity)
