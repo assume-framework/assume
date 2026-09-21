@@ -372,8 +372,7 @@ class DSMFlex:
                 # boilers
                 if hasattr(self, "boilers"):
                     for boiler in self.boilers:
-                        if hasattr(m.dsm_blocks[boiler], "power_in"):
-                            total_power_input += m.dsm_blocks[boiler].power_in[t]
+                        total_power_input += m.dsm_blocks[boiler].power_in[t]
 
                 # EV topology
                 if getattr(self, "has_ev", False) and getattr(
@@ -382,8 +381,7 @@ class DSMFlex:
                     # charging stations connect to grid/building
                     for cs in self.charging_stations:
                         total_power_input += m.dsm_blocks[cs].charge[t]
-                        if hasattr(m.dsm_blocks[cs], "discharge"):
-                            total_power_input -= m.dsm_blocks[cs].discharge[t]
+                        total_power_input -= m.dsm_blocks[cs].discharge[t]
 
                 elif getattr(self, "has_ev", False):
                     # no charging station: EVs directly connect to grid

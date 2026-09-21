@@ -133,6 +133,7 @@ class HeatPump:
         add_ramping_constraints(
             model_block=model_block,
             time_steps=self.time_steps,
+            ramped=model_block.power_in,
         )
 
         # Define additional variables and constraints for startup/shutdown and operational status
@@ -389,6 +390,7 @@ class Boiler:
             add_ramping_constraints(
                 model_block=model_block,
                 time_steps=self.time_steps,
+                ramped=model_block.power_in,
             )
 
         # Define operational status variable if min operating time, downtime, or min_power is required (for electric boilers)
@@ -996,6 +998,7 @@ class Electrolyser:
         add_ramping_constraints(
             model_block=model_block,
             time_steps=self.time_steps,
+            ramped=model_block.power_in,
         )
 
         # Define additional variables and constraints for startup/shutdown and operational status
@@ -1252,6 +1255,7 @@ class DRIPlant:
         add_ramping_constraints(
             model_block=model_block,
             time_steps=self.time_steps,
+            ramped=model_block.power_in,
         )
 
         # Define additional variables and constraints for startup/shutdown and operational status
@@ -1444,6 +1448,7 @@ class ElectricArcFurnace:
         add_ramping_constraints(
             model_block=model_block,
             time_steps=self.time_steps,
+            ramped=model_block.power_in,
         )
 
         # Define additional variables and constraints for startup/shutdown and operational status
@@ -2255,6 +2260,7 @@ class GrindingMill:
         add_ramping_constraints(
             model_block=model_block,
             time_steps=self.time_steps,
+            ramped=model_block.power_in,
         )
 
         # Define additional variables and constraints for startup/shutdown and operational status
@@ -2387,7 +2393,10 @@ class ThermalProcessStage:
 
     def _check_prices(self, model: pyo.ConcreteModel) -> None:
         """Verify the plant model provides every price series this stage needs."""
-        required = ["electricity_price"]  # auxiliaries are always electric
+        required = [
+            "electricity_price",
+            "co2_price",
+        ]  # auxiliaries are electric; emission costs require co2_price
         if self.uses_fossil:
             required += ["natural_gas_price", "coal_price"]
         if self.fuel_type == "hydrogen":
@@ -2549,7 +2558,7 @@ class ThermalProcessStage:
         add_ramping_constraints(
             model_block=model_block,
             time_steps=self.time_steps,
-            quantity="heat_out",
+            ramped=model_block.heat_out,
         )
 
         if (
@@ -2786,11 +2795,12 @@ def availability_at(availability_profile, t: int) -> float:
     return float(availability_profile[t])
 
 
-def add_ramping_constraints(model_block, time_steps, quantity: str = "power_in"):
-    """Limit the change of *quantity* between consecutive time steps.
+def add_ramping_constraints(model_block, time_steps, ramped):
+    """Limit the change of *ramped* variable between consecutive time steps.
 
-    *quantity* names the block variable the ramp limits apply to - ``power_in`` for
-    electric components, ``heat_out`` for thermally driven ones.
+    *ramped* is the Pyomo Var on *model_block* the ramp limits apply to (e.g.
+    ``model_block.power_in`` for electric components, ``model_block.heat_out`` for
+    thermally driven ones).
 
     The first time step has no predecessor, so it is only capped by ``ramp_up`` (how
     fast the component can rise from an assumed standing start of zero). ``ramp_down``
@@ -2799,7 +2809,6 @@ def add_ramping_constraints(model_block, time_steps, quantity: str = "power_in")
     high first-step value the way it would if it were treated as a second, tighter
     absolute cap alongside ``ramp_up``.
     """
-    ramped = getattr(model_block, quantity)
 
     # Ramp-up constraint
     @model_block.Constraint(time_steps)

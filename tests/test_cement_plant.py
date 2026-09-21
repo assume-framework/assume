@@ -1630,5 +1630,70 @@ def test_rolling_horizon_never_overproduces_once_demand_is_met():
     assert total_produced == pytest.approx(10, rel=1e-4)
 
 
+def test_cement_plant_with_none_components():
+    """Initializing CementPlant with components=None should not raise AttributeError."""
+    forecaster = make_forecaster(n=6)
+    plant = CementPlant(
+        id="test_none_components",
+        unit_operator="test_operator",
+        bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
+        forecaster=forecaster,
+        components=None,
+        demand=0,
+    )
+    assert plant.components == {}
+
+
+def test_cement_plant_invalid_forecaster_type():
+    """Passing a non-CementForecaster instance must raise TypeError."""
+    with pytest.raises(TypeError, match="forecaster must be of type CementForecaster"):
+        CementPlant(
+            id="test_invalid_forecaster",
+            unit_operator="test_operator",
+            bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
+            forecaster="not_a_forecaster",
+            components={},
+        )
+
+
+def test_thermal_process_stage_requires_co2_price():
+    """ThermalProcessStage must reject a model missing co2_price."""
+    from assume.units.dst_components import Kiln
+
+    kiln = Kiln(max_heat_out=10, specific_heat_demand=1.7, time_steps=[0, 1])
+    m = pyo.ConcreteModel()
+    m.electricity_price = pyo.Param([0, 1], initialize=10.0)
+    # co2_price is intentionally omitted from m
+    with pytest.raises(ValueError, match="requires a 'co2_price' profile"):
+        kiln.add_to_model(m, pyo.Block())
+
+
+def test_component_schema_unique_keys_in_operations(cement_components):
+    """Component operations dict must have distinct keys for preheater and raw_material_mill."""
+    components = copy.deepcopy(cement_components)
+    components["raw_material_mill"] = {
+        "max_power": 10,
+        "specific_electricity_consumption": 0.02,
+    }
+    forecaster = make_forecaster(n=6)
+    plant = make_plant(
+        components,
+        forecaster,
+        demand=10,
+        plant_id="test_schema_keys",
+        dsm_optimisation_config={
+            "horizon_mode": "rolling_horizon",
+            "look_ahead_horizon": "6h",
+            "commit_horizon": "3h",
+            "rolling_step": "3h",
+        },
+    )
+    plant._check_and_reoptimize_rolling_window(pd.Timestamp("2023-01-01 00:00"))
+    assert len(plant._component_operations) == 3
+    op_row = plant._component_operations[0]
+    assert "preheater_raw_meal_output" in op_row
+    assert "raw_material_mill_output" in op_row
+
+
 if __name__ == "__main__":
     pytest.main(["-s", __file__])

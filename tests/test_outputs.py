@@ -3,9 +3,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import numpy as np
+import pandas as pd
+import pytest
 from sqlalchemy import create_engine
 
 from assume.common.outputs import WriteOutput
@@ -168,3 +170,62 @@ def test_output_write_flows():
 
     output_writer.handle_output_message(content, meta)
     assert len(output_writer.write_buffers["grid_flows"]) == 1, "grid_flows"
+
+
+@pytest.mark.asyncio
+async def test_adaptive_merit_order_forecast_output_schema(tmp_path):
+    simulation_start = datetime(2025, 1, 1)
+    db_uri = f"sqlite:///{tmp_path / 'adaptive-merit-order.db'}"
+    writer = WriteOutput(
+        "adaptive-merit-order-test",
+        simulation_start,
+        simulation_start + timedelta(days=1),
+        None,
+        db_uri=db_uri,
+        export_csv_path=str(tmp_path / "csv"),
+    )
+    writer.db = create_engine(db_uri)
+    record = {
+        "forecast_id": "operator|EOM|issue|product",
+        "unit_operator_id": "operator",
+        "market_id": "EOM",
+        "issue_time": simulation_start,
+        "product_start": simulation_start + timedelta(hours=1),
+        "merit_order_price_forecast": 55.0,
+        "residual_mean_forecast": -4.0,
+        "corrected_price_mean_forecast": 51.0,
+        "residual_std_forecast": 3.0,
+        "price_q10": 47.0,
+        "price_q50": 51.0,
+        "price_q90": 55.0,
+        "training_status": "trained",
+        "training_sample_count": 168,
+        "realised_price": 49.0,
+        "realised_residual": -6.0,
+        "post_forecast_residual": -2.0,
+    }
+    writer.handle_output_message(
+        {
+            "context": "write_results",
+            "type": "adaptive_merit_order_forecast",
+            "data": [record],
+        },
+        {},
+    )
+    frame = writer.convert_adaptive_merit_order_forecasts(
+        writer.write_buffers["adaptive_merit_order_forecast"]
+    )
+
+    assert frame.index.name == "product_start"
+    assert frame.iloc[0]["realised_residual"] == -6
+    await writer.store_dfs()
+    csv_frame = pd.read_csv(
+        tmp_path
+        / "csv"
+        / "adaptive-merit-order-test"
+        / "adaptive_merit_order_forecast.csv"
+    )
+    with writer.db.connect() as connection:
+        db_frame = pd.read_sql("adaptive_merit_order_forecast", connection)
+    assert csv_frame.loc[0, "forecast_id"] == record["forecast_id"]
+    assert db_frame.loc[0, "forecast_id"] == record["forecast_id"]
