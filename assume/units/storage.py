@@ -12,6 +12,7 @@ from assume.common.base import SupportsMinMaxCharge
 from assume.common.exceptions import ValidationError
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import UnitForecaster
+from assume.common.market_objects import MarketConfig, Orderbook
 
 logger = logging.getLogger(__name__)
 EPS = 1e-4
@@ -365,6 +366,34 @@ class Storage(SupportsMinMaxCharge):
         marginal_cost = additional_cost
 
         return marginal_cost
+
+    def set_dispatch_plan(
+        self, marketconfig: MarketConfig, orderbook: Orderbook
+    ) -> None:
+        """Preserve the market-committed energy schedule before SoC clipping.
+
+        Redispatch must start from the schedule accepted in the preceding market.
+        The normal storage dispatch update may clip that schedule to the available
+        state of charge, so the committed value is kept separately for the
+        redispatch baseline.
+        """
+        if orderbook and marketconfig.product_type == "energy":
+            start = min(order["start_time"] for order in orderbook)
+            end_excl = max(order["end_time"] for order in orderbook) - self.index.freq
+            self.outputs["energy_committed"].loc[start:end_excl] = self.outputs[
+                "energy"
+            ].loc[start:end_excl]
+
+            for order in orderbook:
+                order_end_excl = order["end_time"] - self.index.freq
+                accepted_volume = order["accepted_volume"]
+                if isinstance(accepted_volume, dict):
+                    accepted_volume = list(accepted_volume.values())
+                self.outputs["energy_committed"].loc[
+                    order["start_time"] : order_end_excl
+                ] += accepted_volume
+
+        super().set_dispatch_plan(marketconfig, orderbook)
 
     def calculate_soc_max_discharge(self, soc) -> float:
         """

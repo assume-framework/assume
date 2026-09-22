@@ -11,6 +11,7 @@ import pypsa
 from assume.common.grid_utils import (
     add_redispatch_generators,
     add_redispatch_loads,
+    add_redispatch_storages,
     calculate_network_meta,
     get_supported_solver_linopy,
     read_pypsa_grid,
@@ -69,6 +70,9 @@ class RedispatchMarketRole(MarketRole):
             network=self.network,
             loads=self.grid_data["loads"],
         )
+        storage_units = self.grid_data.get("storage_units")
+        if storage_units is not None and not storage_units.empty:
+            add_redispatch_storages(self.network, storage_units)
 
         self.solver_name = get_supported_solver_linopy(
             marketconfig.param_dict.get("solver_name", "highs")
@@ -147,15 +151,26 @@ class RedispatchMarketRole(MarketRole):
         # Generators and loads from the grid data
         generator_names = self.grid_data["generators"].index
         load_names = self.grid_data["loads"].index
+        storage_units = self.grid_data.get("storage_units")
+        storage_names = (
+            storage_units.index if storage_units is not None else pd.Index([])
+        )
 
         gen_cols = p_set.columns.intersection(generator_names)
         load_cols = p_set.columns.intersection(load_names)
+        storage_cols = p_set.columns.intersection(storage_names)
+        exogenous_cols = p_set.columns.difference(
+            gen_cols.union(load_cols).union(storage_cols)
+        )
 
         # 1. Fixed generator dispatch
         gen_p_set = p_set[gen_cols].copy()
 
-        redispatch_network.generators_t.p_set = gen_p_set.reindex(
-            index=redispatch_network.snapshots, columns=gen_cols, fill_value=0.0
+        baseline_cols = gen_cols.union(storage_cols)
+        redispatch_network.generators_t.p_set = p_set[baseline_cols].reindex(
+            index=redispatch_network.snapshots,
+            columns=baseline_cols,
+            fill_value=0.0,
         )
 
         p_nom = p_nom_pivot[gen_cols].copy()
@@ -174,6 +189,30 @@ class RedispatchMarketRole(MarketRole):
             columns=redispatch_network.loads.index,
             fill_value=0.0,
         )
+
+        # Storage and exchange schedules are part of the cleared day-ahead
+        # balance. Keep them as signed, fixed injections so the network solver
+        # does not replace an omitted schedule with backup redispatch.
+        if len(exogenous_cols):
+            exogenous_nodes = (
+                orderbook_df.drop_duplicates("unit_id")
+                .set_index("unit_id")
+                .loc[exogenous_cols, "node"]
+            )
+            exogenous_dispatch = p_set[exogenous_cols].reindex(
+                index=redispatch_network.snapshots, fill_value=0.0
+            )
+            exogenous_p_nom = exogenous_dispatch.abs().max().clip(lower=1.0)
+            exogenous_pu = exogenous_dispatch.div(exogenous_p_nom)
+            redispatch_network.add(
+                "Generator",
+                exogenous_cols,
+                suffix="_fixed_schedule",
+                bus=exogenous_nodes,
+                p_nom=exogenous_p_nom,
+                p_min_pu=exogenous_pu,
+                p_max_pu=exogenous_pu,
+            )
 
         # 3. Redispatch flexibility only for power plants
         # Upward redispatch capacity:
@@ -204,6 +243,42 @@ class RedispatchMarketRole(MarketRole):
         redispatch_network.generators_t.marginal_cost.update(
             costs.add_suffix("_down") * (-1)
         )
+
+        # Storage can move from a signed day-ahead baseline in either direction.
+        # Its own strategy supplies state-of-charge-aware absolute bounds.
+        if len(storage_cols):
+            storage_dispatch = p_set[storage_cols].copy()
+            storage_p_nom = p_nom_pivot[storage_cols].where(
+                p_nom_pivot[storage_cols] != 0, np.inf
+            )
+            storage_pu = storage_dispatch.div(storage_p_nom).clip(lower=-1, upper=1)
+            redispatch_network.generators_t.p_min_pu.update(storage_pu)
+            redispatch_network.generators_t.p_max_pu.update(storage_pu)
+
+            storage_up = (
+                (max_power_pivot[storage_cols] - storage_dispatch)
+                .div(storage_p_nom)
+                .clip(lower=0, upper=1)
+            )
+            storage_down = (
+                (storage_dispatch - min_power_pivot[storage_cols])
+                .div(storage_p_nom)
+                .clip(lower=0, upper=1)
+            )
+            storage_costs = price_pivot[storage_cols]
+            redispatch_network.generators_t.p_max_pu.update(
+                storage_up.add_suffix("_up")
+            )
+            redispatch_network.generators_t.p_max_pu.update(
+                storage_down.add_suffix("_down")
+            )
+            redispatch_network.generators_t.marginal_cost.update(
+                storage_costs.add_suffix("_up")
+            )
+            # Charging is an absorption service, not an avoided fuel cost.
+            redispatch_network.generators_t.marginal_cost.update(
+                (storage_costs * 0.0).add_suffix("_down")
+            )
 
         # run linear powerflow
         redispatch_network.lpf()

@@ -96,6 +96,49 @@ def add_redispatch_generators(
     )
 
 
+def add_redispatch_storages(network: pypsa.Network, storages: pd.DataFrame) -> None:
+    """Add bidirectional storage baselines and redispatch headroom to a grid."""
+    zeros = pd.DataFrame(
+        np.zeros((len(network.snapshots), len(storages.index))),
+        index=network.snapshots,
+        columns=storages.index,
+    )
+    # Charge power is negative, so this is the full charge-to-discharge span.
+    p_nom = storages["max_power_discharge"] - storages["max_power_charge"]
+    network.add(
+        "Generator",
+        name=storages.index,
+        bus=storages["node"],
+        p_nom=p_nom,
+        p_set=zeros,
+        p_min_pu=zeros,
+        p_max_pu=zeros,
+        sign=1,
+    )
+    network.add(
+        "Generator",
+        name=storages.index,
+        suffix="_up",
+        bus=storages["node"],
+        p_nom=p_nom,
+        p_min_pu=zeros,
+        p_max_pu=zeros + 1,
+        marginal_cost=zeros,
+        sign=1,
+    )
+    network.add(
+        "Generator",
+        name=storages.index,
+        suffix="_down",
+        bus=storages["node"],
+        p_nom=p_nom,
+        p_min_pu=zeros,
+        p_max_pu=zeros + 1,
+        marginal_cost=zeros,
+        sign=-1,
+    )
+
+
 def add_redispatch_loads(
     network: pypsa.Network,
     loads: pd.DataFrame,

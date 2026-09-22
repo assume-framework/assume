@@ -217,6 +217,78 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
             unit.outputs["total_costs"].loc[start:end_excl] = costs
 
 
+class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
+    """Offer SoC-aware storage flexibility in both redispatch directions."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.foresight = parse_duration(kwargs.get("eom_foresight", "12h"))
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMaxCharge,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        theoretic_soc = unit.outputs["soc"].at[product_tuples[0][0]]
+        p_nom = unit.max_power_discharge - unit.max_power_charge
+        price_forecast = unit.forecaster.price.get(
+            "EOM", unit.forecaster.price.get(market_config.market_id)
+        )
+        if price_forecast is None:
+            price_forecast = next(iter(unit.forecaster.price.values()))
+
+        bids = []
+        for start, end, only_hours in product_tuples:
+            # This is the schedule cleared in the previous market. It is kept
+            # separately because the executable storage schedule may be clipped
+            # later by the state-of-charge update.
+            current_power = unit.outputs["energy_committed"].at[start]
+            _, discharge_headroom = unit.calculate_min_max_discharge(
+                start, end, soc=theoretic_soc
+            )
+            _, charge_headroom = unit.calculate_min_max_charge(
+                start, end, soc=theoretic_soc
+            )
+            max_power = current_power + discharge_headroom[0]
+            min_power = current_power + charge_headroom[0]
+            average_price = calculate_price_average(
+                current_time=start,
+                foresight=self.foresight,
+                price_forecast=price_forecast,
+            )
+            price = (
+                average_price / (unit.efficiency_charge * unit.efficiency_discharge)
+                + unit.additional_cost_charge
+                + unit.additional_cost_discharge
+            )
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": only_hours,
+                    "price": price,
+                    "volume": current_power,
+                    "max_power": max_power,
+                    "min_power": min_power,
+                    "p_nom": p_nom,
+                    "node": unit.node,
+                }
+            )
+
+            duration = (end - start) / timedelta(hours=1)
+            if current_power > 0:
+                theoretic_soc -= (
+                    current_power * duration / unit.efficiency_discharge / unit.capacity
+                )
+            elif current_power < 0:
+                theoretic_soc -= (
+                    current_power * duration * unit.efficiency_charge / unit.capacity
+                )
+        return bids
+
+
 class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
     """
     The strategy is analogue to the storage strategy in flexABLE.

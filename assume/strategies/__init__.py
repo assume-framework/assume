@@ -15,6 +15,7 @@ from assume.strategies.flexable import (
 )
 from assume.strategies.flexable_storage import (
     StorageEnergyHeuristicFlexableStrategy,
+    StorageEnergyHeuristicRedispatchStrategy,
     StorageCapacityHeuristicBalancingNegStrategy,
     StorageCapacityHeuristicBalancingPosStrategy,
 )
@@ -22,6 +23,7 @@ from assume.strategies.naive_strategies import (
     DsmEnergyOptimizationStrategy,
     EnergyNaiveProfileStrategy,
     DsmEnergyNaiveRedispatchStrategy,
+    EnergyFixedRedispatchStrategy,
     EnergyNaiveRedispatchStrategy,
     EnergyNaiveStrategy,
     ExchangeEnergyNaiveStrategy,
@@ -75,6 +77,7 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "powerplant_capacity_heuristic_balancing_neg": CapacityHeuristicBalancingNegStrategy,
     "powerplant_capacity_heuristic_balancing_pos": CapacityHeuristicBalancingPosStrategy,
     "storage_energy_heuristic_flexable": StorageEnergyHeuristicFlexableStrategy,
+    "storage_energy_heuristic_redispatch": StorageEnergyHeuristicRedispatchStrategy,
     "storage_capacity_heuristic_balancing_neg": StorageCapacityHeuristicBalancingNegStrategy,
     "storage_capacity_heuristic_balancing_pos": StorageCapacityHeuristicBalancingPosStrategy,
     "household_capacity_heuristic_balancing_pos": DsmCapacityHeuristicBalancingStrategy,
@@ -83,6 +86,8 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "industry_capacity_heuristic_balancing_neg": DsmCapacityHeuristicBalancingStrategy,
     "powerplant_energy_naive_redispatch": EnergyNaiveRedispatchStrategy,
     "demand_energy_naive_redispatch": EnergyNaiveRedispatchStrategy,
+    "storage_energy_fixed_redispatch": EnergyFixedRedispatchStrategy,
+    "exchange_energy_fixed_redispatch": EnergyFixedRedispatchStrategy,
     "household_energy_optimization": DsmEnergyOptimizationStrategy,
     "industry_energy_optimization": DsmEnergyOptimizationStrategy,
     "household_energy_naive_redispatch": DsmEnergyNaiveRedispatchStrategy,

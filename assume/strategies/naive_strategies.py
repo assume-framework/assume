@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 
-from assume.common.base import MinMaxStrategy, SupportsMinMax
+from assume.common.base import MinMaxChargeStrategy, MinMaxStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 
 
@@ -328,6 +328,39 @@ class EnergyNaiveRedispatchStrategy(MinMaxStrategy):
             # update previous power for the next iteration
             previous_power = current_power
 
+        return bids
+
+
+class EnergyFixedRedispatchStrategy(MinMaxChargeStrategy):
+    """Submit an already-cleared schedule as a fixed nodal injection.
+
+    Storage and border exchanges must be present in the redispatch power balance
+    even when they do not offer redispatch flexibility themselves.
+    """
+
+    def calculate_bids(
+        self,
+        unit,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        bids = []
+        for start, end, only_hours in product_tuples:
+            volume = unit.outputs["energy"].at[start]
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": only_hours,
+                    "price": 0.0,
+                    "volume": volume,
+                    "max_power": volume,
+                    "min_power": volume,
+                    "p_nom": max(abs(volume), 1.0),
+                    "node": unit.node,
+                }
+            )
         return bids
 
 
