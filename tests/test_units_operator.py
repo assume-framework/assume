@@ -155,6 +155,7 @@ def test_adaptive_merit_order_forecast_lifecycle():
         market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
     )
     forecaster = Mock()
+    forecaster.get_adaptive_merit_order_forecast.return_value = []
     forecaster.update_adaptive_merit_order_forecast.return_value = []
     units_operator = UnitsOperator([marketconfig], forecaster=forecaster)
     units_operator.id = "operator"

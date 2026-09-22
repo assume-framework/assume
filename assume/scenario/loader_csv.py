@@ -1137,6 +1137,15 @@ def setup_world(
             forecast_algorithms=operator_forecast_algorithms.get(
                 op, config_forecast_algorithms
             ),
+            # the adaptive correction initializes by running a full
+            # merit-order clearing over every unit the operator manages, so
+            # it is only worth the cost for operators whose bidding strategies
+            # actually consume a forward price series (storage arbitrage does;
+            # a power-plant operator with hundreds of units otherwise pays
+            # this cost on every run for no behavioural change)
+            enable_adaptive_merit_order=any(
+                u["unit_type"] == "storage" for u in units[op]
+            ),
         )
         for op in set(units.keys())
     }

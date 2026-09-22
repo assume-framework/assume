@@ -166,6 +166,7 @@ examples/inputs/NachfrageNiedrig_RN_BID
 examples/inputs/Technologiemix_RN_BID
 examples/inputs/WCMean_BID
 examples/inputs/WCTail_BID
+examples/inputs/example_2019_update
 examples/notebooks/outputs
 **/scenario/*.csv
 *.pb

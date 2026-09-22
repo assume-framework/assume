@@ -368,6 +368,7 @@ class World:
             outputs_buffer_size_mb=self.scenario_data["config"].get(
                 "outputs_buffer_size_mb", 300
             ),
+            write_tables=self.scenario_data["config"].get("output_tables"),
         )
         if not self.output_agent_addr:
             return

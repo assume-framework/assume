@@ -50,6 +50,10 @@ class WriteOutput(Role):
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
         evaluation_mode (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
         additional_kpis (dict[str, OutputDef], optional): makes it possible to define additional kpis evaluated
+        write_tables (list[str], optional): restricts output to these tables, e.g.
+            ``["market_meta", "market_orders"]``. Data for every other table is discarded as
+            soon as it arrives, so it costs neither memory nor write time. ``None`` (the
+            default) writes all tables.
     """
 
     def __init__(
@@ -66,8 +70,12 @@ class WriteOutput(Role):
         episode: int = None,
         eval_episode: int = None,
         additional_kpis: dict[str, OutputDef] = {},
+        write_tables: list[str] | None = None,
     ):
         super().__init__()
+
+        # None means "write everything"; a set means only these tables are kept
+        self.write_tables = set(write_tables) if write_tables else None
 
         # store needed date
         self.simulation_id = simulation_id
@@ -228,6 +236,16 @@ class WriteOutput(Role):
 
         if content_data is None or len(content_data) == 0:
             return
+
+        # drop unwanted tables here rather than in store_dfs, so that they cost
+        # no buffer memory and no dataframe conversion either
+        if self.write_tables is not None:
+            if content_type == "store_units":
+                table_name = content_data["unit_type"] + "_meta"
+            else:
+                table_name = content_type
+            if table_name not in self.write_tables:
+                return
 
         if content_type in [
             "market_meta",
@@ -483,6 +501,11 @@ class WriteOutput(Role):
 
         for table, data_list in self.write_buffers.items():
             if len(data_list) == 0:
+                continue
+
+            # rl_meta is seeded directly into the buffer, so filter here as well
+            if self.write_tables is not None and table not in self.write_tables:
+                data_list.clear()
                 continue
 
             df = None

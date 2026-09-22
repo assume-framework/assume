@@ -225,16 +225,37 @@ class UnitsOperator(Role):
         marketconfig = self.registered_markets.get(opening["market_id"])
         if (
             self.forecaster
+            and getattr(self.forecaster, "enable_adaptive_merit_order", False)
             and marketconfig
             and marketconfig.product_type == "energy"
             and opening["products"]
+            # matches the eligibility checks inside
+            # calculate_adaptive_merit_order_forecast_inputs -- skip up front
+            # instead of paying for an exception every opening on markets
+            # that will never qualify (e.g. nodal redispatch, pay-as-bid CRM)
+            and not marketconfig.param_dict.get("grid_data")
+            and marketconfig.market_mechanism != "pay_as_bid"
+            and marketconfig.param_dict.get("pricing_mechanism") != "pay_as_bid"
         ):
             horizon = max(product[1] for product in opening["products"]) - min(
                 product[0] for product in opening["products"]
             )
-            self.forecaster.get_adaptive_merit_order_forecast(
+            issued = self.forecaster.get_adaptive_merit_order_forecast(
                 opening["market_id"], opening["start_time"], horizon
             )
+            # feed the corrected mean back into the plain price series that
+            # bidding strategies actually read (e.g. storage arbitrage does
+            # unit.forecaster.price[market_id] over a lookahead window) -- the
+            # adaptive method itself only issues/logs forecasts, it does not
+            # touch that series on its own.
+            market_id = opening["market_id"]
+            for row in issued:
+                for unit in self.units.values():
+                    price = getattr(unit.forecaster, "price", None)
+                    if price is not None and market_id in price:
+                        price[market_id].at[row["product_start"]] = row[
+                            "corrected_price_mean_forecast"
+                        ]
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening, meta))
 
     def handle_market_feedback(self, content: ClearingMessage, meta: MetaDict) -> None:
@@ -254,7 +275,11 @@ class UnitsOperator(Role):
             order["market_id"] = content["market_id"]
 
         marketconfig = self.registered_markets[content["market_id"]]
-        if self.forecaster and marketconfig.product_type == "energy":
+        if (
+            self.forecaster
+            and getattr(self.forecaster, "enable_adaptive_merit_order", False)
+            and marketconfig.product_type == "energy"
+        ):
             clearing_prices = {}
             for order in accepted_orders:
                 accepted_price = order.get("accepted_price")

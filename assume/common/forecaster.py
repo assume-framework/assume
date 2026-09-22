@@ -1203,6 +1203,7 @@ class UnitsOperatorForecaster(UnitForecaster):
         residual_load: dict[str, ForecastSeries] = None,
         forecast_algorithms: dict[str, str] = {},
         forecast_registries: dict[str, dict] = None,
+        enable_adaptive_merit_order: bool = False,
         **kwargs,
     ):
         super().__init__(
@@ -1217,6 +1218,11 @@ class UnitsOperatorForecaster(UnitForecaster):
         self._adaptive_merit_order_units: tuple[BaseUnit, ...] = ()
         self._adaptive_merit_order_markets: dict[str, MarketConfig] = {}
         self.unit_operator_id = "operator"
+        # Off by default: initializing the model runs a full merit-order
+        # clearing over every unit this operator manages, which is only worth
+        # paying for on operators whose units actually consume a forward price
+        # series (e.g. storage arbitrage) -- see UnitsOperator.handle_opening.
+        self.enable_adaptive_merit_order = enable_adaptive_merit_order
 
         for k, v in kwargs.items():
             if isinstance(v, pd.Series):
