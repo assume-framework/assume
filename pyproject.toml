@@ -44,6 +44,7 @@ dependencies = [
     "pyomo >=6.8.0",
     "xarray <v2026.04.0", # https://github.com/assume-framework/assume/issues/790
     "highspy",
+    "protobuf >= 7.36.2"  # Protobuf update for usage in GoogleColab.
 ]
 
 [project.optional-dependencies]
