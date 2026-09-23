@@ -953,21 +953,6 @@ def setup_world(
             f"Current value: {save_frequency_hours}."
         )
 
-    # Disable save frequency if CSV export is enabled
-    if world.export_csv_path and save_frequency_hours is not None:
-        save_frequency_hours = None
-        logger.info(
-            "save_frequency_hours is disabled due to CSV export being enabled. "
-            "Data will be stored in the CSV files at the end of the simulation."
-        )
-
-        # If PostgreSQL database is in use, warn the user about end-of-simulation saving
-        if world.db_uri is not None and "postgresql" in world.db_uri:
-            logger.warning(
-                "Data will be stored in the PostgreSQL database only at the end of the simulation due to CSV export being enabled. "
-                "Disable CSV export to save data at regular intervals (export_csv_path = '')."
-            )
-
     bidding_params = config.get("bidding_strategy_params", {})
 
     if config.get("learning_mode"):
