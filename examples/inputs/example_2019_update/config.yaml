@@ -21,6 +21,11 @@ base_case_2019:
     quantile_initial_iterations: 100
     quantile_update_iterations: 10
 
+  # CRM bids reserve power in four-hour blocks. The opening on 2018-12-31
+  # procures the first block delivered at the start of 2019.
+  bidding_strategy_params:
+    crm_foresight: 4h
+
   markets_config:
     EOM:
       operator: EOM_operator
@@ -38,6 +43,40 @@ base_case_2019:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
+
+    CRM_pos:
+      operator: CRM_operator
+      product_type: capacity_pos
+      start_date: 2018-12-31 20:00
+      products:
+        - duration: 4h
+          count: 1
+          first_delivery: 4h
+      opening_frequency: 4h
+      opening_duration: 1h
+      volume_unit: MW
+      maximum_bid_volume: 100000
+      maximum_bid_price: 9999
+      minimum_bid_price: -9999
+      price_unit: EUR/MW
+      market_mechanism: pay_as_bid
+
+    CRM_neg:
+      operator: CRM_operator
+      product_type: capacity_neg
+      start_date: 2018-12-31 20:00
+      products:
+        - duration: 4h
+          count: 1
+          first_delivery: 4h
+      opening_frequency: 4h
+      opening_duration: 1h
+      volume_unit: MW
+      maximum_bid_volume: 100000
+      maximum_bid_price: 9999
+      minimum_bid_price: -9999
+      price_unit: EUR/MW
+      market_mechanism: pay_as_bid
 
     redispatch:
       operator: network_operator
