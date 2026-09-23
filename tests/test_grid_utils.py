@@ -13,6 +13,7 @@ import pypsa
 from assume.common.grid_utils import (
     add_redispatch_generators,
     add_redispatch_loads,
+    add_redispatch_storages,
     read_pypsa_grid,
 )
 
@@ -131,6 +132,23 @@ def test_add_redispatch_generators(n_2bus_1line, generators_for_n_2_bus_1line):
     assert actual_down_generators["marginal_cost"].to_numpy() == pytest.approx(
         expected_down_generators["marginal_cost"].to_numpy(), abs=1e-6, rel=0
     )
+
+
+def test_add_redispatch_storages_uses_charge_and_discharge_span(n_2bus_1line):
+    storages = pd.DataFrame(
+        {
+            "name": ["storage"],
+            "node": ["N"],
+            "max_power_charge": [25.0],
+            "max_power_discharge": [35.0],
+        }
+    ).set_index("name")
+
+    add_redispatch_storages(n_2bus_1line, storages)
+
+    assert n_2bus_1line.generators.loc[
+        ["storage", "storage_up", "storage_down"], "p_nom"
+    ].to_list() == [60.0, 60.0, 60.0]
 
 
 def test_add_redispatch_loads(n_2bus_1line, loads_for_n_2_bus_1line):

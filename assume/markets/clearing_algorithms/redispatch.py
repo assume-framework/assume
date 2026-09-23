@@ -167,11 +167,6 @@ class RedispatchMarketRole(MarketRole):
         gen_p_set = p_set[gen_cols].copy()
 
         baseline_cols = gen_cols.union(storage_cols)
-        redispatch_network.generators_t.p_set = p_set[baseline_cols].reindex(
-            index=redispatch_network.snapshots,
-            columns=baseline_cols,
-            fill_value=0.0,
-        )
 
         p_nom = p_nom_pivot[gen_cols].copy()
 
@@ -213,6 +208,29 @@ class RedispatchMarketRole(MarketRole):
                 p_min_pu=exogenous_pu,
                 p_max_pu=exogenous_pu,
             )
+
+        # ``p_set`` is needed only for the initial linear power flow. PyPSA
+        # turns every non-null entry into an equality constraint during
+        # optimisation, so a partially assigned table would silently fix the
+        # backup and redispatch generators at zero. Keep a complete table with
+        # null entries for flexible generators and fill fixed schedules only.
+        fixed_dispatch = pd.DataFrame(
+            np.nan,
+            index=redispatch_network.snapshots,
+            columns=redispatch_network.generators.index,
+        )
+        fixed_dispatch.loc[:, baseline_cols] = p_set[baseline_cols].reindex(
+            index=redispatch_network.snapshots,
+            columns=baseline_cols,
+            fill_value=0.0,
+        )
+        if len(exogenous_cols):
+            fixed_dispatch.loc[:, exogenous_cols] = p_set[exogenous_cols].reindex(
+                index=redispatch_network.snapshots,
+                columns=exogenous_cols,
+                fill_value=0.0,
+            )
+        redispatch_network.generators_t.p_set = fixed_dispatch
 
         # 3. Redispatch flexibility only for power plants
         # Upward redispatch capacity:
@@ -282,6 +300,15 @@ class RedispatchMarketRole(MarketRole):
 
         # run linear powerflow
         redispatch_network.lpf()
+
+        # Fixed schedules are enforced by their equal p_min_pu/p_max_pu bounds
+        # below. Remove the power-flow-only p_set constraints so up/down and
+        # backup generators remain available to the optimizer.
+        redispatch_network.generators_t.p_set = pd.DataFrame(
+            np.nan,
+            index=redispatch_network.snapshots,
+            columns=redispatch_network.generators.index,
+        )
 
         # check lines for congestion where power flow is larger than s_nom * s_max_pu
         line_loading = redispatch_network.lines_t.p0.abs() / (

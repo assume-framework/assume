@@ -103,8 +103,10 @@ def add_redispatch_storages(network: pypsa.Network, storages: pd.DataFrame) -> N
         index=network.snapshots,
         columns=storages.index,
     )
-    # Charge power is negative, so this is the full charge-to-discharge span.
-    p_nom = storages["max_power_discharge"] - storages["max_power_charge"]
+    # Input tables store charge power as a positive magnitude, while dispatch
+    # uses a negative sign for charging. The nominal span must therefore cover
+    # both directions.
+    p_nom = storages["max_power_discharge"] + storages["max_power_charge"]
     network.add(
         "Generator",
         name=storages.index,
