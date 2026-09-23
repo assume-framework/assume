@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -17,7 +18,10 @@ from assume.strategies import (
     EnergyNaiveProfileStrategy,
     EnergyNaiveStrategy,
 )
-from assume.strategies.naive_strategies import EnergyNaiveRedispatchStrategy
+from assume.strategies.naive_strategies import (
+    EnergyFixedRedispatchStrategy,
+    EnergyNaiveRedispatchStrategy,
+)
 from tests.conftest import MockMinMaxUnit
 
 start = datetime(2023, 7, 1)
@@ -242,6 +246,25 @@ def test_naive_redispatch_strategy(
     assert [bids[i]["price"] for i in range(len(bids))] == pytest.approx(
         [3] * len(bids)
     )  # should bid at marginal cost, which are set to 3 in MockMinMaxUnit
+
+
+def test_fixed_redispatch_strategy_preserves_signed_schedule():
+    strategy = EnergyFixedRedispatchStrategy()
+    products = [
+        (start, start + timedelta(hours=1), None),
+        (start + timedelta(hours=1), start + timedelta(hours=2), None),
+    ]
+    unit = SimpleNamespace(
+        node="south",
+        outputs={"energy": pd.Series([50.0, -30.0], index=[p[0] for p in products])},
+    )
+
+    bids = strategy.calculate_bids(unit, None, products)
+
+    assert [bid["volume"] for bid in bids] == [50.0, -30.0]
+    assert [bid["min_power"] for bid in bids] == [50.0, -30.0]
+    assert [bid["max_power"] for bid in bids] == [50.0, -30.0]
+    assert [bid["node"] for bid in bids] == ["south", "south"]
 
 
 if __name__ == "__main__":
