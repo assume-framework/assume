@@ -206,6 +206,29 @@ class BaseUnit:
             generation_costs
         )
 
+    def update_avg_op_time(self, start: datetime, end: datetime) -> None:
+        """
+        Updates the average operation time from the dispatch which was just executed.
+
+        It needs to be called once per unit and time step after the dispatch has been
+        executed, so that the average operation time is based on the actual dispatch and
+        avoids double-counting in case of multiple market dispatches.
+
+        Args:
+            start (datetime.datetime): The start of the executed range.
+            end (datetime.datetime): The end of the executed range, inclusive.
+        """
+        start = max(start, self.index[0])
+
+        # Increment total operation time for operating periods in the executed range
+        self.total_op_time += (self.outputs["energy"].loc[start:end] > 0).sum()
+
+        # Update the average operation time
+        total_periods = (
+            len(self.index[:end]) + 1
+        )  # Total periods up to and including 'end'
+        self.avg_op_time = self.total_op_time / total_periods
+
     def execute_current_dispatch(
         self,
         start: datetime,
