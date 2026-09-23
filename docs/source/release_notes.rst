@@ -59,6 +59,7 @@ Upcoming Release
   - **Fix errors in portfolio learning strategies**: The ``min_max_rescale`` function was missing from ``utils.py``, causing an ``ImportError`` in ``portfolio_learning_strategies.py``. Resolved by extending ``min_max_scale`` to cover the rescaling use case. And fix minor construction bug for observation space.
   - **Skip torch seeding when torch is installed but not used**: Irrelevant seeding was performed and a warning was thrown about deterministic PyTorch behavior, even though simulation does not use RL. This is fixed by only setting the PyTorch seeds when learning is active.
   - **Fix bug in redispatch mechanism**: Fixed the bug in redispatch evaluation due to PyPSA's version upgrade. In ``PyPSA >= 0.35.2`` (released in February 2025) the sign of load was not taken into account correctly & since the fixed EOM dispatch was modelled as a load with positive sign which was resulting in incorrect redispatch amounts.
+  - **Fix loss of the last ``train_freq`` window during learning**: Tasks scheduled at exactly the simulation end were started by the run loop but never awaited, because tasks registered with ``src="no_wait"`` are excluded from mango's termination detection. The run loop now drains all remaining tasks before shutting the container down.
 
 0.6.0 - (18th March 2026)
 =========================
