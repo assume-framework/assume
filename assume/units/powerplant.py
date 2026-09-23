@@ -35,13 +35,13 @@ class PowerPlant(SupportsMinMax):
         emission_factor (float, optional): The emission factor associated with the power plant's fuel type (tons of CO2 emissions per MWh). Defaults to 0.0.
         ramp_up (Union[float, None], optional): The ramp-up rate of the power plant, indicating how quickly it can increase power output. Defaults to None.
         ramp_down (Union[float, None], optional): The ramp-down rate of the power plant, indicating how quickly it can decrease power output. Defaults to None.
-        hot_start_cost (float, optional): The cost of a hot start, where the power plant is restarted after a recent shutdown. Defaults to 0.
-        warm_start_cost (float, optional): The cost of a warm start, where the power plant is restarted after a moderate downtime. Defaults to 0.
-        cold_start_cost (float, optional): The cost of a cold start, where the power plant is restarted after a prolonged downtime. Defaults to 0.
-        min_operating_time (float, optional): The minimum duration that the power plant must operate once started, in hours. Defaults to 0.
-        min_down_time (float, optional): The minimum downtime required after a shutdown before the power plant can be restarted, in hours. Defaults to 0.
-        downtime_hot_start (int, optional): The downtime required after a hot start before the power plant can be restarted, in hours. Defaults to 8.
-        downtime_warm_start (int, optional): The downtime required after a warm start before the power plant can be restarted, in hours. Defaults to 48.
+        hot_start_cost (float, optional): The cost of a hot start [in €/MW installed capacity], where the power plant is restarted after a recent shutdown. Defaults to 0.0.
+        warm_start_cost (float, optional): The cost of a warm start [in €/MW installed capacity], where the power plant is restarted after a moderate downtime. Defaults to 0.0.
+        cold_start_cost (float, optional): The cost of a cold start [in €/MW installed capacity], where the power plant is restarted after a prolonged downtime. Defaults to 0.0.
+        min_operating_time (float, optional): The minimum duration that the power plant must operate once started, in hours. Defaults to 0.0.
+        min_down_time (float, optional): The minimum downtime required after a shutdown before the power plant can be restarted, in hours. Defaults to 0.0.
+        downtime_hot_start (float, optional): The downtime threshold for hot start classification, in hours. If the unit has been shut down for this long or less, a hot start cost applies. Defaults to 0.0.
+        downtime_warm_start (float, optional): The downtime threshold for warm start classification, in hours. If the unit has been shut down for longer than downtime_hot_start but this long or less, a warm start cost applies. Defaults to 0.0.
         max_heat_extraction (float, optional): The maximum amount of heat that the power plant can extract for external use, in some suitable unit. Defaults to 0.
         location (Tuple[float, float], optional): The geographical coordinates (latitude and longitude) of the power plant's location. Defaults to (0.0, 0.0).
         node (str, optional): The identifier of the electrical bus or network node to which the power plant is connected. Defaults to "node0".
@@ -64,14 +64,14 @@ class PowerPlant(SupportsMinMax):
         emission_factor: float = 0.0,
         ramp_up: float | None = None,
         ramp_down: float | None = None,
-        hot_start_cost: float = 0,
-        warm_start_cost: float = 0,
-        cold_start_cost: float = 0,
-        min_operating_time: int = 1,  # hours
-        min_down_time: int = 1,  # hours
-        downtime_hot_start: int = 0,  # hours
-        downtime_warm_start: int = 0,  # hours
-        max_heat_extraction: float = 0,
+        hot_start_cost: float = 0.0,
+        warm_start_cost: float = 0.0,
+        cold_start_cost: float = 0.0,
+        min_operating_time: float = 1.0,  # hours, but I really don't like this. It should be 0 as a default.
+        min_down_time: float = 1.0,  # hours
+        downtime_hot_start: float = 0.0,  # hours
+        downtime_warm_start: float = 0.0,  # hours
+        max_heat_extraction: float = 0.0,
         location: tuple[float, float] = (0.0, 0.0),
         node: str = "node0",
         **kwargs,
@@ -144,26 +144,27 @@ class PowerPlant(SupportsMinMax):
         self.ramp_down = None if ramp_down == 0 else ramp_down
         self.ramp_up = None if ramp_up == 0 else ramp_up
 
+        # Convert time parameters from hours to index steps
+        hours_to_steps = timedelta(hours=1) / self.index.freq
+
         if min_operating_time < 0:
             raise ValidationError(
-                message=f"{min_operating_time=} must be > 0 for unit {self.id}",
+                message=f"{min_operating_time=} must be > 0 for unit {self.id}",  # operator not alingned with statement above
                 id=self.id,
                 field="min_operating_time",
             )
-        self.min_operating_time = min_operating_time
+        self.min_operating_time = min_operating_time * hours_to_steps
+
         if min_down_time < 0:
             raise ValidationError(
                 message=f"{min_down_time=} must be > 0 for unit {self.id}",
                 id=self.id,
                 field="min_down_time",
             )
-        self.min_down_time = min_down_time
-        self.downtime_hot_start = downtime_hot_start / (
-            self.index.freq / timedelta(hours=1)
-        )
-        self.downtime_warm_start = downtime_warm_start / (
-            self.index.freq / timedelta(hours=1)
-        )
+        self.min_down_time = min_down_time * hours_to_steps
+
+        self.downtime_hot_start = downtime_hot_start * hours_to_steps
+        self.downtime_warm_start = downtime_warm_start * hours_to_steps
 
         self.marginal_cost = self.calc_simple_marginal_cost()
 
@@ -193,7 +194,6 @@ class PowerPlant(SupportsMinMax):
             current_power = self.outputs["energy"].at[t]
             previous_power = self.get_output_before(t)
             op_time = self.get_operation_time(t)
-
             current_power = self.calculate_ramp(op_time, previous_power, current_power)
 
             if current_power > 0:
@@ -202,7 +202,75 @@ class PowerPlant(SupportsMinMax):
 
             self.outputs["energy"].at[t] = current_power
 
+        # Book start-up and variable generation costs from the finalized
+        # dispatch. Both helpers overwrite their output series, which keeps
+        # the computation idempotent when execute_current_dispatch is called
+        # multiple times per simulation tick (once per cleared market).
+        self._book_start_costs(start, end, "energy")
+        self.calculate_generation_cost(start, end, "energy")
         return self.outputs["energy"].loc[start:end]
+
+    def get_starting_costs(self, op_time: float) -> float:
+        """
+        Returns the start-up cost for the given operation time.
+
+        If ``op_time`` is positive, the unit is running and no start-up cost is
+        returned. Otherwise the cost is selected from the hot / warm / cold
+        tiers based on how many index steps the unit has been shut down.
+
+        Args:
+            op_time: The operation time, in index steps. Positive if running,
+                negative (as produced by :meth:`get_operation_time`) if it was
+                shut down.
+
+        Returns:
+            The start-up cost applicable to the given operation time.
+        """
+        if op_time > 0:
+            return 0
+
+        downtime = abs(op_time)
+        if downtime <= self.downtime_hot_start:
+            return self.hot_start_cost
+        if downtime <= self.downtime_warm_start:
+            return self.warm_start_cost
+        return self.cold_start_cost
+
+    def _book_start_costs(
+        self, start: datetime, end: datetime, product_type: str = "energy"
+    ) -> None:
+        """
+        Recomputes and overwrites ``{product_type}_start_costs`` for the window.
+
+        A start-up cost is booked at step ``t`` iff the unit transitions from
+        non-operating to operating between ``t - freq`` and ``t`` in the final,
+        multi-market-aggregated ``outputs[product_type]`` series. The amount is
+        taken from :meth:`get_starting_costs` using the operation time observed
+        just before ``t``.
+
+        Idempotent: calling it repeatedly with the same
+        ``outputs[product_type]`` history produces the same series. Must be
+        called after :meth:`calculate_ramp` has finalized the dispatch, so
+        starts that are suppressed by ``min_down_time`` are not charged.
+        """
+        if start not in self.index:
+            start = self.index[0]
+
+        energy = self.outputs[product_type]
+        start_cost_key = f"{product_type}_start_costs"
+
+        for t in self.index[start:end]:
+            self.outputs[start_cost_key].at[t] = 0.0
+
+            if energy.at[t] <= 0:
+                continue
+
+            prev_energy = self.get_output_before(t, product_type)
+            if prev_energy > 0:
+                continue
+
+            op_time = self.get_operation_time(t)
+            self.outputs[start_cost_key].at[t] = self.get_starting_costs(op_time)
 
     def calc_simple_marginal_cost(
         self,
@@ -401,3 +469,15 @@ class PowerPlant(SupportsMinMax):
         )
 
         return unit_dict
+
+    def get_max_lookback_op_time(self):
+        # Add one time step to the warm/hot-start threshold so the window is big enough to
+        # distinguish warm/hot from cold starts (downtime > downtime_warm_start).
+        max_time = max(
+            self.min_operating_time,
+            self.min_down_time,
+            self.downtime_hot_start + 1.0,
+            self.downtime_warm_start + 1.0,
+            1.0,
+        )
+        return max_time
