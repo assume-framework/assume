@@ -221,14 +221,13 @@ class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
                 profit[idx] += accepted_price * accepted_volume
 
         # consideration of start-up costs
+        # TODO: needs to be attributed in case of multiple markets, because the start-up costs are overall and not per market
         for i, start in enumerate(products_index):
             op_time = unit.get_operation_time(start)
 
             output = unit.outputs[product_type].at[start]
             marginal_cost = unit.calculate_marginal_cost(start, output)
-            costs[i] += (
-                marginal_cost * output
-            )  # TODO: only base the costs on the actual market contribution (accepted volume)
+            costs[i] += marginal_cost * output
 
             if output != 0 and op_time < 0:
                 start_up_cost = unit.get_starting_costs(op_time)

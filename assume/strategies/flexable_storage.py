@@ -210,7 +210,7 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
                 outputs != 0,
                 np.abs(outputs)
                 * np.array([unit.calculate_marginal_cost(start, x) for x in outputs]),
-                0,  # TODO: check if this is correct for step-wise marginal costs, shouldn't it be the area under the curve?
+                0,
             )
 
             unit.outputs["profit"].loc[start:end_excl] += (

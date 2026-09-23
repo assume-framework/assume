@@ -201,9 +201,7 @@ class BaseUnit:
             self.calculate_marginal_cost(t, product_data[idx])
             for idx, t in enumerate(self.index[start:end])
         ]
-        generation_costs = np.abs(
-            marginal_costs * product_data
-        )  # TODO: generation costs need to be the integral of the marginal costs over the power output, not just the product of the two. This is a simplification and may not accurately reflect the true generation costs for partial efficiencies or step-wise mc functions.
+        generation_costs = np.abs(marginal_costs * product_data)
         self.outputs[f"{product_type}_generation_costs"].loc[start:end] = (
             generation_costs
         )

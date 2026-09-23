@@ -595,7 +595,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         end_excl = end - unit.index.freq
 
         # Depending on how the unit calculates marginal costs, retrieve cost values.
-        marginal_cost = unit.calculate_marginal_cost(  # TODO: check what about step-wise mc or partial efficiencies?
+        marginal_cost = unit.calculate_marginal_cost(
             start, unit.outputs[product_type].at[start]
         )
         market_clearing_price = orderbook[0]["accepted_price"]
@@ -617,16 +617,13 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
 
             # Calculate profit as income minus operational cost for this event.
             order_income = market_clearing_price * accepted_volume * duration
-            order_cost = (
-                marginal_cost * accepted_volume * duration
-            )  # TODO: move outside loop, because costs are overall and need to be attributed to markets
+            order_cost = marginal_cost * accepted_volume * duration
 
             # Accumulate income and operational cost for all orders.
             income += order_income
             operational_cost += order_cost
 
         # Consideration of start-up costs, divided evenly between upward and downward regulation events.
-        # TODO: Finer grade (warm, hot, cold start costs) and allocation based on overall dispatch across multiple markets?
         if (
             unit.outputs[product_type].at[start] != 0
             and unit.outputs[product_type].at[start - unit.index.freq] == 0
