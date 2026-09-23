@@ -1,0 +1,7 @@
+name,technology,bidding_EOM,bidding_CRM_pos,bidding_CRM_neg,max_power,min_power,unit_operator,bidding_redispatch,node
+demand_EOM_north,inflex_demand,demand_energy_naive,,,160000.0,0.0,eom_de,demand_energy_naive_redispatch,north
+demand_EOM_east,inflex_demand,demand_energy_naive,,,160000.0,0.0,eom_de,demand_energy_naive_redispatch,east
+demand_EOM_west,inflex_demand,demand_energy_naive,,,380000.0,0.0,eom_de,demand_energy_naive_redispatch,west
+demand_EOM_south,inflex_demand,demand_energy_naive,,,300000.0,0.0,eom_de,demand_energy_naive_redispatch,south
+demand_CRM_pos,reserve_capacity,,demand_energy_naive,,1000000.0,0.0,crm_de,,west
+demand_CRM_neg,reserve_capacity,,,demand_energy_naive,1000000.0,0.0,crm_de,,west

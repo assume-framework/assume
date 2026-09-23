@@ -1,0 +1,10 @@
+name,bidding_EOM,price_import,price_export,unit_operator,bidding_redispatch,node
+DE_NL,exchange_energy_naive,0,2999,Exchanges Operator,exchange_energy_fixed_redispatch,west
+DE_CH,exchange_energy_naive,0,2999,Exchanges Operator,exchange_energy_fixed_redispatch,south
+DE_DK,exchange_energy_naive,0,2999,Exchanges Operator,exchange_energy_fixed_redispatch,north
+DE_CZ,exchange_energy_naive,0,2999,Exchanges Operator,exchange_energy_fixed_redispatch,east
+DE_LU,exchange_energy_naive,0,2999,Exchanges Operator,exchange_energy_fixed_redispatch,west
+DE_SE,exchange_energy_naive,0,2999,Exchanges Operator,exchange_energy_fixed_redispatch,north
+DE_AT,exchange_energy_naive,0,2999,Exchanges Operator,exchange_energy_fixed_redispatch,south
+DE_FR,exchange_energy_naive,0,2999,Exchanges Operator,exchange_energy_fixed_redispatch,west
+DE_PL,exchange_energy_naive,0,2999,Exchanges Operator,exchange_energy_fixed_redispatch,east

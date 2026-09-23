@@ -1,0 +1,5 @@
+name,v_nom,zone_id,x,y
+north,380.0,DE_LU,9.5,53.5
+east,380.0,DE_LU,12.0,52.0
+west,380.0,DE_LU,7.0,51.0
+south,380.0,DE_LU,10.5,48.5

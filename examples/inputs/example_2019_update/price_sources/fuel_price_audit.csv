@@ -1,0 +1,8 @@
+fuel,original_mean,updated_mean,unit,assessment
+uranium,0.9000000000000001,0.9000000000000001,EUR/MWh_th,Retained: unverified model assumption
+lignite,1.8000000000000003,1.8000000000000003,EUR/MWh_th,Retained: unverified model assumption
+hard coal,7.434393009043693,9.703967571551404,EUR/MWh_th,"Updated: 2019 annual import-coal benchmark, constant proxy"
+natural gas,18.92264871190354,15.517320630525601,EUR/MWh_th,Updated: monthly NCG benchmark / 0.9024; LHV scenario convention
+oil,25.66832077625571,33.165458788846585,EUR/MWh_th,"Updated: 2019 annual heavy-fuel-oil benchmark, constant generic-oil proxy"
+biomass,20.699999999999996,20.699999999999996,EUR/MWh_th,Retained: unverified assumption; not used by base biomass aggregate
+co2,24.829370077054794,24.829370077054794,EUR/tCO2,Retained: annual mean consistent with published 2019 benchmark; individual observations unverified

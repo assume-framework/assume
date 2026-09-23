@@ -1,0 +1,3 @@
+fuel,price,unit,source,note
+hard coal,79,EUR/tce,https://english.kohlenimporteure.de/files/user_upload/jahresberichte_en/VDKi_Annual_Report_2020.pdf,2019 imported steam coal; annual-average proxy
+oil,270,EUR/tce,https://english.kohlenimporteure.de/files/user_upload/jahresberichte_en/VDKi_Annual_Report_2020.pdf,2019 heavy fuel oil; annual-average proxy for unspecific oil units

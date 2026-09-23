@@ -1,0 +1,6 @@
+line,bus0,bus1,s_nom,s_max_pu,x,r
+north_west,north,west,12000.0,1.0,0.08,0.008
+north_east,north,east,10000.0,1.0,0.08,0.008
+east_west,east,west,8000.0,1.0,0.1,0.01
+east_south,east,south,8000.0,1.0,0.1,0.01
+west_south,west,south,14000.0,1.0,0.08,0.008
