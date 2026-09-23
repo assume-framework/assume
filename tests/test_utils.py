@@ -17,7 +17,6 @@ from dateutil.tz import tzlocal
 from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
-    sum_line_capacities,
     aggregate_step_amount,
     convert_to_rrule_freq,
     datetime2timestamp,
@@ -31,6 +30,7 @@ from assume.common.utils import (
     plot_orderbook,
     separate_orders,
     set_random_seed,
+    sum_line_capacities,
     timestamp2datetime,
     visualize_orderbook,
 )
@@ -885,13 +885,16 @@ def test_sum_line_capacities_with_s_max_pu():
 
     assert "cap_forward" in result.columns
     assert "cap_reverse" in result.columns
+    assert "s_max_pu" in result.columns
     assert list(result.index) == ["L1", "L2"]
 
     assert result.at["L1", "cap_forward"] == 100.0
     assert result.at["L1", "cap_reverse"] == 100.0
+    assert result.at["L1", "s_max_pu"] == 1.0
 
-    assert result.at["L2", "cap_forward"] == 180.0 * 0.8
-    assert result.at["L2", "cap_reverse"] == 190.0 * 0.8
+    assert result.at["L2", "cap_forward"] == 180.0
+    assert result.at["L2", "cap_reverse"] == 190.0
+    assert result.at["L2", "s_max_pu"] == 0.8
 
 
 def test_sum_line_capacities_zonal_aggregation():
@@ -910,14 +913,33 @@ def test_sum_line_capacities_zonal_aggregation():
         index=["Z1", "Z2"], columns=["Z1_Z1", "Z1_Z2", "Z2_Z2"]
     )
 
-    result = sum_line_capacities(
-        lines, incidence_matrix, node_mapping=node_mapping
-    )
+    result = sum_line_capacities(lines, incidence_matrix, node_mapping=node_mapping)
 
     assert list(result.index) == ["Z1_Z1", "Z1_Z2", "Z2_Z2"]
     assert result.at["Z1_Z1", "cap_forward"] == 100.0
     assert result.at["Z1_Z2", "cap_forward"] == 50.0
     assert result.at["Z2_Z2", "cap_forward"] == 50.0
+
+
+def test_sum_line_capacities_aggregates_s_max_pu_by_capacity_weight():
+    lines = pd.DataFrame(
+        {
+            "bus0": ["B1", "B3"],
+            "bus1": ["B2", "B4"],
+            "s_nom": [100.0, 50.0],
+            "s_max_pu": [1.0, 0.5],
+        },
+        index=["L1", "L2"],
+    )
+
+    node_mapping = {"B1": "Z1", "B2": "Z2", "B3": "Z1", "B4": "Z2"}
+    incidence_matrix = pd.DataFrame(index=["Z1", "Z2"], columns=["Z1_Z2"])
+
+    result = sum_line_capacities(lines, incidence_matrix, node_mapping=node_mapping)
+
+    assert result.at["Z1_Z2", "cap_forward"] == 150.0
+    assert result.at["Z1_Z2", "cap_reverse"] == 150.0
+    assert result.at["Z1_Z2", "s_max_pu"] == (100.0 * 1.0 + 50.0 * 0.5) / 150.0
 
 
 def test_sum_line_capacities_fallback_and_reverse():
