@@ -13,9 +13,9 @@ from pyomo.opt import OptSolver, SolverFactory, TerminationCondition
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.common.utils import (
-    sum_line_capacities,
     create_incidence_matrix,
     get_supported_solver_pyomo,
+    sum_line_capacities,
 )
 from assume.markets.base_market import MarketRole
 

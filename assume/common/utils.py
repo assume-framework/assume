@@ -572,11 +572,12 @@ def sum_line_capacities(
     from that physical line. Otherwise the function attempts a zone-pair style
     aggregation: physical lines are mapped to node pairs using `node_mapping`
     (or by treating buses as nodes), and capacities are summed per zone-pair.
+    If lines contain a `s_max_pu` column, the resulting capacities are multiplied
+    by the weighted average of `s_max_pu` for all physical lines mapped to that edge.
 
     Directional columns in `lines` take precedence:
       - `s_nom_forward` used for forward (bus0 -> bus1)
       - `s_nom_reverse` used for reverse (bus1 -> bus0)
-    The directional capacities are multiplied with s_max_pu (defaults to 1).
     If directional capacities are missing, fallback to `s_nom * s_max_pu` for that direction.
 
     Args:
@@ -587,7 +588,7 @@ def sum_line_capacities(
 
     Returns:
         pd.DataFrame: indexed by `incidence_matrix.columns` with columns
-            ['cap_forward', 'cap_reverse'].
+            ['cap_forward', 'cap_reverse', 's_max_pu'].
     """
 
     # prepare defaults for each physical line
@@ -599,7 +600,7 @@ def sum_line_capacities(
             and not pd.isna(lines.at[line_idx, "s_max_pu"])
             else 1.0
         )
-        default_capacity = lines.at[line_idx, "s_nom"] * s_max_pu
+        default_capacity = lines.at[line_idx, "s_nom"]
 
         if "s_nom_forward" in lines.columns and not pd.isna(
             lines.at[line_idx, "s_nom_forward"]
@@ -618,6 +619,7 @@ def sum_line_capacities(
         per_line_caps[line_idx] = {
             "cap_forward": float(cap_f),
             "cap_reverse": float(cap_r),
+            "s_max_pu": float(s_max_pu),
         }
 
     # If all incidence columns directly match physical lines, return per-line caps
@@ -636,7 +638,15 @@ def sum_line_capacities(
             node_mapping[row["bus0"]] = row["bus0"]
             node_mapping[row["bus1"]] = row["bus1"]
 
-    agg_caps = {col: {"cap_forward": 0.0, "cap_reverse": 0.0} for col in cols}
+    agg_caps = {
+        col: {
+            "cap_forward": 0.0,
+            "cap_reverse": 0.0,
+            "s_max_pu_weighted": 0.0,
+            "s_max_pu_weight": 0.0,
+        }
+        for col in cols
+    }
 
     for line_idx, line in lines.iterrows():
         bus0 = line["bus0"]
@@ -654,10 +664,16 @@ def sum_line_capacities(
         if key_f in agg_caps:
             agg_caps[key_f]["cap_forward"] += caps["cap_forward"]
             agg_caps[key_f]["cap_reverse"] += caps["cap_reverse"]
+            weight = caps["cap_forward"] + caps["cap_reverse"]
+            agg_caps[key_f]["s_max_pu_weighted"] += weight * caps["s_max_pu"]
+            agg_caps[key_f]["s_max_pu_weight"] += weight
         elif key_r in agg_caps:
             # If the aggregated column uses reversed ordering, still add capacities
             agg_caps[key_r]["cap_forward"] += caps["cap_forward"]
             agg_caps[key_r]["cap_reverse"] += caps["cap_reverse"]
+            weight = caps["cap_forward"] + caps["cap_reverse"]
+            agg_caps[key_r]["s_max_pu_weighted"] += weight * caps["s_max_pu"]
+            agg_caps[key_r]["s_max_pu_weight"] += weight
         else:
             # final fallback: if no matching aggregated key, try to add to any column
             # that contains either node name (best-effort)
@@ -666,6 +682,9 @@ def sum_line_capacities(
                 if str(node0) in str(col) and str(node1) in str(col):
                     agg_caps[col]["cap_forward"] += caps["cap_forward"]
                     agg_caps[col]["cap_reverse"] += caps["cap_reverse"]
+                    weight = caps["cap_forward"] + caps["cap_reverse"]
+                    agg_caps[col]["s_max_pu_weighted"] += weight * caps["s_max_pu"]
+                    agg_caps[col]["s_max_pu_weight"] += weight
                     matched = True
                     break
             if not matched:
@@ -678,6 +697,15 @@ def sum_line_capacities(
     # ensure numeric types
     df["cap_forward"] = df["cap_forward"].astype(float)
     df["cap_reverse"] = df["cap_reverse"].astype(float)
+    # the resulting s_max_pu of an aggregated line is the weighted average of the s_max_pu of the physical lines,
+    # weighted by their capacities
+    # s_max_pu = sum(s_max_pu_i * weight_i) / sum(weight_i), where the weight is the sum of forward and reverse capacities
+    df["s_max_pu"] = np.where(
+        df["s_max_pu_weight"] > 0,
+        df["s_max_pu_weighted"] / df["s_max_pu_weight"],
+        0.0,
+    )
+    df = df.drop(columns=["s_max_pu_weighted", "s_max_pu_weight"])
     return df
 
 
