@@ -489,6 +489,7 @@ class UnitsOperator(Role):
             current_dispatch = unit.execute_current_dispatch(start, end)
             dispatch = {"power": current_dispatch}
             unit.calculate_generation_cost(start, end, "energy")
+            unit.update_avg_op_time(start, end)
             valid_outputs = [
                 "soc",
                 "cashflow",
