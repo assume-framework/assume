@@ -1,0 +1,3 @@
+,components,max_power,min_power,node,simulation,technology,unit_operator
+demand_EOM,,-1e+06,-0,node0,test_case_1_building_no_tariff,inflex_demand,eom_operator
+aggregator,electric_vehicle_EV_0,,,lv_node,test_case_1_building_no_tariff,building,aggregator_operator
