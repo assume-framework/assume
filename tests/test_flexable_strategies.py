@@ -87,6 +87,7 @@ def test_flexable_pos_reserve(mock_market_config, power_plant):
     assert bids[0]["volume"] == 1000
 
     mc.product_type = "capacity_pos"
+    mc.market_id = "CRM_pos"
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert len(bids) == 1
     assert bids[0]["price"] == 50
@@ -123,6 +124,7 @@ def test_flexable_neg_reserve(mock_market_config, power_plant):
 
     # Calculations for negative capacity
     mc.product_type = "capacity_neg"
+    mc.market_id = "CRM_neg"
     product_tuples = [(start, end, None)]
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert bids == []

@@ -370,7 +370,9 @@ class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
                 marginal_cost=marginal_cost,
                 t=start,
                 foresight=self.foresight,
-                price_forecast=unit.forecaster.price[market_config.market_id],
+                # A CRM commitment replaces potential EOM dispatch, therefore
+                # its opportunity cost is based on the EOM price forecast.
+                price_forecast=unit.forecaster.price["EOM"],
             )
 
             # if specific revenue is positive, bid specific_revenue

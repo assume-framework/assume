@@ -312,7 +312,9 @@ class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
             )
             # Specific revenue if power was offered on the energy market
             specific_revenue = get_specific_revenue(
-                price_forecast=unit.forecaster.price[market_config.market_id],
+                # CRM capacity is valued against foregone EOM revenue. CRM is
+                # not an energy market, so it has no own price forecast.
+                price_forecast=unit.forecaster.price["EOM"],
                 marginal_cost=marginal_cost,
                 t=start,
                 foresight=self.foresight,
@@ -423,7 +425,9 @@ class CapacityHeuristicBalancingNegStrategy(MinMaxStrategy):
 
             # Specific revenue if power was offered on the energy market
             specific_revenue = get_specific_revenue(
-                price_forecast=unit.forecaster.price[market_config.market_id],
+                # CRM capacity is valued against foregone EOM revenue. CRM is
+                # not an energy market, so it has no own price forecast.
+                price_forecast=unit.forecaster.price["EOM"],
                 marginal_cost=marginal_cost,
                 t=start,
                 foresight=self.foresight,

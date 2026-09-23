@@ -173,6 +173,7 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
 
     # assert capacity_pos
     mc.product_type = "capacity_pos"
+    mc.market_id = "CRM_pos"
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     assert len(bids) == 1
     assert math.isclose(bids[0]["price"], specific_revenue)
