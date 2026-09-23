@@ -164,6 +164,16 @@ and do not provide unit-level conventional outages, so this case is suitable for
 model development and sensitivity analysis rather than price backtesting without
 further calibration.
 
+## Hybrid forward-price signal
+
+`base_case_2019` enables the adaptive merit-order forecast for storage
+operators. It starts with the physical merit-order price, learns the residual
+against cleared EOM prices, and supplies the corrected forward EOM price to the
+storage energy and redispatch strategies before they bid. The nonlinear model
+trains after 504 cleared hourly products; earlier forecasts retain the
+merit-order point estimate and use empirical uncertainty. Other unit types can
+be selected through `adaptive_merit_order.unit_types` in `config.yaml`.
+
 ## Reproduction and validation
 
 ```sh

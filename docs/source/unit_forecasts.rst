@@ -85,6 +85,11 @@ The resolution flow is:
 
 This design lets you swap algorithms via configuration without touching code.
 
+The optional adaptive merit-order correction starts from a physical
+merit-order forecast and updates it from realised clearing prices. When it is
+enabled, its corrected mean replaces the relevant rolling portion of the
+``price`` series read by the selected bidding strategies.
+
 ***********************************
 Configuration
 ***********************************
@@ -110,6 +115,82 @@ Specify which algorithms to use in the ``forecast_algorithms`` section of your s
             preprocess_price: price_default
             update_price: price_default
             update_congestion_signal: congestion_signal_default
+
+Adaptive merit-order correction
+===============================
+
+Enable the adaptive correction explicitly in the study configuration. By
+default, ``unit_types`` targets storage operators, since storage arbitrage
+strategies use a forward energy-price signal. Set it to ``[all]`` only when
+the chosen strategies of every unit operator should receive the corrected
+price signal.
+
+.. code-block:: yaml
+
+    example_study_case:
+        adaptive_merit_order:
+            enabled: true
+            unit_types: [storage]
+            uncertainty_model: nonlinear_quantile
+            minimum_training_samples: 504
+            quantile_hidden_size: 16
+            quantile_initial_iterations: 500
+            quantile_update_iterations: 20
+
+The correction is applied only to non-spatial, uniform-price energy markets
+with one scalar price per product. Redispatch and pay-as-bid markets are
+excluded. At each eligible market opening, the operator issues forecasts for
+the offered delivery window before strategies create their bids.
+
+For every selected energy product, the operator forecaster first calculates
+the existing merit-order forecast :math:`P^{MO}`. After clearing it observes
+the day-ahead price :math:`P^{DA}` and learns the residual
+:math:`r=P^{DA}-P^{MO}`. A separate Elastic-Net model learns residual location,
+while a second model learns log scale. The corrected mean is
+:math:`P^{MO}+\hat{r}`. ``nonlinear_quantile`` additionally trains a small
+PyTorch model for asymmetric q10, q50 and q90 residual errors; ``gaussian``
+and ``johnson_su`` are also available.
+Feature matrices, discounted sufficient statistics, coordinate descent, and
+Gaussian inverse-CDF calculations use ``torch.float64`` tensors on CPU by
+default. The double precision is intentional because online discounted
+statistics are updated repeatedly over long simulations.
+
+The default features are merit-order price, separate capacity-weighted wind
+and solar availability factors, forecast residual load, previous-day
+same-hour realised residual and price, cyclic hour and weekday terms, and a
+weekend indicator. General generator availability is deliberately excluded.
+The built-in settings use 504 training samples,
+``0.995`` forgetting, Gaussian residuals, and a ``0.01`` minimum standard
+deviation.
+
+Information timing and statuses
+--------------------------------
+
+Forecast rows are issued and frozen when
+``get_adaptive_merit_order_forecast`` is called. Cleared prices can therefore
+update only later forecasts. Before the
+initial window is complete, the corrected mean equals merit order. Fewer than
+two outcomes produce ``fallback_no_uncertainty``; two or more produce
+``fallback_empirical_uncertainty`` with expanding residual uncertainty. At the
+configured sample count, scaling is fitted once and frozen and both models are
+activated. Later outcomes update discounted sufficient statistics with the
+configured forgetting factor and use ``trained`` status.
+
+Finalised rows are written to ``adaptive_merit_order_forecast`` and contain the issue
+and delivery timestamps, operator and market identifiers, immutable
+``forecast_id``, merit-order and corrected forecasts, residual location and
+scale, q10/q50/q90, realised price and residual, frozen post-forecast error,
+sample count, and status. The helper
+:func:`~assume.common.forecast_algorithms.evaluate_adaptive_merit_order_forecasts`
+reports MAE, RMSE, pinball loss, central-80% coverage and width overall and by
+delivery hour for merit order, expanding historical mean bias, and adaptive
+correction.
+
+The correction state belongs to each unit operator. Its point forecast is fed
+back into the selected units' market-price series before bidding; cleared
+outcomes update only subsequent forecasts. Dispatch and already-issued bids
+are never changed. The output also records forecast quantiles and training
+status for later evaluation.
 
 Via unit CSV files
 ==================

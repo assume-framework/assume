@@ -11,6 +11,15 @@ base_case_2019:
   save_frequency_hours: 720
   # Recalculate forecasts from the updated fuel costs.
   use_forecasts_df: false
+  # Hybrid merit-order/ML forecast for storage arbitrage and redispatch
+  # opportunity-cost signals. The loader enables it for storage operators.
+  adaptive_merit_order:
+    enabled: true
+    unit_types: [storage]
+    uncertainty_model: nonlinear_quantile
+    quantile_hidden_size: 8
+    quantile_initial_iterations: 100
+    quantile_update_iterations: 10
 
   markets_config:
     EOM:

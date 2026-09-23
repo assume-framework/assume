@@ -1113,15 +1113,34 @@ def setup_world(
     else:
         unit_operators_strategies = {}
 
+    adaptive_merit_order = config.get("adaptive_merit_order", {})
+    adaptive_settings = {
+        key: value
+        for key, value in adaptive_merit_order.items()
+        if key not in {"enabled", "uncertainty_model", "unit_types"}
+    }
+    target_unit_types = set(adaptive_merit_order.get("unit_types", ("storage",)))
+    adaptive_enabled = adaptive_merit_order.get("enabled", False)
     operator_forecasts = {
         op: UnitsOperatorForecaster(
             index=units_operator_forecast_data["shared_unit_index"],
             forecast_algorithms=operator_forecast_algorithms.get(
                 op, config_forecast_algorithms
             ),
+            enable_adaptive_merit_order=adaptive_enabled
+            and (
+                "all" in target_unit_types
+                or any(unit["unit_type"] in target_unit_types for unit in units[op])
+            ),
         )
         for op in set(units.keys())
     }
+    for forecaster in operator_forecasts.values():
+        if forecaster.enable_adaptive_merit_order:
+            forecaster.set_adaptive_merit_order_uncertainty_model(
+                adaptive_merit_order.get("uncertainty_model", "nonlinear_quantile"),
+                **adaptive_settings,
+            )
 
     # if distributed_role is true - there is a manager available
     # and we can add each units_operator as a separate process
