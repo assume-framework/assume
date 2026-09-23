@@ -84,7 +84,8 @@ docs = [
   "ipython >=9",
 ]
 colab = [
-    "protobuf >=5.28.3, <6.0.0"]
+    "protobuf >=5.28.3, <6.0.0",
+]
 
 
 [project.urls]
