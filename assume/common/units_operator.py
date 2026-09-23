@@ -270,6 +270,9 @@ class UnitsOperator(Role):
             self.forecaster
             and getattr(self.forecaster, "enable_adaptive_merit_order", False)
             and marketconfig.product_type == "energy"
+            and not marketconfig.param_dict.get("grid_data")
+            and marketconfig.market_mechanism != "pay_as_bid"
+            and marketconfig.param_dict.get("pricing_mechanism") != "pay_as_bid"
         ):
             clearing_prices = {}
             for order in accepted_orders:
