@@ -60,6 +60,7 @@ Upcoming Release
   - **Skip torch seeding when torch is installed but not used**: Irrelevant seeding was performed and a warning was thrown about deterministic PyTorch behavior, even though simulation does not use RL. This is fixed by only setting the PyTorch seeds when learning is active.
   - **Fix bug in redispatch mechanism**: Fixed the bug in redispatch evaluation due to PyPSA's version upgrade. In ``PyPSA >= 0.35.2`` (released in February 2025) the sign of load was not taken into account correctly & since the fixed EOM dispatch was modelled as a load with positive sign which was resulting in incorrect redispatch amounts.
   - **Fix bug in flexable balancing market strategies**: Flexables balancing market strategies queried ``get_specific_revenue`` with forecasted market prices from their own markets instead of from the "EOM" market.
+  - **Fix loss of the last ``train_freq`` window during learning**: Tasks scheduled at exactly the simulation end were started by the run loop but never awaited, because tasks registered with ``src="no_wait"`` are excluded from mango's termination detection. The run loop now drains all remaining tasks before shutting the container down.
 
 0.6.0 - (18th March 2026)
 =========================
