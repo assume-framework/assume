@@ -44,7 +44,6 @@ dependencies = [
     "pyomo >=6.8.0",
     "xarray <v2026.04.0", # https://github.com/assume-framework/assume/issues/790
     "highspy",
-    "protobuf >= 7.36.2"  # Protobuf update for usage in GoogleColab.
 ]
 
 [project.optional-dependencies]
@@ -84,6 +83,9 @@ docs = [
   "sphinxcontrib-mermaid >=1.0.0",
   "ipython >=9",
 ]
+colab = [
+    "protobuf >=5.28.3, <6.0.0"]
+
 
 [project.urls]
 Homepage = "https://assume-project.de/"
