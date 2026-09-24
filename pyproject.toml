@@ -85,7 +85,6 @@ docs = [
 ]
 colab = [
     "protobuf ==5.27.2",
-    "gencode <=5.27.2",
 ]
 # "protobuf >=5.28.3, <6.0.0",
 
