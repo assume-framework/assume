@@ -178,11 +178,11 @@ class BaseUnit:
             orderbook=orderbook,
         )
 
-    def calculate_generation_cost(
+    def calculate_costs(
         self, start: datetime, end: datetime, product_type: str
     ) -> None:
         """
-        Calculates the generation cost for a specific product type within the given time range,
+        Calculates the total costs (generation and startup) for a specific product type within the given time range,
         but only if the end is the last index in the time series.
 
         Args:
@@ -204,6 +204,25 @@ class BaseUnit:
         generation_costs = np.abs(marginal_costs * product_data)
         self.outputs[f"{product_type}_generation_costs"].loc[start:end] = (
             generation_costs
+        )
+
+        starting_costs = np.zeros(len(self.index[start:end]))
+        for idx, t in enumerate(self.index[start:end]):
+            op_time = self.get_operation_time(t)
+
+            if self.outputs[product_type].loc[t] != 0 and op_time < 0:
+                starting_costs[idx] = self.get_starting_costs(op_time)
+
+        self.outputs[f"{product_type}_starting_costs"].loc[start:end] = starting_costs
+
+        # future work:
+        # balancing_costs = balancing_price * abs(sum(accepted_volumes across all products and markets) - product_data)
+        # self.outputs[f"{product_type}_balancing_costs"].loc[start:end] = (
+        #   balancing_costs
+        # )
+
+        self.outputs[f"{product_type}_total_costs"].loc[start:end] = (
+            generation_costs + starting_costs  # future work: + balancing_costs
         )
 
     def update_avg_op_time(self, start: datetime, end: datetime) -> None:
