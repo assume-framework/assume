@@ -134,7 +134,7 @@ def plot_biddings(df: pd.DataFrame):
   return fig, ax
 
 
-def plot_biddings_with_bidding_price(df: pd.DataFrame):
+def plot_biddings_with_clearing_price(df: pd.DataFrame):
   fig, ax = plt.subplots()
   df["end_time"] = pd.to_datetime(df["end_time"])
   sns.scatterplot(df, x="end_time", y="price", hue="unit_id", ax=ax, marker="X")
