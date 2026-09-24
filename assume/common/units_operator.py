@@ -442,29 +442,16 @@ class UnitsOperator(Role):
         last_ts = self.last_executed_dispatch
         self.last_executed_dispatch = datetime2timestamp(execute_until)
 
-        try:
-            # add one second to exclude the first time stamp,
-            # because it is already executed in the last step
-            actual_dispatch = self.get_actual_dispatch(
-                timestamp2datetime(last_ts + 1), execute_until
-            )
-            self.write_actual_dispatch(actual_dispatch)
+        # add one second to exclude the first time stamp,
+        # because it is already executed in the last step
+        actual_dispatch = self.get_actual_dispatch(
+            timestamp2datetime(last_ts + 1), execute_until
+        )
+        self.write_actual_dispatch(actual_dispatch)
 
-            # now that the dispatch is realized, the reward of every product whose
-            # delivery period has been executed can be calculated
-            self.calculate_unit_reward(execute_until)
-        except (
-            AttributeError,
-            NameError,
-            TypeError,
-        ):  # TODO: check if this is intended error behavior
-            # these indicate a coding error rather than a problem with the data,
-            # so they must not be hidden in the log
-            raise
-        except Exception:
-            # any other exception escaping here would stop the recurrent task,
-            # which would silently disable the dispatch for the rest of the run
-            logger.exception("error while executing the dispatch at %s", now)
+        # now that the dispatch is realized, the reward of every product whose
+        # delivery period has been executed can be calculated
+        self.calculate_unit_reward(execute_until)
 
     def get_actual_dispatch(self, start: datetime, end: datetime) -> list[dict]:
         """
