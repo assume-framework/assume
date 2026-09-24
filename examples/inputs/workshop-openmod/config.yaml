@@ -7,7 +7,7 @@ marginal:
   end_date: 2019-03-02 12:00
   time_step: 1h
   save_frequency_hours: null
-  seed: null
+  seed: 65537
   powerplant_units: "powerplant_units_study_1.csv"
 
   learning_config:
@@ -36,7 +36,7 @@ learning:
   end_date: 2019-03-02 12:00
   time_step: 1h
   save_frequency_hours: null
-  seed: null
+  seed: 65537
   powerplant_units: "powerplant_units_study_2.csv"
 
   learning_config:
@@ -83,7 +83,7 @@ learning_2_agents:
   end_date: 2019-03-02 12:00
   time_step: 1h
   save_frequency_hours: null
-  seed: null
+  seed: 65537
   powerplant_units: "powerplant_units_study_3.csv"
 
   learning_config:
