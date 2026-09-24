@@ -136,16 +136,24 @@ class ReplayBuffer:
         """
         # copying all to avoid modification
         len_obs = obs.shape[0]
-        self.observations[self.pos : self.pos + len_obs] = obs.copy()
-        self.actions[self.pos : self.pos + len_obs] = actions.copy()
-        self.rewards[self.pos : self.pos + len_obs] = np.squeeze(
-            reward.copy(), axis=-1
-        )  # always one reward value per agent and time-step hence squezze
+        if len_obs > self.buffer_size:
+            raise ValueError("Batch size exceeds replay buffer capacity")
 
-        self.pos += len_obs
-        if self.pos + len_obs >= self.buffer_size:
-            self.full = True
-            self.pos = 0
+        rewards = np.squeeze(reward, axis=-1)
+        first = min(len_obs, self.buffer_size - self.pos)
+        remaining = len_obs - first
+
+        self.observations[self.pos : self.pos + first] = obs[:first].copy()
+        self.actions[self.pos : self.pos + first] = actions[:first].copy()
+        self.rewards[self.pos : self.pos + first] = rewards[:first].copy()
+        if remaining:
+            self.observations[:remaining] = obs[first:].copy()
+            self.actions[:remaining] = actions[first:].copy()
+            self.rewards[:remaining] = rewards[first:].copy()
+
+        end = self.pos + len_obs
+        self.full = self.full or end >= self.buffer_size
+        self.pos = end % self.buffer_size
 
     def sample(self, batch_size: int) -> ReplayBufferSamples:
         """
