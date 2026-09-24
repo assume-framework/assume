@@ -344,6 +344,18 @@ class BaseUnit:
         """
         return 0
 
+    def get_operation_time(self, start: datetime) -> int:
+        """
+        Returns the time the unit is operating (positive) or shut down (negative).
+
+        Args:
+            start (datetime.datetime): The start time.
+
+        Returns:
+            int: The operation time as a positive integer if operating, or negative if shut down.
+        """
+        return 0
+
 
 class SupportsMinMax(BaseUnit):
     """
