@@ -117,3 +117,37 @@ def plot_revenue(df: pd.DataFrame):
   ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
 
   return fig, ax
+
+
+def plot_biddings(df: pd.DataFrame):
+  fig, ax = plt.subplots()
+  df["end_time"] = pd.to_datetime(df["end_time"])
+  sns.scatterplot(df, x="end_time", y="price", hue="unit_id", ax=ax, marker="X")
+  date_form = mdates.DateFormatter('%H')
+  ax.xaxis.set_major_formatter(date_form)
+  ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
+  ax.set_ylabel("Offer price (€)")
+  ax.set_xlabel("Time (h)")
+  ax.legend(title="Strategy")
+  plt.tight_layout()
+
+  return fig, ax
+
+
+def plot_biddings_with_bidding_price(df: pd.DataFrame):
+  fig, ax = plt.subplots()
+  df["end_time"] = pd.to_datetime(df["end_time"])
+  sns.scatterplot(df, x="end_time", y="price", hue="unit_id", ax=ax, marker="X")
+  date_form = mdates.DateFormatter('%H')
+  ax.xaxis.set_major_formatter(date_form)
+  ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
+  ax.set_ylabel("Offer price (€)")
+  ax.set_xlabel("Time (h)")
+  ax.legend(title="Strategy")
+
+  clearing_price_df = df.groupby('end_time')['accepted_price'].first().reset_index()
+  sns.lineplot(clearing_price_df, y="accepted_price", x="end_time", color="green", alpha=0.8, label="clearing price")
+
+  plt.tight_layout()
+
+  return fig, ax
