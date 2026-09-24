@@ -311,3 +311,29 @@ async def test_market_accepted(market_role: MarketRole):
 
     accepted, meta = await market_role.clear_market([(start, end, None)])
     assert accepted == orderbook
+
+
+async def test_market_normalizes_partial_rejected_order(market_role: MarketRole):
+    """Rejected feedback remains dispatchable when a clearer omits its price."""
+    meta = {
+        "sender_addr": market_role.context.addr,
+        "sender_id": market_role.context.aid,
+    }
+    order = {
+        "start_time": start,
+        "end_time": start + rd(hours=1),
+        "volume": 10,
+        "price": 20,
+        "agent_addr": "gen1",
+        "only_hours": None,
+    }
+    market_role.open_auctions |= {(start, start + rd(hours=1), None)}
+    market_role.handle_orderbook(content={"orderbook": [order]}, meta=meta)
+
+    def reject_without_price(all_orders, products):
+        return [], [{**all_orders[0], "accepted_volume": 0.0}], [
+            {"price": 17, "product_start": products[0][0]}
+        ], []
+
+    market_role.clear = reject_without_price
+    await market_role.clear_market([(start, start + rd(hours=1), None)])

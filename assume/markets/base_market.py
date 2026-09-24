@@ -645,22 +645,33 @@ class MarketRole(MarketMechanism, Role):
         self.all_orders = []
 
         for order in rejected_orderbook:
-            if "accepted_volume" not in order and "accepted_price" not in order:
+            # Clearing mechanisms may provide one rejected-order field but not
+            # the other. Normalize both fields independently so every market
+            # feedback order can be applied to a unit dispatch plan.
+            if "accepted_volume" not in order:
                 if isinstance(order["volume"], dict):
                     order["accepted_volume"] = {
                         start: 0.0 for start in order["volume"].keys()
                     }
-                    order["accepted_price"] = {
-                        start: market_meta[i]["price"]
-                        for i, start in enumerate(order["volume"].keys())
-                    }
                 else:
                     order["accepted_volume"] = 0.0
-                    # TODO entry is generally not needed
-                    # it is of interest to have a reward in RL for rejected bids
-                    # the matching of meta to product by start_time is sufficient in most cases
-                    # but might not be correct if multiple orders with same start (but different end or zone)
-                    # exist - in these cases the rejected_bids should be set in the clearing itself
+
+            if "accepted_price" not in order:
+                if isinstance(order["volume"], dict):
+                    order["accepted_price"] = {
+                        start: next(
+                            (
+                                product["price"]
+                                for product in market_meta
+                                if product.get("product_start") == start
+                            ),
+                            0,
+                        )
+                        for start in order["volume"].keys()
+                    }
+                else:
+                    # A rejected bid has no realized price; retain the market
+                    # price when available for reward accounting.
                     order["accepted_price"] = next(
                         (
                             product["price"]
