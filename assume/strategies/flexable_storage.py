@@ -179,46 +179,6 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
 
         return bids
 
-    def calculate_reward(
-        self,
-        unit: SupportsMinMaxCharge,
-        marketconfig: MarketConfig,
-        orderbook: Orderbook,
-    ):
-        """
-        Calculates the reward (costs and profit).
-
-        The profit is defined by the cashflow minus the costs.
-
-        Args:
-            unit (SupportsMinMaxCharge): The unit to calculate reward for.
-            marketconfig (MarketConfig): The market configuration.
-            orderbook (Orderbook): The orderbook.
-        """
-        product_type = marketconfig.product_type
-
-        for order in orderbook:
-            start = order["start_time"]
-            # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-            end_excl = order["end_time"] - unit.index.freq
-
-            # Extract outputs and costs in one step
-            outputs = unit.outputs[product_type].loc[
-                start:end_excl
-            ]  # TODO: use accepted volume (and price?) from orderbook
-            costs = np.where(
-                outputs != 0,
-                np.abs(outputs)
-                * np.array([unit.calculate_marginal_cost(start, x) for x in outputs]),
-                0,
-            )
-
-            unit.outputs["profit"].loc[start:end_excl] += (
-                unit.outputs[f"{product_type}_cashflow"].loc[start:end_excl]
-                - costs  # TODO: only use market cashflow?
-            )
-            unit.outputs["total_costs"].loc[start:end_excl] += costs
-
 
 class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
     """

@@ -591,8 +591,6 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
 
         start = orderbook[0]["start_time"]
         end = orderbook[0]["end_time"]
-        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-        end_excl = end - unit.index.freq
 
         # Depending on how the unit calculates marginal costs, retrieve cost values.
         marginal_cost = unit.calculate_marginal_cost(
@@ -674,11 +672,6 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         scaling = 1 / (self.max_bid_price * unit.max_power)
         regret = regret_scale * opportunity_cost
         reward = scaling * (reward - regret)
-
-        # Store results in unit outputs
-        # Note: these are not learning-specific results but stored for all units for analysis
-        unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["total_costs"].loc[start:end_excl] += operational_cost
 
         # write rl-rewards to buffer
         if self.learning_mode:
@@ -1027,8 +1020,6 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         order = orderbook[0]
         start = order["start_time"]
         end = order["end_time"]
-        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-        end_excl = end - unit.index.freq
 
         next_time = start + unit.index.freq
         duration_hours = (end - start) / timedelta(hours=1)
@@ -1081,11 +1072,6 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         scaling_factor = 1 / (self.max_bid_price * unit.max_power_discharge)
 
         reward += scaling_factor * profit
-
-        # Store results in unit outputs
-        # Note: these are not learning-specific results but stored for all units for analysis
-        unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["total_costs"].loc[start:end_excl] += order_cost
 
         # write rl-rewards to buffer
         if self.learning_mode:
@@ -1230,8 +1216,6 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
 
         start = orderbook[0]["start_time"]
         end = orderbook[0]["end_time"]
-        # `end_excl` marks the last product's start time by subtracting one frequency interval.
-        end_excl = end - unit.index.freq
 
         # Depending on how the unit calculates marginal costs, retrieve cost values.
         marginal_cost = unit.calculate_marginal_cost(
@@ -1320,11 +1304,6 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
 
         regret = regret_scale * opportunity_cost
         reward = scaling * (profit - regret)
-
-        # Store results in unit outputs
-        # Note: these are not learning-specific results but stored for all units for analysis
-        unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["total_costs"].loc[start:end_excl] += operational_cost
 
         # write rl-rewards to buffer
         if self.learning_mode:

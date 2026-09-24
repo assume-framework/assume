@@ -4,11 +4,9 @@
 
 from datetime import datetime, timedelta
 
-import numpy as np
-
 from assume.common.base import MinMaxStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.common.utils import get_products_index, parse_duration
+from assume.common.utils import parse_duration
 
 
 class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
@@ -159,85 +157,6 @@ class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
         bids = self.remove_empty_bids(bids)
 
         return bids
-
-    def calculate_reward(
-        self,
-        unit,
-        marketconfig: MarketConfig,
-        orderbook: Orderbook,
-    ):
-        """
-        Calculates and writes the reward (costs and profit).
-
-        Args:
-            unit (SupportsMinMax): A unit that the unit operator manages.
-            marketconfig (MarketConfig): A market configuration.
-            orderbook (Orderbook): An orderbook with accepted and rejected orders for the unit.
-
-        Note:
-            The reward is calculated as the profit minus the opportunity cost,
-            which is the loss of income we have because we are not running at full power.
-            The regret is the opportunity cost.
-            Because the regret_scale is set to 0 the reward equals the profit.
-            The profit is the income we have from the accepted bids.
-            The total costs are the running costs and the start-up costs.
-
-        """
-        product_type = marketconfig.product_type
-        products_index = get_products_index(orderbook)
-
-        # Initialize intermediate results as numpy arrays for better performance
-        profit = np.zeros(len(products_index))
-        costs = np.zeros(len(products_index))
-
-        # Map products_index to their positions for faster updates
-        index_map = {time: i for i, time in enumerate(products_index)}
-
-        for order in orderbook:
-            start = order["start_time"]
-            end_excl = order["end_time"] - unit.index.freq
-
-            order_times = unit.index[start:end_excl]
-            accepted_volume = order.get("accepted_volume", 0)
-            accepted_price = order.get("accepted_price", 0)
-
-            for start in order_times:
-                idx = index_map.get(start)
-
-                marginal_cost = unit.calculate_marginal_cost(
-                    start, unit.outputs[product_type].at[start]
-                )
-
-                if isinstance(accepted_volume, dict):
-                    accepted_volume = accepted_volume.get(start, 0)
-                else:
-                    accepted_volume = accepted_volume
-
-                if isinstance(accepted_price, dict):
-                    accepted_price = accepted_price.get(start, 0)
-                else:
-                    accepted_price = accepted_price
-
-                profit[idx] += accepted_price * accepted_volume
-
-        # consideration of start-up costs
-        # TODO: needs to be attributed in case of multiple markets, because the start-up costs are overall and not per market
-        for i, start in enumerate(products_index):
-            op_time = unit.get_operation_time(start)
-
-            output = unit.outputs[product_type].at[start]
-            marginal_cost = unit.calculate_marginal_cost(start, output)
-            costs[i] += marginal_cost * output
-
-            if output != 0 and op_time < 0:
-                start_up_cost = unit.get_starting_costs(op_time)
-                costs[i] += start_up_cost
-
-        profit -= costs
-
-        # store results in unit outputs which are written to database by unit operator
-        unit.outputs["profit"].loc[products_index] += profit
-        unit.outputs["total_costs"].loc[products_index] += costs
 
 
 class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
