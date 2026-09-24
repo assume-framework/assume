@@ -49,8 +49,7 @@ dependencies = [
 [project.optional-dependencies]
 learning = [
     "torch >=2.0.1,<2.6.0",
-    "tensorboard>=2.16.0",
-    "tensorflow>=2.16.0",
+    "tensorboard > 2.18.0",
     "setuptools >=65.0.0,<82.0.0" # https://github.com/tensorflow/tensorboard/issues/7003
 ]
 network = [
