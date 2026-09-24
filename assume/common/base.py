@@ -359,6 +359,11 @@ class SupportsMinMax(BaseUnit):
     emission_factor: float
     min_operating_time: int = 0
     min_down_time: int = 0
+    downtime_hot_start: int = 0
+    downtime_warm_start: int = 0
+    hot_start_cost: float = 0
+    warm_start_cost: float = 0
+    cold_start_cost: float = 0
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
