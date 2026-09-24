@@ -84,7 +84,7 @@ docs = [
   "ipython >=9",
 ]
 colab = [
-    "protobuf ==5.27.2",
+    "protobuf ==5.28.3",
 ]
 # "protobuf >=5.28.3, <6.0.0",
 
