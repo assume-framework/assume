@@ -148,6 +148,18 @@ def test_flexable_neg_reserve(mock_market_config, power_plant):
     assert math.isclose(bids[0]["price"], 50 / 3)
     assert bids[0]["volume"] == 300
 
+    # Negative reserve is the activation direction, not a negative capacity
+    # remuneration.  This case has bid_quantity below min_power, which used
+    # to reverse the sign of the opportunity-cost price.
+    power_plant.min_power = 400
+    power_plant.outputs["energy"][start] = 600
+    power_plant.marginal_cost[start + pd.Timedelta(hours=1)] = 80
+    bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
+    assert len(bids) == 1
+    assert bids[0]["price"] == 150
+    assert bids[0]["price"] >= 0
+    assert bids[0]["volume"] == 200
+
 
 if __name__ == "__main__":
     # run pytest and enable prints

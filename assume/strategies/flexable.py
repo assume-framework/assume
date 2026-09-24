@@ -434,9 +434,13 @@ class CapacityHeuristicBalancingNegStrategy(MinMaxStrategy):
             )
 
             if specific_revenue < 0:
+                # ``capacity_neg`` identifies the balancing direction; its
+                # capacity remuneration must remain non-negative.  The
+                # opportunity-cost magnitude is independent of whether the
+                # offered downward headroom is above or below ``min_power``.
                 capacity_price = (
                     abs(specific_revenue)
-                    * (bid_quantity - unit.min_power)
+                    * abs(bid_quantity - unit.min_power)
                     / bid_quantity
                 )
             else:
