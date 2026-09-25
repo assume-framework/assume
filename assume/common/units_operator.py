@@ -472,7 +472,12 @@ class UnitsOperator(Role):
             list[dict]: the unit_dispatch dataframes
         """
         unit_dispatch = []
+        market_ids = {m.market_id for m in self.available_markets}
         for unit_id, unit in self.units.items():
+            # skip unit if it does not participate in any of the markets
+            if not (market_ids & unit.bidding_strategies.keys()):
+                continue
+
             current_dispatch = unit.execute_current_dispatch(start, end)
             dispatch = {"power": current_dispatch}
             unit.calculate_costs(start, end, "energy")
