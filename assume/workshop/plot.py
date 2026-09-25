@@ -123,7 +123,7 @@ def plot_accepted_volume(df: pd.DataFrame):
     ax.fill_between(x_values, previous, previous + y_values, color=COLORS[label], alpha=0.45)
     previous = [prev + y for prev, y in zip(previous, y_values)]
 
-  ax.plot(x_values, df_demand["accepted_volume (abs)"], label="Demand", color=COLORS["demand_EOM"])
+  ax.plot(x_values, df_demand["accepted_volume (abs)"], label="demand", color=COLORS["demand"])
   ax.xaxis.set_major_formatter(date_form)
   ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
   
