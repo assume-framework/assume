@@ -3,15 +3,16 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 """
-Full-year run of all 16 risk-preference case folders (8 price-taker + 8
-bid-price, 6 families x 4 years each = 384 scenarios), each simulation
-compressed and the uncompressed CSVs removed immediately once it finishes --
-384 scenarios x ~3.5 GB uncompressed each would otherwise far outrun disk,
-even with only a few running at once.
+Full-year re-run of cement_base and steel_base (6 families x 4 years each =
+48 scenarios) after the adaptive storage forecast merge and the EOM market
+config fixes (minimum_bid_volume 0 -> 0.1, plus the earlier CRM_energy
+pay_as_clear fix). Output goes to examples/outputs/cement_base and
+examples/outputs/steel_base (distinct from the pre-fix examples/outputs/cement
+and examples/outputs/steel results) so the two can be diffed afterwards.
 
-Job order deliberately puts every non-_BID case before any _BID case, so a
-process pool -- which pulls jobs in submission order as workers free up --
-finishes the price-taker set first.
+Same rolling-compression convention as run_full_batch.py: each scenario's 3
+CSVs (grid_line_loading, market_meta, market_orders) are tar.gz'd and the
+uncompressed copy removed immediately once it finishes.
 """
 
 import os
@@ -34,11 +35,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 INPUTS_PATH = "examples/inputs"
 OUTPUTS_ROOT = REPO_ROOT / "examples/outputs"
 
-NON_BID_CASES = [
-    "AktuellePolitiken_RN", "FokusH2_RN", "FokusStrom_RN", "HoheNachfrage_RN",
-    "NachfrageNiedrig_RN", "Technologiemix_RN", "WCMean", "WCTail",
-]
-BID_CASES = [f"{c}_BID" for c in NON_BID_CASES]
+CASES = ["cement_base", "steel_base"]
 FAMILIES = ["aktuellepolitiken", "fokusH2", "fokusstrom", "hohenachfrage",
             "niedrigenachfrage", "technologiemix"]
 YEARS = [2030, 2035, 2040, 2045]
@@ -66,7 +63,7 @@ def run_one(job: tuple[str, str, int]) -> dict:
     scenario = f"{family}_{year}"
     study_case = f"base_case_{year}"
     name = f"{case}/{scenario}"
-    log_dir = OUTPUTS_ROOT / "logs_full"
+    log_dir = OUTPUTS_ROOT / "logs_cement_steel"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / f"{case}__{scenario}.log"
 
@@ -120,16 +117,9 @@ def run_one(job: tuple[str, str, int]) -> dict:
     }
 
 
-PRIORITY_CASES = ["WCMean", "WCTail", "WCMean_BID", "WCTail_BID"]
-
-
 def build_jobs() -> list[tuple[str, str, int]]:
-    remaining_non_bid = [c for c in NON_BID_CASES if c not in PRIORITY_CASES]
-    remaining_bid = [c for c in BID_CASES if c not in PRIORITY_CASES]
-    case_order = PRIORITY_CASES + remaining_non_bid + remaining_bid
-
     jobs = []
-    for case in case_order:
+    for case in CASES:
         for family in FAMILIES:
             for year in YEARS:
                 jobs.append((case, family, year))
@@ -150,8 +140,8 @@ if __name__ == "__main__":
         sys.exit(0)
 
     os.chdir(REPO_ROOT)
-    print(f"running {len(jobs)} full-year simulations, {args.workers} workers, "
-          f"non-_BID cases first", flush=True)
+    print(f"running {len(jobs)} full-year simulations (cement_base + steel_base), "
+          f"{args.workers} workers", flush=True)
 
     rows = []
     t_start = time.perf_counter()
@@ -167,7 +157,7 @@ if __name__ == "__main__":
                 + (f"  ERROR: {row['error']}" if row["error"] else ""),
                 flush=True,
             )
-            pd.DataFrame(rows).to_csv(OUTPUTS_ROOT / "full_batch_summary.csv", index=False)
+            pd.DataFrame(rows).to_csv(OUTPUTS_ROOT / "cement_steel_batch_summary.csv", index=False)
 
     total_h = (time.perf_counter() - t_start) / 3600
     df = pd.DataFrame(rows)
