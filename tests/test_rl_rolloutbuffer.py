@@ -361,9 +361,7 @@ def test_gae_multi_agent_independence():
     expected_advantages = np.array(
         [[3.72272, -0.482096], [3.976, -0.5168], [2.925, 1.06]]
     )
-    expected_returns = np.array(
-        [[4.22272, -0.282096], [4.376, -0.4168], [3.225, 0.86]]
-    )
+    expected_returns = np.array([[4.22272, -0.282096], [4.376, -0.4168], [3.225, 0.86]])
     np.testing.assert_allclose(buf.advantages, expected_advantages, atol=1e-5)
     np.testing.assert_allclose(buf.returns, expected_returns, atol=1e-5)
 
@@ -402,9 +400,7 @@ def test_rollout_buffer_get_full_batch():
 def test_rollout_buffer_mini_batches_preserve_rows_and_cover_all_steps():
     """Shuffling must keep fields aligned and yield every transition once."""
     n_steps = 8
-    buf = make_rollout_buffer(
-        buffer_size=n_steps, obs_dim=2, act_dim=1, n_rl_units=2
-    )
+    buf = make_rollout_buffer(buffer_size=n_steps, obs_dim=2, act_dim=1, n_rl_units=2)
     for step in range(n_steps):
         marker = float(step)
         buf.add(

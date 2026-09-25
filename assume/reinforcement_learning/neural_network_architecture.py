@@ -199,7 +199,9 @@ class CriticPPO(Critic):
 
     def _init_weights(self) -> None:
         """Apply orthogonal initialisation: sqrt(2) gain for hidden layers, 1.0 for the value head."""
-        linear_layers = [layer for layer in self.v_layers if isinstance(layer, nn.Linear)]
+        linear_layers = [
+            layer for layer in self.v_layers if isinstance(layer, nn.Linear)
+        ]
         for layer in linear_layers[:-1]:
             orthogonal_init_weights(layer, gain=np.sqrt(2))
         orthogonal_init_weights(linear_layers[-1], gain=1.0)
@@ -297,7 +299,9 @@ class LSTMActor(Actor):
         self.LSTM2 = nn.LSTMCell(8, 16, dtype=float_type)
 
         # Concatenating all recurrent outputs with the agent-specific observations.
-        self.FC1 = nn.Linear(self.timeseries_len * 16 + unique_obs_dim, 128, dtype=float_type)
+        self.FC1 = nn.Linear(
+            self.timeseries_len * 16 + unique_obs_dim, 128, dtype=float_type
+        )
         self.FC2 = nn.Linear(128, act_dim, dtype=float_type)
 
     def forward(self, obs):
@@ -490,7 +494,9 @@ class ActorPPO(nn.Module):
         """Apply the tanh change-of-variables correction to Gaussian log-probability."""
         distribution = th.distributions.Normal(mean, std)
         gaussian_log_prob = distribution.log_prob(latent_actions)
-        log_squash_derivative = 2 * (np.log(2.0) - latent_actions - F.softplus(-2 * latent_actions))
+        log_squash_derivative = 2 * (
+            np.log(2.0) - latent_actions - F.softplus(-2 * latent_actions)
+        )
         return (gaussian_log_prob - log_squash_derivative).sum(dim=-1)
 
 

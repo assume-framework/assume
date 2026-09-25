@@ -170,10 +170,11 @@ class PPO(ActorCriticAlgorithm):
 
         # For on-policy algorithms, simpler progress calculation
         total_episodes = self.learning_config.training_episodes
-        progress_remaining = 1 - (
-            self.learning_role.episodes_done
-            + elapsed_duration / total_duration
-        ) / total_episodes
+        progress_remaining = (
+            1
+            - (self.learning_role.episodes_done + elapsed_duration / total_duration)
+            / total_episodes
+        )
 
         return progress_remaining
 
@@ -299,7 +300,13 @@ class PPO(ActorCriticAlgorithm):
                     unit_id_order,
                     self.float_type,
                 )
-                for field in ("obs", "actions", "rewards", "log_probs", "latent_actions")
+                for field in (
+                    "obs",
+                    "actions",
+                    "rewards",
+                    "log_probs",
+                    "latent_actions",
+                )
             }
 
             # Computing V(s_t) centrally and reshaping it to the buffer layout

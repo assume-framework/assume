@@ -463,14 +463,17 @@ def test_maddpg_load_corrupted_critic(tmp_path, base_learning_config, caplog):
     learning.rl_algorithm.load_critic_params(directory=str(tmp_path))
 
     assert compare_state_dicts(strategy.critics.state_dict(), original_critic_state)
-    assert compare_state_dicts(strategy.target_critics.state_dict(), original_target_state)
-    assert "Missing critic_optimizer in critic params for agent_0; skipping." in caplog.text
+    assert compare_state_dicts(
+        strategy.target_critics.state_dict(), original_target_state
+    )
+    assert (
+        "Missing critic_optimizer in critic params for agent_0; skipping."
+        in caplog.text
+    )
 
 
 @pytest.mark.require_learning
-def test_maddpg_does_not_load_actor_without_target(
-    learning_role_n, tmp_path, caplog
-):
+def test_maddpg_does_not_load_actor_without_target(learning_role_n, tmp_path, caplog):
     learning_role_n.initialize_policy()
     strategy = learning_role_n.rl_strats["agent_0"]
     original_actor_state = deepcopy(strategy.actor.state_dict())
@@ -491,15 +494,13 @@ def test_maddpg_does_not_load_actor_without_target(
 
 
 @pytest.mark.require_learning
-def test_maddpg_critic_transfer_is_atomic(
-    saved_n_agent_model, base_learning_config
-):
+def test_maddpg_critic_transfer_is_atomic(saved_n_agent_model, base_learning_config):
     save_dir, _ = saved_n_agent_model
     critic_path = Path(save_dir) / "critics" / "critic_agent_0.pt"
     checkpoint = th.load(critic_path, weights_only=True)
-    checkpoint["critic_target"]["q_layers.2.weight"] = checkpoint[
-        "critic_target"
-    ]["q_layers.2.weight"][:1]
+    checkpoint["critic_target"]["q_layers.2.weight"] = checkpoint["critic_target"][
+        "q_layers.2.weight"
+    ][:1]
     th.save(checkpoint, critic_path)
 
     config = copy(base_learning_config)

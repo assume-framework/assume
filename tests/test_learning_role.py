@@ -198,8 +198,12 @@ async def test_atomic_swap_no_data_loss(learning_role):
 
     # Verify ts2 carried-over data is still there
     assert ts2 in learning_role.cache["obs"], "ts2 should still be carried over"
-    assert ts2 in learning_role.cache["actions"], "ts2 actions should still be carried over"
-    assert ts2 in learning_role.cache["rewards"], "ts2 rewards should still be carried over"
+    assert ts2 in learning_role.cache["actions"], (
+        "ts2 actions should still be carried over"
+    )
+    assert ts2 in learning_role.cache["rewards"], (
+        "ts2 rewards should still be carried over"
+    )
 
     # Verify the actual data content
     assert len(learning_role.cache["obs"][ts3]["unit_1"]) == 1

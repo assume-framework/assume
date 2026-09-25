@@ -184,7 +184,9 @@ def test_mappo_complete_policy_update_changes_actor_and_critic(learning_role_n):
     )
 
     actor_before = {
-        unit_id: [parameter.detach().clone() for parameter in strategy.actor.parameters()]
+        unit_id: [
+            parameter.detach().clone() for parameter in strategy.actor.parameters()
+        ]
         for unit_id, strategy in learning_role_n.rl_strats.items()
     }
     critic_before = {
@@ -289,7 +291,9 @@ def test_mappo_actors_use_consistent_squashed_gaussian_log_probs():
 
     for actor in actors:
         activation_input = th.tensor([-1.0, 0.0, 1.0])
-        assert th.equal(actor.activation_function(activation_input), th.tanh(activation_input))
+        assert th.equal(
+            actor.activation_function(activation_input), th.tanh(activation_input)
+        )
 
         th.manual_seed(42)
         actions, sampled_log_probs = actor.get_action_and_log_prob(observations)
@@ -349,14 +353,21 @@ def test_saturated_ppo_ratios_preserve_latent_samples(constant_ppo_actor, mean):
     assert (actions.abs() == 1).any()
 
     buffer = RolloutBuffer(
-        buffer_size=1, obs_dim=10, act_dim=1, n_rl_units=1,
-        device="cpu", float_type=th.float32,
+        buffer_size=1,
+        obs_dim=10,
+        act_dim=1,
+        n_rl_units=1,
+        device="cpu",
+        float_type=th.float32,
     )
     for index in range(len(observations)):
         buffer.ensure_capacity(index + 1)
         buffer.add(
-            observations[index].numpy(), actions[index].numpy(),
-            np.zeros(1), np.zeros(1), old_log_probs[index].numpy(),
+            observations[index].numpy(),
+            actions[index].numpy(),
+            np.zeros(1),
+            np.zeros(1),
+            old_log_probs[index].numpy(),
             latent_action=latents[index].numpy(),
         )
     # Growth and shuffled sampling must retain the original sample/log-prob pair.
@@ -366,9 +377,7 @@ def test_saturated_ppo_ratios_preserve_latent_samples(constant_ppo_actor, mean):
     log_probs, _ = actor.evaluate_actions(
         batch.observations[:, 0], batch.actions[:, 0], batch.latent_actions[:, 0]
     )
-    th.testing.assert_close(
-        (log_probs - batch.old_log_probs[:, 0]).exp(), th.ones(16)
-    )
+    th.testing.assert_close((log_probs - batch.old_log_probs[:, 0]).exp(), th.ones(16))
 
     with th.no_grad():
         actor.mean_layer.bias.add_(0.2)
@@ -379,8 +388,10 @@ def test_saturated_ppo_ratios_preserve_latent_samples(constant_ppo_actor, mean):
     samples = batch.latent_actions[:, 0, 0]
     expected_log_ratio = -0.5 * ((samples - (mean + 0.2)) ** 2 - (samples - mean) ** 2)
     th.testing.assert_close(
-        changed_log_probs - batch.old_log_probs[:, 0], expected_log_ratio,
-        atol=3e-6, rtol=1e-5,
+        changed_log_probs - batch.old_log_probs[:, 0],
+        expected_log_ratio,
+        atol=3e-6,
+        rtol=1e-5,
     )
 
 
@@ -441,16 +452,19 @@ def test_mappo_excludes_late_rewards_from_old_policy(learning_role_n, monkeypatc
     def record_store(cache, device):
         original_store(cache, device)
         buffer = algorithm.buffer
-        stored_hours.append(buffer.observations[:buffer.pos, 0, 0].tolist())
+        stored_hours.append(buffer.observations[: buffer.pos, 0, 0].tolist())
         batch = buffer.sample(np.arange(buffer.pos))
         for index, strategy in enumerate(learn.rl_strats.values()):
             log_probs, _ = strategy.actor.evaluate_actions(
-                batch.observations[:, index], batch.actions[:, index],
+                batch.observations[:, index],
+                batch.actions[:, index],
                 batch.latent_actions[:, index],
             )
             th.testing.assert_close(
                 (log_probs - batch.old_log_probs[:, index]).exp(),
-                th.ones(buffer.pos), atol=1e-5, rtol=1e-5,
+                th.ones(buffer.pos),
+                atol=1e-5,
+                rtol=1e-5,
             )
 
     def record_output(cache):
@@ -470,7 +484,9 @@ def test_mappo_excludes_late_rewards_from_old_policy(learning_role_n, monkeypatc
 
     def add_rewards(hour):
         for unit_id in learn.rl_strats:
-            learn.add_reward_to_cache(unit_id, start + timedelta(hours=hour), 1.0, 0.0, 1.0)
+            learn.add_reward_to_cache(
+                unit_id, start + timedelta(hours=hour), 1.0, 0.0, 1.0
+            )
 
     for hour in range(1, 5):
         add_actions(hour)
@@ -674,6 +690,7 @@ def test_mappo_buffer_storage_uses_rl_strats_order(base_learning_config):
     already do.
     """
     import asyncio
+
     config = copy(base_learning_config)
 
     learn = Learning(config["learning_config"], start, end)
@@ -684,9 +701,9 @@ def test_mappo_buffer_storage_uses_rl_strats_order(base_learning_config):
     )
 
     for agent_id in insertion_order:
-        strat = LearningStrategy(**config, learning_role=learn)
-        strat.unit_id = agent_id
-        learn.rl_strats[agent_id] = strat
+        strategy = LearningStrategy(**config, learning_role=learn)
+        strategy.unit_id = agent_id
+        learn.rl_strats[agent_id] = strategy
 
     learn.initialize_policy()
 
@@ -701,7 +718,7 @@ def test_mappo_buffer_storage_uses_rl_strats_order(base_learning_config):
     act_dim = config["act_dim"]
 
     # Build a fake rollout buffer large enough to hold one fake timestep.
-    learn.rl_algorithm.buffer = RolloutBuffer( # TODO: probably doesn't work
+    learn.rl_algorithm.buffer = RolloutBuffer(  # TODO: probably doesn't work
         buffer_size=4,
         obs_dim=obs_dim,
         act_dim=act_dim,
@@ -737,9 +754,7 @@ def test_mappo_buffer_storage_uses_rl_strats_order(base_learning_config):
             th.full((act_dim,), marker, dtype=th.float32)
         ]
         cache["rewards"][timestamp][unit_id] = [marker]
-        cache["noises"][timestamp][unit_id] = [
-            th.zeros(act_dim, dtype=th.float32)
-        ]
+        cache["noises"][timestamp][unit_id] = [th.zeros(act_dim, dtype=th.float32)]
         cache["regret"][timestamp][unit_id] = [0.0]
         cache["profit"][timestamp][unit_id] = [0.0]
         cache["log_probs"][timestamp][unit_id] = [-marker]
@@ -755,9 +770,7 @@ def test_mappo_buffer_storage_uses_rl_strats_order(base_learning_config):
     learn.update_steps = 0
     learn.rl_algorithm.update_policy = lambda: None
 
-    asyncio.run(
-        learn._store_to_buffer_and_update_sync(cache, learn.device)
-    )
+    asyncio.run(learn._store_to_buffer_and_update_sync(cache, learn.device))
 
     buf = learn.rl_algorithm.buffer
     # One timestamp -> one row in the buffer.

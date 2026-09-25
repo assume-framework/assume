@@ -537,7 +537,9 @@ class ActorCriticAlgorithm(RLAlgorithm):
                 if self.uses_target_networks:
                     required_keys.append("critic_target")
 
-                missing_keys = [key for key in required_keys if key not in critic_params]
+                missing_keys = [
+                    key for key in required_keys if key not in critic_params
+                ]
                 if missing_keys:
                     logger.warning(
                         f"Missing {', '.join(missing_keys)} in critic params for "
