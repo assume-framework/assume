@@ -440,7 +440,6 @@ class UnitsOperator(Role):
         execute_until = now - self.simulation_index.freq
 
         last_ts = self.last_executed_dispatch
-        self.last_executed_dispatch = datetime2timestamp(execute_until)
 
         # add one second to exclude the first time stamp,
         # because it is already executed in the last step
@@ -452,6 +451,7 @@ class UnitsOperator(Role):
         # now that the dispatch is realized, the reward of every product whose
         # delivery period has been executed can be calculated
         self.calculate_unit_reward(execute_until)
+        self.last_executed_dispatch = datetime2timestamp(execute_until)
 
     def get_actual_dispatch(self, start: datetime, end: datetime) -> list[dict]:
         """
