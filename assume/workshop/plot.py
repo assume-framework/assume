@@ -13,10 +13,13 @@ gelb = "#ffe863"
 rosa = "#f5c2ed"
 schwarz = "#000000"
 
+ai_orange = "#FF8C00"
+ai_teal = "#40E0D0"
+
 COLORS = dict()
 COLORS["nuclear_plant"] = gruen
-COLORS["gas_plant_marginal"] = rosa
-COLORS["marginal"] = rosa
+COLORS["gas_plant_marginal"] = ai_teal
+COLORS["marginal"] = ai_teal
 COLORS["gas_plant_learning"] = dunkelblau
 COLORS["learning"] = dunkelblau
 COLORS["back_up_plant"] = braun
@@ -94,7 +97,7 @@ def plot_demand(df: pd.DataFrame):
       marker="s",
       edgecolor=None,
       label="Demand <= 1000 MW",
-      color=gelb) # drawstyle="steps-post")
+      color=ai_orange) # drawstyle="steps-post")
   # ax.hlines(y=1000, xmin=index_below_1000.min())
 
   plt.tight_layout()
