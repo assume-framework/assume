@@ -18,12 +18,12 @@ ai_teal = "#40E0D0"
 
 COLORS = dict()
 COLORS["nuclear_plant"] = gruen
-COLORS["gas_plant_marginal"] = ai_teal
-COLORS["marginal"] = ai_teal
+COLORS["gas_plant_marginal"] = braun
+COLORS["marginal"] = braun
 COLORS["gas_plant_learning"] = dunkelblau
 COLORS["learning"] = dunkelblau
-COLORS["back_up_plant"] = braun
-COLORS["backup_plant"] = braun
+COLORS["back_up_plant"] = rosa
+COLORS["backup_plant"] = rosa
 COLORS["demand"] = schwarz
 
 COLORS["gas_plant_learning_1"] = blau
