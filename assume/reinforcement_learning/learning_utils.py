@@ -26,12 +26,26 @@ observation_dict = dict[list[datetime], ObsActRew]
 Schedule = Callable[[float], float]
 
 
+class ActivationLimits(TypedDict):
+    """Output limits for activation functions."""
+
+    min: float
+    max: float
+    func: Callable[[th.Tensor], th.Tensor]
+
+
+activation_function_limit: dict[str, ActivationLimits] = {
+    "tanh": {"min": -1, "max": 1, "func": th.tanh},
+    "sigmoid": {"min": 0, "max": 1, "func": th.sigmoid},
+    "relu": {"min": 0, "max": float("inf"), "func": th.nn.functional.relu},
+    "softsign": {"min": -1, "max": 1, "func": th.nn.functional.softsign},
+}
+
+
 # Ornstein-Uhlenbeck Noise
 # from https://github.com/songrotek/DDPG/blob/master/ou_noise.py
 class OUNoise:
-    """
-    A class that implements Ornstein-Uhlenbeck noise.
-    """
+    """A class that implements Ornstein-Uhlenbeck noise."""
 
     def __init__(self, action_dimension, mu=0, sigma=0.5, theta=0.15, dt=1e-2):
         self.action_dimension = action_dimension
@@ -60,9 +74,7 @@ class OUNoise:
 
 
 class NormalActionNoise:
-    """
-    A Gaussian action noise that supports direct tensor creation on a given device.
-    """
+    """A Gaussian action noise that supports direct tensor creation on a given device."""
 
     def __init__(self, action_dimension, mu=0.0, sigma=0.1, scale=1.0, dt=0.9998):
         self.act_dimension = action_dimension
@@ -72,8 +84,7 @@ class NormalActionNoise:
         self.dt = dt
 
     def noise(self, device=None, dtype=th.float):
-        """
-        Generates noise using torch.normal(), ensuring efficient execution on GPU if needed.
+        """Generate noise using torch.normal() ensuring efficient execution on GPU if needed.
 
         Args:
         - device (torch.device, optional): Target device (e.g., 'cuda' or 'cpu').
@@ -99,9 +110,9 @@ class NormalActionNoise:
 
 
 def polyak_update(params, target_params, tau: float):
-    """
-    Perform a Polyak average update on ``target_params`` using ``params``:
-    target parameters are slowly updated towards the main parameters.
+    """Perform a Polyak average update on ``target_params`` using ``params``.
+
+    Target parameters are slowly updated towards the main parameters.
     ``tau``, the soft update coefficient controls the interpolation:
     ``tau=1`` corresponds to copying the parameters to the target ones whereas nothing happens when ``tau=0``.
     The Polyak update is done in place, with ``no_grad``, and therefore does not create intermediate tensors,
@@ -111,9 +122,9 @@ def polyak_update(params, target_params, tau: float):
     See https://github.com/DLR-RM/stable-baselines3/issues/93
 
     Args:
-        params: parameters to use to update the target params
-        target_params: parameters to update
-        tau: the soft update coefficient ("Polyak update", between 0 and 1)
+        params: Parameters to use to update the target params.
+        target_params: Parameters to update.
+        tau: The soft update coefficient ("Polyak update", between 0 and 1).
     """
     with th.no_grad():
         for param, target_param in zip(params, target_params):
@@ -123,9 +134,10 @@ def polyak_update(params, target_params, tau: float):
 def linear_schedule_func(
     start: float, end: float = 0, end_fraction: float = 1
 ) -> Schedule:
-    """
-    Create a function that interpolates linearly between start and end
-    between ``progress_remaining`` = 1 and ``progress_remaining`` = 1 - ``end_fraction``.
+    """Create a function that interpolates linearly between start and end.
+
+    Interpolates linearly between start and end between ``progress_remaining`` = 1
+    and ``progress_remaining`` = 1 - ``end_fraction``.
 
     Args:
         start: value to start with if ``progress_remaining`` = 1
@@ -135,11 +147,10 @@ def linear_schedule_func(
             of the complete training process.
 
     Returns:
-        Linear schedule function.
+        The linear schedule function.
 
     Note:
         Adapted from SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L100
-
     """
 
     def func(progress_remaining: float) -> float:
@@ -152,17 +163,18 @@ def linear_schedule_func(
 
 
 def constant_schedule(val: float) -> Schedule:
-    """
-    Create a function that returns a constant. It is useful for learning rate schedule (to avoid code duplication)
+    """Create a function that returns a constant.
+
+    It is useful for learning rate schedule (to avoid code duplication).
 
     Args:
-        val: constant value
+        val: Constant value.
+
     Returns:
         Constant schedule function.
 
     Note:
         From SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L124
-
     """
 
     def func(_):
@@ -172,14 +184,27 @@ def constant_schedule(val: float) -> Schedule:
 
 
 def get_hidden_sizes(state_dict: dict, prefix: str) -> list[int]:
-    sizes = []
-    i = 0
-    while f"{prefix}.{i}.weight" in state_dict:
-        weight = state_dict[f"{prefix}.{i}.weight"]
-        out_dim = weight.shape[0]
-        sizes.append(out_dim)
-        i += 1
+    sizes = [
+        state_dict[f"{prefix}.{index}.weight"].shape[0]
+        for index in _get_linear_layer_indices(state_dict, prefix)
+    ]
     return sizes[:-1]  # exclude the final output layer if needed
+
+
+def _get_linear_layer_indices(state_dict: dict, prefix: str) -> list[int]:
+    indices = {
+        int(key.split(".")[1])
+        for key in state_dict
+        if key.startswith(f"{prefix}.")
+        and key.endswith(".weight")
+        and key.split(".")[1].isdigit()
+    }
+    return sorted(indices)
+
+
+def _get_network_prefixes(state_dict: dict) -> list[str]:
+    known = ("q_layers", "q1_layers", "q2_layers", "v_layers")
+    return [p for p in known if f"{p}.0.weight" in state_dict]
 
 
 def copy_layer_data(dst, src):
@@ -189,7 +214,10 @@ def copy_layer_data(dst, src):
 
 
 def transform_buffer_data(
-    nested_dict: dict, device: th.device, keys_unit_order: list
+    nested_dict: dict,
+    device: th.device,
+    keys_unit_order: list,
+    float_type: th.dtype = th.float32,
 ) -> np.ndarray:
     """
     Transform nested dict {datetime -> {unit_id -> [values]}} into
@@ -197,15 +225,24 @@ def transform_buffer_data(
     Get tensors from GPU to CPU.
 
     Args:
-        nested_dict: Dict with structure {datetime -> {unit_id -> list[tensor]}}
+        nested_dict: Dict with structure {datetime -> {unit_id -> list[tensor]}}.
+        device: PyTorch device config.
+        keys_unit_order: Ordered iterable of unit ids defining the agent
+            axis of the returned tensor.
+        float_type: PyTorch dtype for the returned data.
 
     Returns:
-        th.Tensor: Shape (n_timesteps, n_powerplants, feature_dim)
+        np.ndarray: Shape (n_timesteps, n_powerplants, feature_dim).
     """
-    # Get sorted lists of units and timestamps (for consistent ordering)
     all_times = sorted(nested_dict.keys())
 
-    # Get feature dimension from first non-empty value
+    for timestamp, unit_data in nested_dict.items():
+        for unit_id, values in unit_data.items():
+            if len(values) > 1:
+                raise ValueError(
+                    f"Expected one cached value per unit and timestamp, got {len(values)} for unit {unit_id!r} at {timestamp!r}."
+                )
+
     feature_dim = None
     for unit_data in nested_dict.values():
         for values in unit_data.values():
@@ -220,19 +257,22 @@ def transform_buffer_data(
 
     if feature_dim is None:
         raise ValueError(
-            "Error, while transforming RL data for buffer: No data found to determine feature dimension"
+            "Error, while transforming RL data for buffer: No data found "
+            "to determine feature dimension. Callers must filter out empty "
+            "timesteps before calling transform_buffer_data (see "
+            "learning_role._store_to_buffer_and_update_sync)."
         )
 
-    # Pre-allocate tensor (keep on same device as input data)
     result = th.zeros(
-        (len(all_times), len(keys_unit_order), feature_dim), device=device
+        (len(all_times), len(keys_unit_order), feature_dim),
+        device=device,
+        dtype=float_type,
     )
 
-    # Fill tensor with values (stays on same device as input so if on GPU it stays there during filling)
     for t, timestamp in enumerate(all_times):
         for u, unit_id in enumerate(keys_unit_order):
             values = nested_dict[timestamp].get(unit_id, [])
-            if values:  # if we have values for this timestamp
+            if values:
                 result[t, u] = values[0]
 
     return result.cpu().numpy()
@@ -246,6 +286,7 @@ def transfer_weights(
     obs_base: int,
     act_dim: int,
     unique_obs: int,
+    current_id: str | None = None,
 ) -> dict | None:
     """
     Transfer weights from loaded model to new model. Copy only those obs- and action-slices for matching IDs.
@@ -259,15 +300,27 @@ def transfer_weights(
         obs_base (int): The base observation size.
         act_dim (int): The action dimension size.
         unique_obs (int): The unique observation size per agent, smaller than obs_base as these include also shared observation values.
+        current_id: Agent whose centralized critic is being transferred. Its own
+            observation occupies the shared ``obs_base`` block.
 
-    returns:
+    Returns:
         dict | None: The updated state dictionary with transferred weights, or None if architecture mismatch.
     """
 
     # 1) Architecture check
     new_state = model.state_dict()
-    loaded_hidden = get_hidden_sizes(loaded_state, prefix="q1_layers")
-    new_hidden = get_hidden_sizes(new_state, prefix="q1_layers")
+    prefixes = _get_network_prefixes(loaded_state)
+    if not prefixes:
+        logger.warning(
+            "Cannot transfer weights: no recognised critic network prefix found "
+            "in loaded state dict."
+        )
+        return None
+
+    # Using the first detected prefix for architecture check.
+    check_prefix = prefixes[0]
+    loaded_hidden = get_hidden_sizes(loaded_state, prefix=check_prefix)
+    new_hidden = get_hidden_sizes(new_state, prefix=check_prefix)
     if loaded_hidden != new_hidden:
         logger.warning(
             f"Cannot transfer weights: neural network architecture mismatch.\n"
@@ -284,58 +337,96 @@ def transfer_weights(
     # 3) Clone new state
     new_state_copy = {k: v.clone() for k, v in new_state.items()}
 
-    # 4) Transfer per-prefix
-    for prefix in ("q1_layers", "q2_layers"):
-        w_loaded = loaded_state[f"{prefix}.0.weight"]
-        b_loaded = loaded_state[f"{prefix}.0.bias"]
-        w_new = new_state_copy[f"{prefix}.0.weight"]
-        b_new = new_state_copy[f"{prefix}.0.bias"]
-        w_loaded_random = new_state[f"{prefix}.0.weight"].clone()
+    for prefix in prefixes:
+        loaded_indices = _get_linear_layer_indices(loaded_state, prefix)
+        new_indices = _get_linear_layer_indices(new_state, prefix)
+        if loaded_indices != new_indices:
+            logger.warning(
+                "Cannot transfer weights: critic layer structure mismatch for %s.",
+                prefix,
+            )
+            return None
+
+        input_index = new_indices[0]
+        w_loaded = loaded_state[f"{prefix}.{input_index}.weight"]
+        b_loaded = loaded_state[f"{prefix}.{input_index}.bias"]
+        w_new = new_state_copy[f"{prefix}.{input_index}.weight"]
+        b_new = new_state_copy[f"{prefix}.{input_index}.bias"]
 
         # a) shared obs_base
         w_new[:, :obs_base] = w_loaded[:, :obs_base]
 
         # b) matched agents’ ID
         # copy weights from loaded to new model
-        for new_idx, u in enumerate(new_id_order):
-            if u not in loaded_id_order:
-                continue
-            loaded_idx = loaded_id_order.index(u)
+        if current_id is None:
+            loaded_other_ids = loaded_id_order[1:]
+            new_other_ids = new_id_order[1:]
+        else:
+            loaded_other_ids = [u for u in loaded_id_order if u != current_id]
+            new_other_ids = [u for u in new_id_order if u != current_id]
 
-            # unique_obs for agents beyond the first
-            if new_idx > 0 and loaded_idx > 0:
-                ns = obs_base + unique_obs * (new_idx - 1)
-                os_ = obs_base + unique_obs * (loaded_idx - 1)
+        for new_idx, unit_id in enumerate(new_other_ids):
+            if unit_id in loaded_other_ids:
+                loaded_idx = loaded_other_ids.index(unit_id)
+                ns = obs_base + unique_obs * new_idx
+                os_ = obs_base + unique_obs * loaded_idx
                 w_new[:, ns : ns + unique_obs] = w_loaded[:, os_ : os_ + unique_obs]
 
-            # action blocks for every agent
-            new_act = new_obs_tot + act_dim * new_idx
-            loaded_act = loaded_obs_tot + act_dim * loaded_idx
-            w_new[:, new_act : new_act + act_dim] = w_loaded[
-                :, loaded_act : loaded_act + act_dim
-            ]
+        if act_dim:
+            for new_idx, unit_id in enumerate(new_id_order):
+                if unit_id not in loaded_id_order:
+                    continue
+                loaded_idx = loaded_id_order.index(unit_id)
+                new_act = new_obs_tot + act_dim * new_idx
+                loaded_act = loaded_obs_tot + act_dim * loaded_idx
+                w_new[:, new_act : new_act + act_dim] = w_loaded[
+                    :, loaded_act : loaded_act + act_dim
+                ]
 
-        # c) unmatched agents’ ID
-        # use randomly initialized weights for unmatched agents
-        for new_idx, u in enumerate(new_id_order):
-            if new_idx == 0 or u in loaded_id_order:
-                continue
-            ns = obs_base + unique_obs * (new_idx - 1)
-            w_new[:, ns : ns + unique_obs] = w_loaded_random[:, ns : ns + unique_obs]
-            # actions untouched
-
-        # d) bias and deeper layers
-        # copy all other wigths and biases (besides input layer) from loaded to new model
+        # c) bias and deeper layers
+        # copy all other weights and biases (besides input layer) from loaded to new model
         b_new.copy_(b_loaded)
-        for i in range(1, len(new_hidden) + 1):
-            new_state_copy[f"{prefix}.{i}.weight"].copy_(
-                loaded_state[f"{prefix}.{i}.weight"]
+        for index in new_indices[1:]:
+            new_state_copy[f"{prefix}.{index}.weight"].copy_(
+                loaded_state[f"{prefix}.{index}.weight"]
             )
-            new_state_copy[f"{prefix}.{i}.bias"].copy_(
-                loaded_state[f"{prefix}.{i}.bias"]
+            new_state_copy[f"{prefix}.{index}.bias"].copy_(
+                loaded_state[f"{prefix}.{index}.bias"]
             )
 
     return new_state_copy
+
+
+def xavier_init_weights(module: th.nn.Module) -> None:
+    """Apply Xavier uniform initialisation to all Linear layers in *module*.
+
+    Xavier initialisation keeps activation variance roughly constant across
+    layers, which works well for tanh / softsign activations (TD3/DDPG actors
+    and all Q-network critics).
+
+    Args:
+        module: Any ``nn.Module`` whose ``Linear`` sub-layers should be initialised.
+    """
+    if isinstance(module, th.nn.Linear):
+        th.nn.init.xavier_uniform_(module.weight)
+        th.nn.init.zeros_(module.bias)
+
+
+def orthogonal_init_weights(module: th.nn.Module, gain: float = 1.0) -> None:
+    """Apply orthogonal initialisation to a single Linear layer.
+
+    Orthogonal initialisation is the standard choice for PPO because it
+    preserves gradient norms better than Xavier when combined with ReLU
+    activations and a Gaussian policy head.
+
+    Args:
+        module: An ``nn.Linear`` layer to initialise.
+        gain: Scaling factor for the weight matrix.  Common choices:
+            ``sqrt(2)`` for hidden layers, ``0.01`` for the output / policy head.
+    """
+    if isinstance(module, th.nn.Linear):
+        th.nn.init.orthogonal_(module.weight, gain=gain)
+        th.nn.init.zeros_(module.bias)
 
 
 def encode_hourly_features(date: datetime) -> list:
