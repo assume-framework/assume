@@ -20,6 +20,7 @@ COLORS["marginal"] = rosa
 COLORS["gas_plant_learning"] = dunkelblau
 COLORS["learning"] = dunkelblau
 COLORS["back_up_plant"] = braun
+COLORS["backup_plant"] = braun
 COLORS["demand"] = schwarz
 
 COLORS["gas_plant_learning_1"] = blau
