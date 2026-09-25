@@ -156,21 +156,21 @@ class BaseUnit:
                 accepted_price
             )
 
-    def calculate_cashflow_and_reward(
+    def calculate_reward(
         self,
         marketconfig: MarketConfig,
         orderbook: Orderbook,
     ) -> None:
         """
-        Calculates the cashflow and the reward for the given unit.
+        Calculates the reward for the given unit.
+
+        This is called once the delivery period of the orders has been executed,
+        so that the reward can be based on the actual dispatch of the unit.
 
         Args:
             marketconfig (MarketConfig): The market configuration.
             orderbook (Orderbook): The orderbook.
         """
-
-        product_type = marketconfig.product_type
-        self.calculate_cashflow(product_type, orderbook)
 
         self.bidding_strategies[marketconfig.market_id].calculate_reward(
             unit=self,
@@ -178,11 +178,11 @@ class BaseUnit:
             orderbook=orderbook,
         )
 
-    def calculate_generation_cost(
+    def calculate_costs(
         self, start: datetime, end: datetime, product_type: str
     ) -> None:
         """
-        Calculates the generation cost for a specific product type within the given time range,
+        Calculates the total costs (generation and startup) for a specific product type within the given time range,
         but only if the end is the last index in the time series.
 
         Args:
@@ -205,6 +205,48 @@ class BaseUnit:
         self.outputs[f"{product_type}_generation_costs"].loc[start:end] = (
             generation_costs
         )
+
+        starting_costs = np.zeros(len(self.index[start:end]))
+        for idx, t in enumerate(self.index[start:end]):
+            op_time = self.get_operation_time(t)
+
+            if self.outputs[product_type].loc[t] != 0 and op_time < 0:
+                starting_costs[idx] = self.get_starting_costs(op_time)
+
+        self.outputs[f"{product_type}_starting_costs"].loc[start:end] = starting_costs
+
+        # future work:
+        # balancing_costs = balancing_price * abs(sum(accepted_volumes across all products and markets) - product_data)
+        # self.outputs[f"{product_type}_balancing_costs"].loc[start:end] = (
+        #   balancing_costs
+        # )
+
+        self.outputs[f"{product_type}_total_costs"].loc[start:end] = (
+            generation_costs + starting_costs  # future work: + balancing_costs
+        )
+
+    def update_avg_op_time(self, start: datetime, end: datetime) -> None:
+        """
+        Updates the average operation time from the dispatch which was just executed.
+
+        It needs to be called once per unit and time step after the dispatch has been
+        executed, so that the average operation time is based on the actual dispatch and
+        avoids double-counting in case of multiple market dispatches.
+
+        Args:
+            start (datetime.datetime): The start of the executed range.
+            end (datetime.datetime): The end of the executed range, inclusive.
+        """
+        start = max(start, self.index[0])
+
+        # Increment total operation time for operating periods in the executed range
+        self.total_op_time += (self.outputs["energy"].loc[start:end] > 0).sum()
+
+        # Update the average operation time
+        total_periods = (
+            len(self.index[:end]) + 1
+        )  # Total periods up to and including 'end'
+        self.avg_op_time = self.total_op_time / total_periods
 
     def execute_current_dispatch(
         self,
@@ -302,6 +344,18 @@ class BaseUnit:
         """
         return 0
 
+    def get_operation_time(self, start: datetime) -> int:
+        """
+        Returns the time the unit is operating (positive) or shut down (negative).
+
+        Args:
+            start (datetime.datetime): The start time.
+
+        Returns:
+            int: The operation time as a positive integer if operating, or negative if shut down.
+        """
+        return 0
+
 
 class SupportsMinMax(BaseUnit):
     """
@@ -317,6 +371,11 @@ class SupportsMinMax(BaseUnit):
     emission_factor: float
     min_operating_time: int = 0
     min_down_time: int = 0
+    downtime_hot_start: int = 0
+    downtime_warm_start: int = 0
+    hot_start_cost: float = 0
+    warm_start_cost: float = 0
+    cold_start_cost: float = 0
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

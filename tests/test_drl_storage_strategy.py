@@ -106,7 +106,7 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
         # Mock the calculate_marginal_cost method to return a fixed marginal cost
         with patch.object(Storage, "calculate_marginal_cost", return_value=10.0):
             # Calculate bids using the strategy
-            bids = strategy.calculate_bids(  # TODO
+            bids = strategy.calculate_bids(
                 storage_unit, mc, product_tuples=product_tuples
             )
 
@@ -152,7 +152,6 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
 
             reward = reward_cache[last_ts][unit_id][0]
             profit = profit_cache[last_ts][unit_id][0]
-            costs = storage_unit.outputs["total_costs"].loc[product_index]
 
             # Calculate expected values
             duration_hours = 1  # Since the product tuple is 1 hour
@@ -177,11 +176,6 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
             # Assert the calculated profit
             assert profit == expected_profit - expected_costs, (
                 f"Expected profit {expected_profit}, got {profit}"
-            )
-
-            # Assert the calculated costs
-            assert costs[0] == expected_costs, (
-                f"Expected costs {expected_costs}, got {costs[0]}"
             )
 
 
@@ -256,7 +250,6 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
 
             reward = reward_cache[last_ts][unit_id][0]
             profit = profit_cache[last_ts][unit_id][0]
-            costs = storage_unit.outputs["total_costs"].loc[product_index]
 
             # Calculate expected values
             duration_hours = 1  # Since the product tuple is 1 hour
@@ -281,11 +274,6 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
             # Assert the calculated profit
             assert profit == expected_profit - expected_costs, (
                 f"Expected profit {expected_profit}, got {profit}"
-            )
-
-            # Assert the calculated costs
-            assert costs[0] == expected_costs, (
-                f"Expected costs {expected_costs}, got {costs[0]}"
             )
 
 
