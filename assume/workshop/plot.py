@@ -25,9 +25,20 @@ COLORS["learning"] = dunkelblau
 COLORS["back_up_plant"] = rosa
 COLORS["backup_plant"] = rosa
 COLORS["demand"] = schwarz
-
 COLORS["gas_plant_learning_1"] = blau
 COLORS["gas_plant_learning_2"] = dunkelblau
+
+MARKERS = dict()
+MARKERS["nuclear_plant"] = "o"
+MARKERS["gas_plant_marginal"] = "s"
+MARKERS["marginal"] = "s"
+MARKERS["gas_plant_learning"] = "D"
+MARKERS["learning"] = "D"
+MARKERS["back_up_plant"] = "^"
+MARKERS["backup_plant"] = "^"
+MARKERS["demand"] = "X"
+MARKERS["gas_plant_learning_1"] = "o"
+MARKERS["gas_plant_learning_2"] = "D"
 
 
 def plot_merit_order(df: pd.DataFrame):
@@ -122,7 +133,7 @@ def plot_accepted_volume(df: pd.DataFrame):
     data = df_generation.query('unit_id == @label')
     y_values = data["accepted_volume (abs)"]
     # sns.lineplot(data=data, x="end_time", y="accepted_volume (abs)", label=label, color=COLORS[label])
-    ax.plot(x_values, previous, label=label, color=COLORS[label])
+    # ax.plot(x_values, previous, label=label, color=COLORS[label])
     ax.fill_between(x_values, previous, previous + y_values, color=COLORS[label], alpha=0.45)
     previous = [prev + y for prev, y in zip(previous, y_values)]
 
@@ -148,7 +159,7 @@ def plot_revenue(df: pd.DataFrame):
   df["revenue"] = df['accepted_price'] * df['accepted_volume'] 
   df["revenue (cum)"] = df.groupby("strategy")["revenue"].cumsum()
 
-  sns.lineplot(data=df, x="end_time", y="revenue (cum)", ax=ax, hue="strategy", palette=COLORS)
+  sns.lineplot(data=df, x="end_time", y="revenue (cum)", ax=ax, hue="strategy", palette=COLORS, style="strategy")
 
   ax.set_ylabel("Revenue (€)")
   ax.set_xlabel("Time (h)")
@@ -164,7 +175,7 @@ def plot_revenue(df: pd.DataFrame):
 def plot_biddings(df: pd.DataFrame):
   fig, ax = plt.subplots()
   df["end_time"] = pd.to_datetime(df["end_time"])
-  sns.scatterplot(df, x="end_time", y="price", hue="unit_id", ax=ax, marker="X", palette=COLORS)
+  sns.scatterplot(df, x="end_time", y="price", hue="unit_id", ax=ax, palette=COLORS, style="unit_id", markers=MARKERS)
   date_form = mdates.DateFormatter('%H')
   ax.xaxis.set_major_formatter(date_form)
   ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
@@ -179,7 +190,7 @@ def plot_biddings(df: pd.DataFrame):
 def plot_biddings_with_clearing_price(df: pd.DataFrame):
   fig, ax = plt.subplots()
   df["end_time"] = pd.to_datetime(df["end_time"])
-  sns.scatterplot(df, x="end_time", y="price", hue="unit_id", ax=ax, marker="X", palette=COLORS)
+  sns.scatterplot(df, x="end_time", y="price", hue="unit_id", ax=ax, style="unit_id", markers=MARKERS, palette=COLORS)
   date_form = mdates.DateFormatter('%H')
   ax.xaxis.set_major_formatter(date_form)
   ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
@@ -188,7 +199,7 @@ def plot_biddings_with_clearing_price(df: pd.DataFrame):
   ax.legend(title="Strategy")
 
   clearing_price_df = df.groupby('end_time')['accepted_price'].first().reset_index()
-  sns.lineplot(clearing_price_df, y="accepted_price", x="end_time", color=gelb, alpha=0.8, label="clearing price")
+  sns.lineplot(clearing_price_df, y="accepted_price", x="end_time", color=ai_orange, alpha=0.8, label="clearing price")
 
   plt.tight_layout()
 
