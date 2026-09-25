@@ -145,7 +145,7 @@ def plot_revenue(df: pd.DataFrame):
   df["revenue"] = df['accepted_price'] * df['accepted_volume'] 
   df["revenue (cum)"] = df.groupby("strategy")["revenue"].cumsum()
 
-  sns.lineplot(data=df, x="end_time", y="revenue (cum)", ax=ax, hue="strategy")
+  sns.lineplot(data=df, x="end_time", y="revenue (cum)", ax=ax, hue="strategy", palette=COLORS)
 
   ax.set_ylabel("Revenue (€)")
   ax.set_xlabel("Time (h)")
