@@ -134,7 +134,7 @@ def plot_accepted_volume(df: pd.DataFrame):
     y_values = data["accepted_volume (abs)"]
     # sns.lineplot(data=data, x="end_time", y="accepted_volume (abs)", label=label, color=COLORS[label])
     # ax.plot(x_values, previous, label=label, color=COLORS[label])
-    ax.fill_between(x_values, previous, previous + y_values, color=COLORS[label], alpha=0.45)
+    ax.fill_between(x_values, previous, previous + y_values, color=COLORS[label], alpha=0.45, label=label)
     previous = [prev + y for prev, y in zip(previous, y_values)]
 
   ax.plot(x_values, df_demand["accepted_volume (abs)"], label="demand", color=COLORS["demand"])

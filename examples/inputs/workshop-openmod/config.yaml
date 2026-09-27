@@ -47,7 +47,7 @@ learning:
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.001
-    training_episodes: 40
+    training_episodes: 20
     episodes_collecting_initial_experience: 5
     train_freq: 7h
     gradient_steps: 64
