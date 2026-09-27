@@ -136,9 +136,9 @@ def test_learning_strategies_parametrized(
     # Fetch reward, profit, regret from learning_role cache instead of outputs
     # Get the latest timestamp used for reward cache
     learning_role = strategy.learning_role
-    reward_cache = learning_role.all_rewards
-    profit_cache = learning_role.all_profits
-    regret_cache = learning_role.all_regrets
+    reward_cache = learning_role.cache["rewards"]
+    profit_cache = learning_role.cache["profit"]
+    regret_cache = learning_role.cache["regret"]
 
     # Use the last timestamp (should be the one just written)
     last_ts = sorted(reward_cache.keys())[-1]
