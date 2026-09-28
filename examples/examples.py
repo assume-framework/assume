@@ -107,6 +107,8 @@ available_examples = {
     },
     # redispatch example
     "redisp_3_nodes": {"scenario": "example_04a", "study_case": "base"},
+    # heat system example
+    "heat_system_3_nodes": {"scenario": "example_04b", "study_case": "base"},
 }
 
 
