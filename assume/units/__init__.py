@@ -12,6 +12,7 @@ from assume.units.cement_plant import CementPlant
 from assume.units.steam_generation_plant import SteamPlant
 from assume.units.hydrogen_plant import HydrogenPlant
 from assume.units.building import Building
+from assume.units.heat_system import HeatSystem
 from assume.units.dst_components import demand_side_technologies
 
 unit_types: dict[str, type[BaseUnit]] = {
@@ -24,4 +25,5 @@ unit_types: dict[str, type[BaseUnit]] = {
     "hydrogen_plant": HydrogenPlant,
     "steam_plant": SteamPlant,
     "building": Building,
+    "heat_system": HeatSystem,
 }

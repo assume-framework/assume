@@ -906,6 +906,113 @@ class CementForecaster(DsmUnitForecaster):
 
         initializing_unit.setup_model()
 
+class HeatSystemForecaster(DsmUnitForecaster):
+    """
+    Forecaster for heat system units.
+
+    Provides the forecasts required by a HeatSystem:
+    - heat demand
+    - electricity price
+    - fuel prices
+    - DSM congestion and renewable-utilisation signals
+
+    The electricity price is inherited from DsmUnitForecaster and is
+    derived from the EOM price forecast.
+    """
+
+    def __init__(
+        self,
+        index: ForecastIndex,
+        fuel_prices: dict[str, ForecastSeries] | None = None,
+        heat_demand: ForecastSeries = 0,
+        electricity_price_flex: ForecastSeries | None = None,
+        availability: ForecastSeries = 1,
+        forecast_algorithms: dict[str, str] = {},
+        forecast_registries: dict[str, dict] = None,
+        market_prices: dict[str, ForecastSeries] = None,
+        residual_load: dict[str, ForecastSeries] = None,
+        congestion_signal: ForecastSeries = 0.0,
+        renewable_utilisation_signal: ForecastSeries = 0.0,
+        electricity_price: ForecastSeries = None,
+    ):
+        super().__init__(
+            index=index,
+            availability=availability,
+            forecast_algorithms=forecast_algorithms,
+            forecast_registries=forecast_registries,
+            market_prices=market_prices,
+            residual_load=residual_load,
+            congestion_signal=congestion_signal,
+            renewable_utilisation_signal=renewable_utilisation_signal,
+            electricity_price=electricity_price,
+        )
+
+        if fuel_prices is None:
+            fuel_prices = {}
+
+        self.fuel_prices = self._dict_to_series(fuel_prices)
+        self.heat_demand = self._to_series(heat_demand)
+
+        self._electricity_price_flex = (
+            self._to_series(electricity_price_flex)
+            if electricity_price_flex is not None
+            else None
+        )
+
+    @property
+    def electricity_price_flex(self) -> FastSeries:
+        """
+        Alternative electricity-price signal used for flexibility
+        optimisation.
+
+        If no separate flexibility price is provided, use the normal
+        electricity-price forecast.
+        """
+        if self._electricity_price_flex is None:
+            return self.electricity_price
+
+        return self._electricity_price_flex
+
+    @electricity_price_flex.setter
+    def electricity_price_flex(self, value: ForecastSeries) -> None:
+        self._electricity_price_flex = (
+            self._to_series(value)
+            if value is not None
+            else None
+        )
+
+    def get_price(self, fuel: str) -> FastSeries:
+        """
+        Return the forecasted price for a fuel.
+
+        Returns a zero-valued series if the requested fuel is not
+        available.
+        """
+        if fuel not in self.fuel_prices:
+            return self._to_series(0)
+
+        return self.fuel_prices[fuel]
+
+    def initialize(
+        self,
+        units: list[BaseUnit],
+        market_configs: list[MarketConfig],
+        forecast_df: ForecastSeries = None,
+        initializing_unit: BaseUnit = None,
+    ):
+        super().initialize(
+            units,
+            market_configs,
+            forecast_df,
+            initializing_unit,
+        )
+
+        initializing_unit.congestion_signal = self.congestion_signal
+        initializing_unit.renewable_utilisation_signal = (
+            self.renewable_utilisation_signal
+        )
+
+        initializing_unit.setup_model()
 
 class SteamgenerationForecaster(DsmUnitForecaster):
     """Forecaster for steam generation units.

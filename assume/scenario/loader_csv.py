@@ -25,6 +25,7 @@ from assume.common.forecaster import (
     DemandForecaster,
     DsmUnitForecaster,
     ExchangeForecaster,
+    HeatSystemForecaster,
     HydrogenForecaster,
     PowerplantForecaster,
     SteamgenerationForecaster,
@@ -595,6 +596,8 @@ def load_config_and_create_forecaster(
     if not study_case:
         study_case = list(config.keys())[0]
     config = config[study_case]
+    logger.info(f"Loaded config from: {path}/config.yaml")
+    logger.info(f"heat_system config value: {config.get('heat_system', 'MISSING')!r}")
     learning_config = config.get("learning_config", {})
     learning_mode = learning_config.get("learning_mode", False) or learning_config.get(
         "continue_learning", False
@@ -648,6 +651,45 @@ def load_config_and_create_forecaster(
         units = load_dsm_units(path=path, config=config, file_name=unit_type)
         if units is not None:
             dsm_units.update(units)
+    """
+    # Load heat system units only if enabled in config
+    if config.get("heat_system", False):
+        logger.info("Loading heat_system_units.csv")
+        units = load_dsm_units(path=path,config=config,file_name="heat_system_units",)
+        if units is None:
+            raise ValueError("heat_system is enabled in config but heat_system_units.csv was not found.")
+        dsm_units.update(units)
+    """
+
+    # Load heat system units only if enabled in config
+    logger.info(
+        f"Checking HeatSystem: heat_system={config.get('heat_system', False)!r}"
+    )
+
+    if config.get("heat_system", False):
+        logger.info("HeatSystem enabled - loading heat_system_units.csv")
+
+        units = load_dsm_units(
+            path=path,
+            config=config,
+            file_name="heat_system_units",
+        )
+
+        logger.info(
+            f"Result from load_dsm_units for HeatSystem: "
+            f"{list(units.keys()) if units is not None else None}"
+        )
+
+        if units is None:
+            raise ValueError(
+                "heat_system is enabled in config but "
+                "heat_system_units.csv was not found."
+            )
+
+        dsm_units.update(units)
+
+        logger.info(f"DSM unit types after HeatSystem loading: {list(dsm_units.keys())}")
+
 
     forecasts_df = load_file(
         path=path, config=config, file_name="forecasts_df", index=index
@@ -874,6 +916,27 @@ def load_config_and_create_forecaster(
                         thermal_storage_schedule=0,  # TODO
                         thermal_demand=0,  # TODO
                     )
+                if type == "heat_system":
+                    heat_demand = get_unit_forecast_column(
+                        forecasts_df,
+                        id,
+                        "heat",
+                    )
+                    if heat_demand is None:
+                        raise ValueError(
+                            f"No heat demand forecast found for HeatSystem '{id}'. "
+                            f"Expected column '{id}_heat' in forecasts_df.csv."
+                        )
+                    unit_forecasts[id] = HeatSystemForecaster(
+                        index=shared_unit_index,
+                        availability=availability.get(
+                            id,
+                            pd.Series(1.0, index, name=id),
+                        ),
+                        forecast_algorithms=unit_forecast_algorithms,
+                        fuel_prices=fuel_prices_df,
+                        heat_demand=heat_demand,
+                    )
     # shared inputs used to build one UnitsOperatorForecaster per operator in
     # setup_world. An operator has no availability of its own (that is a
     # per-unit concept), so only the index and algorithms are shared here.
@@ -1075,17 +1138,23 @@ def setup_world(
         world_bidding_strategies=world.bidding_strategies,
     )
 
-    if dsm_units is not None:
+    if dsm_units:
         for unit_type, units_df in dsm_units.items():
-            dsm_units = read_units(
+
+            logger.info(
+                f"Preparing DSM unit type '{unit_type}' "
+            )
+
+            parsed_dsm_units = read_units(
                 units_df=units_df,
                 unit_type=unit_type,
                 forecaster=unit_forecasts,
                 world_bidding_strategies=world.bidding_strategies,
                 learning_mode=learning_mode,
             )
-        for op, op_units in dsm_units.items():
-            units[op].extend(op_units)
+
+            for op, op_units in parsed_dsm_units.items():
+                units[op].extend(op_units)
 
     for op, op_units in powerplant_units.items():
         units[op].extend(op_units)
