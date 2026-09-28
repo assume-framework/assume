@@ -1,0 +1,10 @@
+name,unit_type,technology,unit_operator,node,bidding_DAM,bidding_EOM,objective,flexibility_measure,cost_tolerance,max_power,min_power,cop,efficiency,fuel_type,capacity,min_soc,max_soc,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,initial_soc,storage_loss_rate,storage_type
+hs_north,heat_system,heat_pump,eom_de,north,heat_system_energy_optimization,heat_system_energy_optimization,min_variable_cost,cost_based_load_shift,10,2,0,2,,,,,,,,,,,,
+hs_north,heat_system,boiler_gas,eom_de,north,heat_system_energy_optimization,heat_system_energy_optimization,min_variable_cost,cost_based_load_shift,10,5,0,,1,natural_gas,,,,,,,,,,
+hs_north,heat_system,thermal_storage,eom_de,north,heat_system_energy_optimization,heat_system_energy_optimization,min_variable_cost,cost_based_load_shift,10,,,,,,8,0,1,4,4,1,1,0.5,0,short-term
+hs_east,heat_system,heat_pump,eom_de,east,heat_system_energy_optimization,heat_system_energy_optimization,min_variable_cost,cost_based_load_shift,10,3,0,2,,,,,,,,,,,,
+hs_east,heat_system,boiler_gas,eom_de,east,heat_system_energy_optimization,heat_system_energy_optimization,min_variable_cost,cost_based_load_shift,10,7,0,,1,natural_gas,,,,,,,,,,
+hs_east,heat_system,thermal_storage,eom_de,east,heat_system_energy_optimization,heat_system_energy_optimization,min_variable_cost,cost_based_load_shift,10,,,,,,12,0,1,6,6,1,1,0.5,0,short-term
+hs_west,heat_system,heat_pump,eom_de,west,heat_system_energy_optimization,heat_system_energy_optimization,min_variable_cost,cost_based_load_shift,10,4,0,2,,,,,,,,,,,,
+hs_west,heat_system,boiler_gas,eom_de,west,heat_system_energy_optimization,heat_system_energy_optimization,min_variable_cost,cost_based_load_shift,10,9,0,,1,natural_gas,,,,,,,,,,
+hs_west,heat_system,thermal_storage,eom_de,west,heat_system_energy_optimization,heat_system_energy_optimization,min_variable_cost,cost_based_load_shift,10,,,,,,16,0,1,8,8,1,1,0.5,0,short-term
