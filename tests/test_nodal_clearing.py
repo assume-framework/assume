@@ -392,3 +392,132 @@ def test_nodal_clearing_with_storage_single_hour():
     assert math.isclose(flows_df.loc[products[0][0], "line_1_2"], 200, abs_tol=eps)
     assert math.isclose(flows_df.loc[products[0][0], "line_1_3"], 5000, abs_tol=eps)
     assert math.isclose(flows_df.loc[products[0][0], "line_2_3"], 4800, abs_tol=eps)
+
+
+def _two_node_grid(generators, loads, storage_units=None):
+    """generators and loads map unit name to (node, max_power)."""
+    nodes = pd.DataFrame(
+        {"name": ["node1", "node2"], "v_nom": [380.0, 380.0]}
+    ).set_index("name")
+    lines = pd.DataFrame(
+        {
+            "name": ["line_1_2"],
+            "bus0": ["node1"],
+            "bus1": ["node2"],
+            "s_nom": [1000.0],
+            "x": [0.01],
+            "r": [0.001],
+        }
+    ).set_index("name")
+    columns = ["node", "max_power"]
+    grid_data = {
+        "buses": nodes,
+        "lines": lines,
+        "generators": pd.DataFrame.from_dict(
+            generators, orient="index", columns=columns
+        ),
+        "loads": pd.DataFrame.from_dict(loads, orient="index", columns=columns),
+    }
+    if storage_units is not None:
+        grid_data["storage_units"] = storage_units
+    return grid_data
+
+
+def _order(unit_id, node, product, volume, price):
+    return {
+        "start_time": product[0],
+        "end_time": product[1],
+        "only_hours": None,
+        "unit_id": unit_id,
+        "bid_id": f"{unit_id}_{product[0]}",
+        "node": node,
+        "volume": volume,
+        "price": price,
+    }
+
+
+@pytest.mark.require_network
+def test_nodal_clearing_units_without_bids_are_not_dispatched():
+    """
+    Units in grid_data which do not bid must not be available to the clearing.
+    Only gen_bid and dem_bid bid here, so gen_bid has to cover the demand.
+    """
+    market_config = simple_nodal_auction_config
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))
+    ]
+    storage_units = pd.DataFrame(
+        {
+            "name": ["storage_silent"],
+            "node": ["node2"],
+            "max_power_charge": [100.0],
+            "max_power_discharge": [100.0],
+        }
+    ).set_index("name")
+    market_config.param_dict["grid_data"] = _two_node_grid(
+        generators={"gen_bid": ("node1", 200.0), "gen_silent": ("node2", 200.0)},
+        loads={"dem_bid": ("node1", 100.0), "dem_silent": ("node2", 50.0)},
+        storage_units=storage_units,
+    )
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(market_config.market_products, next_opening)
+
+    orderbook = [
+        _order("gen_bid", "node1", products[0], 200, 50),
+        _order("dem_bid", "node1", products[0], -100, 3000),
+    ]
+
+    mr = NodalClearingRole(market_config)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
+
+    accepted = {o["unit_id"]: o["accepted_volume"] for o in accepted_orders}
+    assert math.isclose(accepted.get("gen_bid", 0), 100, abs_tol=eps)
+    assert math.isclose(accepted["dem_bid"], -100, abs_tol=eps)
+    supply = sum(m["supply_volume"] for m in meta)
+    demand = sum(m["demand_volume"] for m in meta)
+    assert math.isclose(supply, demand, abs_tol=eps)
+
+
+@pytest.mark.require_network
+def test_nodal_clearing_unit_bidding_in_some_hours_only():
+    """
+    gen_partial bids only in the first hour. In the second hour it has no bid
+    and must not be available, so gen_bid has to cover the demand.
+    """
+    market_config = simple_nodal_auction_config
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), 2, timedelta(hours=1))
+    ]
+    market_config.param_dict["grid_data"] = _two_node_grid(
+        generators={"gen_bid": ("node1", 200.0), "gen_partial": ("node1", 200.0)},
+        loads={"dem_bid": ("node1", 100.0)},
+    )
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(market_config.market_products, next_opening)
+
+    orderbook = [
+        _order("gen_bid", "node1", products[0], 200, 50),
+        _order("gen_bid", "node1", products[1], 200, 50),
+        _order("gen_partial", "node1", products[0], 200, 10),
+        _order("dem_bid", "node1", products[0], -100, 3000),
+        _order("dem_bid", "node1", products[1], -100, 3000),
+    ]
+
+    mr = NodalClearingRole(market_config)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
+
+    accepted = {
+        (o["unit_id"], o["start_time"]): o["accepted_volume"] for o in accepted_orders
+    }
+    assert math.isclose(
+        accepted.get(("gen_partial", products[0][0]), 0), 100, abs_tol=eps
+    )
+    assert math.isclose(accepted.get(("gen_bid", products[1][0]), 0), 100, abs_tol=eps)
+    for product in products:
+        supply = sum(
+            m["supply_volume"] for m in meta if m["product_start"] == product[0]
+        )
+        demand = sum(
+            m["demand_volume"] for m in meta if m["product_start"] == product[0]
+        )
+        assert math.isclose(supply, demand, abs_tol=eps)
