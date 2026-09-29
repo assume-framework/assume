@@ -15,6 +15,7 @@ schwarz = "#000000"
 
 ai_orange = "#FF8C00"
 ai_teal = "#40E0D0"
+rb_purple = "rebeccapurple"
 
 COLORS = dict()
 COLORS["nuclear_plant"] = gruen
@@ -22,8 +23,8 @@ COLORS["gas_plant_marginal"] = braun
 COLORS["marginal"] = braun
 COLORS["gas_plant_learning"] = dunkelblau
 COLORS["learning"] = dunkelblau
-COLORS["back_up_plant"] = rosa
-COLORS["backup_plant"] = rosa
+COLORS["back_up_plant"] = rb_purple
+COLORS["backup_plant"] = rb_purple
 COLORS["demand"] = schwarz
 COLORS["gas_plant_learning_1"] = blau
 COLORS["gas_plant_learning_2"] = dunkelblau
