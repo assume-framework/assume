@@ -44,6 +44,27 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
     required_technologies = ["electrolyser"]
     optional_technologies = ["hydrogen_seasonal_storage"]
 
+    # Rolling-horizon hooks (DSMFlex). The absolute ``demand`` is the
+    # horizon-wide hydrogen target; committed net hydrogen supply reduces it
+    # window by window.
+    _demand_attr_suffix = "demand"
+    _component_schema = {
+        "electrolyser": (
+            "power_in",
+            "hydrogen_out",
+            "electrolyser_power",
+            "hydrogen_output",
+        ),
+    }
+
+    def _primary_output_expr(self, m, t):
+        """Net hydrogen supplied at *t*, including seasonal storage flows."""
+        hydrogen_output = m.dsm_blocks["electrolyser"].hydrogen_out[t]
+        if self.has_h2seasonal_storage:
+            storage = m.dsm_blocks["hydrogen_seasonal_storage"]
+            hydrogen_output += storage.discharge[t] - storage.charge[t]
+        return hydrogen_output
+
     def __init__(
         self,
         id: str,
@@ -97,6 +118,7 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         # Initialize parameters
         self.hydrogen_demand = self.forecaster.hydrogen_demand
         self.demand = demand
+        self.demand_per_timestep = self.hydrogen_demand if not self.demand else None
 
         self.objective = objective
         self.flexibility_measure = flexibility_measure
@@ -130,7 +152,14 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
                 )
             },
         )
-        self.model.absolute_hydrogen_demand = pyo.Param(initialize=self.demand)
+        # A rolling window must meet only the demand not already supplied in
+        # committed windows.  Full-horizon operation continues to use demand.
+        demand_value = self.demand
+        if self._rh_window_remaining_demand is not None:
+            demand_value = self._rh_window_remaining_demand
+            logger.info("Using rolling-horizon remaining_demand: %s", demand_value)
+
+        self.model.absolute_hydrogen_demand = pyo.Param(initialize=demand_value)
         self.model.hydrogen_demand_per_timestep = pyo.Param(
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.hydrogen_demand)},
