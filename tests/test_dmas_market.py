@@ -713,13 +713,114 @@ def test_clearing_multi_hours():
     assert meta[0]["demand_volume"] == 4832
     assert meta[1]["demand_volume"] == 4832
 
+
+def test_clearing_with_storage_exclusive_and_powerplant_linked_orders():
     """
-    the following shows a flaw in the usage of GLPK.
-    it does not occur for highs or CBC
-    maximum_bid_price should not be too high.. Some floating point issue in pyomo..?
-    I don't know why this happens with GLPK
+    Test market clearing where a powerplant bids linked orders
+    and a storage unit bids exclusive orders.
     """
-    # simple_dayahead_auction_config.maximum_bid_price = 1e12
-    # mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    # accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
-    # assert meta[0]["price"] == 65
+    cfg = MarketConfig(
+        market_id="dayahead",
+        market_products=[MarketProduct(timedelta(hours=1), 2, timedelta(hours=1))],
+        additional_fields=["exclusive_id", "link", "block_id"],
+        opening_hours=rr.rrule(
+            rr.HOURLY,
+            dtstart=datetime(2022, 1, 1),
+            until=datetime(2022, 1, 3),
+            cache=True,
+        ),
+        opening_duration=timedelta(hours=1),
+        volume_unit="MW",
+        price_unit="€/MW",
+        market_mechanism="pay_as_clear",
+    )
+    products = get_available_products(cfg.market_products, datetime(2022, 1, 1, 12))
+    p0_start, p0_end = products[0][:2]
+    p1_start, p1_end = products[1][:2]
+
+    orderbook = [
+        # Powerplant: linked orders (block 0 is parent, block 1 links to 0)
+        {
+            "start_time": p0_start,
+            "end_time": p0_end,
+            "price": 30.0,
+            "volume": 50.0,
+            "block_id": 0,
+            "link": -1,
+            "exclusive_id": None,
+            "agent_addr": "pp_agent",
+            "bid_id": "pp_0",
+            "only_hours": None,
+        },
+        {
+            "start_time": p1_start,
+            "end_time": p1_end,
+            "price": 35.0,
+            "volume": 50.0,
+            "block_id": 1,
+            "link": 0,
+            "exclusive_id": None,
+            "agent_addr": "pp_agent",
+            "bid_id": "pp_1",
+            "only_hours": None,
+        },
+        # Storage: exclusive orders (exclusive profile A: charge h0, discharge h1)
+        {
+            "start_time": p0_start,
+            "end_time": p0_end,
+            "price": 25.0,
+            "volume": -20.0,
+            "block_id": None,
+            "link": None,
+            "exclusive_id": 0,
+            "agent_addr": "st_agent",
+            "bid_id": "st_0_h0",
+            "only_hours": None,
+        },
+        {
+            "start_time": p1_start,
+            "end_time": p1_end,
+            "price": 50.0,
+            "volume": 18.0,
+            "block_id": None,
+            "link": None,
+            "exclusive_id": 0,
+            "agent_addr": "st_agent",
+            "bid_id": "st_0_h1",
+            "only_hours": None,
+        },
+        # Demand in h0 and h1
+        {
+            "start_time": p0_start,
+            "end_time": p0_end,
+            "price": 100.0,
+            "volume": -30.0,
+            "block_id": None,
+            "link": None,
+            "exclusive_id": None,
+            "agent_addr": "demand_agent",
+            "bid_id": "dem_h0",
+            "only_hours": None,
+        },
+        {
+            "start_time": p1_start,
+            "end_time": p1_end,
+            "price": 100.0,
+            "volume": -68.0,
+            "block_id": None,
+            "link": None,
+            "exclusive_id": None,
+            "agent_addr": "demand_agent",
+            "bid_id": "dem_h1",
+            "only_hours": None,
+        },
+    ]
+
+    mr = ComplexDmasClearingRole(cfg)
+    accepted, rejected, meta, flows = mr.clear(orderbook, products)
+    assert len(accepted) > 0
+    # Both PP and storage orders should be accepted
+    accepted_agents = {o["agent_addr"] for o in accepted}
+    assert "pp_agent" in accepted_agents
+    assert "st_agent" in accepted_agents
+    assert "demand_agent" in accepted_agents

@@ -243,5 +243,75 @@ def test_dmas_prevent_start_end(power_plant_day):
     assert unknown == [], "found unknown link orders"
 
 
+def test_dmas_prevent_start_avoided_cost_validation(power_plant_day):
+    """
+    Validates that when a price dip occurs before high morning prices,
+    prevented_start triggers with delta > 0, and bid prices during dip hours
+    are discounted to keep the plant dispatched and avoid morning startup costs.
+    """
+    power_plant_day.cold_start_cost = 50000.0
+    hour_count = 24
+    power_plant_day.forecaster.price["EOM"].iloc[:] = 50.0
+    # Price dip below marginal cost at the end of Day 1
+    power_plant_day.forecaster.price["EOM"].iloc[20:24] = 10.0
+    # High price on Day 2
+    power_plant_day.forecaster.price["EOM"].iloc[24:48] = 50.0
+
+    strategy = EnergyOptimizationDmasStrategy()
+
+    mc = MarketConfig(
+        market_id="EOM",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[
+            MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))
+        ],
+        additional_fields=["link", "block_id"],
+    )
+    start = power_plant_day.index[0]
+    products = get_available_products(mc.market_products, start)
+    orderbook = strategy.calculate_bids(
+        power_plant_day, market_config=mc, product_tuples=products
+    )
+
+    assert strategy.prevented_start["prevent"] is True
+    assert strategy.prevented_start["delta"] > 0
+    assert len(strategy.prevented_start["hours"]) > 0
+
+    # Verify orders in orderbook
+    df = pd.DataFrame(orderbook)
+    assert not df.empty
+    # Orders during dip hours should reflect discounted price
+    dip_start_times = [
+        start + timedelta(hours=int(h)) for h in strategy.prevented_start["hours"]
+    ]
+    dip_orders = df[df["start_time"].isin(dip_start_times)]
+    assert not dip_orders.empty
+    assert (dip_orders["price"] < 20.0).any()
+    # Next day reduction should be stored
+    assert start.date() in strategy.reduction_next_day
+
+
+def test_powerplant_ramping_limits_enforced(power_plant_day):
+    """Test that ramp up and ramp down constraints strictly limit rate of power change."""
+    import numpy as np
+
+    power_plant_day.ramp_up = 150.0
+    power_plant_day.ramp_down = 150.0
+    strategy = EnergyOptimizationDmasStrategy()
+    hour_count = 24
+    start = power_plant_day.index[0]
+    base_price = power_plant_day.forecaster.price["EOM"]
+
+    gen = strategy.optimize(power_plant_day, start, hour_count, base_price)
+    power = np.asarray(gen)
+    # When staying online, power deltas must not exceed ramp limits
+    for t in range(1, len(power)):
+        if power[t] > 0 and power[t - 1] > 0:
+            assert power[t] - power[t - 1] <= power_plant_day.ramp_up + 1e-3
+            assert power[t - 1] - power[t] <= power_plant_day.ramp_down + 1e-3
+
+
 if __name__ == "__main__":
     pytest.main(["-s", __file__])
