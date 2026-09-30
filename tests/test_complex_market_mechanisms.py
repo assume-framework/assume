@@ -252,6 +252,72 @@ def test_market_coupling_directional_capacities():
     market_config.param_dict = {}
 
 
+def test_market_coupling_zonal_directional_capacities():
+    market_config = simple_dayahead_auction_config
+    h = 2
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), h, timedelta(hours=1))
+    ]
+    market_config.additional_fields = [
+        "bid_type",
+        "node_id",
+    ]
+    nodes = {
+        "name": ["bus1", "bus2"],
+        "zone_id": ["zone1", "zone2"],
+        "v_nom": [380.0, 380.0],
+    }
+    nodes = pd.DataFrame(nodes).set_index("name")
+
+    lines = {
+        "name": ["line_1"],
+        "bus0": ["bus1"],
+        "bus1": ["bus2"],
+        "s_nom": [500.0],
+        "s_max_pu": [0.8],
+        "s_nom_forward": [1000.0],
+        "s_nom_reverse": [300.0],
+    }
+    lines = pd.DataFrame(lines)
+
+    grid_data = {"buses": nodes, "lines": lines}
+    market_config.param_dict["grid_data"] = grid_data
+    market_config.param_dict["zones_identifier"] = "zone_id"
+    market_config.param_dict["log_flows"] = True
+
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(market_config.market_products, next_opening)
+
+    orderbook = []
+    orderbook = extend_orderbook(
+        products, volume=-1000, price=3000, orderbook=orderbook, node="zone1"
+    )
+    orderbook = extend_orderbook(
+        products, volume=-200, price=3000, orderbook=orderbook, node="zone2"
+    )
+    orderbook = extend_orderbook(products, 1000, 100, orderbook, node="zone1")
+    orderbook = extend_orderbook(products, 1000, 50, orderbook, node="zone2")
+
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
+
+    # Effective reverse capacity is s_nom_reverse * s_max_pu = 300 * 0.8 = 240
+    # Local supply at zone1 is 1000 - 240 = 760
+    assert math.isclose(meta[0]["supply_volume"], 760, abs_tol=eps)
+    assert math.isclose(meta[0]["demand_volume"], 1000, abs_tol=eps)
+    assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
+
+    # Local supply at zone2 is 200 + 240 = 440
+    assert math.isclose(meta[2]["supply_volume"], 440, abs_tol=eps)
+    assert math.isclose(meta[2]["demand_volume"], 200, abs_tol=eps)
+    assert math.isclose(meta[2]["price"], 50, abs_tol=eps)
+
+    # Flow is -240 (zone2 -> zone1)
+    assert math.isclose(flows[(products[0][0], 0)], -240, abs_tol=eps)
+
+    market_config.param_dict = {}
+
+
 def test_market_coupling_with_island():
     market_config = simple_dayahead_auction_config
     h = 2

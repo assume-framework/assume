@@ -189,18 +189,17 @@ def market_clearing_opt_constraints(
         model.transmission_constr = pyo.ConstraintList()
         for t in model.T:
             for line in model.lines:
-                # s_max_pu might also be time variant. but for now we assume it is static
-                s_max_pu = (
-                    lines.at[line, "s_max_pu"]
-                    if "s_max_pu" in lines.columns
-                    and not pd.isna(lines.at[line, "s_max_pu"])
-                    else 1.0
-                )
                 # If precomputed directional capacities are provided, use them
                 if (
                     directional_capacities is not None
                     and line in directional_capacities.index
                 ):
+                    s_max_pu = (
+                        directional_capacities.at[line, "s_max_pu"]
+                        if "s_max_pu" in directional_capacities.columns
+                        and not pd.isna(directional_capacities.at[line, "s_max_pu"])
+                        else 1.0
+                    )
                     cap_forward = (
                         directional_capacities.at[line, "cap_forward"] * s_max_pu
                     )
@@ -210,6 +209,14 @@ def market_clearing_opt_constraints(
                     model.transmission_constr.add(model.flows[t, line] <= cap_forward)
                     model.transmission_constr.add(model.flows[t, line] >= -cap_reverse)
                 else:
+                    # s_max_pu might also be time variant. but for now we assume it is static
+                    s_max_pu = (
+                        lines.at[line, "s_max_pu"]
+                        if lines is not None
+                        and "s_max_pu" in lines.columns
+                        and not pd.isna(lines.at[line, "s_max_pu"])
+                        else 1.0
+                    )
                     capacity = lines.at[line, "s_nom"] * s_max_pu
                     # Limit the flow on each line (symmetric fallback)
                     model.transmission_constr.add(model.flows[t, line] <= capacity)
@@ -384,6 +391,7 @@ class ComplexClearingRole(MarketRole):
         self.zones_id = None
         self.incidence_matrix = None
         self.lines = None
+        self.directional_capacities = None
 
         if self.grid_data:
             self.lines = self.grid_data["lines"]
@@ -409,16 +417,13 @@ class ComplexClearingRole(MarketRole):
                 # Nodal Case
                 self.incidence_matrix = create_incidence_matrix(self.lines, buses)
                 self.nodes = buses.index.values
+
             # Pre-compute directional capacities for use in the clearing constraints
-            try:
-                self.directional_capacities = sum_line_capacities(
-                    self.lines,
-                    self.incidence_matrix,
-                    zones_id=self.zones_id,
-                    node_mapping=self.node_to_zone,
-                )
-            except Exception:
-                self.directional_capacities = None
+            self.directional_capacities = sum_line_capacities(
+                self.lines,
+                self.incidence_matrix,
+                node_mapping=self.node_to_zone,
+            )
 
             # Informational log if input contains directional columns
             if self.lines is not None:
@@ -565,7 +570,7 @@ class ComplexClearingRole(MarketRole):
                 with_linked_bids=with_linked_bids,
                 incidence_matrix=self.incidence_matrix,
                 lines=self.lines,
-                directional_capacities=getattr(self, "directional_capacities", None),
+                directional_capacities=self.directional_capacities,
                 solver=self.solver,
                 solver_options=self.solver_options,
             )
