@@ -844,3 +844,72 @@ def test_empty_market_clearing():
     assert acc == [] and rej == []
     assert len(meta) == len(products)
     assert meta[0]["supply_volume"] == 0.0
+
+
+def test_two_sided_elastic_demand_clearing():
+    """Test two-sided market clearing where low-willingness buyer is rejected."""
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
+    products = get_available_products(
+        simple_dayahead_auction_config.market_products, next_opening
+    )
+    start_t = products[0][0]
+    end_t = products[0][1]
+
+    orderbook: Orderbook = [
+        # Supply: 100 MW @ 40 €/MW
+        {
+            "start_time": start_t,
+            "end_time": end_t,
+            "volume": 100,
+            "price": 40,
+            "agent_addr": "gen1",
+            "bid_id": "gen_bid",
+            "only_hours": None,
+            "exclusive_id": None,
+            "block_id": None,
+            "link": None,
+        },
+        # Demand 1: Willing to pay 60 €/MW (in the money)
+        {
+            "start_time": start_t,
+            "end_time": end_t,
+            "volume": -50,
+            "price": 60,
+            "agent_addr": "buyer_high",
+            "bid_id": "buy_high",
+            "only_hours": None,
+            "exclusive_id": None,
+            "block_id": None,
+            "link": None,
+        },
+        # Demand 2: Willing to pay only 20 €/MW (out of the money, < 40)
+        {
+            "start_time": start_t,
+            "end_time": end_t,
+            "volume": -50,
+            "price": 20,
+            "agent_addr": "buyer_low",
+            "bid_id": "buy_low",
+            "only_hours": None,
+            "exclusive_id": None,
+            "block_id": None,
+            "link": None,
+        },
+    ]
+
+    mr = ComplexDmasClearingRole(simple_dayahead_auction_config, elastic_demand=True)
+    accepted, rejected, meta, flows = mr.clear(orderbook, products[:1])
+
+    acc_agents = {o["agent_addr"] for o in accepted}
+    rej_agents = {o["agent_addr"] for o in rejected}
+
+    # Buyer high should clear, buyer low should be rejected
+    assert "buyer_high" in acc_agents
+    assert "buyer_low" in rej_agents
+    assert "buyer_low" not in acc_agents
+
+    # Generator should supply 50 MW
+    gen_acc = [o for o in accepted if o["agent_addr"] == "gen1"][0]
+    assert gen_acc["accepted_volume"] == 50

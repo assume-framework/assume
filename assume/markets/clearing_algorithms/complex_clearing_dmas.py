@@ -34,8 +34,14 @@ order_types = ["single_ask", "single_bid", "linked_ask", "exclusive_ask"]
 class ComplexDmasClearingRole(MarketRole):
     required_fields = ["link", "block_id", "exclusive_id"]
 
-    def __init__(self, marketconfig: MarketConfig, verbose: bool = False):
+    def __init__(
+        self,
+        marketconfig: MarketConfig,
+        verbose: bool = False,
+        elastic_demand: bool = False,
+    ):
         super().__init__(marketconfig)
+        self.elastic_demand = elastic_demand
         if not verbose:
             logger.setLevel(logging.WARNING)
 
@@ -183,6 +189,19 @@ class ComplexDmasClearingRole(MarketRole):
             initialize=0,
         )
         model_vars["single_ask"] = model.use_hourly_ask
+
+        if self.elastic_demand:
+            model.use_single_bid = Var(
+                set(
+                    (block, hour, agent)
+                    for block, hour, agent in orders["single_bid"].keys()
+                ),
+                within=Reals,
+                bounds=(0, 1),
+                initialize=0,
+            )
+            model_vars["single_bid"] = model.use_single_bid
+
         # Step 3 initialize binary variables for ask order in block per agent
         model.use_linked_order = Var(
             set(
@@ -263,6 +282,12 @@ class ComplexDmasClearingRole(MarketRole):
 
         def get_volume(type_: str, hour: int):
             if type_ == "single_bid":
+                if self.elastic_demand and "single_bid" in model_vars:
+                    return quicksum(
+                        orders[type_][block, hour, name][1]
+                        * model_vars[type_][block, hour, name]
+                        for block, name in index_orders[type_][hour]
+                    )
                 return quicksum(
                     orders[type_][block, hour, name][1]
                     for block, name in index_orders[type_][hour]
@@ -330,17 +355,36 @@ class ComplexDmasClearingRole(MarketRole):
 
         # Step 9 set constraint: Cost for each hour
         # add magic_cost as very expensive, to overbid bids with marketconfig.maximum_bid_price
-        generation_cost = quicksum(
-            quicksum(
-                get_cost(type_=order_type, hour=t)
-                for order_type in order_types
-                if "bid" not in order_type
+        if self.elastic_demand and "single_bid" in model_vars:
+            generation_cost = quicksum(
+                quicksum(
+                    get_cost(type_=order_type, hour=t)
+                    for order_type in order_types
+                    if "bid" not in order_type
+                )
+                + quicksum(
+                    orders["single_bid"][block, t, name][0]
+                    * orders["single_bid"][block, t, name][1]
+                    * model.use_single_bid[block, t, name]
+                    for block, name in index_orders["single_bid"][t]
+                )
+                + (model.source[t] + model.sink[t])
+                * self.marketconfig.maximum_bid_price
+                * 10
+                for t in t_range
             )
-            + (model.source[t] + model.sink[t])
-            * self.marketconfig.maximum_bid_price
-            * 10
-            for t in t_range
-        )
+        else:
+            generation_cost = quicksum(
+                quicksum(
+                    get_cost(type_=order_type, hour=t)
+                    for order_type in order_types
+                    if "bid" not in order_type
+                )
+                + (model.source[t] + model.sink[t])
+                * self.marketconfig.maximum_bid_price
+                * 10
+                for t in t_range
+            )
         # TODO currently, this does not represent a two-sided clearing, as demand has to be taken
         # and is magically filled if not
 
@@ -368,6 +412,8 @@ class ComplexDmasClearingRole(MarketRole):
         for t in t_range:
             max_price = self.marketconfig.minimum_bid_price
             for type_ in model_vars.keys():
+                if type_ == "single_bid":
+                    continue
                 for block, name in index_orders[type_][t]:
                     if type_ == "exclusive_ask":
                         order_used = model_vars[type_][block, name].value
@@ -398,7 +444,15 @@ class ComplexDmasClearingRole(MarketRole):
             sum_magic_source += get_real_number(magic_source[t])
             volume = 0
             for block, name in index_orders["single_bid"][t]:
-                volume += (-1) * orders["single_bid"][block, t, name][1]
+                if self.elastic_demand and "single_bid" in model_vars:
+                    u_bid = (
+                        model.use_single_bid[block, t, name].value
+                        if (block, t, name) in model.use_single_bid
+                        else 0
+                    ) or 0
+                    volume += (-1) * orders["single_bid"][block, t, name][1] * u_bid
+                else:
+                    volume += (-1) * orders["single_bid"][block, t, name][1]
             for block, name in index_orders["exclusive_ask"][t]:
                 if (
                     model.use_exclusive_block[block, name].value
@@ -417,6 +471,8 @@ class ComplexDmasClearingRole(MarketRole):
             end = start + duration * (t + 1)
             clear_price = prices["price"][t]
             for type_ in model_vars.keys():
+                if type_ == "single_bid":
+                    continue
                 for block, name in index_orders[type_][t]:
                     if type_ in ["single_ask", "linked_ask"]:
                         # usage from 0 to 1
@@ -473,27 +529,37 @@ class ComplexDmasClearingRole(MarketRole):
 
         for key, val in orders["single_bid"].items():
             block, hour, name = key
-            _, vol = val
+            orig_price, vol = val
             prc = prices["price"][hour]
             bstart = start + duration * hour
             end = start + duration * (hour + 1)
-            accepted.append(
-                {
-                    "start_time": bstart,
-                    "end_time": end,
-                    "only_hours": None,
-                    "price": prc,
-                    "volume": vol,
-                    "accepted_price": prc,
-                    "accepted_volume": vol,
-                    "block_id": None,
-                    "link": None,
-                    "exclusive_id": None,
-                    "agent_addr": agent_addrs[name],
-                    "bid_id": bid_ids[name],
-                    "unit_id": unit_ids[name],
-                }
-            )
+            if self.elastic_demand and "single_bid" in model_vars:
+                usage = (
+                    model.use_single_bid[key].value
+                    if key in model.use_single_bid
+                    else 0
+                ) or 0
+            else:
+                usage = 1.0
+            o: Order = {
+                "start_time": bstart,
+                "end_time": end,
+                "only_hours": None,
+                "price": orig_price,
+                "volume": vol,
+                "accepted_price": prc,
+                "accepted_volume": vol * usage,
+                "block_id": None,
+                "link": None,
+                "exclusive_id": None,
+                "agent_addr": agent_addrs[name],
+                "bid_id": bid_ids[name],
+                "unit_id": unit_ids[name],
+            }
+            if usage > 0:
+                accepted.append(o)
+            else:
+                rejected.append(o)
 
         prices["volume"] = volumes
         prices["magic_source"] = [get_real_number(m) for m in magic_source]
