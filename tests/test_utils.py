@@ -948,6 +948,8 @@ def test_sum_line_capacities_fallback_and_reverse():
             "bus0": ["B1", "B2"],
             "bus1": ["B2", "B3"],
             "s_nom": [30.0, 40.0],
+            "s_nom_forward": [30.0, 40.0],
+            "s_nom_reverse": [10.0, 20.0],
         },
         index=["L1", "L2"],
     )
@@ -956,8 +958,17 @@ def test_sum_line_capacities_fallback_and_reverse():
 
     result = sum_line_capacities(lines, incidence_matrix)
 
-    assert result.at["B2_B1", "cap_forward"] == 30.0
+    # For edge B2_B1 (reversed relative to L1: B1->B2):
+    # forward on B2_B1 is B2->B1 (which is reverse on L1 = 10.0)
+    # reverse on B2_B1 is B1->B2 (which is forward on L1 = 30.0)
+    assert result.at["B2_B1", "cap_forward"] == 10.0
     assert result.at["B2_B1", "cap_reverse"] == 30.0
+
+    # For Link_B2_B3_fallback (B2 precedes B3, matching L2: B2->B3):
+    # forward on Link_B2_B3 is B2->B3 (forward on L2 = 40.0)
+    # reverse on Link_B2_B3 is B3->B2 (reverse on L2 = 20.0)
+    assert result.at["Link_B2_B3_fallback", "cap_forward"] == 40.0
+    assert result.at["Link_B2_B3_fallback", "cap_reverse"] == 20.0
 
 
 if __name__ == "__main__":

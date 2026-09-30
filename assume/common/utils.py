@@ -554,7 +554,6 @@ def create_incidence_matrix(lines, buses, zones_id=None):
 def sum_line_capacities(
     lines: pd.DataFrame,
     incidence_matrix: pd.DataFrame,
-    zones_id: str = None,
     node_mapping: dict = None,
 ) -> pd.DataFrame:
     """
@@ -567,23 +566,23 @@ def sum_line_capacities(
     together for lines mapped to the same aggregated edge.
 
     The function returns a DataFrame indexed by the columns of `incidence_matrix`
-    with columns `cap_forward` and `cap_reverse` (absolute MW). If a column in
-    `incidence_matrix` matches a line index in `lines`, the capacities are taken
-    from that physical line. Otherwise the function attempts a zone-pair style
-    aggregation: physical lines are mapped to node pairs using `node_mapping`
-    (or by treating buses as nodes), and capacities are summed per zone-pair.
-    If lines contain a `s_max_pu` column, the resulting capacities are multiplied
-    by the weighted average of `s_max_pu` for all physical lines mapped to that edge.
+    with columns `cap_forward`, `cap_reverse` (absolute MW) and `s_max_pu`.
+    If a column in `incidence_matrix` matches a line index in `lines`, the
+    capacities are taken from that physical line. Otherwise the function attempts
+    a zone-pair style aggregation: physical lines are mapped to node pairs using
+    `node_mapping` (or by treating buses as nodes), and capacities are summed per
+    zone-pair. If lines contain a `s_max_pu` column, the resulting `s_max_pu` for
+    the aggregated edge is the capacity-weighted average of `s_max_pu` for all
+    physical lines mapped to that edge.
 
     Directional columns in `lines` take precedence:
       - `s_nom_forward` used for forward (bus0 -> bus1)
       - `s_nom_reverse` used for reverse (bus1 -> bus0)
-    If directional capacities are missing, fallback to `s_nom * s_max_pu` for that direction.
+    If directional capacities are missing, fallback to `s_nom` for that direction.
 
     Args:
         lines: DataFrame of lines (indexed by line id).
         incidence_matrix: Incidence matrix whose columns identify edges/lines.
-        zones_id: Optional zones identifier (unused here, kept for API compatibility).
         node_mapping: Optional mapping from bus id -> node/zone id.
 
     Returns:
@@ -668,20 +667,27 @@ def sum_line_capacities(
             agg_caps[key_f]["s_max_pu_weighted"] += weight * caps["s_max_pu"]
             agg_caps[key_f]["s_max_pu_weight"] += weight
         elif key_r in agg_caps:
-            # If the aggregated column uses reversed ordering, still add capacities
-            agg_caps[key_r]["cap_forward"] += caps["cap_forward"]
-            agg_caps[key_r]["cap_reverse"] += caps["cap_reverse"]
+            # If the aggregated column uses reversed ordering, swap forward and reverse capacities
+            agg_caps[key_r]["cap_forward"] += caps["cap_reverse"]
+            agg_caps[key_r]["cap_reverse"] += caps["cap_forward"]
             weight = caps["cap_forward"] + caps["cap_reverse"]
             agg_caps[key_r]["s_max_pu_weighted"] += weight * caps["s_max_pu"]
             agg_caps[key_r]["s_max_pu_weight"] += weight
         else:
             # final fallback: if no matching aggregated key, try to add to any column
-            # that contains either node name (best-effort)
+            # that contains both node names (best-effort)
             matched = False
             for col in cols:
-                if str(node0) in str(col) and str(node1) in str(col):
-                    agg_caps[col]["cap_forward"] += caps["cap_forward"]
-                    agg_caps[col]["cap_reverse"] += caps["cap_reverse"]
+                col_str = str(col)
+                if str(node0) in col_str and str(node1) in col_str:
+                    pos0 = col_str.find(str(node0))
+                    pos1 = col_str.find(str(node1))
+                    if pos0 <= pos1:
+                        agg_caps[col]["cap_forward"] += caps["cap_forward"]
+                        agg_caps[col]["cap_reverse"] += caps["cap_reverse"]
+                    else:
+                        agg_caps[col]["cap_forward"] += caps["cap_reverse"]
+                        agg_caps[col]["cap_reverse"] += caps["cap_forward"]
                     weight = caps["cap_forward"] + caps["cap_reverse"]
                     agg_caps[col]["s_max_pu_weighted"] += weight * caps["s_max_pu"]
                     agg_caps[col]["s_max_pu_weight"] += weight
@@ -690,7 +696,7 @@ def sum_line_capacities(
             if not matched:
                 # give up and skip mapping this physical line
                 logger.debug(
-                    f"aggregate_line_capacities: could not map line {line_idx} to incidence column"
+                    f"sum_line_capacities: could not map line {line_idx} to incidence column"
                 )
 
     df = pd.DataFrame.from_dict(agg_caps, orient="index")
