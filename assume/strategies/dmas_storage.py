@@ -54,6 +54,7 @@ def shaping(prc, type_: str = "peak") -> np.ndarray:
       np.ndarray: shifted price curve
 
     """
+    prc = np.asarray(prc, dtype=float).copy()
     if type_ == "peak":
         prc[8:20] *= (
             1.1  # between 8 and 20 hours, the price is multiplied by 1.1 (general production is high)
@@ -142,28 +143,38 @@ class StorageEnergyOptimizationDmasStrategy(MinMaxChargeStrategy):
             time_range, within=pyo.NonNegativeReals, bounds=(0, unit.capacity)
         )
 
-        self.power = np.array(
+        # Delta volume inside storage (charging increases, discharging decreases)
+        self.delta_volume = np.array(
             [
-                -self.model.p_minus[t] / unit.efficiency_discharge
-                + self.model.p_plus[t] * unit.efficiency_charge
+                self.model.p_plus[t] * unit.efficiency_charge
+                - self.model.p_minus[t] / unit.efficiency_discharge
                 for t in time_range
             ]
         )
+
+        # Net grid power: positive for generation (discharge), negative for consumption (charge)
+        self.grid_power = np.array(
+            [self.model.p_minus[t] - self.model.p_plus[t] for t in time_range]
+        )
+        self.power = self.grid_power
 
         self.model.vol_con = pyo.ConstraintList()
         v0 = unit.outputs["soc"].at[start] * unit.capacity
 
         for t in time_range:
             if t == 0:
-                self.model.vol_con.add(self.model.volume[t] == v0 + self.power[t])
+                self.model.vol_con.add(
+                    self.model.volume[t] == v0 + self.delta_volume[t]
+                )
             else:
                 self.model.vol_con.add(
-                    self.model.volume[t] == self.model.volume[t - 1] + self.power[t]
+                    self.model.volume[t]
+                    == self.model.volume[t - 1] + self.delta_volume[t]
                 )
 
         # always end with half full SoC
         self.model.vol_con.add(self.model.volume[hour_count - 1] == unit.capacity / 2)
-        return self.power
+        return self.grid_power
 
     def optimize(
         self,
@@ -181,42 +192,48 @@ class StorageEnergyOptimizationDmasStrategy(MinMaxChargeStrategy):
             hour_count(int): number of hours to optimize
 
         Returns:
-          dict: optimization results
+            dict: optimization results
         """
         opt_results = {key: np.zeros(hour_count) for key in PRICE_FUNCS.keys()}
         time_range = range(hour_count)
 
-        base_price = unit.forecaster.price[market_id][
-            start : start + timedelta(hours=hour_count)
-        ]
+        raw_price = unit.forecaster.price[market_id]
+        if hasattr(raw_price, "loc"):
+            base_price = raw_price.loc[start : start + timedelta(hours=hour_count - 1)]
+        elif hasattr(raw_price, "iloc"):
+            base_price = raw_price.iloc[:hour_count]
+        elif isinstance(raw_price, (list, np.ndarray)):
+            base_price = raw_price[:hour_count]
+        else:
+            try:
+                base_price = raw_price[start : start + timedelta(hours=hour_count)]
+            except (TypeError, KeyError):
+                base_price = raw_price[:hour_count]
+
+        base_price = np.asarray(base_price, dtype=float)
 
         for key, func in PRICE_FUNCS.items():
-            prices = func(base_price)
-            self.power = self.build_model(unit, start, hour_count)
-            profit = [-self.power[t] * prices[t] for t in time_range]
+            prices = np.asarray(func(base_price))
+            self.build_model(unit, start, hour_count)
+            profit = [self.grid_power[t] * prices[t] for t in time_range]
             self.model.obj = pyo.Objective(
                 expr=pyo.quicksum(profit[t] for t in time_range), sense=pyo.maximize
             )
             self.opt.solve(self.model)
 
-            power = np.asarray(
+            grid_power = np.asarray(
                 [
-                    -self.model.p_minus[t].value * unit.efficiency_discharge
-                    + self.model.p_plus[t].value
+                    self.model.p_minus[t].value - self.model.p_plus[t].value
                     for t in time_range
                 ]
             )
-            profit = [-power[t] * prices[t] for t in time_range]
+            profit = [grid_power[t] * prices[t] for t in time_range]
             volume = np.asarray([self.model.volume[t].value for t in time_range])
-            opt_results[key] = power
+            opt_results[key] = grid_power
             if key == "normal":
                 end = start + unit.index.freq * (hour_count - 1)
-
-                # unit.outputs["total"][self.power < 0] = -self.power[self.power < 0]
-                # unit.outputs["demand"][self.power > 0] = self.power[self.power > 0]
-                # unit.outputs["storage"] = self.power
                 unit.outputs["volume"].loc[start:end] = volume
-                unit.outputs["generation"].loc[start:end] = power
+                unit.outputs["generation"].loc[start:end] = np.maximum(grid_power, 0)
                 unit.outputs["profit"].loc[start:end] = profit
         return opt_results
 
@@ -255,22 +272,38 @@ class StorageEnergyOptimizationDmasStrategy(MinMaxChargeStrategy):
         )
         total_orders = {}
         block_id = 0
-        power_prices = unit.forecaster.price[market_config.market_id][
-            start : start + timedelta(hours=hour_count)
-        ]
+        raw_prices = unit.forecaster.price[market_config.market_id]
+        if hasattr(raw_prices, "loc"):
+            power_prices = raw_prices.loc[
+                start : start + timedelta(hours=hour_count - 1)
+            ]
+        elif hasattr(raw_prices, "iloc"):
+            power_prices = raw_prices.iloc[:hour_count]
+        elif isinstance(raw_prices, (list, np.ndarray)):
+            power_prices = raw_prices[:hour_count]
+        else:
+            try:
+                power_prices = raw_prices[start : start + timedelta(hours=hour_count)]
+            except (TypeError, KeyError):
+                power_prices = raw_prices[:hour_count]
+        power_prices_arr = np.asarray(power_prices)
+        round_trip_eff = unit.efficiency_charge * unit.efficiency_discharge
+
         for key, power in opt_results.items():
             prc = np.zeros(hour_count)
             bid_hours = np.argwhere(power < 0).flatten()
             ask_hours = np.argwhere(power > 0).flatten()
-            if len(bid_hours) > 1:
-                max_charging_price = power_prices[bid_hours].max()
+            if len(bid_hours) > 0:
+                max_charging_price = power_prices_arr[bid_hours].max()
             else:
                 max_charging_price = 0
-            min_discharging_price = max_charging_price / (
-                unit.efficiency_discharge * unit.efficiency_discharge
+            min_discharging_price = (
+                max_charging_price / round_trip_eff
+                if round_trip_eff > 0
+                else max_charging_price
             )
-            prc[ask_hours] = (power_prices[ask_hours] + min_discharging_price) / 2
-            prc[bid_hours] = power_prices[bid_hours]
+            prc[ask_hours] = (power_prices_arr[ask_hours] + min_discharging_price) / 2
+            prc[bid_hours] = power_prices_arr[bid_hours]
             add = True
             for orders in total_orders.values():
                 if any(prc != orders["price"]) or any(power != orders["volume"]):
@@ -288,7 +321,12 @@ class StorageEnergyOptimizationDmasStrategy(MinMaxChargeStrategy):
             df = df.set_index(["exclusive_id", "hour", "bid_id"])
             dfs.append(df)
 
-        bids = pd.concat(dfs)
+        if dfs:
+            bids = pd.concat(dfs)
+        else:
+            bids = pd.DataFrame(
+                columns=["price", "volume", "bid_id", "exclusive_id", "hour"]
+            )
 
         if not bids.empty:
             bids = bids.reset_index()

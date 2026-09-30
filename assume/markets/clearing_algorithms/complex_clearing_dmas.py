@@ -200,7 +200,7 @@ class ComplexDmasClearingRole(MarketRole):
                     parent_hours = orders_local[(parent_id, agent)]
                     model.enable_child_block.add(
                         quicksum(model.use_linked_order[block, h, agent] for h in hours)
-                        <= 100  # this factor is arbitrary and means that if we took at least 0.01 from the linked block, we can use our full block
+                        <= len(hours)
                         * quicksum(
                             model.use_linked_order[parent_id, h, agent]
                             for h in parent_hours
@@ -230,8 +230,7 @@ class ComplexDmasClearingRole(MarketRole):
         # ------------------------------------------------
         # Step 7 set constraint: only one scheduling can be used
         model.one_exclusive_block = ConstraintList()
-        for data in set([(agent,) for _, _, agent in orders["exclusive_ask"].keys()]):
-            agent = data
+        for agent in {agent for _, _, agent in orders["exclusive_ask"].keys()}:
             model.one_exclusive_block.add(
                 1 >= quicksum(model.use_exclusive_block[:, agent])
             )
@@ -293,7 +292,11 @@ class ComplexDmasClearingRole(MarketRole):
         for t in t_range:
             if not index_orders["single_bid"][t]:
                 logger.error(f"no hourly_bids available at hour {t}")
-            elif not (index_orders["single_ask"][t] or index_orders["linked_ask"][t]):
+            elif not (
+                index_orders["single_ask"][t]
+                or index_orders["linked_ask"][t]
+                or index_orders["exclusive_ask"][t]
+            ):
                 # constraints with 0 <= 0 are not valid
                 logger.error(f"no hourly_asks available at hour {t}")
             else:
@@ -419,7 +422,7 @@ class ComplexDmasClearingRole(MarketRole):
 
                     elif type_ == "exclusive_ask":
                         # usage from 0 to 1
-                        usage = model_vars[type_][block, t, name].value or 0
+                        usage = model_vars[type_][block, name].value or 0
 
                         prc, vol = orders[type_][block, t, name]
                         o: Order = {

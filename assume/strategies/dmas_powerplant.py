@@ -96,6 +96,10 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
         self.model.clear()
         tr = np.arange(hour_count)
 
+        fuel_prices = np.asarray(fuel_prices, dtype=float)
+        emission_prices = np.asarray(emission_prices, dtype=float)
+        power_prices = np.asarray(power_prices, dtype=float)
+
         delta = unit.max_power - unit.min_power
 
         self.model.p_out = Var(tr, bounds=(0, unit.max_power), within=Reals)
@@ -173,7 +177,12 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
                         self.model.v[k] for k in range(t - unit.min_operating_time, t)
                     )
                 )
-            if t > 0:
+            if t == 0:
+                z_initial = 1 if runtime > 0 else 0
+                self.model.states.add(
+                    z_initial - self.model.z[0] + self.model.v[0] - self.model.w[0] == 0
+                )
+            else:
                 self.model.states.add(
                     self.model.z[t - 1]
                     - self.model.z[t]
@@ -240,6 +249,10 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
         # TODO rounding really needed?
         self.opt_results[step]["power"][power < 0.1] = 0
 
+        emission_prices = np.asarray(emission_prices, dtype=float)
+        fuel_prices = np.asarray(fuel_prices, dtype=float)
+        power_prices = np.asarray(power_prices, dtype=float)
+
         # -> emission costs
         self.opt_results[step]["emission"] = (
             power / unit.efficiency * unit.emission_factor * emission_prices
@@ -262,10 +275,118 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
             unit.outputs["start_ups"].loc[start:end] = self.opt_results[step]["start"]
             unit.outputs["profit"].loc[start:end] = self.opt_results[step]["profit"]
             unit.outputs["generation"].loc[start:end] = self.opt_results[step]["power"]
-            # self.generation[
-            #    str(unit.fuel_type).replace("_combined", "")
-            # ] = self.opt_results[step]["power"]
-            # self.generation["total"] = self.opt_results[step]["power"]
+
+    def _check_avoided_start_costs(
+        self,
+        unit: SupportsMinMax,
+        start: datetime,
+        hour_count: int,
+        hour_count2: int,
+        prices_48h,
+        fuel_prices,
+        emission_prices,
+        step0_obj: float,
+    ) -> None:
+        """
+        Evaluates a 48-hour rolling horizon to detect whether running at a slight loss
+        in the final hours of the first day avoids a costly restart on the second day.
+        """
+        power_step0 = self.opt_results[0]["power"]
+        if power_step0[-1] != 0:
+            return
+
+        all_off = np.argwhere(power_step0 == 0).flatten()
+        last_on = np.argwhere(power_step0 > 0).flatten()
+        last_on = last_on[-1] if len(last_on) > 0 else 0
+        prevented_off_hours = list(all_off[all_off > last_on])
+        if not prevented_off_hours:
+            return
+
+        # simulate powerplant is turned off on Day 2
+        runtime_day2 = -len(prevented_off_hours)
+        p0_day2 = 0
+        day2_start = start + unit.index.freq * hour_count
+        day2_prices = (
+            prices_48h.iloc[hour_count:hour_count2]
+            if hasattr(prices_48h, "iloc")
+            else prices_48h[hour_count:hour_count2]
+        )
+        day2_emissions = (
+            emission_prices.iloc[hour_count:hour_count2]
+            if hasattr(emission_prices, "iloc")
+            else emission_prices[hour_count:hour_count2]
+        )
+        day2_fuels = (
+            fuel_prices.iloc[hour_count:hour_count2]
+            if hasattr(fuel_prices, "iloc")
+            else fuel_prices[hour_count:hour_count2]
+        )
+
+        cashflow_day2 = self.build_model(
+            unit,
+            day2_start,
+            hour_count,
+            day2_emissions,
+            day2_fuels,
+            day2_prices,
+            runtime_day2,
+            p0_day2,
+        )
+        self.model.obj = Objective(expr=quicksum(cashflow_day2), sense=maximize)
+        self.opt.solve(self.model)
+        total_obj_single = step0_obj + value(self.model.obj)
+        tr = np.arange(hour_count)
+        power_day1 = list(self.opt_results[0]["power"])
+        power_day2 = [self.model.p_out[t].value for t in tr]
+        total_single_power = np.asarray(power_day1 + power_day2)
+
+        all_off = np.argwhere(total_single_power == 0).flatten()
+        prevented_off_hours = np.asarray(list(all_off[all_off > last_on]))
+
+        # 48h horizon starting from initial state at `start`
+        runtime_day1 = unit.get_operation_time(start)
+        p0_day1 = unit.get_output_before(start)
+        cashflow_48h = self.build_model(
+            unit,
+            start,
+            hour_count2,
+            emission_prices.iloc[:hour_count2]
+            if hasattr(emission_prices, "iloc")
+            else emission_prices[:hour_count2],
+            fuel_prices.iloc[:hour_count2]
+            if hasattr(fuel_prices, "iloc")
+            else fuel_prices[:hour_count2],
+            prices_48h,
+            runtime_day1,
+            p0_day1,
+        )
+        tr_48 = np.arange(hour_count2)
+        self.model.obj = Objective(expr=quicksum(cashflow_48h), sense=maximize)
+        self.opt.solve(self.model)
+        power_check = np.asarray([self.model.p_out[t].value for t in tr_48])
+        delta = value(self.model.obj) - total_obj_single
+
+        prevent_start = len(prevented_off_hours) > 0 and all(
+            power_check[prevented_off_hours] > 0
+        )
+        off_power_sum = (
+            sum(power_check[prevented_off_hours]) if len(prevented_off_hours) > 0 else 0
+        )
+        if prevent_start and delta > 0 and off_power_sum > 0:
+            delta /= off_power_sum
+            prevent_start_today = np.asarray(
+                [h for h in prevented_off_hours if h < hour_count]
+            )
+            self.prevented_start = dict(
+                prevent=True, hours=prevent_start_today, delta=delta
+            )
+            prevent_start_tomorrow = np.asarray(
+                [h - hour_count for h in prevented_off_hours if h >= hour_count]
+            )
+            self.reduction_next_day[start.date()] = (
+                delta,
+                prevent_start_tomorrow,
+            )
 
     def optimize(
         self,
@@ -289,14 +410,18 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
           np.ndarray: generation
 
         """
-        base_price = prices.copy()
-        self.prevented_start = dict(
-            prevent=False, hours=np.zeros(self.T, float), delta=0
-        )
         hour_count2 = 2 * hour_count
+        if hasattr(prices, "iloc"):
+            prices_24h = prices.iloc[:hour_count].copy()
+            prices_48h = prices.iloc[:hour_count2].copy()
+        else:
+            prices_24h = prices[:hour_count].copy()
+            prices_48h = prices[:hour_count2].copy()
+
+        self.prevented_start = dict(
+            prevent=False, hours=np.zeros(hour_count, float), delta=0
+        )
         steps = steps or self.steps
-        prices_24h = prices[:hour_count].copy()
-        prices_48h = prices[:hour_count2].copy()
         try:
             fuel_prices = unit.forecaster.fuel_prices[unit.fuel_type]
             emission_prices = unit.forecaster.fuel_prices["co2"]
@@ -304,14 +429,25 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
             logger.error(f"no price for {unit.fuel_type=} with {steps=} and {start=}")
             raise Exception(f"No Fuel prices given for fuel {unit.fuel_type}")
 
+        fuel_slice = (
+            fuel_prices.iloc[:hour_count]
+            if hasattr(fuel_prices, "iloc")
+            else fuel_prices[:hour_count]
+        )
+        emission_slice = (
+            emission_prices.iloc[:hour_count]
+            if hasattr(emission_prices, "iloc")
+            else emission_prices[:hour_count]
+        )
+
         for step in steps:
-            adjusted_price = base_price[:hour_count] + step
+            adjusted_price = prices_24h + step
             cashflow = self.build_model(
                 unit,
                 start,
                 hour_count,
-                emission_prices.iloc[:hour_count],
-                fuel_prices.iloc[:hour_count],
+                emission_slice,
+                fuel_slice,
                 adjusted_price,
             )
             self.model.obj = Objective(expr=quicksum(cashflow), sense=maximize)
@@ -331,71 +467,17 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
                     hour_count=hour_count,
                 )
 
-                if self.opt_results[step]["power"][-1] == 0 and step == 0:
-                    all_off = np.argwhere(
-                        self.opt_results[step]["power"] == 0
-                    ).flatten()
-                    last_on = np.argwhere(self.opt_results[step]["power"] > 0).flatten()
-                    last_on = last_on[-1] if len(last_on) > 0 else 0
-                    prevented_off_hours = list(all_off[all_off > last_on])
-
-                    # simulate powerplant is turned off
-                    runtime = -len(prevented_off_hours)
-                    p0 = 0
-                    cashflow = self.build_model(
+                if step == 0:
+                    self._check_avoided_start_costs(
                         unit,
                         start,
                         hour_count,
-                        emission_prices.iloc[:hour_count],
-                        fuel_prices.iloc[:hour_count],
-                        prices_24h,
-                        runtime,
-                        p0,
-                    )
-                    self.model.obj = Objective(expr=quicksum(cashflow), sense=maximize)
-                    self.opt.solve(self.model)
-                    total_obj_single = self.opt_results[step]["obj"] + value(
-                        self.model.obj
-                    )
-                    tr = np.arange(hour_count)
-                    power_day1 = list(self.opt_results[step]["power"])
-                    power_day2 = [self.model.p_out[t].value for t in tr]
-                    total_single_power = np.asarray(power_day1 + power_day2)
-
-                    all_off = np.argwhere(total_single_power == 0).flatten()
-                    prevented_off_hours = np.asarray(list(all_off[all_off > last_on]))
-
-                    self.build_model(
-                        unit,
-                        start,
                         hour_count2,
-                        emission_prices.iloc[:hour_count2],
-                        fuel_prices.iloc[:hour_count2],
                         prices_48h,
-                        runtime,
-                        p0,
+                        fuel_prices,
+                        emission_prices,
+                        step0_obj=self.opt_results[step]["obj"],
                     )
-                    tr = np.arange(hour_count2)
-                    self.model.obj = Objective(expr=quicksum(cashflow), sense=maximize)
-                    self.opt.solve(self.model)
-                    power_check = np.asarray([self.model.p_out[t].value for t in tr])
-                    prevent_start = all(power_check[prevented_off_hours] > 0)
-                    delta = value(self.model.obj) - total_obj_single
-                    if prevent_start and delta > 0:
-                        delta /= sum(power_check[prevented_off_hours])
-                        prevent_start_today = prevented_off_hours[
-                            prevented_off_hours < self.T
-                        ]
-                        self.prevented_start = dict(
-                            prevent=True, hours=prevent_start_today, delta=delta
-                        )
-                        prevent_start_tomorrow = (
-                            prevented_off_hours[prevented_off_hours >= self.T] - self.T
-                        )
-                        self.reduction_next_day[start.date()] = (
-                            delta,
-                            prevent_start_tomorrow,
-                        )
 
             else:
                 if r.solver.termination_condition == TerminationCondition.infeasible:
@@ -403,7 +485,7 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
                 else:
                     logger.error(f"{step} - {r.solver}")
                 for key in ["power", "emission", "fuel", "start", "profit"]:
-                    self.opt_results[step][key] = np.zeros(self.T)
+                    self.opt_results[step][key] = np.zeros(hour_count)
                 self.opt_results[step]["obj"] = 0
         return unit.outputs["generation"].loc[start:]
 
@@ -462,8 +544,8 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
         self.optimize(unit, start, hour_count, base_price)
 
         def get_cost(p: float, t: int):
-            f = fuel_price[t]
-            e = e_price[t]
+            f = fuel_price.iloc[t] if hasattr(fuel_price, "iloc") else fuel_price[t]
+            e = e_price.iloc[t] if hasattr(e_price, "iloc") else e_price[t]
             return (p / unit.efficiency) * (f + e * unit.emission_factor)
 
         def get_marginal(p0: float, p1: float, t: int):
@@ -479,10 +561,16 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
             we calculate the sliding window and see when the most profitable time is to turn on.
             This does search the most profitable hours, even if the first hour might be sufficient to match our marginal costs
             """
-            max_profit, start_hour = 0, 0
-            run_time = unit.min_operating_time
-            for t in range(start, hour_count - run_time):
-                p = np.sum(unit.min_power * base_price[t : t + run_time])
+            max_profit, start_hour = -float("inf"), start
+            run_time = max(unit.min_operating_time, 1)
+            limit = max(start + 1, hour_count - run_time + 1)
+            for t in range(start, limit):
+                slice_prc = (
+                    base_price.iloc[t : t + run_time]
+                    if hasattr(base_price, "iloc")
+                    else base_price[t : t + run_time]
+                )
+                p = np.sum(unit.min_power * np.asarray(slice_prc))
 
                 if p > max_profit:
                     max_profit = p
@@ -746,7 +834,6 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
                     min_price,
                     unit.min_power,
                     last_block,
-                    "generation",
                 )
             last_block = block_number
             block_number += 1
@@ -759,18 +846,23 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
                         prc,
                         vol,
                         last_block,
-                        "generation",
                     )
                     block_number += 1
 
-            df_prev = pd.DataFrame.from_dict(prev_order, orient="index")
-            df_prev.columns = ["price", "volume", "link"]
-            df_prev.index = pd.MultiIndex.from_tuples(
-                df_prev.index, names=["block_id", "hour", "bid_id"]
+            if prev_order:
+                df_prev = pd.DataFrame.from_dict(prev_order, orient="index")
+                df_prev.columns = ["price", "volume", "link"]
+                df_prev.index = pd.MultiIndex.from_tuples(
+                    df_prev.index, names=["block_id", "hour", "bid_id"]
+                )
+                df = pd.concat([df, df_prev], axis=0)
+            min_bid = (
+                market_config.minimum_bid_price
+                if hasattr(market_config, "minimum_bid_price")
+                and market_config.minimum_bid_price is not None
+                else -500 / 1e3
             )
-            # -> limit to market price range
-            df = pd.concat([df, df_prev], axis=0)
-            df.loc[df["price"] < -500 / 1e3, "price"] = -500 / 1e3
+            df.loc[df["price"] < min_bid, "price"] = min_bid
         if not df.empty:
             df = df.reset_index()
             df["start_time"] = df.apply(
@@ -783,3 +875,6 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
             df["exclusive_id"] = None
         df["unit_id"] = unit.id
         return df.to_dict("records")
+
+
+PowerplantDmasStrategy = EnergyOptimizationDmasStrategy
