@@ -41,7 +41,7 @@ class ComplexDmasClearingRole(MarketRole):
 
     def clear(
         self, accepted: Orderbook, market_products: list[MarketProduct]
-    ) -> (Orderbook, Orderbook, list[dict]):
+    ) -> tuple[Orderbook, Orderbook, list[dict], list]:
         """
         This performs the process of "market clearing" for a given market agent and its orders.
         During this process, incoming orders are matched against each other and allocations are determined to adhere to market rules.
@@ -59,8 +59,11 @@ class ComplexDmasClearingRole(MarketRole):
             market_products (list[MarketProduct]): the list of products which are cleared in this clearing
 
         Returns:
-            tuple[Orderbook, Orderbook, list[dict]]: accepted orderbook, rejected orderbook and clearing meta data
+            tuple[Orderbook, Orderbook, list[dict], list]: accepted orderbook, rejected orderbook, clearing meta data and flows
         """
+        if not market_products:
+            return [], [], [], []
+
         # assumes same duration for all given products
         start = market_products[0][0]
         duration = market_products[0][1] - start
@@ -72,6 +75,26 @@ class ComplexDmasClearingRole(MarketRole):
 
         T = len(market_products)
         t_range = np.arange(T)
+
+        if not accepted:
+            min_p = self.marketconfig.minimum_bid_price or 0.0
+            meta = [
+                {
+                    "supply_volume": 0.0,
+                    "demand_volume": 0.0,
+                    "demand_volume_energy": 0.0,
+                    "supply_volume_energy": 0.0,
+                    "price": min_p,
+                    "max_price": min_p,
+                    "min_price": min_p,
+                    "node": None,
+                    "product_start": start + duration * t,
+                    "product_end": start + duration * (t + 1),
+                    "only_hours": None,
+                }
+                for t in range(T)
+            ]
+            return [], [], meta, []
         # Orders have (block, hour, name) as key and (price, volume, link) as values
         orders = {type_: {} for type_ in order_types}
         # Index Orders have t as key and (block, name) as value
@@ -199,7 +222,10 @@ class ComplexDmasClearingRole(MarketRole):
                 if (parent_id, agent) in orders_local.keys():
                     parent_hours = orders_local[(parent_id, agent)]
                     model.enable_child_block.add(
-                        quicksum(model.use_linked_order[block, h, agent] for h in hours)
+                        len(parent_hours)
+                        * quicksum(
+                            model.use_linked_order[block, h, agent] for h in hours
+                        )
                         <= len(hours)
                         * quicksum(
                             model.use_linked_order[parent_id, h, agent]

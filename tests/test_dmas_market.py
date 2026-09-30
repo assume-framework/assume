@@ -824,3 +824,23 @@ def test_clearing_with_storage_exclusive_and_powerplant_linked_orders():
     assert "pp_agent" in accepted_agents
     assert "st_agent" in accepted_agents
     assert "demand_agent" in accepted_agents
+
+
+def test_empty_market_clearing():
+    """Test clearing with empty orderbook and empty products."""
+    mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
+    # Empty products
+    acc, rej, meta, flows = mr.clear([], [])
+    assert acc == [] and rej == [] and meta == [] and flows == []
+
+    # Empty orderbook with products
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
+    products = get_available_products(
+        simple_dayahead_auction_config.market_products, next_opening
+    )
+    acc, rej, meta, flows = mr.clear([], products)
+    assert acc == [] and rej == []
+    assert len(meta) == len(products)
+    assert meta[0]["supply_volume"] == 0.0
