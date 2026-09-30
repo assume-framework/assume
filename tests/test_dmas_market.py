@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from dataclasses import replace
 from datetime import datetime, timedelta
 
 from dateutil import rrule as rr
@@ -913,3 +914,76 @@ def test_two_sided_elastic_demand_clearing():
     # Generator should supply 50 MW
     gen_acc = [o for o in accepted if o["agent_addr"] == "gen1"][0]
     assert gen_acc["accepted_volume"] == 50
+
+
+def test_exclusive_order_pricing_pay_as_clear_and_pay_as_bid():
+    """Verify exclusive orders receive uniform clearing price in pay_as_clear."""
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
+    products = get_available_products(
+        simple_dayahead_auction_config.market_products, next_opening
+    )
+    start_t = products[0][0]
+    end_t = products[0][1]
+
+    orderbook: Orderbook = [
+        # Cheap exclusive ask: 50 MW @ 25 €/MW
+        {
+            "start_time": start_t,
+            "end_time": end_t,
+            "volume": 50,
+            "price": 25.0,
+            "agent_addr": "gen_ex",
+            "bid_id": "bid_ex",
+            "only_hours": None,
+            "exclusive_id": 0,
+            "block_id": None,
+            "link": None,
+        },
+        # Marginal single ask: 50 MW @ 45 €/MW
+        {
+            "start_time": start_t,
+            "end_time": end_t,
+            "volume": 50,
+            "price": 45.0,
+            "agent_addr": "gen_marginal",
+            "bid_id": "bid_single",
+            "only_hours": None,
+            "exclusive_id": None,
+            "block_id": None,
+            "link": None,
+        },
+        # Inelastic Demand: 100 MW @ 100 €/MW
+        {
+            "start_time": start_t,
+            "end_time": end_t,
+            "volume": -100,
+            "price": 100.0,
+            "agent_addr": "buyer",
+            "bid_id": "bid_dem",
+            "only_hours": None,
+            "exclusive_id": None,
+            "block_id": None,
+            "link": None,
+        },
+    ]
+
+    # Test 1: pay_as_clear
+    cfg_pac = replace(simple_dayahead_auction_config, market_mechanism="pay_as_clear")
+    mr_pac = ComplexDmasClearingRole(cfg_pac)
+    acc_pac, _, meta_pac, _ = mr_pac.clear(orderbook, products[:1])
+    assert meta_pac[0]["price"] == 45.0
+
+    ex_acc_pac = [o for o in acc_pac if o["bid_id"] == "bid_ex"][0]
+    assert ex_acc_pac["price"] == 25.0
+    assert ex_acc_pac["accepted_price"] == 45.0  # pay-as-clear: receives clearing price
+
+    # Test 2: pay_as_bid
+    cfg_pab = replace(simple_dayahead_auction_config, market_mechanism="pay_as_bid")
+    mr_pab = ComplexDmasClearingRole(cfg_pab)
+    acc_pab, _, meta_pab, _ = mr_pab.clear(orderbook, products[:1])
+
+    ex_acc_pab = [o for o in acc_pab if o["bid_id"] == "bid_ex"][0]
+    assert ex_acc_pab["price"] == 25.0
+    assert ex_acc_pab["accepted_price"] == 25.0  # pay-as-bid: receives own bid price

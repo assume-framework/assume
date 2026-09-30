@@ -482,13 +482,18 @@ class ComplexDmasClearingRole(MarketRole):
                             prc, vol, link = orders[type_][block, t, name]
                         else:
                             prc, vol = orders[type_][block, t, name]
+                        accepted_prc = (
+                            clear_price
+                            if self.marketconfig.market_mechanism == "pay_as_clear"
+                            else prc
+                        )
                         o: Order = {
                             "start_time": bstart,
                             "end_time": end,
                             "only_hours": None,
                             "price": prc,
                             "volume": vol,
-                            "accepted_price": clear_price,
+                            "accepted_price": accepted_prc,
                             "accepted_volume": vol * usage,
                             "block_id": block,
                             "link": link,
@@ -507,13 +512,18 @@ class ComplexDmasClearingRole(MarketRole):
                         usage = model_vars[type_][block, name].value or 0
 
                         prc, vol = orders[type_][block, t, name]
+                        accepted_prc = (
+                            clear_price
+                            if self.marketconfig.market_mechanism == "pay_as_clear"
+                            else prc
+                        )
                         o: Order = {
                             "start_time": bstart,
                             "end_time": end,
                             "only_hours": None,
                             "price": prc,
                             "volume": vol,
-                            "accepted_price": prc,
+                            "accepted_price": accepted_prc,
                             "accepted_volume": vol * usage,
                             "block_id": None,
                             "link": None,
@@ -541,13 +551,18 @@ class ComplexDmasClearingRole(MarketRole):
                 ) or 0
             else:
                 usage = 1.0
+            accepted_prc = (
+                prc
+                if self.marketconfig.market_mechanism == "pay_as_clear"
+                else orig_price
+            )
             o: Order = {
                 "start_time": bstart,
                 "end_time": end,
                 "only_hours": None,
                 "price": orig_price,
                 "volume": vol,
-                "accepted_price": prc,
+                "accepted_price": accepted_prc,
                 "accepted_volume": vol * usage,
                 "block_id": None,
                 "link": None,
