@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-import time
 from collections import defaultdict
 
 import numpy as np
@@ -45,73 +44,43 @@ class ComplexDmasClearingRole(MarketRole):
         if not verbose:
             logger.setLevel(logging.WARNING)
 
-    def clear(
-        self, accepted: Orderbook, market_products: list[MarketProduct]
-    ) -> tuple[Orderbook, Orderbook, list[dict], list]:
-        """
-        This performs the process of "market clearing" for a given market agent and its orders.
-        During this process, incoming orders are matched against each other and allocations are determined to adhere to market rules.
-        Linked orders are respected to be only taken if the prior block was also taken.
-        Orders with the same exclusive ID from the same agent can only be taken together, in which case no other exclusive blocks can be taken.
-        The result are an orderbook, the rejected orders and market metadata.
-
-        Limitations:
-            * The clearing is currently one-sided, in the way that the price of the demand is not respected
-            * A per-agent-unique bid_id is required for standard bids
-            * The cost of taking additional blocks is taken individually instead (like pay-as-bid) instead of applying uniform pricing during the calculation
-
-        Args:
-            orderbook (Orderbook): the orders to be cleared as an orderbook
-            market_products (list[MarketProduct]): the list of products which are cleared in this clearing
-
-        Returns:
-            tuple[Orderbook, Orderbook, list[dict], list]: accepted orderbook, rejected orderbook, clearing meta data and flows
-        """
-        if not market_products:
-            return [], [], [], []
-
-        # assumes same duration for all given products
-        start = market_products[0][0]
-        duration = market_products[0][1] - start
+    @staticmethod
+    def _validate_product_alignment(
+        market_products: list[MarketProduct], start, duration
+    ) -> None:
         s = start
         for market_product in market_products[1:]:
             if market_product[0] != s + duration:
                 raise ValueError("Market products of one clearing must align")
             s = market_product[0]
 
-        T = len(market_products)
-        t_range = np.arange(T)
+    def _empty_orderbook_results(
+        self, start, duration, T: int
+    ) -> tuple[Orderbook, Orderbook, list[dict], list]:
+        min_p = self.marketconfig.minimum_bid_price or 0.0
+        meta = [
+            {
+                "supply_volume": 0.0,
+                "demand_volume": 0.0,
+                "demand_volume_energy": 0.0,
+                "supply_volume_energy": 0.0,
+                "price": min_p,
+                "max_price": min_p,
+                "min_price": min_p,
+                "node": None,
+                "product_start": start + duration * t,
+                "product_end": start + duration * (t + 1),
+                "only_hours": None,
+            }
+            for t in range(T)
+        ]
+        return [], [], meta, []
 
-        if not accepted:
-            min_p = self.marketconfig.minimum_bid_price or 0.0
-            meta = [
-                {
-                    "supply_volume": 0.0,
-                    "demand_volume": 0.0,
-                    "demand_volume_energy": 0.0,
-                    "supply_volume_energy": 0.0,
-                    "price": min_p,
-                    "max_price": min_p,
-                    "min_price": min_p,
-                    "node": None,
-                    "product_start": start + duration * t,
-                    "product_end": start + duration * (t + 1),
-                    "only_hours": None,
-                }
-                for t in range(T)
-            ]
-            return [], [], meta, []
-        # Orders have (block, hour, name) as key and (price, volume, link) as values
+    def _parse_orders(self, accepted: Orderbook, start, duration) -> dict:
         orders = {type_: {} for type_ in order_types}
-        # Index Orders have t as key and (block, name) as value
         index_orders = {type_: defaultdict(list) for type_ in order_types}
-        model_vars = {}
         parent_blocks = {}
         start_block = []
-        model = ConcreteModel("dmas_market")
-        # Create a solver
-        opt = SolverFactory(get_supported_solver_pyomo())
-
         bid_ids = {}
         agent_addrs = {}
         unit_ids = {}
@@ -122,33 +91,29 @@ class ComplexDmasClearingRole(MarketRole):
                 if order["block_id"] is None and order["link"] is None:
                     order_type = "exclusive_ask"
                 else:
-                    order_type = None
                     logger.error(f"received invalid order: {order=}")
             elif not (order["block_id"] is None or order["link"] is None):
                 if order["exclusive_id"] is None:
                     order_type = "linked_ask"
                 else:
-                    order_type = None
                     logger.error(f"received invalid order: {order=}")
             else:
                 if order["volume"] < 0:
                     order_type = "single_bid"
                 elif order["volume"] > 0:
                     order_type = "single_ask"
-                else:
-                    order_type = None
+
             if order_type is not None:
                 tt = (order["start_time"] - start) / duration
-                # block_id, hour, name
                 name = f"{order['agent_addr']} {order.get('unit_id', '')}"
                 if "exclusive" in order_type:
                     idx = (order["exclusive_id"], tt, name)
                 elif "linked" in order_type:
                     idx = (order["block_id"], tt, name)
                 else:
-                    # needs bid_id to distinguish orders in the set
                     name += str(order["bid_id"])
                     idx = (None, tt, name)
+
                 agent_addrs[name] = order["agent_addr"]
                 bid_ids[name] = order["bid_id"]
                 unit_ids[name] = order.get("unit_id", "")
@@ -156,13 +121,11 @@ class ComplexDmasClearingRole(MarketRole):
                 index_orders[order_type][tt].append((idx[0], idx[2]))
 
                 if "linked" in order_type:
-                    val = order["price"], order["volume"], order["link"]
+                    val = (order["price"], order["volume"], order["link"])
                 else:
-                    val = order["price"], order["volume"]
+                    val = (order["price"], order["volume"])
 
                 orders[order_type][idx] = val
-
-        ################ set parameter ################
 
         for key_tuple, val in orders["linked_ask"].items():
             block, _, agent = key_tuple
@@ -172,13 +135,28 @@ class ComplexDmasClearingRole(MarketRole):
             if parent_id == -1:
                 start_block.append((block, agent))
 
-        start_block = set(start_block)
+        return {
+            "orders": orders,
+            "index_orders": index_orders,
+            "parent_blocks": parent_blocks,
+            "start_block": set(start_block),
+            "bid_ids": bid_ids,
+            "agent_addrs": agent_addrs,
+            "unit_ids": unit_ids,
+        }
 
-        # optimize
-        model.clear()
-        logger.info("start building model")
-        t1 = time.time()
-        # Step 1 initialize binary variables for hourly ask block per agent and id
+    def _build_model(
+        self, parsed: dict, t_range: np.ndarray
+    ) -> tuple[ConcreteModel, dict, list]:
+        orders = parsed["orders"]
+        index_orders = parsed["index_orders"]
+        parent_blocks = parsed["parent_blocks"]
+        start_block = parsed["start_block"]
+
+        model = ConcreteModel("dmas_market")
+        model_vars = {}
+
+        # 1. Decision Variables
         model.use_hourly_ask = Var(
             set(
                 (block, hour, agent)
@@ -202,7 +180,6 @@ class ComplexDmasClearingRole(MarketRole):
             )
             model_vars["single_bid"] = model.use_single_bid
 
-        # Step 3 initialize binary variables for ask order in block per agent
         model.use_linked_order = Var(
             set(
                 [
@@ -214,10 +191,8 @@ class ComplexDmasClearingRole(MarketRole):
             bounds=(0, 1),
         )
         model_vars["linked_ask"] = model.use_linked_order
-
         model.use_mother_order = Var(start_block, within=Binary)
 
-        # Step 4 initialize binary variables for exclusive block and agent
         model.use_exclusive_block = Var(
             set([(block, agent) for block, _, agent in orders["exclusive_ask"].keys()]),
             within=Binary,
@@ -227,7 +202,7 @@ class ComplexDmasClearingRole(MarketRole):
         model.sink = Var(t_range, within=NonNegativeReals)
         model.source = Var(t_range, within=NonNegativeReals)
 
-        # Step 6 set constraint: If parent block of an agent is used -> enable usage of child block
+        # 2. Linked constraints
         model.enable_child_block = ConstraintList()
         model.mother_bid = ConstraintList()
         orders_local = defaultdict(list)
@@ -253,33 +228,24 @@ class ComplexDmasClearingRole(MarketRole):
                     )
                 else:
                     logger.warning(
-                        f"Agent {agent} send invalid linked orders "
+                        f"Agent {agent} sent invalid linked orders "
                         f"- block {block} has no parent_id {parent_id}"
                     )
-                    logger.warning("Block, Hour, Agent, Price, Volume, Link")
-                    for key, data in orders["linked_ask"].items():
-                        if key[2] == agent:
-                            logger.warning(
-                                f"{key[0], key[1], key[2], data[0], data[1], data[2]}"
-                            )
             else:
-                # mother bid must exist with at least one entry
-                # either the whole mother bid can be used | None
                 mother_bid_counter = len(hours)
                 model.mother_bid.add(
                     quicksum(model.use_linked_order[block, h, agent] for h in hours)
                     == mother_bid_counter * model.use_mother_order[(block, agent)]
                 )
 
-        # Constraints for exclusive block orders
-        # ------------------------------------------------
-        # Step 7 set constraint: only one scheduling can be used
+        # 3. Exclusive block constraints
         model.one_exclusive_block = ConstraintList()
         for agent in {agent for _, _, agent in orders["exclusive_ask"].keys()}:
             model.one_exclusive_block.add(
                 1 >= quicksum(model.use_exclusive_block[:, agent])
             )
 
+        # 4. Supply/demand volumes and balance
         def get_volume(type_: str, hour: int):
             if type_ == "single_bid":
                 if self.elastic_demand and "single_bid" in model_vars:
@@ -320,9 +286,6 @@ class ComplexDmasClearingRole(MarketRole):
                     if orders[type_][block, hour, name][1] > 0
                 )
             else:
-                # TODO actually for linked order in the same hour,
-                # the maximum price of all its prior required blocks
-                # should be used to determine the cost of the additional block
                 return quicksum(
                     orders[type_][block, hour, name][0]
                     * orders[type_][block, hour, name][1]
@@ -338,7 +301,6 @@ class ComplexDmasClearingRole(MarketRole):
             for t in t_range
         ]
 
-        # generation +- magic_source must match demand
         model.gen_dem = ConstraintList()
         for t in t_range:
             if not index_orders["single_bid"][t]:
@@ -348,13 +310,11 @@ class ComplexDmasClearingRole(MarketRole):
                 or index_orders["linked_ask"][t]
                 or index_orders["exclusive_ask"][t]
             ):
-                # constraints with 0 <= 0 are not valid
                 logger.error(f"no hourly_asks available at hour {t}")
             else:
                 model.gen_dem.add(magic_source[t] == model.source[t] - model.sink[t])
 
-        # Step 9 set constraint: Cost for each hour
-        # add magic_cost as very expensive, to overbid bids with marketconfig.maximum_bid_price
+        # 5. Objective: Social welfare / cost minimization
         if self.elastic_demand and "single_bid" in model_vars:
             generation_cost = quicksum(
                 quicksum(
@@ -385,13 +345,21 @@ class ComplexDmasClearingRole(MarketRole):
                 * 10
                 for t in t_range
             )
-        # TODO currently, this does not represent a two-sided clearing, as demand has to be taken
-        # and is magically filled if not
 
         model.obj = Objective(expr=generation_cost, sense=minimize)
-        logger.info(f"built model in {time.time() - t1:.2f} seconds")
-        logger.info("start optimization/market clearing")
-        t1 = time.time()
+        return model, model_vars, magic_source
+
+    def _solve_and_extract_prices(
+        self,
+        model: ConcreteModel,
+        model_vars: dict,
+        parsed: dict,
+        t_range: np.ndarray,
+    ) -> pd.DataFrame:
+        orders = parsed["orders"]
+        index_orders = parsed["index_orders"]
+
+        opt = SolverFactory(get_supported_solver_pyomo())
         try:
             if hasattr(opt, "name") and opt.name == "gurobi":
                 options = {"MIPGap": 0.1, "TimeLimit": 60}
@@ -403,11 +371,7 @@ class ComplexDmasClearingRole(MarketRole):
             logger.exception("error solving optimization problem")
             logger.error(f"Model: {model}")
             logger.error(f"{repr(e)}")
-        logger.info(f"cleared market in {time.time() - t1:.2f} seconds")
 
-        ################ convert internal bids to orderbook ################
-
-        # -> determine price at each hour
         prices = []
         for t in t_range:
             max_price = self.marketconfig.minimum_bid_price
@@ -417,7 +381,6 @@ class ComplexDmasClearingRole(MarketRole):
                 for block, name in index_orders[type_][t]:
                     if type_ == "exclusive_ask":
                         order_used = model_vars[type_][block, name].value
-                        # -> disable price by storage if the storage is on the demand side
                         if order_used and orders[type_][block, t, name][1] > 0:
                             order_used = True
                         else:
@@ -429,15 +392,26 @@ class ComplexDmasClearingRole(MarketRole):
                         if price > max_price:
                             max_price = price
 
-            prices += [max_price]
-        prices = pd.DataFrame(data=dict(price=prices))
+            prices.append(max_price)
+        return pd.DataFrame(data=dict(price=prices))
 
-        # check volume in price in
-        # orders["single_ask"]
-        # {k: v.value for k, v in list(model_vars["single_ask"].items())}
-        # watch order
+    def _reconstruct_orders(
+        self,
+        model: ConcreteModel,
+        model_vars: dict,
+        parsed: dict,
+        prices: pd.DataFrame,
+        magic_source: list,
+        start,
+        duration,
+        t_range: np.ndarray,
+    ) -> tuple[Orderbook, Orderbook, list[dict], list]:
+        orders = parsed["orders"]
+        index_orders = parsed["index_orders"]
+        agent_addrs = parsed["agent_addrs"]
+        bid_ids = parsed["bid_ids"]
+        unit_ids = parsed["unit_ids"]
 
-        # -> determine volume at each hour
         volumes = []
         sum_magic_source = 0
         for t in t_range:
@@ -461,7 +435,6 @@ class ComplexDmasClearingRole(MarketRole):
                     volume += (-1) * orders["exclusive_ask"][block, t, name][1]
             volumes.append(volume)
         logger.info(f"Got {sum_magic_source:.2f} kWh from Magic source")
-        # -> determine used ask orders
 
         accepted = []
         rejected = []
@@ -475,7 +448,6 @@ class ComplexDmasClearingRole(MarketRole):
                     continue
                 for block, name in index_orders[type_][t]:
                     if type_ in ["single_ask", "linked_ask"]:
-                        # usage from 0 to 1
                         usage = model_vars[type_][block, t, name].value or 0
                         link = None
                         if "linked" in type_:
@@ -508,9 +480,7 @@ class ComplexDmasClearingRole(MarketRole):
                             rejected.append(o)
 
                     elif type_ == "exclusive_ask":
-                        # usage from 0 to 1
                         usage = model_vars[type_][block, name].value or 0
-
                         prc, vol = orders[type_][block, t, name]
                         accepted_prc = (
                             clear_price
@@ -602,7 +572,33 @@ class ComplexDmasClearingRole(MarketRole):
                 }
             )
 
-        # write network flows here if applicable
         flows = []
-
         return accepted, rejected, meta, flows
+
+    def clear(
+        self, accepted: Orderbook, market_products: list[MarketProduct]
+    ) -> tuple[Orderbook, Orderbook, list[dict], list]:
+        """Clear market orders against products adhering to DMAS rules.
+
+        Incoming orders are matched and allocations are determined using
+        a MILP formulation with linked blocks and exclusive order groups.
+        """
+        if not market_products:
+            return [], [], [], []
+
+        start = market_products[0][0]
+        duration = market_products[0][1] - start
+        self._validate_product_alignment(market_products, start, duration)
+
+        T = len(market_products)
+        t_range = np.arange(T)
+
+        if not accepted:
+            return self._empty_orderbook_results(start, duration, T)
+
+        parsed = self._parse_orders(accepted, start, duration)
+        model, model_vars, magic_source = self._build_model(parsed, t_range)
+        prices = self._solve_and_extract_prices(model, model_vars, parsed, t_range)
+        return self._reconstruct_orders(
+            model, model_vars, parsed, prices, magic_source, start, duration, t_range
+        )
