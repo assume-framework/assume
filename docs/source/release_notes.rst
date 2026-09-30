@@ -61,6 +61,7 @@ Upcoming Release
   - **Fix bug in redispatch mechanism**: Fixed the bug in redispatch evaluation due to PyPSA's version upgrade. In ``PyPSA >= 0.35.2`` (released in February 2025) the sign of load was not taken into account correctly & since the fixed EOM dispatch was modelled as a load with positive sign which was resulting in incorrect redispatch amounts.
   - **Fix bug in flexable balancing market strategies**: Flexables balancing market strategies queried ``get_specific_revenue`` with forecasted market prices from their own markets instead of from the "EOM" market.
   - **Fix loss of the last ``train_freq`` window during learning**: Tasks scheduled at exactly the simulation end were started by the run loop but never awaited, because tasks registered with ``src="no_wait"`` are excluded from mango's termination detection. The run loop now drains all remaining tasks before shutting the container down.
+  - **Fix nodal clearing for units without a bid**: Generators, loads and storage units present in the grid data but without a bid in a snapshot kept the default availability they were added to the network with, and a unit bidding in only some snapshots passed NaN availability to the optimization. Such units now have zero availability in the snapshots without a bid.
 
 0.6.0 - (18th March 2026)
 =========================
