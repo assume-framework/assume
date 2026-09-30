@@ -942,6 +942,7 @@ class World:
             unit (BaseUnit): The unit instance to be added.
         """
         self._validate_unit_operator(operator_id)
+        self.units[unit.id] = unit
         self.unit_operators[operator_id].add_unit(unit)
 
     def init_forecasts(
