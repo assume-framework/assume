@@ -18,7 +18,9 @@ from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
     aggregate_step_amount,
-    convert_to_rrule_freq,
+    convert_str_to_rrule_freq,
+    convert_timedelta_to_rrule_freq,
+    create_rrule,
     datetime2timestamp,
     get_available_products,
     get_products_index,
@@ -39,16 +41,34 @@ from .utils import create_orderbook
 
 
 def test_convert_rrule():
-    freq, interval = convert_to_rrule_freq("1h")
+    freq, interval = convert_str_to_rrule_freq("1h")
     assert freq == rr.HOURLY
     assert interval == 1
 
     with pytest.raises(ValueError):
-        freq, interval = convert_to_rrule_freq("h")
+        freq, interval = convert_str_to_rrule_freq("h")
 
-    freq, interval = convert_to_rrule_freq("99d")
+    freq, interval = convert_str_to_rrule_freq("99d")
     assert freq == rr.DAILY
     assert interval == 99
+
+
+def test_convert_timedelta_rrule():
+    # the coarsest matching unit is used, as a SECONDLY rule with a large
+    # interval is much more expensive for dateutil to iterate
+    assert convert_timedelta_to_rrule_freq(timedelta(hours=1)) == (rr.HOURLY, 1)
+    assert convert_timedelta_to_rrule_freq(timedelta(hours=4)) == (rr.HOURLY, 4)
+    assert convert_timedelta_to_rrule_freq(timedelta(minutes=15)) == (rr.MINUTELY, 15)
+    assert convert_timedelta_to_rrule_freq(timedelta(seconds=90)) == (rr.SECONDLY, 90)
+
+    with pytest.raises(ValueError):
+        convert_timedelta_to_rrule_freq(timedelta(0))
+
+
+def test_create_rrule_with_timedelta():
+    start = datetime(2020, 1, 1)
+    rule = create_rrule(start, start + timedelta(hours=3), timedelta(hours=1))
+    assert list(rule) == [start + timedelta(hours=i) for i in range(4)]
 
 
 def test_reproducability_with_seed():
