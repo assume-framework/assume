@@ -423,13 +423,13 @@ def _two_node_grid(generators, loads, storage_units=None):
     return grid_data
 
 
-def _order(unit_id, node, product, volume, price):
+def _order(unit_id, node, product, volume, price, bid_id=None):
     return {
         "start_time": product[0],
         "end_time": product[1],
         "only_hours": None,
         "unit_id": unit_id,
-        "bid_id": f"{unit_id}_{product[0]}",
+        "bid_id": bid_id or f"{unit_id}_{product[0]}",
         "node": node,
         "volume": volume,
         "price": price,
@@ -513,6 +513,131 @@ def test_nodal_clearing_unit_bidding_in_some_hours_only():
         accepted.get(("gen_partial", products[0][0]), 0), 100, abs_tol=eps
     )
     assert math.isclose(accepted.get(("gen_bid", products[1][0]), 0), 100, abs_tol=eps)
+    for product in products:
+        supply = sum(
+            m["supply_volume"] for m in meta if m["product_start"] == product[0]
+        )
+        demand = sum(
+            m["demand_volume"] for m in meta if m["product_start"] == product[0]
+        )
+        assert math.isclose(supply, demand, abs_tol=eps)
+
+
+@pytest.mark.require_network
+def test_nodal_clearing_multiple_bids_per_unit():
+    """
+    A unit may place more than one bid for the same product, as the flexable
+    strategy for units with a minimum output, the two-price learning strategy
+    and the elastic demand strategy do. Every bid has to be cleared on its own
+    price and volume.
+    """
+    market_config = simple_nodal_auction_config
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))
+    ]
+    storage_units = pd.DataFrame(
+        {
+            "name": ["storage_multi"],
+            "node": ["node2"],
+            "max_power_charge": [100.0],
+            "max_power_discharge": [100.0],
+        }
+    ).set_index("name")
+    market_config.param_dict["grid_data"] = _two_node_grid(
+        generators={"gen_multi": ("node1", 200.0), "gen_ref": ("node2", 200.0)},
+        loads={"dem": ("node1", 100.0)},
+        storage_units=storage_units,
+    )
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(market_config.market_products, next_opening)
+
+    orderbook = [
+        _order("gen_multi", "node1", products[0], 50, 10, bid_id="gen_multi_cheap"),
+        _order("gen_multi", "node1", products[0], 150, 80, bid_id="gen_multi_dear"),
+        _order("gen_ref", "node2", products[0], 200, 50),
+        _order(
+            "storage_multi", "node2", products[0], 40, 15, bid_id="storage_multi_cheap"
+        ),
+        _order(
+            "storage_multi", "node2", products[0], 60, 70, bid_id="storage_multi_dear"
+        ),
+        _order("dem", "node1", products[0], -100, 3000),
+    ]
+
+    mr = NodalClearingRole(market_config)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
+
+    volumes = {
+        o["bid_id"]: o["accepted_volume"] for o in accepted_orders + rejected_orders
+    }
+    # merit order for 100 MW of demand: 50 at 10, 40 at 15, then 10 of gen_ref at 50
+    assert math.isclose(volumes["gen_multi_cheap"], 50, abs_tol=eps)
+    assert math.isclose(volumes["gen_multi_dear"], 0, abs_tol=eps)
+    assert math.isclose(volumes["storage_multi_cheap"], 40, abs_tol=eps)
+    assert math.isclose(volumes["storage_multi_dear"], 0, abs_tol=eps)
+    assert math.isclose(volumes[f"gen_ref_{products[0][0]}"], 10, abs_tol=eps)
+    assert math.isclose(volumes[f"dem_{products[0][0]}"], -100, abs_tol=eps)
+
+    # gen_ref is the marginal unit, so both nodes clear at its bid price
+    for m in meta:
+        assert math.isclose(m["price"], 50, abs_tol=eps)
+    supply = sum(m["supply_volume"] for m in meta)
+    demand = sum(m["demand_volume"] for m in meta)
+    assert math.isclose(supply, 100, abs_tol=eps)
+    assert math.isclose(supply, demand, abs_tol=eps)
+
+
+@pytest.mark.require_network
+def test_nodal_clearing_multiple_bids_over_two_hours():
+    """
+    A unit may split into several bids in one hour and send a single bid in the
+    next, on both the supply and the demand side. The number of bids per unit
+    must not change the result for the other hours.
+    """
+    market_config = simple_nodal_auction_config
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), 2, timedelta(hours=1))
+    ]
+    market_config.param_dict["grid_data"] = _two_node_grid(
+        generators={"gen_cheap": ("node1", 100.0), "gen_multi": ("node1", 200.0)},
+        loads={"dem_elastic": ("node1", 300.0)},
+    )
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(market_config.market_products, next_opening)
+
+    orderbook = [
+        _order("gen_cheap", "node1", products[0], 100, 20),
+        _order("gen_cheap", "node1", products[1], 100, 20),
+        _order("gen_multi", "node1", products[0], 60, 30, bid_id="gen_multi_h0_cheap"),
+        _order("gen_multi", "node1", products[0], 140, 90, bid_id="gen_multi_h0_dear"),
+        _order("gen_multi", "node1", products[1], 200, 30),
+        _order("dem_elastic", "node1", products[0], -100, 100, bid_id="dem_h0_high"),
+        _order("dem_elastic", "node1", products[0], -100, 50, bid_id="dem_h0_low"),
+        _order("dem_elastic", "node1", products[1], -150, 100),
+    ]
+
+    mr = NodalClearingRole(market_config)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
+
+    volumes = {
+        o["bid_id"]: o["accepted_volume"] for o in accepted_orders + rejected_orders
+    }
+    # hour 0: 100 at 20 and 60 at 30 are below the second demand bid of 50,
+    # the 140 MW at 90 are not, so 160 MW of the 200 MW asked for are served
+    assert math.isclose(volumes[f"gen_cheap_{products[0][0]}"], 100, abs_tol=eps)
+    assert math.isclose(volumes["gen_multi_h0_cheap"], 60, abs_tol=eps)
+    assert math.isclose(volumes["gen_multi_h0_dear"], 0, abs_tol=eps)
+    assert math.isclose(volumes["dem_h0_high"], -100, abs_tol=eps)
+    assert math.isclose(volumes["dem_h0_low"], -60, abs_tol=eps)
+    # hour 1: 150 MW of demand, gen_multi is marginal with its single bid
+    assert math.isclose(volumes[f"gen_cheap_{products[1][0]}"], 100, abs_tol=eps)
+    assert math.isclose(volumes[f"gen_multi_{products[1][0]}"], 50, abs_tol=eps)
+    assert math.isclose(volumes[f"dem_elastic_{products[1][0]}"], -150, abs_tol=eps)
+
+    prices = {(m["node"], m["product_start"]): m["price"] for m in meta}
+    # hour 0 is set by the partly served demand bid, hour 1 by gen_multi
+    assert math.isclose(prices[("node1", products[0][0])], 50, abs_tol=eps)
+    assert math.isclose(prices[("node1", products[1][0])], 30, abs_tol=eps)
     for product in products:
         supply = sum(
             m["supply_volume"] for m in meta if m["product_start"] == product[0]

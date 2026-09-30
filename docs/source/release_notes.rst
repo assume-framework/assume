@@ -12,6 +12,10 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+
+**Bug Fixes:**
+  - **Fix nodal clearing for units with several bids per product**: The clearing pivoted the orderbook on unit and start time, so a unit sending more than one bid for the same product, as the flexable strategy for units with a minimum output, the two price learning strategy and the elastic demand strategy do, raised ``Index contains duplicate entries, cannot reshape``. The market role logged ``clearing failed``, the simulation ran on, and that clearing gave no results. Each bid now gets its own generator in the clearing network and its own accepted volume and price.
+
 0.7.0 - (11th November 2026)
 =========================
 
