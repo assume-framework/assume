@@ -1,0 +1,66 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Grid-sensitive control of an EV fleet behind one LV node.
+#
+# Independent EV units are scheduled by the aggregator operator portfolio strategy.
+# The DSO publishes grid fees that enter the EV price forecasts.
+#
+# Timing: EOM delivers 1h after opening, GridTariff 3h after opening. Both close
+# one hour after opening, so the fee for a delivery hour is cleared two market
+# rounds before the EOM round that dispatches it.
+
+# ---------------------------------------------------------------------------
+# Reference: no grid fee at all.
+# ---------------------------------------------------------------------------
+base_stump: &base_stump
+  availability_df: common/availability_df.csv
+  demand_df: common/demand_df.csv
+  demand_units: common/demand_units.csv
+  fuel_prices_df: common/fuel_prices_df.csv
+  powerplant_units: common/powerplant_units.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-03 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+
+  markets_config:
+    EOM: &test_case_1_building_eom
+      operator: eom_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 1000000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+
+test_case_1_no_tariff_ev:
+  simulation_id: test_case_1_no_tariff_ev
+  <<: *base_stump
+  electric_vehicle_units: study_cases/test_case_1_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_1_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_1_ev/unit_operators_no_tariff.csv
+
+  # Shared by every study case through `<<: *ev_defaults`, so the fleet, the
+  # connection and the planning window are one physical setup throughout and the
+  # cases differ only in the mechanism being tested.
+  bidding_strategy_params: &test_case_1_building_ev_defaults
+    ev_look_ahead_horizon: 27h
+    ev_background_load_mw: 0.00
+
+
+test_case_1_no_tariff_building:
+  simulation_id: test_case_1_no_tariff_building
+  <<: *base_stump
+  forecasts_df: study_cases/test_case_1_building/forecasts_df.csv
+  residential_dsm_units: study_cases/test_case_1_building/residential_dsm_units.csv
+
