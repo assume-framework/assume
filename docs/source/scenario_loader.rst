@@ -244,6 +244,13 @@ default parameters of hydro storage units (duration, charge/discharge
 efficiency and round-trip cost) can be tuned with the ``efficiencies`` and
 ``storage_defaults`` arguments of :py:meth:`assume.scenario.loader_entsoe.load_entsoe`.
 
+By default the demand to be served is the actual load. Because generation
+follows the realised profiles, imports and exports are not part of the market
+in an island setup. With ``demand_proxy="generation"`` the total realised
+generation of the country is served instead, which includes net exports and
+excludes net imports. Note that realised generation already reflects the actual
+dispatch, so a comparison against historic prices is then partly circular.
+
 API responses are cached under ``~/.assume/entsoe`` to avoid repeated downloads.
 For more information consult the methods documentation :py:meth:`assume.scenario.loader_entsoe.load_entsoe`.
 

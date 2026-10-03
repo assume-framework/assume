@@ -37,6 +37,7 @@ from assume.scenario.loader_entsoe import (
     _add_storage_units,
     _add_variable_unit,
     _resolve_co2_prices,
+    _total_generation,
     load_entsoe,
 )
 
@@ -411,6 +412,34 @@ def test_load_entsoe_builds_world(mock_entsoe_data, hourly_index):
     world.add_unit_operator.assert_any_call("generation_DE")
     assert world.add_unit.call_count > 5
     world.init_forecasts.assert_called_once()
+
+
+def test_total_generation_sums_all_technologies(mock_entsoe_data, hourly_index):
+    _, generation, capacity = mock_entsoe_data
+    technologies = EntsoeInterface.aggregate_by_technology(capacity, generation)
+    total = _total_generation(technologies, hourly_index)
+    expected = sum(
+        t["generation_mw"].reindex(hourly_index).fillna(0)
+        for t in technologies.values()
+    )
+    assert total.equals(expected.clip(lower=0))
+    assert (total >= 0).all()
+
+
+def test_load_entsoe_rejects_unknown_demand_proxy():
+    with pytest.raises(AssumeException, match="demand_proxy"):
+        load_entsoe(
+            MagicMock(),
+            "s",
+            "c",
+            datetime(2024, 1, 1),
+            datetime(2024, 1, 2),
+            ["DE"],
+            [],
+            {},
+            api_key="k",
+            demand_proxy="bogus",
+        )
 
 
 def test_aggregate_maps_pondage_and_poundage_hydropower():

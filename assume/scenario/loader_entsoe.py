@@ -54,6 +54,7 @@ def load_entsoe(
     storage_defaults: dict[str, float] | None = None,
     use_cache: bool = True,
     use_instrat_fuel_prices: bool = True,
+    demand_proxy: str = "load",
     save_frequency_hours: int = 48,
 ):
     """
@@ -85,9 +86,18 @@ def load_entsoe(
             ``efficiency_discharge`` (0..1).
         use_cache (bool): cache API responses under ``~/.assume/entsoe``
         use_instrat_fuel_prices (bool): fetch coal, gas and CO2 from instrat.pl
+        demand_proxy (str): demand to be served, either ``"load"`` (actual
+            load) or ``"generation"`` (total realised generation of the
+            country). The latter includes net exports and excludes net
+            imports, which matters for an island market that follows the
+            realised generation profiles. Defaults to ``"load"``.
         save_frequency_hours (int): database save interval (48 h as in the CSV
             loader)
     """
+    if demand_proxy not in ("load", "generation"):
+        raise AssumeException(
+            f"demand_proxy must be 'load' or 'generation', got {demand_proxy!r}"
+        )
     if not countries:
         countries = ["DE"]
 
@@ -140,6 +150,8 @@ def load_entsoe(
             start, end, country, use_cache=use_cache
         )
         technologies = entsoe.aggregate_by_technology(capacity, generation)
+        if demand_proxy == "generation":
+            demand = _total_generation(technologies, index)
         # countries without a known centroid get (0, 0)
         location = COUNTRY_LOCATIONS.get(country, (0.0, 0.0))
 
@@ -214,6 +226,15 @@ def load_entsoe(
                 )
 
     world.init_forecasts()
+
+
+def _total_generation(technologies, index):
+    """Sum of the realised generation of all technologies on the hourly index."""
+    total = sum(
+        tech_data["generation_mw"].reindex(index).fillna(0)
+        for tech_data in technologies.values()
+    )
+    return total.clip(lower=0)
 
 
 def _generation_availability(gen_series, max_power):
