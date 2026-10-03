@@ -29,6 +29,11 @@ from assume.strategies.naive_strategies import (
     DsmCapacityHeuristicBalancingStrategy,
 )
 from assume.strategies.interactive_strategies import EnergyInteractiveStrategy
+from assume.strategies.industrial_hybrid import (
+    IndustrialHybridCapacityNegStrategy,
+    IndustrialHybridEomStrategy,
+    IndustrialHybridOtcStrategy,
+)
 from assume.strategies.dmas_powerplant import EnergyOptimizationDmasStrategy
 from assume.strategies.dmas_storage import StorageEnergyOptimizationDmasStrategy
 from assume.strategies.portfolio_strategies import (
@@ -85,6 +90,9 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "demand_energy_naive_redispatch": EnergyNaiveRedispatchStrategy,
     "household_energy_optimization": DsmEnergyOptimizationStrategy,
     "industry_energy_optimization": DsmEnergyOptimizationStrategy,
+    "industrial_hybrid_eom": IndustrialHybridEomStrategy,
+    "industrial_hybrid_capacity_neg": IndustrialHybridCapacityNegStrategy,
+    "industrial_hybrid_otc": IndustrialHybridOtcStrategy,
     "household_energy_naive_redispatch": DsmEnergyNaiveRedispatchStrategy,
     "industry_energy_naive_redispatch": DsmEnergyNaiveRedispatchStrategy,
     "powerplant_energy_optimization_dmas": EnergyOptimizationDmasStrategy,

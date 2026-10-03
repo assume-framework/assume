@@ -80,6 +80,14 @@ assume.strategies.interactive\_strategies module
    :undoc-members:
    :show-inheritance:
 
+assume.strategies.industrial\_hybrid module
+--------------------------------------------
+
+.. automodule:: assume.strategies.industrial_hybrid
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 assume.strategies.portfolio\_strategies module
 ----------------------------------------------
 

@@ -131,6 +131,19 @@ class DSMFlex:
             if hasattr(m.dsm_blocks[block], "power_in")
         )
 
+    def set_dispatch_plan(self, marketconfig, orderbook) -> None:
+        """Store market awards and let a strategy apply optional award rules.
+
+        Most DSM strategies only need the standard dispatch bookkeeping.  A
+        strategy may additionally expose ``on_market_feedback`` when the
+        accepted/rejected EOM orders affect its carried physical state.
+        """
+        super().set_dispatch_plan(marketconfig, orderbook)
+        strategy = self.bidding_strategies.get(marketconfig.market_id)
+        feedback_handler = getattr(strategy, "on_market_feedback", None)
+        if feedback_handler is not None:
+            feedback_handler(self, marketconfig, orderbook)
+
     def initialize_components(self):
         """
         Initializes the DSM components by creating and adding blocks to the model.
@@ -1311,7 +1324,9 @@ class DSMFlex:
     # /Rolling-horizon helpers
     # ------------------------------------------------------------------
 
-    def _check_and_reoptimize_rolling_window(self, current_time) -> bool:
+    def _check_and_reoptimize_rolling_window(
+        self, current_time, force: bool = False, constraint_builder=None
+    ) -> bool:
         """Check whether to re-optimise for the next rolling window.
 
         Called by the bidding strategy each time it generates bids.
@@ -1330,7 +1345,7 @@ class DSMFlex:
             )
             return False
 
-        if current_step >= self._rh_optimized_until_step:
+        if force or current_step >= self._rh_optimized_until_step:
             logger.info(
                 "[RH-MARKET-TRIGGER] %s | step=%d >= opt_until=%d | "
                 "re-optimising window for %s",
@@ -1339,12 +1354,16 @@ class DSMFlex:
                 self._rh_optimized_until_step,
                 self.id,
             )
-            self._solve_rolling_horizon_next_window(current_step)
+            self._solve_rolling_horizon_next_window(
+                current_step, constraint_builder=constraint_builder
+            )
             return True
 
         return False
 
-    def _solve_rolling_horizon_next_window(self, current_step: int) -> None:
+    def _solve_rolling_horizon_next_window(
+        self, current_step: int, constraint_builder=None
+    ) -> None:
         """Optimise the next rolling window starting from *current_step*.
 
         Called after each market round to re-optimise for the next window only,
@@ -1455,6 +1474,13 @@ class DSMFlex:
                     window_start,
                     commit_end,
                 )
+
+            # Market strategies may add temporary physical reservations (for
+            # example, capacity-reserve headroom) to this one rolling solve.
+            # The callback is deliberately small and optional so ordinary DSM
+            # operation keeps exactly the existing optimisation path.
+            if constraint_builder is not None:
+                constraint_builder(self.model, window_start, window_end)
 
             self.define_objective_opt()
 
