@@ -35,6 +35,12 @@ WEATHER_PARAMS_ECMWF = [
 
 logger = logging.getLogger(__name__)
 
+# PV losses between the module DC rating and the AC output: inverter and
+# system losses as in the Atlite CSi panel default
+PV_INVERTER_EFFICIENCY = 0.9
+# linear PV module degradation per year of operation
+PV_AGING_RATE = 0.005
+
 # MaStR units without an Inbetriebnahmedatum (status: In Planung) leak into
 # queries that are not time-bounded, so a status filter keeps replacing the
 # old numeric "EinheitBetriebsstatus >= 35" (codes 35/37/38).
@@ -355,7 +361,8 @@ class InfrastructureInterface:
             f'"HauptausrichtungNeigungswinkel" as "tiltCode", '
             f'COALESCE("Inbetriebnahmedatum", \'2018-01-01\') as "startDate", '
             f'"DatumEndgueltigeStilllegung" as "endDate", '
-            f'"InanspruchnahmeZahlungNachEeg" as "eeg" '
+            f'"InanspruchnahmeZahlungNachEeg" as "eeg", '
+            f'"ArtDerSolaranlage" as "solar_type" '
             f'FROM "solar_extended" '
             f'LEFT JOIN "solar_eeg" ON "EinheitMastrNummer" = "VerknuepfteEinheit" '
             f'WHERE "EinheitBetriebsstatus" IN {MASTR_OPERATIONAL_STATUS} '
@@ -379,22 +386,37 @@ class InfrastructureInterface:
             return df
 
         df["startDate"] = pd.to_datetime(df["startDate"])
-        if solar_type == "roof_top":
-            df["ownConsumption"] = df["ownConsumption"].fillna(
-                (df["startDate"].dt.year > 2013).astype(int)
+
+        # Determine rooftop units for imputation
+        if "solar_type" in df.columns:
+            is_rooftop = df["solar_type"].isin(
+                [mastr_solar_codes["roof_top"], "roof_top"]
             )
+        elif "ArtDerSolaranlage" in df.columns:
+            is_rooftop = df["ArtDerSolaranlage"].isin(
+                [mastr_solar_codes["roof_top"], "roof_top"]
+            )
+        elif solar_type == "roof_top":
+            is_rooftop = pd.Series(True, index=df.index)
         else:
-            # set own consumption for non-rooftop PVs to 0 because demand is unknown
-            df["ownConsumption"] = df["ownConsumption"].fillna(0)
+            is_rooftop = pd.Series(False, index=df.index)
+
+        # Rooftop PV commissioned after 2013 with NULL ownConsumption defaults to 1 (own consumption).
+        # Free-area / other PV with NULL ownConsumption defaults to 0 regardless of date (demand is unknown).
+        fallback_own_consumption = pd.Series(0, index=df.index)
+        if is_rooftop.any():
+            fallback_own_consumption[is_rooftop] = (
+                df.loc[is_rooftop, "startDate"].dt.year > 2013
+            ).astype(int)
+        df["ownConsumption"] = df["ownConsumption"].fillna(fallback_own_consumption)
 
         # the size thresholds below refer to the whole unit, so they have to
         # run before _finish_solar_systems splits Ost-West units
-        if solar_type == "roof_top":
-            # all PVs with nan and startDate > 2012 and maxPower > 30 kWp are limited to 70%
-            missing = df["limited"].isna()
-            power_cap = df["maxPower"] > 30
-            deadline = df["startDate"].dt.year > 2012
-            df.loc[missing & deadline & power_cap, "limited"] = "Ja, auf 70%"
+        # all rooftop PVs with nan and startDate > 2012 and maxPower > 30 kWp are limited to 70%
+        missing = df["limited"].isna()
+        power_cap = df["maxPower"] > 30
+        deadline = df["startDate"].dt.year > 2012
+        df.loc[is_rooftop & missing & deadline & power_cap, "limited"] = "Ja, auf 70%"
 
         # nans have no limitation
         df["limited"] = df["limited"].fillna("Nein")
@@ -420,7 +442,7 @@ class InfrastructureInterface:
         # DatumEndgueltigeStilllegung is NULL for every unit still standing, so
         # without this the column stays an object mix of dates and None that
         # pandas cannot serialize. Both dates are optional, as in get_solar_series.
-        for column in ["startDate", "endDate"]:
+        for column in ["startDate", "endDate", "batStartDate", "batEndDate"]:
             if column in df.columns:
                 df[column] = pd.to_datetime(df[column])
 
@@ -454,9 +476,35 @@ class InfrastructureInterface:
         )
         df["tilt"] = map_mastr_codes(df.pop("tiltCode"), mastr_solar_tilt, "30")
 
-        # apply limit to maxPower
-        df["maxPower"] *= df["limit_factor"]
-        df["demandP"] = df["maxPower"] * 1e3
+        # Ost-West double-row systems cannot be represented by a single
+        # azimuth; split each unit into an east- and a west-facing row at
+        # half capacity. The (azimuth, tilt) groupby in get_solar_series
+        # then treats them as two separate orientations.
+        ew_mask = df["azimuth"].eq(mastr_solar_azimuth["Ost-West"])
+        if ew_mask.any():
+            ew = df[ew_mask].copy()
+            # halve every capacity so that totals, e.g. the battery power
+            # summed in get_solar_series, are not counted twice
+            for column in ["maxPower", "acPower", "batPower", "VMax"]:
+                if column in ew.columns:
+                    ew[column] /= 2
+            ew = pd.concat(
+                [ew.assign(azimuth="90"), ew.assign(azimuth="270")],
+                ignore_index=True,
+            )
+            rest = df[~ew_mask]
+            df = pd.concat([rest, ew], ignore_index=True)
+
+        # maxPower keeps the installed (DC) capacity in kWp, acPower the AC
+        # capacity (Nettonennleistung = min(modules, inverters)). The feed-in
+        # limit and acPower are applied as a peak clip in get_solar_series.
+        if "acPower" not in df.columns:
+            df["acPower"] = df["maxPower"]
+        # units without a net rated power are limited by their DC capacity
+        df["acPower"] = df["acPower"].fillna(df["maxPower"])
+        df["demandP"] = (
+            np.minimum(df["maxPower"] * df["limit_factor"], df["acPower"]) * 1e3
+        )
         return df
 
     def get_wind_turbines_in_area(
@@ -719,18 +767,25 @@ COALESCE(so."Einspeisungsart", 'Teileinspeisung (einschließlich Eigenverbrauch)
 so."HauptausrichtungNeigungswinkel" as "tiltCode",
 COALESCE(so."Inbetriebnahmedatum", '2018-01-01') as "startDate",
 so."DatumEndgueltigeStilllegung" as "endDate",
+COALESCE(spe."Inbetriebnahmedatum", '2018-01-01') as "batStartDate",
+spe."DatumEndgueltigeStilllegung" as "batEndDate",
 an."NutzbareSpeicherkapazitaet" as "VMax"
 FROM "storage_extended" spe
 INNER JOIN "solar_extended" so ON spe."LokationMastrNummer" = so."LokationMastrNummer"
  INNER JOIN "storage_units" an ON spe."SpeMastrNummer" = an."MastrNummer"
 WHERE so."EinheitBetriebsstatus" IN {MASTR_OPERATIONAL_STATUS}
+AND spe."EinheitBetriebsstatus" IN {MASTR_OPERATIONAL_STATUS}
 """
         if plz_codes_str:
             query += f'AND so."Postleitzahl" in {plz_codes_str} '
         if created_before:
             query += f"AND so.\"Inbetriebnahmedatum\" < '{created_before.isoformat()}' "
+            query += (
+                f"AND spe.\"Inbetriebnahmedatum\" < '{created_before.isoformat()}' "
+            )
         if stopped_after:
-            query += f'AND (so."DatumEndgueltigeStilllegung" IS NULL OR so."DatumEndgueltigeStilllegung" > \'{stopped_after.isoformat()}\')'
+            query += f'AND (so."DatumEndgueltigeStilllegung" IS NULL OR so."DatumEndgueltigeStilllegung" > \'{stopped_after.isoformat()}\') '
+            query += f'AND (spe."DatumEndgueltigeStilllegung" IS NULL OR spe."DatumEndgueltigeStilllegung" > \'{stopped_after.isoformat()}\')'
 
         # Get Data from Postgres
         with self.databases["mastr"].connect() as conn:
@@ -741,6 +796,16 @@ WHERE so."EinheitBetriebsstatus" IN {MASTR_OPERATIONAL_STATUS}
             return df
 
         df["VMax"] = df["VMax"].fillna(10)
+        if "batStartDate" in df.columns and "startDate" in df.columns:
+            df["batStartDate"] = pd.concat(
+                [pd.to_datetime(df["batStartDate"]), pd.to_datetime(df["startDate"])],
+                axis=1,
+            ).max(axis=1)
+        if "batEndDate" in df.columns and "endDate" in df.columns:
+            df["batEndDate"] = pd.concat(
+                [pd.to_datetime(df["batEndDate"]), pd.to_datetime(df["endDate"])],
+                axis=1,
+            ).min(axis=1)
         df = self._finish_solar_systems(df, latitude, longitude)
         df["eta"] = 0.96
         return df
@@ -951,7 +1016,30 @@ ORDER BY 1
         return {}
 
 
+def naive_index(weather_df: pd.DataFrame) -> pd.DatetimeIndex:
+    """Returns the weather index without timezone, as MaStR dates carry none."""
+    index = weather_df.index
+    return index.tz_localize(None) if index.tz else index
+
+
+def operating_slice(index: pd.DatetimeIndex, start, end) -> slice:
+    """
+    Selects the time steps of a sorted index in which a unit operates,
+    start <= t < end. A missing start or end date does not restrict it.
+    """
+    first = index.searchsorted(pd.Timestamp(start)) if pd.notna(start) else 0
+    last = index.searchsorted(pd.Timestamp(end)) if pd.notna(end) else len(index)
+    return slice(first, last)
+
+
 def get_wind_series(wind_systems: pd.DataFrame, weather_df: pd.DataFrame):
+    """
+    Calculates the wind feed-in of the given turbines in kW.
+
+    Each turbine only produces between its startDate and endDate, if given,
+    so a fleet growing within the simulated period is not applied to the
+    whole period.
+    """
     data = [
         0.2 * np.ones(len(weather_df.index)),
         weather_df["temp_air"],
@@ -972,12 +1060,20 @@ def get_wind_series(wind_systems: pd.DataFrame, weather_df: pd.DataFrame):
     wt = WindTurbine(82, turbine_type="E-82/2300")
     # todo get wind turbine types from database
     wind_power = pd.Series(0.0, weather_df.index)
+    index = naive_index(weather_df)
     std_curve = wt.power_curve
     std_curve["value"] = std_curve["value"] / wt.power_curve["value"].max()
+    # MaStR lacks some hub heights and rotor diameters, use the mean of the
+    # given systems, 80 m hub height if none is known
+    heights = wind_systems["height"].astype(float)
+    heights = heights.fillna(heights.mean() if heights.notna().any() else 80)
+    diameters = wind_systems["diameter"].astype(float)
+    diameters = diameters.fillna(diameters.mean()).fillna(heights)
+    model_chain_cache = {}
     for line, row in tqdm(wind_systems.iterrows(), total=len(wind_systems)):
         max_power = row["maxPower"] * 1e3
-        diameter = float(row["diameter"])
-        height = float(row["height"])
+        diameter = diameters[line]
+        height = heights[line]
         if height <= 0:
             # weird fix
             height = max_power / 20
@@ -987,39 +1083,99 @@ def get_wind_series(wind_systems: pd.DataFrame, weather_df: pd.DataFrame):
             diameter = height
         if diameter / 2 > height:
             diameter = height
-        p_curve = std_curve.copy()
-        p_curve["value"] = std_curve["value"] * max_power
-        wt = WindTurbine(
-            hub_height=height,
-            rotor_diameter=diameter,
-            nominal_power=max_power,
-            power_curve=p_curve,
-        )
-        mc = ModelChain(wt).run_model(ww)
-        wpower = mc.power_output / 1e3  # [W] -> [kW]
-        wind_power += wpower
+
+        key = (height, diameter)
+        if key not in model_chain_cache:
+            p_curve = std_curve.copy()
+            # evaluate at unit capacity (1 kW = 1e3 W)
+            p_curve["value"] = std_curve["value"] * 1e3
+            wt = WindTurbine(
+                hub_height=height,
+                rotor_diameter=diameter,
+                nominal_power=1e3,
+                power_curve=p_curve,
+            )
+            mc = ModelChain(wt).run_model(ww)
+            model_chain_cache[key] = mc.power_output.to_numpy() / 1e3
+
+        wpower = model_chain_cache[key] * (max_power / 1e3)  # in kW
+        active = operating_slice(index, row.get("startDate"), row.get("endDate"))
+        wind_power.iloc[active] += wpower[active]
     return wind_power
 
 
-def get_solar_series(solar_systems: pd.DataFrame, weather_df: pd.DataFrame):
-    systems = []
-    solar_power = pd.Series(0.0, weather_df.index)
-    battery_power = pd.Series(0.0, weather_df.index)
+def clipped_feed_in(share, installed, cap):
+    """
+    Sums min(share * installed, cap) over all units for every time step.
+
+    All units of an orientation group produce the same share of their
+    installed capacity, but each unit is clipped at its own feed-in cap.
+    Sorting the units by cap / installed gives the exact sum without a loop
+    over units.
+
+    Args:
+        share (numpy.ndarray): produced share of the installed capacity per time step
+        installed (numpy.ndarray): installed capacity per unit
+        cap (numpy.ndarray): maximum feed-in per unit
+
+    Returns:
+        numpy.ndarray: summed feed-in per time step
+    """
+    valid = installed > 0
+    installed, cap = installed[valid], cap[valid]
+    order = np.argsort(cap / installed)
+    ratio = (cap / installed)[order]
+    # units with ratio <= share run at their cap, the others follow share
+    capped = np.concatenate([[0.0], np.cumsum(cap[order])])
+    uncapped = installed.sum() - np.concatenate([[0.0], np.cumsum(installed[order])])
+    n_capped = np.searchsorted(ratio, share, side="right")
+    return share * uncapped[n_capped] + capped[n_capped]
+
+
+def get_solar_series(
+    solar_systems: pd.DataFrame,
+    weather_df: pd.DataFrame,
+    inverter_efficiency: float = PV_INVERTER_EFFICIENCY,
+    aging_rate: float = PV_AGING_RATE,
+):
+    """
+    Calculates the PV feed-in of the given systems in kW.
+
+    maxPower is the installed (DC) capacity in kWp. The DC output is reduced
+    by inverter_efficiency and, if startDate is given, by aging_rate per year
+    of operation at the middle of the simulated period. Each unit's AC output
+    is then clipped at its feed-in limit (limit_factor * maxPower) and its AC
+    capacity (acPower), if these columns are given. Each unit only produces
+    between its startDate and endDate, if given, so a fleet growing within
+    the simulated period is not applied to the whole period. If batPower is
+    present, battery availability is governed by batStartDate and batEndDate
+    (defaulting to startDate/endDate), using the later start and earlier end.
+    """
     if solar_systems.empty:
-        return solar_power, battery_power
+        return pd.Series(0.0, weather_df.index), pd.Series(0.0, weather_df.index)
+    solar_power = np.zeros(len(weather_df.index))
+    battery_power = np.zeros(len(weather_df.index))
+    index = naive_index(weather_df)
+    mid_period = index[0] + (index[-1] - index[0]) / 2
     for info, group in tqdm(solar_systems.groupby(["azimuth", "tilt"])):
         azimuth = int(info[0])
         tilt = int(info[1])
-        maxPower = group["maxPower"].sum()  # in kW
-
-        if "batPower" in group.columns:
-            battery_power += group["batPower"].sum()
+        installed = group["maxPower"].to_numpy(dtype=float)  # in kW
+        cap = installed.copy()
+        if "limit_factor" in group.columns:
+            cap *= group["limit_factor"].to_numpy(dtype=float)
+        if "acPower" in group.columns:
+            cap = np.minimum(cap, group["acPower"].to_numpy(dtype=float))
+        # AC output at 1e3 W/m2 after losses and aging
+        rated_ac = installed * inverter_efficiency
+        if "startDate" in group.columns:
+            age = (mid_period - pd.to_datetime(group["startDate"])).dt.days / 365.25
+            rated_ac *= 1 - aging_rate * age.clip(lower=0).fillna(0).to_numpy()
         system = PVSystem(
             surface_tilt=tilt,
             surface_azimuth=azimuth,
-            module_parameters={"pdc0": maxPower},
+            module_parameters={"pdc0": installed.sum()},
         )
-        systems.append(system)
 
         ir = system.get_irradiance(
             solar_zenith=weather_df["zenith"],
@@ -1028,9 +1184,57 @@ def get_solar_series(solar_systems: pd.DataFrame, weather_df: pd.DataFrame):
             ghi=weather_df["ghi"],
             dhi=weather_df["dhi"],
         )
-        solar_power += ir["poa_global"] * maxPower
-    solar_power /= 1e3  # W -> kW
-    return solar_power, battery_power
+        # poa_global is [W/m2]; 1e3 W/m2 corresponds to the installed capacity.
+        # feed-in limits and inverters clip the peak rather than scaling the
+        # whole curve.
+        share = ir["poa_global"].to_numpy() / 1e3
+
+        # dates outside the period do not restrict the operation within it,
+        # dates outside the period do not restrict the operation within it,
+        # and MaStR dates are daily, so few distinct operating periods remain
+        start = pd.to_datetime(pd.Series(group.get("startDate"), index=group.index))
+        end = pd.to_datetime(pd.Series(group.get("endDate"), index=group.index))
+        periods = pd.DataFrame(
+            {"start": start.where(start > index[0]), "end": end.where(end <= index[-1])}
+        )
+        for (start_val, end_val), units in periods.groupby(
+            ["start", "end"], dropna=False
+        ).indices.items():
+            active = operating_slice(index, start_val, end_val)
+            solar_power[active] += clipped_feed_in(
+                share[active], rated_ac[units], cap[units]
+            )
+
+        if "batPower" in group.columns:
+            if "batStartDate" in group.columns:
+                bat_start = pd.to_datetime(group["batStartDate"])
+                if "startDate" in group.columns:
+                    bat_start = pd.concat([bat_start, start], axis=1).max(axis=1)
+            else:
+                bat_start = start
+
+            if "batEndDate" in group.columns:
+                bat_end = pd.to_datetime(group["batEndDate"])
+                if "endDate" in group.columns:
+                    bat_end = pd.concat([bat_end, end], axis=1).min(axis=1)
+            else:
+                bat_end = end
+
+            bat_periods = pd.DataFrame(
+                {
+                    "start": bat_start.where(bat_start > index[0]),
+                    "end": bat_end.where(bat_end <= index[-1]),
+                }
+            )
+            for (b_start, b_end), b_units in bat_periods.groupby(
+                ["start", "end"], dropna=False
+            ).indices.items():
+                b_active = operating_slice(index, b_start, b_end)
+                battery_power[b_active] += group["batPower"].iloc[b_units].sum()
+    return (
+        pd.Series(solar_power, weather_df.index),
+        pd.Series(battery_power, weather_df.index),
+    )
 
 
 def get_pwp_agents(interface, areas):
