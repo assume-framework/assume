@@ -96,10 +96,11 @@ class EntsoeInterface:
     def _to_naive_index(
         data: pd.Series | pd.DataFrame,
     ) -> pd.Series | pd.DataFrame:
-        # ASSUME simulates with tz-naive timestamps; the request itself uses UTC
+        # ASSUME simulates with tz-naive timestamps; entsoe-py returns data in the
+        # area's local time zone, so convert to UTC before dropping the zone
         if isinstance(data.index, pd.DatetimeIndex) and data.index.tz is not None:
             data = data.copy()
-            data.index = data.index.tz_localize(None)
+            data.index = data.index.tz_convert("UTC").tz_localize(None)
         return data
 
     @staticmethod

@@ -774,3 +774,30 @@ def test_blocked_non_thermal_units_have_no_efficiency(hourly_index):
     )
 
     assert "efficiency" not in world.add_unit.call_args[0][3]
+
+
+def test_to_naive_index_converts_to_utc():
+    index = pd.date_range("2024-01-01", periods=2, freq="h", tz="Europe/Berlin")
+    series = pd.Series([1.0, 2.0], index=index)
+    naive = EntsoeInterface._to_naive_index(series)
+    assert naive.index.tz is None
+    # 00:00 CET is 23:00 UTC of the previous day
+    assert naive.index[0] == pd.Timestamp("2023-12-31 23:00")
+
+
+def test_demand_is_utc_across_spring_dst(tmp_path):
+    iface = EntsoeInterface.__new__(EntsoeInterface)
+    iface.client = MagicMock()
+    iface.cache_dir = tmp_path
+    local = pd.date_range(
+        "2024-03-30 12:00", "2024-04-01 12:00", freq="h", tz="Europe/Berlin"
+    )
+    iface.client.query_load.return_value = pd.Series(1.0, index=local)
+    start, end = datetime(2024, 3, 30, 11), datetime(2024, 4, 1, 10)
+    demand = iface.get_country_demand(start, end, "DE", use_cache=False)
+    assert demand.index.is_unique
+    assert (
+        demand.index.freq is not None
+        or demand.index.to_series().diff().dropna().eq(pd.Timedelta("1h")).all()
+    )
+    assert demand.index[0] == pd.Timestamp("2024-03-30 11:00")
