@@ -801,3 +801,24 @@ def test_demand_is_utc_across_spring_dst(tmp_path):
         or demand.index.to_series().diff().dropna().eq(pd.Timedelta("1h")).all()
     )
     assert demand.index[0] == pd.Timestamp("2024-03-30 11:00")
+
+
+def test_single_row_caches_stay_series(tmp_path):
+    iface = EntsoeInterface.__new__(EntsoeInterface)
+    iface.cache_dir = tmp_path
+    start, end = datetime(2024, 1, 1), datetime(2024, 1, 1)
+    demand_path = iface._cache_path("DE", start, end, "demand")
+    demand_path.parent.mkdir(parents=True)
+    pd.Series([5.0], index=pd.to_datetime(["2024-01-01"])).rename_axis("t").to_csv(
+        demand_path
+    )
+    demand = iface.get_country_demand(start, end, "DE", use_cache=True)
+    assert isinstance(demand, pd.Series)
+    assert len(demand) == 1
+
+    cap_path = iface._cache_path("DE", start, end, "capacity")
+    cap_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.Series({"Solar": 10.0}).to_csv(cap_path)
+    capacity = iface.get_installed_capacity(start, end, "DE", use_cache=True)
+    assert isinstance(capacity, pd.Series)
+    assert capacity["Solar"] == 10.0

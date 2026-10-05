@@ -76,7 +76,8 @@ class EntsoeInterface:
             and isinstance(data, pd.DataFrame)
             and data.shape[1] == 1
         ):
-            return data.squeeze()
+            # iloc keeps a Series for one-row files, where squeeze() gives a scalar
+            return data.iloc[:, 0]
         return data
 
     def _write_cache(self, path: Path, data: pd.Series | pd.DataFrame) -> None:
