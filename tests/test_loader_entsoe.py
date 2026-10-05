@@ -822,3 +822,16 @@ def test_single_row_caches_stay_series(tmp_path):
     capacity = iface.get_installed_capacity(start, end, "DE", use_cache=True)
     assert isinstance(capacity, pd.Series)
     assert capacity["Solar"] == 10.0
+
+
+def test_instrat_download_sorts_descending_data():
+    resp = MagicMock()
+    resp.text = (
+        '[{"date":"2024-01-02T00:00:00Z","v":2},{"date":"2024-01-01T00:00:00Z","v":1}]'
+    )
+    with patch("assume.scenario.entsoe_helper.fuel_prices.requests.get") as get:
+        get.return_value = resp
+        df = InstratFuelPrices._download(
+            "http://x", datetime(2024, 1, 1), datetime(2024, 1, 2)
+        )
+    assert df.index.is_monotonic_increasing

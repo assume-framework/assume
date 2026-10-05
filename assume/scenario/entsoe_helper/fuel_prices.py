@@ -119,7 +119,7 @@ class InstratFuelPrices:
         if "date" not in df.columns:
             logger.warning("instrat.pl response for %s has no date column", url)
             return pd.DataFrame()
-        df = df.set_index("date")
+        df = df.set_index("date").sort_index()
         df.index = df.index.tz_localize(None)
         return df
 
