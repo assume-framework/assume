@@ -3,13 +3,15 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 name: PR Agent
+# pull_request_target gives fork PRs access to the secrets. Never add a checkout or
+# build step for the PR head to this job: PR-Agent only needs the GitHub API.
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, reopened, synchronize, ready_for_review, review_requested]
   issue_comment:
 jobs:
   pr_agent_job:
-    if: ${{ github.event.sender.type != 'Bot' && (github.event_name == 'pull_request' || github.event.issue.pull_request) }}
+    if: ${{ github.event.sender.type != 'Bot' && (github.event_name == 'pull_request_target' || github.event.issue.pull_request) }}
     runs-on: ubuntu-latest
     permissions:
       issues: write
