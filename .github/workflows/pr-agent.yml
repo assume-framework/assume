@@ -29,6 +29,8 @@ jobs:
           pr_description.publish_labels: "true"
           pr_description.publish_description_as_comment: "true"
           pr_description.final_update_message: "false"
+          pr_reviewer.final_update_message: "false"
           pr_description.enable_pr_description: "false"
           github_action_config.pr_actions: '["opened", "reopened", "synchronize", "ready_for_review", "review_requested"]'
           github_action_config.auto_review: "true"
+          github_action_config.auto_improve: "true"
