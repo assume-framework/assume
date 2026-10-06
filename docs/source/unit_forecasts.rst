@@ -143,6 +143,13 @@ the nonlinear quantile uncertainty plug-in instead of the Gaussian default,
 call ``set_adaptive_merit_order_uncertainty_model("nonlinear_quantile")``
 before the first forecast is issued.
 
+Each unit managed by that operator receives a reference to the same adaptive
+signal. A custom unit strategy can therefore use the issued price directly:
+
+.. code-block:: python
+
+    price = unit.forecaster.adaptive_forecast.price["EOM"][delivery_time]
+
 The explicit forecast method remains available for experiments and manual
 evaluation:
 

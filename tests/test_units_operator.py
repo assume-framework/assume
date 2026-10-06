@@ -13,8 +13,12 @@ from mango import RoleAgent, activate, create_tcp_container
 from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
-from assume.common.fast_pandas import FastIndex
-from assume.common.forecaster import DemandForecaster, PowerplantForecaster
+from assume.common.fast_pandas import FastIndex, FastSeries
+from assume.common.forecaster import (
+    DemandForecaster,
+    PowerplantForecaster,
+    UnitsOperatorForecaster,
+)
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
 from assume.common.utils import datetime2timestamp
@@ -232,6 +236,25 @@ def test_adaptive_merit_order_forecast_lifecycle():
     forecaster.update_adaptive_merit_order_forecast.assert_called_once_with(
         "EOM", [{"product_start": start + timedelta(hours=1), "price": 42.0}]
     )
+
+
+def test_unit_forecaster_exposes_shared_adaptive_price_signal():
+    index = FastIndex(start=start, end=start + timedelta(hours=1), freq="1h")
+    operator_forecaster = UnitsOperatorForecaster(index=index)
+    unit = Mock()
+    unit.id = "unit"
+    unit.forecaster = DemandForecaster(
+        index=index, market_prices={"EOM": 50}, demand=-1
+    )
+    units_operator = UnitsOperator([], forecaster=operator_forecaster)
+
+    units_operator.add_unit(unit)
+    operator_forecaster.adaptive_forecast.price["EOM"] = FastSeries(
+        index=index, value=42
+    )
+
+    assert unit.forecaster.adaptive_forecast is operator_forecaster.adaptive_forecast
+    assert unit.forecaster.adaptive_forecast.price["EOM"][start] == 42
 
 
 def test_participate():

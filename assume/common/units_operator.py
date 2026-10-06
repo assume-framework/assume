@@ -152,6 +152,8 @@ class UnitsOperator(Role):
             unit (BaseUnit): The unit to be added.
         """
         self.units[unit.id] = unit
+        if self.forecaster and hasattr(self.forecaster, "adaptive_forecast"):
+            unit.forecaster.adaptive_forecast = self.forecaster.adaptive_forecast
 
     def participate(self, market: MarketConfig) -> bool:
         """
