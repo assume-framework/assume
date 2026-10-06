@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 from datetime import datetime, timedelta
 from itertools import product
@@ -148,7 +148,7 @@ def get_test_prices(num: int = 24):
 
 
 start, end = datetime(2022, 1, 1), datetime(2022, 1, 31)
-index = pd.date_range(start=start, end=end, freq="d")
+index = pd.date_range(start=start, end=end, freq="D")
 
 
 def setup_simple_world() -> World:

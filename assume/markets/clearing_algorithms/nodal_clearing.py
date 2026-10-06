@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import logging
 from datetime import timedelta
@@ -11,7 +11,7 @@ import pandas as pd
 import pypsa
 from mango import AgentAddress
 
-from assume.common.grid_utils import read_pypsa_grid
+from assume.common.grid_utils import get_supported_solver_linopy, read_pypsa_grid
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.common.utils import create_incidence_matrix
 from assume.markets.base_market import MarketRole
@@ -161,7 +161,9 @@ class NodalClearingRole(MarketRole):
                 p_max_pu=1,
             )
 
-        self.solver = marketconfig.param_dict.get("solver", "highs")
+        self.solver_name = get_supported_solver_linopy(
+            marketconfig.param_dict.get("solver_name", "highs")
+        )
 
     def validate_orderbook(
         self, orderbook: Orderbook, agent_addr: AgentAddress
@@ -254,17 +256,23 @@ class NodalClearingRole(MarketRole):
 
         n.set_snapshots(snapshots)
 
+        # units without a bid in a snapshot get zero volume, so they are not available
+        volume_pivot = volume_pivot.reindex(
+            index=snapshots, columns=n.generators.index
+        ).fillna(0)
+        price_pivot = price_pivot.reindex(
+            index=snapshots, columns=n.generators.index
+        ).fillna(0)
+
         # Update p_max_pu for all units based on their bids in the actual snapshots
         # generators
         gen_idx = self.grid_data["generators"].index
-        gen_idx = gen_idx.intersection(volume_pivot.columns)
         n.generators_t.p_max_pu.loc[snapshots, gen_idx] = (
             volume_pivot[gen_idx] / n.generators.loc[gen_idx, "p_nom"].values
         )
         n.generators_t.marginal_cost.loc[snapshots, gen_idx] = price_pivot[gen_idx]
         # demand
         demand_idx = self.grid_data["loads"].index
-        demand_idx = demand_idx.intersection(volume_pivot.columns)
         n.generators_t.p_min_pu.loc[snapshots, demand_idx] = (
             volume_pivot[demand_idx] / n.generators.loc[demand_idx, "p_nom"].values
         )
@@ -275,7 +283,6 @@ class NodalClearingRole(MarketRole):
         # storage
         if self.grid_data.get("storage_units") is not None:
             storage_idx = self.grid_data["storage_units"].index
-            storage_idx = storage_idx.intersection(volume_pivot.columns)
             # discharging (positive bids)
             n.generators_t.p_max_pu.loc[snapshots, storage_idx] = (
                 volume_pivot[storage_idx].clip(lower=0).fillna(0)
@@ -294,9 +301,11 @@ class NodalClearingRole(MarketRole):
         # run linear optimal powerflow
         n.optimize.fix_optimal_capacities()
         status, termination_condition = n.optimize(
-            solver=self.solver,
+            solver_name=self.solver_name,
             log_to_console=False,
             progress=False,
+            # Constant objective terms do not affect dispatch or nodal prices; omit for speed/stability.
+            include_objective_constant=False,
         )
 
         if status != "ok":

@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import logging
 
@@ -95,7 +95,6 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
                 )
 
         # Initialize parameters
-        self.electricity_price = self.forecaster.price["EOM"]
         self.hydrogen_demand = self.forecaster.hydrogen_demand
         self.demand = demand
 
@@ -119,12 +118,17 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
                 )
 
         # Initialize the model
-        self.setup_model()
+        # self.setup_model()  # NOTE: called in forecaster initialization again!!!
 
     def define_parameters(self):
         self.model.electricity_price = pyo.Param(
             self.model.time_steps,
-            initialize={t: value for t, value in enumerate(self.electricity_price)},
+            initialize={
+                t: value
+                for t, value in enumerate(
+                    self._values_for_model(self.forecaster.electricity_price)
+                )
+            },
         )
         self.model.absolute_hydrogen_demand = pyo.Param(initialize=self.demand)
         self.model.hydrogen_demand_per_timestep = pyo.Param(

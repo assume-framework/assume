@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 from datetime import datetime, timedelta
 from functools import lru_cache
@@ -422,6 +422,16 @@ class FastSeries:
             FastSeriesIatIndexer: Indexer for integer-based single-element access.
         """
         return FastSeriesIatIndexer(self)
+
+    def fillna(self, value):
+        result = self.copy()
+        result.data = np.nan_to_num(self.data, value)
+        return result
+
+    def ones_like(self):
+        result = self.copy()
+        result.data = np.ones_like(self.data)
+        return result
 
     def __getitem__(
         self, item: datetime | slice | list | pd.Index | pd.Series | np.ndarray | str

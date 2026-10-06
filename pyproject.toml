@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 [build-system]
 requires = ["setuptools>=80", "setuptools-scm>=8"]
@@ -11,7 +11,7 @@ name = "assume-framework"
 dynamic = ["version"]
 description = "ASSUME - Agent-Based Electricity Markets Simulation Toolbox"
 authors = [{ name = "ASSUME Developers", email = "contact@assume-project.de"}]
-license = "AGPL-3.0-or-later"
+license = "MIT"
 readme = "README.md"
 keywords = ["agent based simulation", "energy market", "reinforcement learning", "market simulation", "simulation"]
 
@@ -27,11 +27,12 @@ classifiers=[
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 requires-python = ">=3.10"
 dependencies = [
     "argcomplete >=3.1.4",
-    "nest-asyncio >=1.5.6",
+    "nest-asyncio2 >=1.7.2",
     "mango-agents >=2.1.3",
     "numpy >=1.26.4",
     "tqdm >=4.64.1",
@@ -40,9 +41,8 @@ dependencies = [
     "pandas >=2.3.0",
     "psycopg2-binary >=2.9.5",
     "pyyaml >=6.0",
-    "pyyaml-include >=2.2a",
     "pyomo >=6.8.0",
-    "xarray",
+    "xarray <v2026.04.0", # https://github.com/assume-framework/assume/issues/790
     "highspy",
 ]
 
@@ -50,6 +50,7 @@ dependencies = [
 learning = [
     "torch >=2.0.1",
     "tensorboard >=2.7.0",
+    "setuptools <82" # https://github.com/tensorflow/tensorboard/issues/7003
 ]
 network = [
     "pypsa",
@@ -60,6 +61,7 @@ oeds = [
     "holidays <1.0",
     "pvlib >=0.10.2",
     "windpowerlib >=0.2.1",
+    "pyarrow",
 ]
 test = [
     "ruff >=0.14.6",
@@ -68,17 +70,24 @@ test = [
     "pytest >=9",
     "pytest-cov >=7.0.0",
     "pytest-asyncio >=1.3.0",
+    "pre-commit >=4.0.0",
+    "holidays <1.0",
+    "demandlib >=0.1.9",
+    "pvlib >=0.10.2",
+    "windpowerlib >=0.2.1",
+    "pyarrow",
 ]
 all = [
-    "assume-framework[oeds, network, learning]",
+    "assume-framework[oeds, network, learning, test]",
 ]
 docs = [
-  "sphinx <9",
+  "sphinx >=8",
   "sphinx-book-theme >=1.1.4",
   "nbsphinx >=0.9.7",
   "nbsphinx-link >= 1.3.1",
-  "sphinx-argparse >= 0.5.2",
+  "sphinx-argparse >= 0.6.0",
   "sphinxcontrib-mermaid >=1.0.0",
+  "ipython >=9",
 ]
 
 [project.urls]
@@ -163,4 +172,4 @@ ignore_missing_imports = true
 [tool.codespell]
 quiet-level = 3
 skip = "*.csv, *.html, *.json, *.orig, *.svg, ./docs/build"
-ignore-words-list = "DED,esy,flexable,Meger,ore"
+ignore-words-list = "DED,esy,flexable,Meger,ore,vertikal,unter"

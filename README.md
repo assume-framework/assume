@@ -1,7 +1,7 @@
 <!--
 SPDX-FileCopyrightText: ASSUME Developers
 
-SPDX-License-Identifier: AGPL-3.0-or-later
+SPDX-License-Identifier: MIT
 -->
 
 # ASSUME: Agent-Based Electricity Markets Simulation Toolbox
@@ -25,8 +25,11 @@ Developed as an open-source model, its primary objectives are to ensure usabilit
 
 ## Introduction
 
-A unique feature of the ASSUME toolbox is its integration of **Deep Reinforcement Learning** methods into the behavioral strategies of market agents. The model offers various predefined agent representations for both the demand and generation sides, which can be used as plug-and-play modules, simplifying the reinforcement of learning strategies.
+A unique feature of the ASSUME toolbox is its integration of **Deep Reinforcement Learning** methods into the behavioral strategies of market agents. The model offers predefined agent representations for both the demand and generation sides that can be used as plug-and-play modules, simplifying the implementation of learning strategies.
 This setup enables research into new market designs and dynamics in energy markets.
+
+**If you have any questions - get in contact on matrix: https://matrix.to/#/#assume-framework:matrix.org**<br>
+Log into your existing matrix account or create a new one. Paste the URL in the search field.
 
 ### What can the software do?
 The main motivation of ASSUME is to overcome the limitations of fixed, rule-based behaviors in existing ABMs.
@@ -69,8 +72,8 @@ pip install assume-framework
 pip install 'assume-framework[learning]'
 ```
 
-Please keep in mind, that the above installation method will install pytorch package without CUDA support.
-If you want to make use of your GPU with CUDA cores, please install pytorch with GPU support separately as described [here](https://pytorch.org/get-started/locally/).
+Please keep in mind that the above installation method will install the PyTorch package without CUDA support.
+If you want to make use of your GPU with CUDA cores, please install PyTorch with GPU support separately as described [here](https://pytorch.org/get-started/locally/).
 
 We also include **network-based market clearing algorithms** such as for the re-dispatch, zonal clearing with NTCs and nodal market clearing, which all require the PyPSA library.
 To install the package with these capabilities, use:
@@ -87,8 +90,9 @@ pip install 'assume-framework[all]'
 
 
 ### Timescale Database and Grafana Dashboards
+The Timescale Database and Grafana Dashboard are used to store and represent simulation results.
 
-If you want to benefit from a supported database and integrated Grafana dashboards for scenario analysis, you can use the provided Docker Compose file.
+If you want to use the supported TimescaleDB and integrated Grafana dashboards for scenario analysis, you can use the provided Docker Compose file.
 
 Follow these steps:
 
@@ -109,6 +113,7 @@ This will launch a container for TimescaleDB and Grafana with preconfigured dash
 You can access the Grafana dashboards at `http://localhost:3000`.
 
 ### Using TensorBoard to display Learning Metrics
+TensorBoard is used to visualize and monitor the learning progress during reinforcement learning training.
 
 When running an example with learning capabilities, you can start TensorBoard to observe the learning process.
 Use the following shell command to start TensorBoard:
@@ -122,14 +127,16 @@ Please note that TensorBoard should ideally be shut down via `Ctrl + C` every ti
 
 ## Trying out ASSUME and the provided Examples
 
-To ease your way into ASSUME we provided some examples and tutorials.
-The former are helpful if you would like to get an impression of how ASSUME works and the latter introduce you into the development of ASSUME.
+To ease your way into ASSUME, we provided some tutorial notebooks and preconfigured example simulations in the examples folder.
+The former are helpful if you would like to get an impression of how ASSUME works, as they present different functionalities of ASSUME condensed in specific notebooks, and the latter provides various example simulations ranging from 8 power plant examples to the representations of Germany for one year.
 
-### The Tutorials
+### The Tutorial Notebooks
 
-The tutorials work completely detached from your own machine on google colab.
-They provide code snippets and task that show you, how you can work with the software package one your own.
-We have multiple tutorials prepared, e.g. one for introducing a new unit and three for getting reinforcement learning ready on ASSUME.
+You can run the tutorials locally using the notebooks [here](examples/notebooks) or use [Google Colab](https://assume.readthedocs.io/en/latest/examples_basic.html).
+The tutorials begin with the basics of ASSUME, e.g., introducing a new unit, while the later tutorials cover more advanced use cases.
+
+We particularly recommend these tutorials; more can be found at the linked pages:
+
 
 How to configure a new unit in ASSUME?
 
@@ -146,9 +153,9 @@ How to use reinforcement learning for new market participants in ASSUME?
 - Storage unit: [![Open Learning Tutorial in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/assume-framework/assume/blob/main/examples/notebooks/04c_reinforcement_learning_storage_example.ipynb)
 
 
-### The Examples
+### Preconfigured Examples
 
-To explore the provided examples, follow these steps:
+To explore the provided example simulations [here](examples/inputs), follow these steps:
 
 1. Clone the repository and navigate to its directory:
 
@@ -182,7 +189,7 @@ For additional CLI options, run `assume -h`.
 
 ## Development
 
-[The Contribution Guidelines explain how to setup your development environment and contribute to the project.](./CONTRIBUTING.md#development-setup)
+[The Contribution Guidelines explain how to set up your development environment and contribute to the project.](./CONTRIBUTING.md#development-setup)
 
 ## Creating Documentation
 
@@ -225,6 +232,6 @@ If you want to cite a specific version of ASSUME, all releases are archived on Z
 
 ## License
 
-Copyright 2022-2025 [ASSUME developers](https://assume.readthedocs.io/en/latest/developers.html).
+Copyright 2022-2026 [ASSUME developers](https://assume.readthedocs.io/en/latest/developers.html).
 
-ASSUME is licensed under the [GNU Affero General Public License v3.0](./LICENSES/AGPL-3.0-or-later.txt). This license is a strong copyleft license that requires that any derivative work be licensed under the same terms as the original work. It is approved by the [Open Source Initiative](https://opensource.org/licenses/AGPL-3.0).
+ASSUME is licensed under the [MIT License](./LICENSES/MIT.txt). This permissive license allows use, modification and redistribution, including in proprietary software, as long as the copyright and license notice are kept. It is approved by the [Open Source Initiative](https://opensource.org/license/mit).

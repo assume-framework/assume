@@ -1,6 +1,6 @@
 .. SPDX-FileCopyrightText: ASSUME Developers
 ..
-.. SPDX-License-Identifier: AGPL-3.0-or-later
+.. SPDX-License-Identifier: MIT
 
 Market Configurations
 =====================
@@ -72,7 +72,7 @@ It then makes sense to reschedule the market clearing all 4 hours, but it would 
 
   gantt
     title Market Schedule Simple count 4
-    dateFormat  YYY-MM-DD HH:mm
+    dateFormat  YYYY-MM-DD HH:mm
     axisFormat %H:%M
     section First
     Bidding00 EOM          :a1, 2019-01-01 12:00, 1h
@@ -153,22 +153,22 @@ Due to the configuration of the market opening frequency and duration, the timet
 
   gantt
     title Market Schedule
-    dateFormat  YYY-MM-DD HH:mm
+    dateFormat  YYYY-MM-DD HH:mm
     axisFormat %H:%M
     section EOM
     Bidding01 EOM          :a1, 2019-01-01 01:00, 1h
-    Delivery01 EOM         :2019-01-01 01:00, 1h
+    Delivery01 EOM         :2019-01-01 02:00, 1h
     Bidding02 EOM          :a2, 2019-01-01 02:00, 1h
-    Delivery02 EOM         :2019-01-01 02:00, 1h
+    Delivery02 EOM         :2019-01-01 03:00, 1h
     Bidding03 EOM          :a3, 2019-01-01 03:00, 1h
-    Delivery03 EOM         :2019-01-01 03:00, 1h
+    Delivery03 EOM         :2019-01-01 04:00, 1h
     Bidding04 EOM          :a4, 2019-01-01 04:00, 1h
-    Delivery04 EOM         :2019-01-01 04:00, 1h
+    Delivery04 EOM         :2019-01-01 05:00, 1h
     section CRM
     Bidding CRM            :crm01, 2019-01-01 00:00, 30m
-    Delivery CRM           :crm02, 2019-01-01 01:00, 4h
+    Delivery CRM           :crm02, 2019-01-01 02:00, 4h
     Bidding CRM            :crm03, 2019-01-01 04:00, 30m
-    Delivery CRM           :crm04, 2019-01-01 05:00, 4h
+    Delivery CRM           :crm04, 2019-01-01 06:00, 4h
 
 
 Example Configuration - Eligible Obligations Lambda
@@ -185,9 +185,9 @@ For example, because only agents with a given minimum or maximum power are allow
         product_type: energy
         start_date: 2019-01-01 01:00
         products:
-          duration: 1h
-          count: 1
-          first_delivery: 1h
+          - duration: 1h
+            count: 1
+            first_delivery: 1h
         opening_frequency: 1h
         opening_duration: 1h
         market_mechanism: pay_as_clear

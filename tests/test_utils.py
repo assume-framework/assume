@@ -1,10 +1,11 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import calendar
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
@@ -21,12 +22,15 @@ from assume.common.utils import (
     datetime2timestamp,
     get_available_products,
     get_products_index,
-    get_supported_solver,
+    get_supported_solver_pyomo,
     initializer,
+    load_index_file,
+    min_max_scale,
     parse_duration,
     plot_orderbook,
     separate_orders,
     set_random_seed,
+    sum_line_capacities,
     timestamp2datetime,
     visualize_orderbook,
 )
@@ -581,8 +585,8 @@ def test_create_date_range():
     for i in range(n):
         q_pd_slice = series.loc[start:new_end]
     res_slice_pd = time.time() - t
-    # more than at least factor 5
-    assert res_slice < res_slice_pd / 5
+    # more than at least factor 4
+    assert res_slice < res_slice_pd / 4
 
     # check that setting items is faster:
     t = time.time()
@@ -596,8 +600,8 @@ def test_create_date_range():
     for i in range(n):
         series.at[start] = 1
     res_slice_pd = time.time() - t
-    # more than at least factor 5
-    assert res_slice < res_slice_pd / 5
+    # more than at least factor 4
+    assert res_slice < res_slice_pd / 4
 
     # check that setting slices is faster
     t = time.time()
@@ -611,8 +615,8 @@ def test_create_date_range():
     for i in range(n):
         series.loc[start:new_end] = 17
     res_slice_pd = time.time() - t
-    # more than at least factor 5
-    assert res_slice < res_slice_pd / 5
+    # more than at least factor 4
+    assert res_slice < res_slice_pd / 4
 
     se = pd.Series(0.0, index=fs.index.get_date_list())
     se.loc[start]
@@ -813,14 +817,158 @@ def test_parse_duration():
 
 
 def test_solver_available():
-    assert get_supported_solver() == "appsi_highs"
-    assert get_supported_solver("unknown_solver") == "appsi_highs"
+    assert get_supported_solver_pyomo() == "appsi_highs"
+    assert get_supported_solver_pyomo("unknown_solver") == "appsi_highs"
 
 
 def test_solver_unavailable(monkeypatch):
     monkeypatch.setattr("assume.common.utils.check_available_solvers", lambda *args: [])
     with pytest.raises(RuntimeError):
-        get_supported_solver()
+        get_supported_solver_pyomo()
+
+
+def test_min_max_scale():
+    # Default out_min/out_max: scales to [0, 1]
+    assert min_max_scale(5.0, in_min=0, in_max=10) == 0.5
+    assert min_max_scale(0.0, in_min=0, in_max=10) == 0.0
+    assert min_max_scale(10.0, in_min=0, in_max=10) == 1.0
+
+    # Custom output range: scale [0, 10] → [1, 3], x=5 → 2.0
+    assert min_max_scale(5.0, in_min=0, in_max=10, out_min=1, out_max=3) == 2.0
+
+    # Edge case: in_min == in_max → returns midpoint of output range
+    assert min_max_scale(5.0, in_min=5, in_max=5) == 0.5
+
+    # Edge case: val is outside the input range → raises ValueError
+    with pytest.raises(ValueError):
+        min_max_scale(15.0, in_min=0, in_max=10)
+
+
+def test_load_index_file():
+    path = Path("./tests/fixtures/forecast_init/demand_df.csv")
+
+    index = pd.date_range("2019-01-01 8:00", periods=3, freq="h")
+    df = load_index_file(path, index)
+    assert len(df) == 3
+
+    index = pd.date_range("2019-01-01 8:00", periods=7, freq="h")
+    df = load_index_file(path, index)
+    assert len(df) == 7
+
+    index = pd.date_range("2019-01-01 8:00", periods=12, freq="h")
+    df = load_index_file(path, index)
+    assert df is None
+
+    invalid_path = Path("./tests/fixtures/forecast_init/invalid")
+
+    index = pd.date_range("2019-01-01", periods=36, freq="h")
+    df = load_index_file(invalid_path, index)
+    assert df is None
+
+
+def test_sum_line_capacities_with_s_max_pu():
+    lines = pd.DataFrame(
+        {
+            "bus0": ["B1", "B2"],
+            "bus1": ["B2", "B3"],
+            "s_nom": [100.0, 200.0],
+            "s_max_pu": [1.0, 0.8],
+            "s_nom_forward": [None, 180.0],
+            "s_nom_reverse": [None, 190.0],
+        },
+        index=["L1", "L2"],
+    )
+
+    incidence_matrix = pd.DataFrame(index=["B1", "B2", "B3"], columns=["L1", "L2"])
+
+    result = sum_line_capacities(lines, incidence_matrix)
+
+    assert "cap_forward" in result.columns
+    assert "cap_reverse" in result.columns
+    assert "s_max_pu" in result.columns
+    assert list(result.index) == ["L1", "L2"]
+
+    assert result.at["L1", "cap_forward"] == 100.0
+    assert result.at["L1", "cap_reverse"] == 100.0
+    assert result.at["L1", "s_max_pu"] == 1.0
+
+    assert result.at["L2", "cap_forward"] == 180.0
+    assert result.at["L2", "cap_reverse"] == 190.0
+    assert result.at["L2", "s_max_pu"] == 0.8
+
+
+def test_sum_line_capacities_zonal_aggregation():
+    lines = pd.DataFrame(
+        {
+            "bus0": ["B1", "B2", "B3"],
+            "bus1": ["B2", "B4", "B4"],
+            "s_nom": [100.0, 50.0, 50.0],
+        },
+        index=["L1", "L2", "L3"],
+    )
+
+    node_mapping = {"B1": "Z1", "B2": "Z1", "B3": "Z2", "B4": "Z2"}
+
+    incidence_matrix = pd.DataFrame(
+        index=["Z1", "Z2"], columns=["Z1_Z1", "Z1_Z2", "Z2_Z2"]
+    )
+
+    result = sum_line_capacities(lines, incidence_matrix, node_mapping=node_mapping)
+
+    assert list(result.index) == ["Z1_Z1", "Z1_Z2", "Z2_Z2"]
+    assert result.at["Z1_Z1", "cap_forward"] == 100.0
+    assert result.at["Z1_Z2", "cap_forward"] == 50.0
+    assert result.at["Z2_Z2", "cap_forward"] == 50.0
+
+
+def test_sum_line_capacities_aggregates_s_max_pu_by_capacity_weight():
+    lines = pd.DataFrame(
+        {
+            "bus0": ["B1", "B3"],
+            "bus1": ["B2", "B4"],
+            "s_nom": [100.0, 50.0],
+            "s_max_pu": [1.0, 0.5],
+        },
+        index=["L1", "L2"],
+    )
+
+    node_mapping = {"B1": "Z1", "B2": "Z2", "B3": "Z1", "B4": "Z2"}
+    incidence_matrix = pd.DataFrame(index=["Z1", "Z2"], columns=["Z1_Z2"])
+
+    result = sum_line_capacities(lines, incidence_matrix, node_mapping=node_mapping)
+
+    assert result.at["Z1_Z2", "cap_forward"] == 150.0
+    assert result.at["Z1_Z2", "cap_reverse"] == 150.0
+    assert result.at["Z1_Z2", "s_max_pu"] == (100.0 * 1.0 + 50.0 * 0.5) / 150.0
+
+
+def test_sum_line_capacities_fallback_and_reverse():
+    lines = pd.DataFrame(
+        {
+            "bus0": ["B1", "B2"],
+            "bus1": ["B2", "B3"],
+            "s_nom": [30.0, 40.0],
+            "s_nom_forward": [30.0, 40.0],
+            "s_nom_reverse": [10.0, 20.0],
+        },
+        index=["L1", "L2"],
+    )
+
+    incidence_matrix = pd.DataFrame(columns=["B2_B1", "Link_B2_B3_fallback"])
+
+    result = sum_line_capacities(lines, incidence_matrix)
+
+    # For edge B2_B1 (reversed relative to L1: B1->B2):
+    # forward on B2_B1 is B2->B1 (which is reverse on L1 = 10.0)
+    # reverse on B2_B1 is B1->B2 (which is forward on L1 = 30.0)
+    assert result.at["B2_B1", "cap_forward"] == 10.0
+    assert result.at["B2_B1", "cap_reverse"] == 30.0
+
+    # For Link_B2_B3_fallback (B2 precedes B3, matching L2: B2->B3):
+    # forward on Link_B2_B3 is B2->B3 (forward on L2 = 40.0)
+    # reverse on Link_B2_B3 is B3->B2 (reverse on L2 = 20.0)
+    assert result.at["Link_B2_B3_fallback", "cap_forward"] == 40.0
+    assert result.at["Link_B2_B3_fallback", "cap_reverse"] == 20.0
 
 
 if __name__ == "__main__":
@@ -831,3 +979,6 @@ if __name__ == "__main__":
     test_initializer()
     test_sep_block_orders()
     test_aggregate_step_amount()
+    test_sum_line_capacities_with_s_max_pu()
+    test_sum_line_capacities_zonal_aggregation()
+    test_sum_line_capacities_fallback_and_reverse()

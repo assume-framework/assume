@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import logging
 from collections import defaultdict
@@ -88,8 +88,8 @@ class Learning(Role):
                     self.learning_config.learning_rate
                 )
             else:
-                self.calc_lr_from_progress = (
-                    lambda x: self.learning_config.learning_rate
+                self.calc_lr_from_progress = lambda x: (
+                    self.learning_config.learning_rate
                 )
 
             if self.learning_config.action_noise_schedule == "linear":

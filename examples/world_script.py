@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import logging
 from datetime import datetime, timedelta
@@ -79,6 +79,8 @@ def init(world, n=1):
             },
             nuclear_forecast,
         )
+
+    world.init_forecasts()
 
 
 if __name__ == "__main__":

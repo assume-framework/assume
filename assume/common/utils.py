@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import calendar
 import inspect
@@ -25,6 +25,7 @@ from pyomo.opt import check_available_solvers
 
 from assume.common.base import BaseStrategy, LearningStrategy
 from assume.common.exceptions import AssumeException
+from assume.common.fast_pandas import FastSeries
 from assume.common.market_objects import MarketProduct, Orderbook
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,12 @@ freq_map = {
     "w": rr.WEEKLY,
     "week": rr.WEEKLY,
 }
+
+# Solver priority order for fallback selection.
+SUPPORTED_SOLVERS = ["highs", "gurobi", "glpk", "cbc", "cplex"]
+
+# Backend-specific aliases for solver names.
+PYOMO_SOLVER_ALIASES = {"highs": "appsi_highs"}
 
 
 def initializer(func):
@@ -544,6 +551,170 @@ def create_incidence_matrix(lines, buses, zones_id=None):
     return incidence_matrix
 
 
+def sum_line_capacities(
+    lines: pd.DataFrame,
+    incidence_matrix: pd.DataFrame,
+    node_mapping: dict = None,
+) -> pd.DataFrame:
+    """
+    Compute forward and reverse capacities by summing physical line capacities
+    into the edges/columns identified in `incidence_matrix`.
+
+    NOTE: This function implements a simple summation aggregation (intended for
+    transport-style models). It does NOT compute PTDF-based equivalent
+    capacities or any power-flow-aware aggregation. Values are simply added
+    together for lines mapped to the same aggregated edge.
+
+    The function returns a DataFrame indexed by the columns of `incidence_matrix`
+    with columns `cap_forward`, `cap_reverse` (absolute MW) and `s_max_pu`.
+    If a column in `incidence_matrix` matches a line index in `lines`, the
+    capacities are taken from that physical line. Otherwise the function attempts
+    a zone-pair style aggregation: physical lines are mapped to node pairs using
+    `node_mapping` (or by treating buses as nodes), and capacities are summed per
+    zone-pair. If lines contain a `s_max_pu` column, the resulting `s_max_pu` for
+    the aggregated edge is the capacity-weighted average of `s_max_pu` for all
+    physical lines mapped to that edge.
+
+    Directional columns in `lines` take precedence:
+      - `s_nom_forward` used for forward (bus0 -> bus1)
+      - `s_nom_reverse` used for reverse (bus1 -> bus0)
+    If directional capacities are missing, fallback to `s_nom` for that direction.
+
+    Args:
+        lines: DataFrame of lines (indexed by line id).
+        incidence_matrix: Incidence matrix whose columns identify edges/lines.
+        node_mapping: Optional mapping from bus id -> node/zone id.
+
+    Returns:
+        pd.DataFrame: indexed by `incidence_matrix.columns` with columns
+            ['cap_forward', 'cap_reverse', 's_max_pu'].
+    """
+
+    # prepare defaults for each physical line
+    per_line_caps = {}
+    for line_idx, line in lines.iterrows():
+        s_max_pu = (
+            lines.at[line_idx, "s_max_pu"]
+            if "s_max_pu" in lines.columns
+            and not pd.isna(lines.at[line_idx, "s_max_pu"])
+            else 1.0
+        )
+        default_capacity = lines.at[line_idx, "s_nom"]
+
+        if "s_nom_forward" in lines.columns and not pd.isna(
+            lines.at[line_idx, "s_nom_forward"]
+        ):
+            cap_f = lines.at[line_idx, "s_nom_forward"]
+        else:
+            cap_f = default_capacity
+
+        if "s_nom_reverse" in lines.columns and not pd.isna(
+            lines.at[line_idx, "s_nom_reverse"]
+        ):
+            cap_r = lines.at[line_idx, "s_nom_reverse"]
+        else:
+            cap_r = default_capacity
+
+        per_line_caps[line_idx] = {
+            "cap_forward": float(cap_f),
+            "cap_reverse": float(cap_r),
+            "s_max_pu": float(s_max_pu),
+        }
+
+    # If all incidence columns directly match physical lines, return per-line caps
+    cols = list(incidence_matrix.columns)
+    if all(col in per_line_caps for col in cols):
+        df = pd.DataFrame.from_dict(per_line_caps, orient="index")
+        # Ensure ordering matches incidence_matrix.columns
+        return df.reindex(cols)
+
+    # Otherwise, attempt to aggregate by node-pair keys (zone-pair aggregation)
+    # Build mapping from physical line -> node pair key
+    if node_mapping is None:
+        # identity mapping: bus id -> bus id
+        node_mapping = {}
+        for _, row in lines.iterrows():
+            node_mapping[row["bus0"]] = row["bus0"]
+            node_mapping[row["bus1"]] = row["bus1"]
+
+    agg_caps = {
+        col: {
+            "cap_forward": 0.0,
+            "cap_reverse": 0.0,
+            "s_max_pu_weighted": 0.0,
+            "s_max_pu_weight": 0.0,
+        }
+        for col in cols
+    }
+
+    for line_idx, line in lines.iterrows():
+        bus0 = line["bus0"]
+        bus1 = line["bus1"]
+        node0 = node_mapping.get(bus0, bus0)
+        node1 = node_mapping.get(bus1, bus1)
+
+        # Determine forward/reverse capacities for this physical line
+        caps = per_line_caps[line_idx]
+
+        # Try matching a column that corresponds to the node0->node1 direction
+        key_f = f"{node0}_{node1}"
+        key_r = f"{node1}_{node0}"
+
+        if key_f in agg_caps:
+            agg_caps[key_f]["cap_forward"] += caps["cap_forward"]
+            agg_caps[key_f]["cap_reverse"] += caps["cap_reverse"]
+            weight = caps["cap_forward"] + caps["cap_reverse"]
+            agg_caps[key_f]["s_max_pu_weighted"] += weight * caps["s_max_pu"]
+            agg_caps[key_f]["s_max_pu_weight"] += weight
+        elif key_r in agg_caps:
+            # If the aggregated column uses reversed ordering, swap forward and reverse capacities
+            agg_caps[key_r]["cap_forward"] += caps["cap_reverse"]
+            agg_caps[key_r]["cap_reverse"] += caps["cap_forward"]
+            weight = caps["cap_forward"] + caps["cap_reverse"]
+            agg_caps[key_r]["s_max_pu_weighted"] += weight * caps["s_max_pu"]
+            agg_caps[key_r]["s_max_pu_weight"] += weight
+        else:
+            # final fallback: if no matching aggregated key, try to add to any column
+            # that contains both node names (best-effort)
+            matched = False
+            for col in cols:
+                col_str = str(col)
+                if str(node0) in col_str and str(node1) in col_str:
+                    pos0 = col_str.find(str(node0))
+                    pos1 = col_str.find(str(node1))
+                    if pos0 <= pos1:
+                        agg_caps[col]["cap_forward"] += caps["cap_forward"]
+                        agg_caps[col]["cap_reverse"] += caps["cap_reverse"]
+                    else:
+                        agg_caps[col]["cap_forward"] += caps["cap_reverse"]
+                        agg_caps[col]["cap_reverse"] += caps["cap_forward"]
+                    weight = caps["cap_forward"] + caps["cap_reverse"]
+                    agg_caps[col]["s_max_pu_weighted"] += weight * caps["s_max_pu"]
+                    agg_caps[col]["s_max_pu_weight"] += weight
+                    matched = True
+                    break
+            if not matched:
+                # give up and skip mapping this physical line
+                logger.debug(
+                    f"sum_line_capacities: could not map line {line_idx} to incidence column"
+                )
+
+    df = pd.DataFrame.from_dict(agg_caps, orient="index")
+    # ensure numeric types
+    df["cap_forward"] = df["cap_forward"].astype(float)
+    df["cap_reverse"] = df["cap_reverse"].astype(float)
+    # the resulting s_max_pu of an aggregated line is the weighted average of the s_max_pu of the physical lines,
+    # weighted by their capacities
+    # s_max_pu = sum(s_max_pu_i * weight_i) / sum(weight_i), where the weight is the sum of forward and reverse capacities
+    df["s_max_pu"] = np.where(
+        df["s_max_pu_weight"] > 0,
+        df["s_max_pu_weighted"] / df["s_max_pu_weight"],
+        0.0,
+    )
+    df = df.drop(columns=["s_max_pu_weighted", "s_max_pu_weight"])
+    return df
+
+
 def normalize_availability(powerplants_df, availability_df):
     # Create a copy of the availability dataframe to avoid modifying the original
     normalized_df = availability_df.copy()
@@ -744,19 +915,37 @@ def calculate_content_size(content: list | dict) -> int:
     return sys.getsizeof(content)
 
 
-def min_max_scale(x, min_val: float, max_val: float):
+def min_max_scale(
+    val: np.ndarray | float,  # or th.Tensor
+    in_min: float,
+    in_max: float,
+    out_min: float = 0.0,
+    out_max: float = 1.0,
+) -> np.ndarray | float:  # or th.Tensor
     """
-    Min-Max scaling of a value x to the range [0, 1]
+    Linearly scale value from [in_min, in_max] to [out_min, out_max] (default: [0.0, 1.0]).
 
     Args:
-        x: value(s) to scale
-        min_val: minimum value of the parameter
-        max_val: maximum value of the parameter
+        val: value(s) to scale
+        in_min: minimum value of the input range
+        in_max: maximum value of the input range
+        out_min: minimum value of the output range
+        out_max: maximum value of the output range
     """
+    # Catch values outside the input range
+    if np.any(val < in_min) or np.any(val > in_max):
+        raise ValueError(
+            f"Value {val} is outside the input range [{in_min}, {in_max}]."
+        )
+    out_mean = (out_min + out_max) / 2
     # Avoid division by zero
-    if min_val == max_val:
-        return x
-    return (x - min_val) / (max_val - min_val)
+    if in_min == in_max:
+        if isinstance(val, FastSeries):
+            return val.ones_like() * out_mean
+        else:
+            return np.ones_like(val) * out_mean
+    else:
+        return out_min + (val - in_min) / (in_max - in_min) * (out_max - out_min)
 
 
 def str_to_bool(val):
@@ -775,16 +964,38 @@ def str_to_bool(val):
         raise ValueError(f"Invalid truth value: {val!r}")
 
 
-def get_supported_solver(default_solver: str | None = None):
-    SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
+def get_supported_solver_pyomo(default_solver: str | None = None):
+    """
+    Get an available solver for Pyomo optimization.
+
+    Filters the list of supported solvers to find which ones are installed,
+    then returns the default solver if available, otherwise falls back to the first available solver.
+    Note: 'highs' is automatically converted to 'appsi_highs' for Pyomo compatibility.
+
+    Args:
+        default_solver (str | None, optional): Preferred solver name. If not available,
+            falls back to the first available solver. Defaults to None.
+
+    Returns:
+        str: Name of the selected solver.
+
+    Raises:
+        RuntimeError: If none of the supported solvers (appsi_highs, gurobi, glpk, cbc, cplex) are available.
+
+    Warning:
+        Logs a warning if the default_solver is not available and a fallback is used.
+    """
+
+    pyomo_solvers = [
+        PYOMO_SOLVER_ALIASES.get(solver, solver) for solver in SUPPORTED_SOLVERS
+    ]
 
     # Check if the solver is available
-    solvers = check_available_solvers(*SOLVERS)
+    solvers = check_available_solvers(*pyomo_solvers)
     if not solvers:
-        raise RuntimeError(f"None of {SOLVERS} are available")
+        raise RuntimeError(f"None of {pyomo_solvers} are available")
 
-    if default_solver == "highs":
-        default_solver = "appsi_highs"
+    default_solver = PYOMO_SOLVER_ALIASES.get(default_solver, default_solver)
 
     solver = default_solver or solvers[0]
 
@@ -846,14 +1057,18 @@ def confirm_learning_save_path(save_path: str, continue_learning: bool) -> None:
             )
 
 
-def set_random_seed(seed: int | None, torch_deterministic: bool = True):
+def set_random_seed(
+    seed: int | None,
+    torch_deterministic: bool = True,
+    learning_mode: bool = False,
+):
     """
     Args:
-     seed (int | None): Integer seed for random number generators or None to disable seeding.
-     torch_deterministic (bool): If True, enforces PyTorch deterministic algorithms.
-                           May reduce performance. Default is True.
+        seed (int | None): Integer seed for random number generators or None to disable seeding.
+        torch_deterministic (bool): If True, enforces PyTorch deterministic algorithms. May reduce performance. Default is True.
+        learning_mode (bool): If True, PyTorch seeding is enabled. Default is False and PyTorch seeding is skipped.
 
-     Notes:
+    Notes:
          - Completely reproducible results are not guaranteed across different PyTorch versions, hardware, or CUDA configurations.
          - See https://docs.pytorch.org/docs/stable/notes/randomness.html
     """
@@ -863,15 +1078,18 @@ def set_random_seed(seed: int | None, torch_deterministic: bool = True):
     random.seed(seed)
     np.random.seed(seed)
 
+    if not learning_mode:
+        return
+
     try:
         import torch as th
-
-        if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
-            os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
         th.manual_seed(seed)
 
         if torch_deterministic:
+            if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
+                os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+
             th.backends.cudnn.deterministic = True
             th.backends.cudnn.benchmark = False
 
@@ -882,3 +1100,46 @@ def set_random_seed(seed: int | None, torch_deterministic: bool = True):
             )
     except ImportError:
         pass
+
+
+def load_index_file(file_name: Path, index: pd.DatetimeIndex):
+    if not file_name.is_file():
+        return None
+    df = pd.read_csv(
+        file_name,
+        index_col=0,
+        encoding="utf-8",
+        na_values=["n.a.", "None", "-", "none", "nan"],
+        parse_dates=True,
+    )
+
+    if len(df.index) == 1:
+        return df
+
+    if len(df.index) != len(index) and not isinstance(df.index, pd.DatetimeIndex):
+        logger.warning(
+            f"{file_name}: simulation time line does not match length of dataframe and index is not a datetimeindex. Returning None."
+        )
+        return None
+
+    df.index.freq = df.index.inferred_freq
+
+    if len(df.index) < len(index) and df.index.freq == index.freq:
+        logger.warning(
+            f"{file_name}: simulation time line is longer than length of the dataframe. Returning None."
+        )
+        return None
+
+    if df.index.freq < index.freq:
+        logger.warning(
+            f"Resolution of {file_name} ({df.index.freq}) is higher than the simulation ({index.freq}). "
+            "Resampling using mean(). Make sure this is what you want."
+        )
+        df = df.resample(index.freq).mean()
+        logger.info(f"Downsampling {file_name} successful.")
+
+    elif df.index.freq > index.freq or len(df.index) < len(index):
+        logger.warning("Upsampling not implemented yet. Returning None.")
+        return None
+
+    return df.loc[index]

@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 # %%
 import logging
@@ -105,6 +105,8 @@ available_examples = {
         "scenario": "example_03c",
         "study_case": "base_case_2019_with_storage",
     },
+    # redispatch example
+    "redisp_3_nodes": {"scenario": "example_04a", "study_case": "base"},
 }
 
 

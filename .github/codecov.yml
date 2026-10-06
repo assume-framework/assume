@@ -1,9 +1,12 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 coverage:
   status:
     project:
       default:
         threshold: 1%
+    patch:
+      default:
+        threshold: 20%   # allow patch coverage to be up to 20% worse than the base

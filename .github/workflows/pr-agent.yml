@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: MIT
+
+name: PR Agent
+# pull_request_target gives fork PRs access to the secrets. Never add a checkout or
+# build step for the PR head to this job: PR-Agent only needs the GitHub API.
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review, review_requested]
+  issue_comment:
+jobs:
+  pr_agent_job:
+    if: ${{ github.event.sender.type != 'Bot' && (github.event_name == 'pull_request_target' || github.event.issue.pull_request) }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+    steps:
+      - name: PR Agent action step
+        uses: the-pr-agent/pr-agent@v0.47.0
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI__API_BASE: "https://chat.kiconnect.nrw/api/v1"
+          config.model: "openai/gpt-5.5"
+          config.fallback_models: '["openai/gpt-5.4", "openai/qwen-qwen3-8-27b"]'
+          config.custom_model_max_tokens: "256000"
+          config.max_model_tokens: "100000"
+          config.output_run_details: "true"
+          pr_description.publish_labels: "true"
+          pr_description.publish_description_as_comment: "true"
+          pr_description.final_update_message: "false"
+          pr_reviewer.final_update_message: "false"
+          pr_description.enable_pr_description: "false"
+          github_action_config.pr_actions: '["opened", "reopened", "synchronize", "ready_for_review", "review_requested"]'
+          github_action_config.auto_review: "true"
+          github_action_config.auto_improve: "true"

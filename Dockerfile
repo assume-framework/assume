@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 RUN useradd -m -s /bin/bash admin
 

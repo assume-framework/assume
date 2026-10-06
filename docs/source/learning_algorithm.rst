@@ -1,6 +1,6 @@
 .. SPDX-FileCopyrightText: ASSUME Developers
 ..
-.. SPDX-License-Identifier: AGPL-3.0-or-later
+.. SPDX-License-Identifier: MIT
 
 ##################################
 Reinforcement Learning Algorithms
@@ -107,12 +107,41 @@ target value of actions selected by the current target policy:
 
 
 Every :math:`d` iterations, which is implemented with the train_freq, the policy is updated with respect to :math:`Q_{\theta_1}` following the deterministic policy gradient algorithm (Silver et al., 2014).
-TD3 is summarized in the following picture from the authors of the original paper (Fujimoto, Hoof and Meger, 2018).
+TD3 is summarized in the following algorithm, as given by the authors of the original paper (Fujimoto, van Hoof and Meger, 2018) [#td3]_.
 
 
-.. image:: img/TD3_algorithm.jpeg
-    :align: center
-    :width: 500px
+.. math::
+
+    \begin{array}{l}
+    \hline
+    \textbf{Algorithm 1} \text{ TD3} \\
+    \hline
+    \text{Initialize critic networks } Q_{\theta_1}, Q_{\theta_2} \text{, and actor network } \pi_\phi \\
+    \text{with random parameters } \theta_1, \theta_2, \phi \\
+    \text{Initialize target networks } \theta'_1 \leftarrow \theta_1, \theta'_2 \leftarrow \theta_2, \phi' \leftarrow \phi \\
+    \text{Initialize replay buffer } \mathcal{B} \\
+    \textbf{for } t = 1 \textbf{ to } T \textbf{ do} \\
+    \quad \text{Select action with exploration noise } a \sim \pi_\phi(s) + \epsilon, \\
+    \quad \epsilon \sim \mathcal{N}(0, \sigma) \text{ and observe reward } r \text{ and new state } s' \\
+    \quad \text{Store transition tuple } (s, a, r, s') \text{ in } \mathcal{B} \\
+    \\
+    \quad \text{Sample mini-batch of } N \text{ transitions } (s, a, r, s') \text{ from } \mathcal{B} \\
+    \quad \tilde{a} \leftarrow \pi_{\phi'}(s') + \epsilon, \quad \epsilon \sim \operatorname{clip}(\mathcal{N}(0, \tilde{\sigma}), -c, c) \\
+    \quad y \leftarrow r + \gamma \min_{i=1,2} Q_{\theta'_i}(s', \tilde{a}) \\
+    \quad \text{Update critics } \theta_i \leftarrow \operatorname{argmin}_{\theta_i} N^{-1} \sum (y - Q_{\theta_i}(s, a))^2 \\
+    \quad \textbf{if } t \bmod d \textbf{ then} \\
+    \qquad \text{Update } \phi \text{ by the deterministic policy gradient:} \\
+    \qquad \nabla_\phi J(\phi) = N^{-1} \sum \nabla_a Q_{\theta_1}(s, a)|_{a=\pi_\phi(s)} \nabla_\phi \pi_\phi(s) \\
+    \qquad \text{Update target networks:} \\
+    \qquad \theta'_i \leftarrow \tau \theta_i + (1 - \tau) \theta'_i \\
+    \qquad \phi' \leftarrow \tau \phi + (1 - \tau) \phi' \\
+    \quad \textbf{end if} \\
+    \textbf{end for} \\
+    \hline
+    \end{array}
+
+.. [#td3] Fujimoto, S.; van Hoof, H.; Meger, D. *Addressing Function Approximation Error in Actor-Critic Methods*.
+   Proceedings of the 35th International Conference on Machine Learning (ICML), PMLR 80:1587–1596, **2018**. https://arxiv.org/abs/1802.09477
 
 
 The steps in the algorithm are translated to implementations in ASSUME in the following way.

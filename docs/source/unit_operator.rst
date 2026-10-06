@@ -1,6 +1,6 @@
 .. SPDX-FileCopyrightText: ASSUME Developers
 ..
-.. SPDX-License-Identifier: AGPL-3.0-or-later
+.. SPDX-License-Identifier: MIT
 
 Unit Operator
 ==============
@@ -25,10 +25,48 @@ The unit operator is responsible for the following tasks:
 As one can see from all the task the unit oporator covers, that it orchestrates and coordinates the technical units and the markets.
 
 
-Portfolio Optimization
+Operator Forecaster
 ----------------------
 
-The main felxibility a unit oporator is, that we can process all the bids and technical constraints a the unit oporator gets from its technical units
-however we want, before sending them to the market. This allows us to implement a portfolio optimization for the technical units assigned to the unit operator.
-A respective function is in place for that. Yet, it is not used in the current version of the unit operator. The function is called :func:`assume.common.units_operator.UnitsOperator.formulate_bids`.
-For example, one could think of coordinating the bids of a battery and a PV unit to maximise the self-consumption of the PV unit under one unit operator.
+Just like each technical unit, a unit operator can own a :class:`~assume.common.forecaster.UnitsOperatorForecaster`.
+This gives the operator (or a portfolio strategy acting on its behalf) its own notion of future **market prices** and
+**residual loads**, instead of having to reach into one of its managed units for them. The forecaster is available as
+``units_operator.forecaster`` and exposes ``price[market_id]`` and ``residual_load[market_id]`` (plus any custom series
+provided at construction).
+
+It reuses the same forecasting machinery as the unit forecasters (see :doc:`unit_forecasts`): its algorithms can be
+selected per operator via ``forecast_*`` columns in ``unit_operators.csv`` (falling back to the config-level
+``forecast_algorithms``), and the series are populated automatically during
+:func:`~assume.world.World.init_forecasts`. The :class:`~assume.strategies.portfolio_learning_strategies.PortfolioLearningStrategy`
+below reads its forecasted price and residual load observations from this operator forecaster.
+
+
+Portfolio Strategies
+----------------------
+
+The main flexibility of a unit operator is that all bids and technical constraints from its units can be processed
+jointly before being sent to the market. This enables portfolio-level bidding strategies, where the operator acts
+as a single strategic agent across all units it manages.
+
+ASSUME provides two levels of general portfolio strategies, both defined in :mod:`assume.strategies.portfolio_strategies`:
+
+- :class:`~assume.strategies.portfolio_strategies.UnitsOperatorDirectStrategy` — passes each unit's individual bids through unchanged, simply aggregating them into a single orderbook.
+- :class:`~assume.strategies.portfolio_strategies.UnitsOperatorEnergyHeuristicCournotStrategy` — applies a Cournot-style markup on top of each unit's marginal cost bid, scaled by the total capacity of the operator's portfolio.
+
+Portfolio Reinforcement Learning
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A reinforcement learning variant is available in :class:`~assume.strategies.portfolio_learning_strategies.PortfolioLearningStrategy`.
+Instead of bidding each unit independently, the RL agent observes the full portfolio state and learns a joint bidding
+policy. The observation space includes:
+
+- **Cyclical hour-of-day encoding** (sin/cos)
+- **Forecasted residual load** over the foresight horizon, scaled by maximum demand
+- **Forecasted price** over the foresight horizon, scaled by maximum bid price
+- **Inframarginal generation forecast**: fraction of portfolio capacity that is cheaper than the forecasted price
+- **Marginal cost curve**: flexible capacity and upper cost bound per cost quantile (``nbins`` bins)
+
+The agent outputs a markup multiplier per cost bin per time step. Units are sorted by marginal cost, and each unit's
+flexible capacity is bid at ``marginal_cost × markup[bin]``. Inflexible (must-run) generation is always bid at
+marginal cost. The reward signal is the difference between realised profit and a competitive benchmark (all units
+bidding at marginal cost given the price forecast).

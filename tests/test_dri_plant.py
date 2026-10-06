@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import pandas as pd
 import pyomo.environ as pyo
@@ -9,7 +9,7 @@ import pytest
 from assume.units.dst_components import DRIPlant
 
 # Define the solver to use
-use_solver = "appsi_highs"  # Replace with the appropriate solver
+solver_name = "appsi_highs"  # Replace with the appropriate solver
 
 
 # Fixture for creating an electricity price profile, including negative prices
@@ -71,7 +71,7 @@ def dri_plant_model(dri_plant_config, price_profile):
     )
 
     # Solve the model
-    solver = pyo.SolverFactory(use_solver)
+    solver = pyo.SolverFactory(solver_name)
     results = solver.solve(model, tee=False)
 
     return model, results

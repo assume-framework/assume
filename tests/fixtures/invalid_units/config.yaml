@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 base:
   start_date: 2019-01-01 00:00
@@ -121,7 +121,7 @@ dam_with_complex_clearing:
       price_unit: EUR/MWh
       market_mechanism: complex_clearing
       param_dict:
-        solver: highs
+        solver_name: highs
         pricing_mechanism: pay_as_clear
       additional_fields:
         - bid_type

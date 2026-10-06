@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import logging
 from collections import defaultdict
@@ -750,6 +750,9 @@ class BaseStrategy:
             cleaned_bids.append(bid)
 
         return cleaned_bids
+
+    def update_forecasts_if_needed(unit: BaseUnit, *args, **kwargs):
+        unit.forecaster.update(*args, **kwargs)
 
 
 @dataclass
