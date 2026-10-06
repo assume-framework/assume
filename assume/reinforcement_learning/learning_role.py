@@ -550,7 +550,6 @@ class Learning(Role):
             logger.info(
                 f"New best policy saved, episode: {self.eval_episodes_done + 1}, metric={default_metric}, value={metrics[default_metric]:.2f}"
             )
-
         return self._early_stopping_triggered(default_metric)
 
     def _early_stopping_triggered(self, metric: str) -> bool:
@@ -569,6 +568,9 @@ class Learning(Role):
             bool: True if the early stopping criteria is triggered.
         """
         steps = self.learning_config.early_stopping_steps
+        if steps is None:
+            # Early stopping is disabled
+            return False
 
         # if we do not see any improvement in the last x evaluation runs we stop the training
         if len(self.rl_eval[metric]) < steps:
@@ -594,9 +596,9 @@ class Learning(Role):
             f"Stopping training as no improvement above {self.learning_config.early_stopping_threshold * 100}% in last {steps} evaluations for {metric}"
         )
         if (
-            self.learning_config.learning_rate_schedule
-            or self.learning_config.action_noise_schedule
-        ) is not None:
+            self.learning_config.learning_rate_schedule is not None
+            or self.learning_config.action_noise_schedule is not None
+        ):
             logger.info(
                 f"Learning rate schedule ({self.learning_config.learning_rate_schedule}) or action noise schedule ({self.learning_config.action_noise_schedule}) were scheduled to decay, further learning improvement can be possible. End value of schedule may not have been reached."
             )

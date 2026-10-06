@@ -801,10 +801,10 @@ class LearningConfig:
             decay is available, which linearly decreases the learning rate over time. Default is None (constant learning rate).
         early_stopping_steps (int | None): The number of validation steps over which the moving average reward
             is calculated for early stopping. If the reward doesn't change by early_stopping_threshold over
-            this many steps, training stops. If None, defaults to training_episodes / validation_episodes_interval + 1.
+            this many steps, training stops. If None, early stopping is disabled. Default is None.
         early_stopping_threshold (float): The minimum improvement in moving average reward required to avoid
             early stopping. If the reward improvement is less than this threshold over early_stopping_steps,
-            training is terminated early. Default is 0.05.
+            training is terminated early. Default is 0.05. Only available if early_stopping_steps is set.
 
         algorithm (str): Specifies which reinforcement learning algorithm to use. Currently, only "matd3"
             (Multi-Agent Twin Delayed Deep Deterministic Policy Gradient) is implemented. Default is "matd3".
@@ -872,12 +872,6 @@ class LearningConfig:
     target_noise_clip: float = 0.5
 
     def __post_init__(self):
-        """Calculate defaults that depend on other fields and validate inputs."""
-        if self.early_stopping_steps is None:
-            self.early_stopping_steps = int(
-                self.training_episodes / self.validation_episodes_interval + 1
-            )
-
         # if we do not have initial experience collected we will get an error as no samples are available on the
         # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
         if self.episodes_collecting_initial_experience < 1:
