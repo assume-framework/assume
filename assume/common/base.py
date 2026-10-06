@@ -816,14 +816,17 @@ class LearningConfig:
             "mlp" (Multi-Layer Perceptron) and "lstm" (Long Short-Term Memory). Default is "mlp".
         policy_delay (int): The frequency (in gradient steps) at which the actor policy is updated.
             TD3 updates the critic more frequently than the actor to stabilize training. Default is 2.
-        noise_sigma (float): The standard deviation of the Ornstein-Uhlenbeck or Gaussian noise distribution
-            used to generate exploration noise added to actions. Default is 0.1.
-        noise_scale (int): The scale factor multiplied by the noise drawn from the distribution.
-            Larger values increase exploration. Default is 1.
-        noise_dt (int): The time step parameter for the Ornstein-Uhlenbeck process, which determines how
-            quickly the noise decays over time. Used for noise scheduling. Default is 1.
+        noise_sigma (float): Standard deviation of the Gaussian exploration noise added to the actor's actions.
+            The effective noise std is noise_sigma * noise_scale * noise_dt. Default is 0.1.
+        noise_scale (float): Constant factor multiplied onto the sampled noise. Larger values increase exploration.
+            Default is 1.
+        noise_dt (float): Noise multiplier that is subject to the action noise schedule. With
+            action_noise_schedule="linear" it decays linearly from noise_dt to 0 over the training episodes;
+            with None it stays constant at noise_dt.
+            Default is 1.
         action_noise_schedule (str | None): Which action noise decay schedule to use. Currently only "linear"
-            decay is available, which linearly decreases exploration noise over training. Default is "linear".
+            is available, which linearly decreases noise_dt (and with it the exploration noise) to 0 over training.
+            Default is None (constant exploration noise).
         tau (float): The soft update coefficient for updating target networks. Controls how slowly target
             networks track the main networks. Smaller values mean slower updates. Default is 0.005.
         target_policy_noise (float): The standard deviation of noise added to target policy actions during
