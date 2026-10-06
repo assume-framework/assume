@@ -169,14 +169,15 @@ bidding_strategy_id                          For Market Types    Description
 ===========================================  ==================  ============
 household_energy_optimization                EOM                 An energy strategy of a Household DSM unit. The bid volume is the optimal power requirement of the optimization.
 industry_energy_optimization                 EOM                 An energy strategy of a Industry DSM unit. The bid volume is the optimal power requirement of the optimization.
-industrial_hybrid_eom                         EOM                 Rule-based EOM strategy for rolling-horizon industrial hybrid plants. The initial implementation supports cement plants with
-                                                                  either direct electric-plus-natural-gas calcination or E-TES plus natural gas. Electricity forecasts create the planned
-                                                                  load; natural-gas and CO2 price series set willingness-to-pay. After clearing, deterministic fallback rules apply.
-industrial_hybrid_capacity_neg                CRM_neg             Capacity-only negative CRM strategy for the same supported routes. It bids firm block capacity and reservation opportunity
-                                                                  cost; accepted awards create capacity_neg commitments and preserve available electric capacity and E-TES SOC space in one pre-EOM rolling solve. No activation energy is modelled.
-industrial_hybrid_otc                         LTM_OTC             Physical long-term electricity-procurement strategy for the same supported routes. It bids a firm auxiliary-security
-                                                                  tranche and, for a direct electric-plus-natural-gas route, a firm process tranche. Accepted pay-as-bid contracts reduce
-                                                                  the overlapping EOM residual demand; E-TES routes bid auxiliary security only.
+industrial_hybrid_eom                         EOM                 Rule-based EOM strategy for rolling-horizon industrial hybrid plants. It supports compatible cement routes and a steel
+                                                                  electrolyser plus hydrogen-buffer route. Gas-hybrid cement uses natural-gas and CO2 forecasts; fully-electric cement
+                                                                  with E-TES bids its electricity forecast; steel requires ``electricity_wtp``. After clearing, deterministic rules apply.
+industrial_hybrid_capacity_neg                CRM_neg             Capacity-only negative CRM strategy for the supported cement routes and steel electrolyser-buffer route. It bids firm block
+                                                                  capacity and reservation opportunity cost; accepted awards preserve available electric capacity and relevant storage space
+                                                                  in one pre-EOM rolling solve. Fully-electric E-TES prices reservation from constrained forecast schedule cost. No activation energy is modelled.
+industrial_hybrid_otc                         LTM_OTC             Physical long-term electricity-procurement strategy. It bids a firm auxiliary-security tranche for compatible cement routes
+                                                                  and the supported steel route, plus a firm process tranche for direct electric-plus-natural-gas cement. Accepted pay-as-bid
+                                                                  contracts reduce the overlapping EOM residual demand; E-TES routes bid auxiliary security only.
 household_capacity_heuristic_balancing_neg   CRM_neg             A negative capacity strategy of a Household DSM unit. The bid volume is the optimal power requirement of the optimization.
 household_capacity_heuristic_balancing_pos   CRM_pos             A positive capacity strategy of a Industry DSM unit. The bid volume is the optimal power requirement of the optimization.
 industry_capacity_heuristic_balancing_neg    CRM_neg             A negative capacity strategy of a Household DSM unit. The bid volume is the optimal power requirement of the optimization.
@@ -194,6 +195,33 @@ Optimization method API references:
 - :py:meth:`assume.strategies.naive_strategies.DsmCapacityHeuristicBalancingStrategy`
 - :py:meth:`assume.strategies.dmas_powerplant.EnergyOptimizationDmasStrategy`
 - :py:meth:`assume.strategies.dmas_storage.StorageEnergyOptimizationDmasStrategy`
+
+Industrial hybrid steel route
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The first steel route is deliberately narrow: a hydrogen-fuelled DRI plant,
+an electrolyser, and ``hydrogen_buffer_storage``. It offers negative CRM
+capacity as additional electrolyser electricity that can be stored as hydrogen
+for the full capacity block. The offer is limited jointly by electrolyser power
+headroom and hydrogen-buffer space. Its reservation opportunity cost is the
+forecast external hydrogen value, converted through electrolyser and buffer
+efficiencies, minus the forecast EOM electricity price.
+
+For the steel EOM strategy configure ``electricity_wtp`` in
+``bidding_strategy_params``. It is the scenario's value of electricity for the
+planned steel-production schedule; ASSUME's current steel model does not expose
+a single technology-independent marginal production value from which this could
+be derived. If an EOM bid is rejected, this V1 rule records the corresponding
+``unserved_steel``; it does not invent a gas, hydrogen-import, or re-optimised
+fallback.
+
+``industrial_hybrid_otc`` supports the steel route's firm DRI auxiliary
+electricity. The DRI component consumes this electricity alongside hydrogen,
+so its firm volume is the lowest hourly ``steel_demand ×
+specific_dri_demand × specific_electricity_consumption`` in the delivery block.
+It requires a complete per-timestep ``steel_demand`` forecast. The strategy
+does not yet bid an electrolyser-process tranche because that additional power
+would create hydrogen that may exceed buffer capacity over a long product.
 
 Industrial hybrid OTC procurement
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -213,6 +241,33 @@ also bids the lowest convertible calciner load. Its ceiling is the
 duration-weighted mean of ``min(EOM price forecast, electric WTP)``. An E-TES
 plus natural-gas route bids only the auxiliary tranche because a continuous
 long-term charger commitment requires a separate storage-activation model.
+
+Fully-electric cement with E-TES
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The fully-electric cement route requires an electric calciner and a
+``short-term_with_generator`` thermal storage. Its EOM demand-bid ceiling is
+the electricity-price forecast for each delivery interval; it does not require
+natural-gas, CO2, or ``electricity_wtp`` forecasts. If procurement is short,
+the rule serves auxiliary and direct calciner electricity first, then charges
+E-TES with any remaining electricity. Missing stored heat is recorded as
+``unserved_clinker`` and ``gas_fallback`` remains zero. This is accounting
+after clearing, not a new Pyomo optimisation.
+
+The route offers negative CRM capacity as additional E-TES charging power. It
+checks charger headroom and storage space for continuous activation throughout
+the product. Its reservation bid price is the non-negative forecast objective
+increase between the ordinary rolling schedule and a non-committing schedule
+that preserves the offered charger capacity and state-of-charge space.
+
+For OTC it bids the firm auxiliary load only. The ceiling is the highest valid
+market price below the delivery product's duration-weighted EOM forecast and
+never exceeds ``auxiliary_security_value``. If no valid price lies below that
+forecast, it submits no OTC bid. This means the OTC contract is only procured
+when it is offered below the expected EOM cost; residual demand is bid in EOM.
+
+Industrial hybrid market sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The market openings must be ordered so that awards are known before the next
 market is bid: ``LTM_OTC`` first, then ``CRM_neg`` when it overlaps delivery,
@@ -246,11 +301,12 @@ still configured solely through its product duration::
        start_date: 2019-01-01 01:00
 
 The product duration is not embedded in the strategy. It must be fully covered
-by electricity, natural-gas, and CO2 forecasts; otherwise that OTC product is
-not bid. Accepted quantities, including partial acceptance, are retained as a
-MW profile. Before EOM bidding the rolling solve imposes that procurement as
-minimum electric load and combines it with any accepted capacity_neg commitment
-reservation. EOM demand then covers only the remaining planned load.
+by the route's required forecasts; otherwise that OTC product is not bid.
+Accepted quantities, including partial acceptance, are retained as a MW profile.
+Before EOM bidding the rolling solve imposes that procurement as minimum electric
+load (and, for steel, minimum DRI electricity) and combines it with any accepted
+capacity_neg commitment reservation. EOM demand then covers only the remaining
+planned load.
 
 Learning
 --------

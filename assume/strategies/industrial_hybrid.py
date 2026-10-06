@@ -7,8 +7,8 @@
 Each public strategy below follows the usual ASSUME pattern: calculate bids,
 then record market feedback when a cleared order creates a physical commitment.
 The small helpers at the top hold the shared physical rules.  The initial
-implementation recognises two compatible cement configurations, but the public
-strategy names are independent of that first implementation.
+implementation recognises compatible cement routes and one steel route, but the
+public strategy names are independent of a particular industrial technology.
 """
 
 from __future__ import annotations
@@ -27,83 +27,135 @@ from assume.common.market_objects import MarketConfig, Orderbook, Product
 # ---------------------------------------------------------------------------
 
 
-def hybrid_route(unit, strategy_name: str) -> tuple[str, dict, dict | None]:
-    """Return the supported heat route and its component configuration.
+def industrial_route(unit, strategy_name: str) -> tuple[str, dict, dict | None]:
+    """Return a compatible industrial route and its process/storage components.
 
-    The industrial strategy family is intentionally generic.  At present its
-    physical rules are implemented for the compatible cement configurations
-    only: a direct electric-plus-natural-gas calciner, or E-TES plus a
-    natural-gas calciner.  A future industrial unit can extend this one
-    explicit function with its own compatible route.
+    The market strategy is shared. This short route selection is deliberately
+    the only technology switch: each route names the physical components used
+    by its bidding and reservation rules.
     """
-    if unit.technology != "cement_plant":
-        raise ValueError(
-            "industrial_hybrid strategies currently support compatible cement "
-            "hybrid routes only."
-        )
     if unit.horizon_mode != "rolling_horizon":
         raise ValueError(
             f"{strategy_name} requires dsm_optimisation_config.horizon_mode="
             "'rolling_horizon'."
         )
 
-    components = getattr(unit, "_orig_components_dict", unit.components)
-    calciner = components.get("calciner")
-    storage = components.get("thermal_storage")
-    if not isinstance(calciner, dict):
-        raise ValueError(f"{strategy_name} requires a configured calciner.")
-    if calciner.get("fossil_ng_share", 1.0) != 1.0:
-        raise ValueError(
-            f"{strategy_name} currently requires a natural-gas-only calciner "
-            "(fossil_ng_share=1)."
-        )
+    components = getattr(unit, "_orig_components_dict", None) or getattr(
+        unit, "components", {}
+    )
+    if unit.technology == "cement_plant":
+        calciner = components.get("calciner")
+        storage = components.get("thermal_storage")
+        if not isinstance(calciner, dict):
+            raise ValueError(f"{strategy_name} requires a configured calciner.")
+        fuel_type = calciner.get("fuel_type", "electricity").lower()
+        if fuel_type in {"both", "fossil"} and calciner.get(
+            "fossil_ng_share", 1.0
+        ) != 1.0:
+            raise ValueError(
+                f"{strategy_name} currently requires a natural-gas-only calciner "
+                "(fossil_ng_share=1)."
+            )
 
-    fuel_type = calciner.get("fuel_type", "electricity").lower()
-    if storage is None and fuel_type == "both":
-        return "direct", calciner, None
-    if (
-        isinstance(storage, dict)
-        and storage.get("storage_type", "short-term")
-        == "short-term_with_generator"
-        and fuel_type == "fossil"
-    ):
-        return "etes", calciner, storage
+        if storage is None and fuel_type == "both":
+            return "cement_direct", calciner, None
+        if (
+            isinstance(storage, dict)
+            and storage.get("storage_type", "short-term")
+            == "short-term_with_generator"
+            and fuel_type == "fossil"
+        ):
+            return "cement_etes", calciner, storage
+        if (
+            isinstance(storage, dict)
+            and storage.get("storage_type", "short-term")
+            == "short-term_with_generator"
+            and fuel_type == "electricity"
+        ):
+            required_positive_values = {
+                "calciner eta_electric": calciner.get("eta_electric", 0.0),
+                "thermal storage capacity": storage.get("capacity", 0.0),
+                "thermal storage charging power": storage.get(
+                    "max_power", storage.get("max_power_charge", storage.get("capacity", 0.0))
+                ),
+                "thermal storage eta_electric": storage.get("eta_electric", 0.0),
+                "thermal storage efficiency_charge": storage.get(
+                    "efficiency_charge", 1.0
+                ),
+                "thermal storage efficiency_discharge": storage.get(
+                    "efficiency_discharge", 1.0
+                ),
+            }
+            invalid_values = [
+                name for name, value in required_positive_values.items() if float(value) <= 0
+            ]
+            if invalid_values:
+                raise ValueError(
+                    f"{strategy_name} requires positive "
+                    + ", ".join(invalid_values)
+                    + " for the fully-electric E-TES route."
+                )
+            return "cement_electric_etes", calciner, storage
+
+    if unit.technology == "steel_plant":
+        dri_plant = components.get("dri_plant")
+        electrolyser = components.get("electrolyser")
+        hydrogen_buffer = components.get("hydrogen_buffer_storage")
+        if (
+            isinstance(dri_plant, dict)
+            and isinstance(electrolyser, dict)
+            and isinstance(hydrogen_buffer, dict)
+            and dri_plant.get("fuel_type", "").lower() == "hydrogen"
+        ):
+            return "steel_electrolyser_buffer", electrolyser, hydrogen_buffer
 
     raise ValueError(
-        f"{strategy_name} supports either a direct electric-plus-natural-gas "
-        "calciner without thermal storage, or E-TES plus a natural-gas calciner."
+        f"{strategy_name} supports either a compatible cement hybrid route or "
+        "a steel electrolyser with hydrogen-buffer storage and hydrogen DRI."
     )
 
 
-def electric_wtp(unit, timestamp, route: str, calciner, storage) -> float:
-    """Value one MWh of electricity as avoided gas and CO2 heat cost."""
+def electric_wtp(unit, timestamp, route: str, process, storage) -> float:
+    """Value electricity from the compatible route's avoided commodity use."""
     fuel_prices = getattr(unit.forecaster, "fuel_prices", {})
-    if "natural_gas" not in fuel_prices or "co2" not in fuel_prices:
+    if route in {"cement_direct", "cement_etes"}:
+        if "natural_gas" not in fuel_prices or "co2" not in fuel_prices:
+            raise ValueError(
+                "cement industrial_hybrid routes require natural_gas and co2 price "
+                "series in fuel_prices_df."
+            )
+        eta_fossil = float(process.get("eta_fossil", 0.90))
+        if eta_fossil <= 0:
+            raise ValueError("Calciner eta_fossil must be positive.")
+        fossil_heat_cost = (
+            float(unit.forecaster.get_price("natural_gas").at[timestamp])
+            + float(process.get("ng_co2_factor", 0.202))
+            * float(unit.forecaster.get_price("co2").at[timestamp])
+        ) / eta_fossil
+
+        if route == "cement_direct":
+            electric_to_heat = float(process.get("eta_electric", 0.95))
+        else:
+            electric_to_heat = (
+                float(storage.get("eta_electric", 0.0))
+                * float(storage.get("efficiency_charge", 1.0))
+                * float(storage.get("efficiency_discharge", 1.0))
+            )
+        if electric_to_heat <= 0:
+            raise ValueError("Electric heat and storage efficiencies must be positive.")
+        return fossil_heat_cost * electric_to_heat
+
+    if "hydrogen" not in fuel_prices:
         raise ValueError(
-            "industrial_hybrid strategies require natural_gas and co2 price series "
-            "in fuel_prices_df."
+            "steel industrial_hybrid routes require a hydrogen price series in "
+            "fuel_prices_df."
         )
-
-    eta_fossil = float(calciner.get("eta_fossil", 0.90))
-    if eta_fossil <= 0:
-        raise ValueError("Calciner eta_fossil must be positive.")
-    fossil_heat_cost = (
-        float(unit.forecaster.get_price("natural_gas").at[timestamp])
-        + float(calciner.get("ng_co2_factor", 0.202))
-        * float(unit.forecaster.get_price("co2").at[timestamp])
-    ) / eta_fossil
-
-    if route == "direct":
-        electric_to_heat = float(calciner.get("eta_electric", 0.95))
-    else:
-        electric_to_heat = (
-            float(storage.get("eta_electric", 0.0))
-            * float(storage.get("efficiency_charge", 1.0))
-            * float(storage.get("efficiency_discharge", 1.0))
-        )
-    if electric_to_heat <= 0:
-        raise ValueError("Electric heat and storage efficiencies must be positive.")
-    return fossil_heat_cost * electric_to_heat
+    return (
+        float(process.get("efficiency", 0.0))
+        * float(storage.get("efficiency_charge", 1.0))
+        * float(storage.get("efficiency_discharge", 1.0))
+        * float(unit.forecaster.get_price("hydrogen").at[timestamp])
+    )
 
 
 def adjust_bid_price(price: float, market_config: MarketConfig) -> float:
@@ -125,6 +177,30 @@ def adjust_bid_price(price: float, market_config: MarketConfig) -> float:
         if upper is not None:
             price = min(price, upper)
     return price
+
+
+def bid_price_below_forecast(
+    forecast_price: float, price_cap: float, market_config: MarketConfig
+) -> float | None:
+    """Return the highest valid demand price strictly below an EOM forecast."""
+    if not math.isfinite(forecast_price) or not math.isfinite(price_cap):
+        return None
+
+    upper = min(math.nextafter(forecast_price, -math.inf), price_cap)
+    if market_config.maximum_bid_price is not None:
+        upper = min(upper, float(market_config.maximum_bid_price))
+
+    if market_config.price_tick:
+        tick = float(market_config.price_tick)
+        lower = math.ceil(float(market_config.minimum_bid_price) / tick) * tick
+        upper = math.floor(upper / tick) * tick
+        if upper < lower:
+            return None
+        return upper
+
+    if upper < float(market_config.minimum_bid_price):
+        return None
+    return upper
 
 
 def adjust_bid_volume(volume: float, market_config: MarketConfig) -> float:
@@ -221,7 +297,7 @@ def otc_profile(unit) -> dict:
     return getattr(unit, "industrial_hybrid_otc_procurement", {})
 
 
-def otc_load_constraint(unit):
+def otc_load_constraint(unit, route: str):
     """Require an EOM schedule to consume every accepted physical OTC contract."""
     procurement = otc_profile(unit)
     if not procurement:
@@ -233,14 +309,23 @@ def otc_load_constraint(unit):
         for local_t in model.time_steps:
             contracted_power = float(procurement.get(unit.index[local_t], 0.0))
             if contracted_power > 0:
-                constraints.add(model.total_power_input[local_t] >= contracted_power)
+                if route == "steel_electrolyser_buffer":
+                    constraints.add(
+                        model.dsm_blocks["dri_plant"].power_in[local_t]
+                        >= contracted_power
+                    )
+                else:
+                    constraints.add(
+                        model.total_power_input[local_t] >= contracted_power
+                    )
 
     return add_constraint
 
 
-def capacity_neg_commitment_constraint(unit, route: str):
+def capacity_neg_commitment_constraint(unit, route: str, commitments=None):
     """Keep accepted ``capacity_neg`` commitments feasible in the EOM schedule."""
-    commitments = getattr(unit, "industrial_hybrid_capacity_neg_commitments", {})
+    if commitments is None:
+        commitments = getattr(unit, "industrial_hybrid_capacity_neg_commitments", {})
     if not commitments:
         return None
 
@@ -254,11 +339,11 @@ def capacity_neg_commitment_constraint(unit, route: str):
             if reserved <= 0:
                 continue
 
-            if route == "direct":
+            if route == "cement_direct":
                 potential = min(
                     float(entry["electric_conversion_capacity"])
                     for entry in entries
-                    if entry["route"] == "direct"
+                    if entry["route"] == "cement_direct"
                 )
                 constraints.add(
                     model.dsm_blocks["calciner"].power_in[local_t]
@@ -266,9 +351,43 @@ def capacity_neg_commitment_constraint(unit, route: str):
                 )
                 continue
 
-            etes_entries = [entry for entry in entries if entry["route"] == "etes"]
+            etes_entries = [
+                entry
+                for entry in entries
+                if entry["route"] in {"cement_etes", "cement_electric_etes"}
+            ]
             if not etes_entries:
+                steel_entries = [
+                    entry
+                    for entry in entries
+                    if entry["route"] == "steel_electrolyser_buffer"
+                ]
+                if not steel_entries:
+                    continue
+                electric_max = min(
+                    float(entry["electric_max"]) for entry in steel_entries
+                )
+                electrolyser = model.dsm_blocks["electrolyser"]
+                constraints.add(
+                    electrolyser.power_in[local_t] <= max(0.0, electric_max - reserved)
+                )
+                storage = model.dsm_blocks["hydrogen_buffer_storage"]
+                for entry in steel_entries:
+                    remaining_steps = sum(
+                        1 for point in entry["hours"] if point > timestamp
+                    )
+                    if remaining_steps > 0:
+                        constraints.add(
+                            storage.soc[local_t]
+                            <= float(entry["max_soc"])
+                            - remaining_steps
+                            * float(entry["volume"])
+                            * float(entry["electrolyser_efficiency"])
+                            * float(entry["efficiency_charge"])
+                            / float(entry["capacity"])
+                        )
                 continue
+
             electric_max = min(float(entry["electric_max"]) for entry in etes_entries)
             storage = model.dsm_blocks["thermal_storage"]
             constraints.add(storage.power_in[local_t] <= max(0.0, electric_max - reserved))
@@ -283,10 +402,24 @@ def capacity_neg_commitment_constraint(unit, route: str):
                         - remaining_steps
                         * float(entry["volume"])
                         * float(entry["eta_electric"])
+                        * float(entry["efficiency_charge"])
                         / float(entry["capacity"])
                     )
 
     return add_constraint
+
+
+def combined_constraints(*builders):
+    """Join optional DSM constraint callbacks for one rolling solve."""
+    active_builders = [builder for builder in builders if builder is not None]
+    if not active_builders:
+        return None
+
+    def add_constraints(model, window_start, window_end):
+        for builder in active_builders:
+            builder(model, window_start, window_end)
+
+    return add_constraints
 
 
 # ---------------------------------------------------------------------------
@@ -297,8 +430,9 @@ def capacity_neg_commitment_constraint(unit, route: str):
 class IndustrialHybridEomStrategy(MinMaxStrategy):
     """Bid the rolling electricity schedule of a compatible industrial hybrid unit."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, electricity_wtp=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.electricity_wtp = electricity_wtp
         self.pending_bid_contexts: dict[tuple[str, str], dict] = {}
 
     def calculate_bids(
@@ -310,9 +444,17 @@ class IndustrialHybridEomStrategy(MinMaxStrategy):
     ) -> Orderbook:
         if market_config.product_type != "energy":
             raise ValueError("industrial_hybrid_eom is an energy-market strategy.")
-        route, calciner, storage = hybrid_route(unit, "industrial_hybrid_eom")
+        route, process, storage = industrial_route(unit, "industrial_hybrid_eom")
         if not product_tuples:
             return []
+        if route == "steel_electrolyser_buffer" and (
+            self.electricity_wtp is None
+            or not math.isfinite(float(self.electricity_wtp))
+        ):
+            raise ValueError(
+                "industrial_hybrid_eom requires a finite electricity_wtp in "
+                "bidding_strategy_params for the steel electrolyser-buffer route."
+            )
         commit_steps = unit._parse_duration_to_steps(unit._rh_commit)
         expected_starts = [
             product_tuples[0][0] + step * unit.index.freq
@@ -325,22 +467,10 @@ class IndustrialHybridEomStrategy(MinMaxStrategy):
             )
 
         # OTC awards must be consumed and CRM awards must remain callable.
-        constraint_builders = [
-            builder
-            for builder in (
-                otc_load_constraint(unit),
-                capacity_neg_commitment_constraint(unit, route),
-            )
-            if builder is not None
-        ]
-        constraint_builder = None
-        if constraint_builders:
-
-            def add_physical_commitments(model, window_start, window_end):
-                for builder in constraint_builders:
-                    builder(model, window_start, window_end)
-
-            constraint_builder = add_physical_commitments
+        constraint_builder = combined_constraints(
+            otc_load_constraint(unit, route),
+            capacity_neg_commitment_constraint(unit, route),
+        )
         initial_states = copy.deepcopy(
             unit._rh_init_states
             if unit._rh_init_states is not None
@@ -357,7 +487,7 @@ class IndustrialHybridEomStrategy(MinMaxStrategy):
         otc_power = otc_profile(unit)
         bid_context = {
             "route": route,
-            "calciner": calciner,
+            "process": process,
             "storage": storage,
             "initial_states": initial_states,
             "products": {},
@@ -371,8 +501,12 @@ class IndustrialHybridEomStrategy(MinMaxStrategy):
             flexible_power = float(
                 row.get(
                     "calciner_power_input"
-                    if route == "direct"
-                    else "thermal_storage_power_input",
+                    if route == "cement_direct"
+                    else (
+                        "thermal_storage_power_input"
+                        if route in {"cement_etes", "cement_electric_etes"}
+                        else "electrolyser_power"
+                    ),
                     0.0,
                 )
             )
@@ -392,15 +526,23 @@ class IndustrialHybridEomStrategy(MinMaxStrategy):
             # An accepted OTC contract already procures this part of the load.
             residual_power = max(0.0, planned_power - contracted_power)
             if residual_power > 0:
+                if route == "steel_electrolyser_buffer":
+                    bid_price = float(self.electricity_wtp)
+                elif route == "cement_electric_etes":
+                    bid_price = float(unit.forecaster.electricity_price.at[start])
+                    if not math.isfinite(bid_price):
+                        raise ValueError(
+                            "Fully-electric E-TES EOM bidding requires a finite "
+                            "electricity-price forecast for every delivery hour."
+                        )
+                else:
+                    bid_price = electric_wtp(unit, start, route, process, storage)
                 bids.append(
                     {
                         "start_time": start,
                         "end_time": end,
                         "only_hours": only_hours,
-                        "price": adjust_bid_price(
-                            electric_wtp(unit, start, route, calciner, storage),
-                            market_config,
-                        ),
+                        "price": adjust_bid_price(bid_price, market_config),
                         "volume": -residual_power,
                         "node": unit.node,
                     }
@@ -412,7 +554,7 @@ class IndustrialHybridEomStrategy(MinMaxStrategy):
     def on_market_feedback(
         self, unit: SupportsMinMax, market_config: MarketConfig, orderbook: Orderbook
     ) -> None:
-        """Apply the deterministic gas-fallback rule after EOM clearing."""
+        """Apply the route's deterministic rule after EOM clearing."""
         bid_context = self.pending_bid_contexts.pop(
             (unit.id, market_config.market_id), None
         )
@@ -425,11 +567,11 @@ class IndustrialHybridEomStrategy(MinMaxStrategy):
         accepted_eom = accepted_demand_by_hour(orderbook)
         accepted_otc = otc_profile(unit)
         route = bid_context["route"]
-        calciner = bid_context["calciner"]
+        process = bid_context["process"]
         storage = bid_context["storage"]
 
         storage_energy = None
-        if route == "etes":
+        if route in {"cement_etes", "cement_electric_etes"}:
             initial_soc = bid_context["initial_states"].get(
                 "thermal_storage", {}
             ).get(
@@ -439,12 +581,25 @@ class IndustrialHybridEomStrategy(MinMaxStrategy):
 
         for start, item in bid_context["products"].items():
             planned_power = item["power"]
-            flexible_power = min(item["flexible_power"], planned_power)
-            base_power = max(0.0, planned_power - flexible_power)
             bought_power = min(
                 planned_power,
                 accepted_eom.get(start, 0.0) + float(accepted_otc.get(start, 0.0)),
             )
+            if route == "steel_electrolyser_buffer":
+                production_share = (
+                    1.0 if planned_power == 0 else bought_power / planned_power
+                )
+                unit.outputs["unserved_steel"].at[start] = item["production"] * (
+                    1.0 - production_share
+                )
+                if hasattr(unit, "_rh_full_horizon_production"):
+                    unit._rh_full_horizon_production[item["global_t"]] = (
+                        item["production"] * production_share
+                    )
+                continue
+
+            flexible_power = min(item["flexible_power"], planned_power)
+            base_power = max(0.0, planned_power - flexible_power)
 
             supplied_base = min(base_power, bought_power)
             production_share = 1.0 if base_power == 0 else supplied_base / base_power
@@ -455,10 +610,10 @@ class IndustrialHybridEomStrategy(MinMaxStrategy):
             missing_flexible = flexible_power * production_share - electric_flexible
 
             gas_fallback = 0.0
-            if route == "direct":
+            if route == "cement_direct":
                 gas_fallback = (
-                    missing_flexible * float(calciner.get("eta_electric", 0.95))
-                ) / float(calciner.get("eta_fossil", 0.90))
+                    missing_flexible * float(process.get("eta_electric", 0.95))
+                ) / float(process.get("eta_fossil", 0.90))
             else:
                 retained_energy = storage_energy * (
                     1.0 - float(storage.get("storage_loss_rate", 0.0))
@@ -474,9 +629,11 @@ class IndustrialHybridEomStrategy(MinMaxStrategy):
                     (retained_energy + charged_heat)
                     * float(storage.get("efficiency_discharge", 1.0)),
                 )
-                gas_fallback = (
-                    target_discharge - actual_discharge
-                ) / float(calciner.get("eta_fossil", 0.90))
+                thermal_shortfall = target_discharge - actual_discharge
+                if route == "cement_etes":
+                    gas_fallback = thermal_shortfall / float(
+                        process.get("eta_fossil", 0.90)
+                    )
                 storage_energy = max(
                     0.0,
                     retained_energy
@@ -487,16 +644,27 @@ class IndustrialHybridEomStrategy(MinMaxStrategy):
                     storage_energy / float(storage["capacity"])
                 )
 
-            unit.outputs["gas_fallback"].at[start] = gas_fallback
-            unit.outputs["unserved_clinker"].at[start] = item["production"] * (
-                1.0 - production_share
-            )
-            if hasattr(unit, "_rh_full_horizon_production"):
-                unit._rh_full_horizon_production[item["global_t"]] = (
-                    item["production"] * production_share
+            unserved_clinker = item["production"] * (1.0 - production_share)
+            if route == "cement_electric_etes":
+                specific_heat_demand = float(process.get("specific_heat_demand", 0.0))
+                if specific_heat_demand <= 0:
+                    raise ValueError(
+                        "Fully-electric E-TES feedback requires a positive calciner "
+                        "specific_heat_demand."
+                    )
+                unserved_clinker = min(
+                    item["production"],
+                    unserved_clinker + thermal_shortfall / specific_heat_demand,
                 )
 
-        if route == "etes" and unit._rh_init_states is not None:
+            unit.outputs["gas_fallback"].at[start] = gas_fallback
+            unit.outputs["unserved_clinker"].at[start] = unserved_clinker
+            if hasattr(unit, "_rh_full_horizon_production"):
+                unit._rh_full_horizon_production[item["global_t"]] = (
+                    item["production"] - unserved_clinker
+                )
+
+        if route in {"cement_etes", "cement_electric_etes"} and unit._rh_init_states is not None:
             unit._rh_init_states.setdefault("thermal_storage", {})["soc"] = (
                 storage_energy / float(storage["capacity"])
             )
@@ -531,10 +699,10 @@ class IndustrialHybridCapacityNegStrategy(MinMaxStrategy):
                 )
 
     @staticmethod
-    def direct_available_capacity_neg(
-        unit, calciner, rows, start, end
+    def cement_direct_available_capacity_neg(
+        unit, process, rows, start, end
     ) -> tuple[float, dict]:
-        eta_electric = float(calciner.get("eta_electric", 0.0))
+        eta_electric = float(process.get("eta_electric", 0.0))
         if eta_electric <= 0:
             return 0.0, {}
         potential: dict = {}
@@ -542,7 +710,7 @@ class IndustrialHybridCapacityNegStrategy(MinMaxStrategy):
         for timestamp in hours_in_product(unit, start, end):
             row = rows.get(unit.index._get_idx_from_date(timestamp), {})
             clinker = max(0.0, float(row.get("calciner_clinker_output", 0.0)))
-            heat = clinker * float(calciner.get("specific_heat_demand", 0.0))
+            heat = clinker * float(process.get("specific_heat_demand", 0.0))
             potential[timestamp] = heat / eta_electric
             available_capacity_neg.append(
                 max(0.0, potential[timestamp] - float(otc_profile(unit).get(timestamp, 0.0)))
@@ -553,7 +721,7 @@ class IndustrialHybridCapacityNegStrategy(MinMaxStrategy):
         )
 
     @staticmethod
-    def etes_available_capacity_neg(
+    def cement_etes_available_capacity_neg(
         storage, projected_soc, start, end
     ) -> tuple[float, float]:
         hours = (end - start) / timedelta(hours=1)
@@ -564,7 +732,8 @@ class IndustrialHybridCapacityNegStrategy(MinMaxStrategy):
             return 0.0, projected_soc
         electric_max = float(
             storage.get(
-                "max_power", float(storage["max_power_charge"]) / eta_electric
+                "max_power",
+                float(storage.get("max_power_charge", capacity)) / eta_electric,
             )
         )
         max_soc = float(storage.get("max_soc", 1.0))
@@ -581,6 +750,49 @@ class IndustrialHybridCapacityNegStrategy(MinMaxStrategy):
         )
         return offered, projected_soc
 
+    @staticmethod
+    def steel_electrolyser_available_capacity_neg(
+        unit, electrolyser, hydrogen_buffer, rows, projected_soc, start, end
+    ) -> tuple[float, float]:
+        """Offer electrolyser load that the hydrogen buffer can absorb."""
+        hours = hours_in_product(unit, start, end, require_complete=True)
+        if not hours:
+            return 0.0, projected_soc
+
+        electric_max = float(electrolyser.get("max_power", 0.0))
+        efficiency = float(electrolyser.get("efficiency", 0.0))
+        capacity = float(hydrogen_buffer.get("capacity", 0.0))
+        efficiency_charge = float(hydrogen_buffer.get("efficiency_charge", 1.0))
+        if electric_max <= 0 or efficiency <= 0 or capacity <= 0 or efficiency_charge <= 0:
+            return 0.0, projected_soc
+
+        available_power = min(
+            max(
+                0.0,
+                electric_max
+                - float(
+                    rows.get(unit.index._get_idx_from_date(timestamp), {}).get(
+                        "electrolyser_power", 0.0
+                    )
+                ),
+            )
+            for timestamp in hours
+        )
+        max_soc = float(hydrogen_buffer.get("max_soc", 1.0))
+        duration = (end - start) / timedelta(hours=1)
+        available_storage = (
+            max(0.0, max_soc - projected_soc)
+            * capacity
+            / (duration * efficiency * efficiency_charge)
+        )
+        offered = min(available_power, available_storage)
+        projected_soc = min(
+            max_soc,
+            projected_soc
+            + offered * duration * efficiency * efficiency_charge / capacity,
+        )
+        return offered, projected_soc
+
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -592,7 +804,7 @@ class IndustrialHybridCapacityNegStrategy(MinMaxStrategy):
             raise ValueError(
                 "industrial_hybrid_capacity_neg is a capacity_neg-market strategy."
             )
-        route, calciner, storage = hybrid_route(
+        route, process, storage = industrial_route(
             unit, "industrial_hybrid_capacity_neg"
         )
         self.validate_capacity_products(unit, product_tuples)
@@ -601,55 +813,151 @@ class IndustrialHybridCapacityNegStrategy(MinMaxStrategy):
 
         # Capacity is calculated from the normal forecast schedule. If accepted,
         # its reservation is imposed in one later EOM rolling solve.
-        update_rolling_schedule(unit, min(product[0] for product in product_tuples))
+        initial_states = copy.deepcopy(
+            unit._rh_init_states
+            if unit._rh_init_states is not None
+            else unit._collect_init_states()
+        )
+        market_time = min(product[0] for product in product_tuples)
+        existing_commitments = copy.deepcopy(
+            getattr(unit, "industrial_hybrid_capacity_neg_commitments", {})
+        )
+        base_constraint_builder = combined_constraints(
+            otc_load_constraint(unit, route),
+            capacity_neg_commitment_constraint(
+                unit, route, existing_commitments
+            ),
+        )
+        update_rolling_schedule(
+            unit,
+            market_time,
+            force=base_constraint_builder is not None,
+            constraint_builder=base_constraint_builder,
+        )
         rows = component_operations_by_step(unit)
+        storage_component = (
+            "thermal_storage"
+            if route in {"cement_etes", "cement_electric_etes"}
+            else "hydrogen_buffer_storage"
+        )
         projected_soc = float(
-            (unit._rh_init_states or {}).get("thermal_storage", {}).get(
+            initial_states.get(storage_component, {}).get(
                 "soc", storage.get("initial_soc", 1.0) if storage else 0.0
             )
         )
         bid_context = {"products": {}}
         bids: Orderbook = []
-        for start, end, only_hours in sorted(product_tuples, key=lambda product: product[0]):
-            hours = hours_in_product(unit, start, end)
+        preview_commitments = copy.deepcopy(existing_commitments)
+        preview_cost = None
+        if route == "cement_electric_etes":
+            preview_cost = unit.preview_rolling_schedule_cost(
+                market_time, constraint_builder=base_constraint_builder
+            )
+
+        for start, end, only_hours in sorted(
+            product_tuples, key=lambda product: product[0]
+        ):
+            hours = hours_in_product(
+                unit,
+                start,
+                end,
+                require_complete=route == "steel_electrolyser_buffer",
+            )
             if not hours:
                 continue
-            if route == "direct":
+            if route == "cement_direct":
                 available_capacity_neg, electric_conversion_capacity = (
-                    self.direct_available_capacity_neg(
-                        unit, calciner, rows, start, end
+                    self.cement_direct_available_capacity_neg(
+                        unit, process, rows, start, end
                     )
                 )
                 product_context = {
                     "electric_conversion_capacity": electric_conversion_capacity
                 }
-            else:
-                available_capacity_neg, projected_soc = self.etes_available_capacity_neg(
+            elif route in {"cement_etes", "cement_electric_etes"}:
+                available_capacity_neg, next_projected_soc = self.cement_etes_available_capacity_neg(
                     storage, projected_soc, start, end
                 )
                 product_context = {
                     "electric_max": float(
                         storage.get(
                             "max_power",
-                            float(storage["max_power_charge"])
+                            float(storage.get("max_power_charge", storage["capacity"]))
                             / float(storage["eta_electric"]),
                         )
                     ),
                     "capacity": float(storage["capacity"]),
                     "eta_electric": float(storage["eta_electric"]),
+                    "efficiency_charge": float(
+                        storage.get("efficiency_charge", 1.0)
+                    ),
+                    "max_soc": float(storage.get("max_soc", 1.0)),
+                }
+            else:
+                available_capacity_neg, projected_soc = (
+                    self.steel_electrolyser_available_capacity_neg(
+                        unit,
+                        process,
+                        storage,
+                        rows,
+                        projected_soc,
+                        start,
+                        end,
+                    )
+                )
+                product_context = {
+                    "electric_max": float(process["max_power"]),
+                    "capacity": float(storage["capacity"]),
+                    "electrolyser_efficiency": float(process["efficiency"]),
+                    "efficiency_charge": float(storage.get("efficiency_charge", 1.0)),
                     "max_soc": float(storage.get("max_soc", 1.0)),
                 }
 
             volume = adjust_bid_volume(available_capacity_neg, market_config)
-            opportunity_cost = sum(
-                max(
-                    0.0,
-                    electric_wtp(unit, timestamp, route, calciner, storage)
-                    - float(unit.forecaster.electricity_price.at[timestamp]),
+            if route == "cement_electric_etes":
+                if volume <= 0 or preview_cost is None:
+                    continue
+                candidate_commitments = copy.deepcopy(preview_commitments)
+                candidate_entry = {
+                    "volume": volume,
+                    "route": route,
+                    "hours": hours,
+                    **product_context,
+                }
+                for timestamp in hours:
+                    candidate_commitments.setdefault(timestamp, []).append(
+                        candidate_entry
+                    )
+                candidate_builder = combined_constraints(
+                    otc_load_constraint(unit, route),
+                    capacity_neg_commitment_constraint(
+                        unit, route, candidate_commitments
+                    ),
                 )
-                * (unit.index.freq / timedelta(hours=1))
-                for timestamp in hours
-            ) / ((end - start) / timedelta(hours=1))
+                candidate_cost = unit.preview_rolling_schedule_cost(
+                    market_time, constraint_builder=candidate_builder
+                )
+                if candidate_cost is None:
+                    continue
+                duration = (end - start) / timedelta(hours=1)
+                opportunity_cost = max(
+                    0.0, (candidate_cost - preview_cost) / (volume * duration)
+                )
+                preview_commitments = candidate_commitments
+                preview_cost = candidate_cost
+                projected_soc = next_projected_soc
+            else:
+                opportunity_cost = sum(
+                    max(
+                        0.0,
+                        electric_wtp(unit, timestamp, route, process, storage)
+                        - float(unit.forecaster.electricity_price.at[timestamp]),
+                    )
+                    * (unit.index.freq / timedelta(hours=1))
+                    for timestamp in hours
+                ) / ((end - start) / timedelta(hours=1))
+                if route == "cement_etes":
+                    projected_soc = next_projected_soc
             bid_context["products"][start] = {
                 "volume": volume,
                 "route": route,
@@ -694,7 +1002,7 @@ class IndustrialHybridCapacityNegStrategy(MinMaxStrategy):
             for timestamp in item["hours"]:
                 entry = {key: value for key, value in item.items() if key != "volume"}
                 entry["volume"] = awarded
-                if item["route"] == "direct":
+                if item["route"] == "cement_direct":
                     entry["electric_conversion_capacity"] = item[
                         "electric_conversion_capacity"
                     ][timestamp]
@@ -755,6 +1063,29 @@ class IndustrialHybridOtcStrategy(MinMaxStrategy):
         )
 
     @staticmethod
+    def steel_auxiliary_security_volume(unit, hours) -> float:
+        """Return the firm DRI electricity needed alongside hydrogen reduction."""
+        components = getattr(unit, "_orig_components_dict", None) or unit.components
+        eaf = components.get("eaf", {})
+        dri_plant = components.get("dri_plant", {})
+        steel_demand = getattr(unit.forecaster, "steel_demand", None)
+        if (
+            not isinstance(eaf, dict)
+            or not isinstance(dri_plant, dict)
+            or steel_demand is None
+        ):
+            raise ValueError(
+                "steel OTC auxiliary procurement requires an EAF configuration and "
+                "a per-timestep steel_demand forecast."
+            )
+        return min(
+            max(0.0, float(steel_demand.at[timestamp]))
+            * float(eaf.get("specific_dri_demand", 0.0))
+            * float(dri_plant.get("specific_electricity_consumption", 0.0))
+            for timestamp in hours
+        )
+
+    @staticmethod
     def process_bid_ceiling(unit, hours, route, calciner, storage) -> float:
         """Average the lower of forecast EOM price and electric WTP over a block."""
         weighted_value = 0.0
@@ -774,6 +1105,23 @@ class IndustrialHybridOtcStrategy(MinMaxStrategy):
             total_hours += duration
         return weighted_value / total_hours if total_hours else 0.0
 
+    @staticmethod
+    def forecast_eom_price(unit, hours) -> float:
+        """Return the duration-weighted EOM forecast for a delivery product."""
+        weighted_price = 0.0
+        total_hours = 0.0
+        for timestamp in hours:
+            price = float(unit.forecaster.electricity_price.at[timestamp])
+            if not math.isfinite(price):
+                raise ValueError(
+                    "industrial_hybrid_otc requires finite electricity-price "
+                    "forecasts for every delivery interval."
+                )
+            duration = unit.index.freq / timedelta(hours=1)
+            weighted_price += price * duration
+            total_hours += duration
+        return weighted_price / total_hours if total_hours else 0.0
+
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -792,7 +1140,7 @@ class IndustrialHybridOtcStrategy(MinMaxStrategy):
             raise ValueError(
                 "industrial_hybrid_otc auxiliary_security_value must be finite."
             )
-        route, calciner, storage = hybrid_route(unit, "industrial_hybrid_otc")
+        route, process, storage = industrial_route(unit, "industrial_hybrid_otc")
 
         bid_context = {"products": {}}
         bids: Orderbook = []
@@ -800,34 +1148,68 @@ class IndustrialHybridOtcStrategy(MinMaxStrategy):
             hours = hours_in_product(unit, start, end, require_complete=True)
             if not hours:
                 continue
-            try:
-                process_ceiling = self.process_bid_ceiling(
-                    unit, hours, route, calciner, storage
-                )
-            except (KeyError, IndexError, TypeError, ValueError):
-                # A physical long-term contract is not bid without full forecasts.
-                continue
-
-            tranches = {
-                "auxiliary": {
-                    "volume": adjust_bid_volume(
-                        self.auxiliary_security_volume(unit, calciner, hours),
-                        market_config,
-                    ),
-                    "price": adjust_bid_price(
-                        float(self.auxiliary_security_value), market_config
-                    ),
-                    "hours": hours,
+            if route in {"cement_direct", "cement_etes", "cement_electric_etes"}:
+                try:
+                    process_ceiling = (
+                        self.process_bid_ceiling(
+                            unit, hours, route, process, storage
+                        )
+                        if route != "cement_electric_etes"
+                        else None
+                    )
+                    auxiliary_price = (
+                        bid_price_below_forecast(
+                            self.forecast_eom_price(unit, hours),
+                            float(self.auxiliary_security_value),
+                            market_config,
+                        )
+                        if route == "cement_electric_etes"
+                        else adjust_bid_price(
+                            float(self.auxiliary_security_value), market_config
+                        )
+                    )
+                except (KeyError, IndexError, TypeError, ValueError):
+                    # A physical long-term contract is not bid without full forecasts.
+                    continue
+                tranches = {
+                    "auxiliary": {
+                        "volume": adjust_bid_volume(
+                            self.auxiliary_security_volume(unit, process, hours),
+                            market_config,
+                        ),
+                        "price": auxiliary_price,
+                        "hours": hours,
+                    }
                 }
-            }
-            if route == "direct":
-                tranches["direct_process"] = {
-                    "volume": adjust_bid_volume(
-                        self.direct_process_volume(unit, calciner, hours),
-                        market_config,
-                    ),
-                    "price": adjust_bid_price(process_ceiling, market_config),
-                    "hours": hours,
+                if auxiliary_price is None:
+                    tranches = {}
+                if route == "cement_direct":
+                    tranches["direct_process"] = {
+                        "volume": adjust_bid_volume(
+                            self.direct_process_volume(unit, process, hours),
+                            market_config,
+                        ),
+                        "price": adjust_bid_price(process_ceiling, market_config),
+                        "hours": hours,
+                    }
+            else:
+                try:
+                    if not all(
+                        math.isfinite(float(unit.forecaster.electricity_price.at[t]))
+                        for t in hours
+                    ):
+                        continue
+                    auxiliary_volume = self.steel_auxiliary_security_volume(unit, hours)
+                except (AttributeError, IndexError, KeyError, TypeError, ValueError):
+                    continue
+                tranches = {
+                    "auxiliary": {
+                        "volume": adjust_bid_volume(auxiliary_volume, market_config),
+                        "price": adjust_bid_price(
+                            float(self.auxiliary_security_value), market_config
+                        ),
+                        "hours": hours,
+                    }
                 }
 
             bid_context["products"][start] = tranches

@@ -1324,6 +1324,63 @@ class DSMFlex:
     # /Rolling-horizon helpers
     # ------------------------------------------------------------------
 
+    def preview_rolling_schedule_cost(self, current_time, constraint_builder=None):
+        """Return a constrained rolling-window objective without changing dispatch.
+
+        Market strategies use this for a forecast-only comparison, for example
+        when pricing the opportunity cost of a capacity reservation.  The
+        regular rolling schedule, carried component states, and optimisation
+        markers are restored before returning.
+        """
+        if self.horizon_mode != "rolling_horizon":
+            return None
+
+        try:
+            current_step = self.index._get_idx_from_date(current_time)
+        except (KeyError, ValueError, AttributeError, TypeError) as error:
+            logger.debug(
+                "Could not map %s to a rolling-horizon preview step: %s.",
+                current_time,
+                error,
+            )
+            return None
+
+        saved_state = {
+            name: copy.deepcopy(getattr(self, name))
+            for name in (
+                "_rh_init_states",
+                "_rh_full_horizon_production",
+                "_component_operations",
+                "_rh_window_remaining_demand",
+                "opt_power_requirement",
+            )
+            if hasattr(self, name)
+        }
+        missing_state = {
+            name
+            for name in (
+                "_rh_init_states",
+                "_rh_full_horizon_production",
+                "_component_operations",
+                "_rh_window_remaining_demand",
+                "opt_power_requirement",
+            )
+            if not hasattr(self, name)
+        }
+        saved_optimized_until = self._rh_optimized_until_step
+
+        try:
+            return self._solve_rolling_horizon_next_window(
+                current_step, constraint_builder=constraint_builder
+            )
+        finally:
+            for name, value in saved_state.items():
+                setattr(self, name, value)
+            for name in missing_state:
+                if hasattr(self, name):
+                    delattr(self, name)
+            self._rh_optimized_until_step = saved_optimized_until
+
     def _check_and_reoptimize_rolling_window(
         self, current_time, force: bool = False, constraint_builder=None
     ) -> bool:
@@ -1363,7 +1420,7 @@ class DSMFlex:
 
     def _solve_rolling_horizon_next_window(
         self, current_step: int, constraint_builder=None
-    ) -> None:
+    ) -> float | None:
         """Optimise the next rolling window starting from *current_step*.
 
         Called after each market round to re-optimise for the next window only,
@@ -1435,6 +1492,7 @@ class DSMFlex:
 
         _pending_opr_updates: dict = {}
         window_production = 0.0
+        objective_value = None
 
         try:
             remaining_demand = None
@@ -1502,6 +1560,7 @@ class DSMFlex:
                 # simulation continues with the previously committed values.
                 return
             self._log_solver_status(results, window_start, window_end)
+            objective_value = float(pyo.value(instance.obj_rule_opt))
 
             n_commit = commit_end - window_start
             for local_t in range(n_commit):
@@ -1551,6 +1610,7 @@ class DSMFlex:
             commit_end,
             list(init_states.keys()),
         )
+        return objective_value
 
     # ------------------------------------------------------------------
 
