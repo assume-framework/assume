@@ -484,6 +484,7 @@ def test_forecast_interface__cache(market_setup, forecast_setup, shared_FastInde
     assert calculate_naive_price_inelastic.cache_info().misses == 1
 
 
+@pytest.mark.require_learning
 def test_adaptive_merit_order_inputs_use_fast_series(
     market_setup, forecast_setup, shared_FastIndex
 ):
@@ -642,6 +643,7 @@ def _issue_adaptive_merit_order_forecast(state, forecast_inputs, position):
     return product_start, issued
 
 
+@pytest.mark.require_learning
 def test_adaptive_residual_and_additive_correction_are_immutable():
     forecast_inputs = _adaptive_merit_order_forecast_inputs()
     state, _ = _adaptive_merit_order_state(
@@ -667,6 +669,7 @@ def test_adaptive_residual_and_additive_correction_are_immutable():
     assert outcome["corrected_price_mean_forecast"] == 55
 
 
+@pytest.mark.require_learning
 def test_adaptive_merit_order_gaussian_quantiles_use_inverse_cdf():
     assert gaussian_residual_quantile(50, 10, 0.5) == pytest.approx(50)
     assert gaussian_residual_quantile(50, 10, 0.1) == pytest.approx(
@@ -677,6 +680,7 @@ def test_adaptive_merit_order_gaussian_quantiles_use_inverse_cdf():
     )
 
 
+@pytest.mark.require_learning
 def test_adaptive_features_are_separate_missing_safe_and_frozen():
     feature_state = initialize_adaptive_merit_order_feature_state(
         (
@@ -725,6 +729,7 @@ def test_adaptive_features_are_separate_missing_safe_and_frozen():
     assert th.equal(feature_state["scales"], scaling[1])
 
 
+@pytest.mark.require_learning
 def test_adaptive_holiday_feature_is_optional():
     forecast_inputs = _adaptive_merit_order_forecast_inputs()
     _, model = _adaptive_merit_order_state(
@@ -737,6 +742,7 @@ def test_adaptive_holiday_feature_is_optional():
     assert "holiday" in model["residual_scale_features"]["feature_names"]
 
 
+@pytest.mark.require_learning
 def test_online_regularized_regression_sparsity_l2_and_forgetting():
     generator = th.Generator().manual_seed(7)
     relevant = th.linspace(-2, 2, 200, dtype=th.float64)
@@ -762,6 +768,7 @@ def test_online_regularized_regression_sparsity_l2_and_forgetting():
     )
 
 
+@pytest.mark.require_learning
 def test_online_irls_reuses_pre_outcome_statistics():
     model = initialize_online_regularized_regression(1, 0, 0, 0.9, 100, 1e-10)
     features = th.ones((2, 1), dtype=th.float64)
@@ -786,6 +793,7 @@ def test_online_irls_reuses_pre_outcome_statistics():
     assert model["effective_weight"] == pytest.approx(0.9 * 2 + 2)
 
 
+@pytest.mark.require_learning
 def test_nonlinear_quantiles_are_asymmetric_non_crossing_and_keep_point_forecast():
     forecast_inputs = _adaptive_merit_order_forecast_inputs(periods=12, merit_order=50)
     gaussian_state, _ = _adaptive_merit_order_state(
@@ -854,6 +862,7 @@ def test_nonlinear_quantiles_are_asymmetric_non_crossing_and_keep_point_forecast
     assert len(quantile_model["residual_quantile_model"]["targets"]) == 9
 
 
+@pytest.mark.require_learning
 def test_adaptive_default_features_match_lasso_selection():
     assert ADAPTIVE_MERIT_ORDER_SETTINGS["features"] == (
         "merit_order_price",
@@ -865,6 +874,7 @@ def test_adaptive_default_features_match_lasso_selection():
     )
 
 
+@pytest.mark.require_learning
 def test_adaptive_fallback_activation_and_no_lookahead():
     forecast_inputs = _adaptive_merit_order_forecast_inputs()
     state, model = _adaptive_merit_order_state(
@@ -903,6 +913,7 @@ def test_adaptive_fallback_activation_and_no_lookahead():
     assert third_start not in model["price_by_product"]
 
 
+@pytest.mark.require_learning
 def test_adaptive_empirical_fallback_and_time_varying_scale():
     residual_load = np.tile([0.0, 1.0], 13)
     forecast_inputs = _adaptive_merit_order_forecast_inputs(
@@ -946,6 +957,7 @@ def test_adaptive_empirical_fallback_and_time_varying_scale():
     assert low["residual_std_forecast"] < high["residual_std_forecast"]
 
 
+@pytest.mark.require_learning
 def test_adaptive_forecast_price_signal_usage_does_not_change_merit_order(
     market_setup, forecast_setup, shared_FastIndex
 ):
@@ -994,6 +1006,7 @@ def test_adaptive_forecast_price_signal_usage_does_not_change_merit_order(
     assert forecaster.adaptive_merit_order_settings["distribution"] == "gaussian"
 
 
+@pytest.mark.require_learning
 def test_adaptive_uncertainty_model_is_selected_before_first_forecast(
     market_setup, forecast_setup, shared_FastIndex
 ):

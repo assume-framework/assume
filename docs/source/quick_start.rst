@@ -48,7 +48,7 @@ Running tests
 
 Install the testing packages after checking out the repo::
 
-    pip install -e .[test]
+    pip install -e .[test,learning]
 
 Run pytest with coverage to run all tests and produce a coverage report::
 
