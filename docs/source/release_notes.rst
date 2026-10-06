@@ -13,6 +13,10 @@ Upcoming Release
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
 
+**License:**
+  - **ASSUME is now licensed under the MIT License** instead of the GNU Affero General Public License v3.0 (AGPL-3.0-or-later). All SPDX headers, the package metadata and the documentation have been updated accordingly.
+
+
 **New Features:**
   - **Cement Plant DSM unit**: Added a ``CementPlant`` unit modelling a fuel-switchable kiln line, each stage independently switchable between electricity, a natural-gas/coal mix, or hydrogen. Optional components include an electrolyser supplying the burners with on-site hydrogen, an electric-heater thermal storage (E-TES) that buffers calciner heat, and a raw material mill / cement mill. Either mill can also run standalone with no kiln line at all, in which case the declared demand targets that mill's own ground tonnage directly. Supports both full-horizon and rolling-horizon optimisation, and all of the existing ``DSMFlex`` flexibility measures. See the Demand Side Agent documentation for details.
   - **New demand-side technology components in** ``dst_components.py``: Added ``ThermalProcessStage``, a shared base class for fuel-switchable thermal stages, with ``Preheater``, ``Calciner``, and ``Kiln`` subclasses used by the new cement plant. ``Calciner`` tracks process (calcination) CO2 emissions separately from energy emissions; ``Preheater`` accepts recovered waste heat from the kiln. Also added ``GrindingMill``, a generic electric grinding component used for both raw material milling and cement grinding, and a new ``short-term_with_generator`` mode for ``ThermalStorage`` where an electric heater charges the storage from grid power.
