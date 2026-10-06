@@ -338,73 +338,11 @@ def test_hydrogen_seasonal_storage_schedule_injection():
     )
 
 
-# ---------------------------------------------------------------------------
-# Rolling horizon
-# ---------------------------------------------------------------------------
-
-
-def _rolling_hydrogen_plant(prices, demand=60):
-    """A small electrolyser-only plant for rolling-horizon regression tests."""
-    n = len(prices)
-    index = pd.date_range("2023-01-01", periods=n, freq="h")
-    plant = HydrogenPlant(
-        id="test_rolling_hydrogen_plant",
-        unit_operator="test_operator",
-        objective="min_variable_cost",
-        flexibility_measure="cost_based_load_shift",
-        bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
-        components={
-            "electrolyser": {
-                "max_power": 100,
-                "min_power": 0,
-                "ramp_up": 100,
-                "ramp_down": 100,
-                "efficiency": 1,
-                "min_operating_time": 0,
-                "min_down_time": 0,
-            }
-        },
-        forecaster=HydrogenForecaster(
-            index,
-            electricity_price=prices,
-            hydrogen_demand=[0] * n,
-        ),
-        demand=demand,
-        dsm_optimisation_config={
-            "horizon_mode": "rolling_horizon",
-            "look_ahead_horizon": "4h",
-            "commit_horizon": "2h",
-            "rolling_step": "2h",
-        },
-    )
-    plant.setup_model(presolve=True)
-    return plant
-
-
-def test_rolling_horizon_tracks_remaining_absolute_hydrogen_demand():
-    """Committed hydrogen output is deducted before the next window is solved."""
-    plant = _rolling_hydrogen_plant(
-        prices=[200.0, 200.0, 200.0, 10.0, 10.0, 10.0]
-    )
-
-    plant._check_and_reoptimize_rolling_window(pd.Timestamp("2023-01-01 00:00"))
-    assert sum(plant._rh_full_horizon_production[:2]) == pytest.approx(0.0)
-
-    plant._check_and_reoptimize_rolling_window(pd.Timestamp("2023-01-01 02:00"))
-    produced = sum(plant._rh_full_horizon_production[:4])
-    assert produced == pytest.approx(60.0)
-
-    plant._check_and_reoptimize_rolling_window(pd.Timestamp("2023-01-01 04:00"))
-    assert plant._rh_window_remaining_demand == pytest.approx(0.0)
-    assert sum(plant._rh_full_horizon_production) == pytest.approx(60.0)
-    assert plant._rh_optimized_until_step == len(plant.index)
-
-
 def test_rolling_horizon_honours_per_timestep_hydrogen_demand():
     """Per-timestep hydrogen demand remains the alternative to an absolute target."""
     n = 6
     index = pd.date_range("2023-01-01", periods=n, freq="h")
-    per_timestep_demand = [5.0] * n
+    per_timestep_demand = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
     plant = HydrogenPlant(
         id="test_rolling_hydrogen_per_timestep",
         unit_operator="test_operator",

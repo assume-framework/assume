@@ -719,73 +719,11 @@ def test_electricity_price_signal_flexibility(steam_plant_with_price_signal_flex
     assert low_price_avg >= high_price_avg - 1e-3
 
 
-# ---------------------------------------------------------------------------
-# Rolling horizon
-# ---------------------------------------------------------------------------
-
-
-def _rolling_steam_plant(prices, demand=60):
-    """A small heat-pump-only plant for rolling-horizon regression tests."""
-    n = len(prices)
-    index = pd.date_range("2023-01-01", periods=n, freq="h")
-    plant = SteamPlant(
-        id="test_rolling_steam_plant",
-        unit_operator="test_operator",
-        objective="min_variable_cost",
-        flexibility_measure="cost_based_load_shift",
-        bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
-        components={
-            "heat_pump": {
-                "max_power": 100,
-                "min_power": 0,
-                "cop": 1,
-                "ramp_up": 100,
-                "ramp_down": 100,
-            }
-        },
-        forecaster=SteamgenerationForecaster(
-            index=index,
-            demand=0,
-            electricity_price=prices,
-            fuel_prices={},
-            thermal_demand=[0] * n,
-        ),
-        demand=demand,
-        dsm_optimisation_config={
-            "horizon_mode": "rolling_horizon",
-            "look_ahead_horizon": "4h",
-            "commit_horizon": "2h",
-            "rolling_step": "2h",
-        },
-    )
-    plant.setup_model(presolve=True)
-    return plant
-
-
-def test_rolling_horizon_tracks_remaining_absolute_thermal_demand():
-    """Committed thermal output is deducted before the next window is solved."""
-    plant = _rolling_steam_plant(
-        prices=[200.0, 200.0, 200.0, 10.0, 10.0, 10.0]
-    )
-
-    plant._check_and_reoptimize_rolling_window(pd.Timestamp("2023-01-01 00:00"))
-    assert sum(plant._rh_full_horizon_production[:2]) == pytest.approx(0.0)
-
-    plant._check_and_reoptimize_rolling_window(pd.Timestamp("2023-01-01 02:00"))
-    produced = sum(plant._rh_full_horizon_production[:4])
-    assert produced == pytest.approx(60.0)
-
-    plant._check_and_reoptimize_rolling_window(pd.Timestamp("2023-01-01 04:00"))
-    assert plant._rh_window_remaining_demand == pytest.approx(0.0)
-    assert sum(plant._rh_full_horizon_production) == pytest.approx(60.0)
-    assert plant._rh_optimized_until_step == len(plant.index)
-
-
 def test_rolling_horizon_honours_per_timestep_thermal_demand():
     """Per-timestep thermal demand remains the alternative to an absolute target."""
     n = 6
     index = pd.date_range("2023-01-01", periods=n, freq="h")
-    per_timestep_demand = [5.0] * n
+    per_timestep_demand = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
     plant = SteamPlant(
         id="test_rolling_steam_per_timestep",
         unit_operator="test_operator",

@@ -37,33 +37,6 @@ class SteamPlant(DSMFlex, SupportsMinMax):
     required_technologies = []
     optional_technologies = ["heat_pump", "boiler", "thermal_storage"]
 
-    # Rolling-horizon hooks (DSMFlex). The absolute ``demand`` is the
-    # horizon-wide thermal target; committed net thermal supply reduces it
-    # window by window.
-    _demand_attr_suffix = "demand"
-    _component_schema = {
-        "heat_pump": ("power_in", "heat_out", "heat_pump_power", "heat_output"),
-        "boiler": ("power_in", "heat_out", "boiler_power", "boiler_heat_output"),
-        "thermal_storage": (
-            "power_in",
-            "discharge",
-            "thermal_storage_power",
-            "thermal_storage_discharge",
-        ),
-    }
-
-    def _primary_output_expr(self, m, t):
-        """Net thermal supply at *t*, including thermal-storage flows."""
-        thermal_output = 0
-        if self.has_heatpump:
-            thermal_output += m.dsm_blocks["heat_pump"].heat_out[t]
-        if self.has_boiler:
-            thermal_output += m.dsm_blocks["boiler"].heat_out[t]
-        if self.has_thermal_storage:
-            storage = m.dsm_blocks["thermal_storage"]
-            thermal_output += storage.discharge[t] - storage.charge[t]
-        return thermal_output
-
     def __init__(
         self,
         id: str,
@@ -133,10 +106,6 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         self.electricity_price_flex = forecaster.electricity_price_flex
         self.demand = demand
         self.thermal_demand = forecaster.thermal_demand
-        # DSMFlex recognises ``<demand attr>_per_timestep`` as the alternative
-        # to a horizon-wide demand target. SteamPlant's existing thermal demand
-        # forecast supplies that per-timestep mode.
-        self.demand_per_timestep = self.thermal_demand if not self.demand else None
         self.congestion_signal = forecaster.congestion_signal
         self.renewable_utilisation_signal = forecaster.renewable_utilisation_signal
 
@@ -169,9 +138,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 initialize={
                     t: value
                     for t, value in enumerate(
-                        self._values_for_model(
-                            self.forecaster.get_price("natural_gas")
-                        )
+                        self._values_for_model(self.forecaster.get_price("natural_gas"))
                     )
                 },
             )
@@ -187,21 +154,12 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 },
             )
 
-        # A rolling window must meet only the demand not already supplied in
-        # committed windows. Full-horizon operation continues to use demand.
-        demand_value = self.demand
-        if self._rh_window_remaining_demand is not None:
-            demand_value = self._rh_window_remaining_demand
-            logger.info("Using rolling-horizon remaining_demand: %s", demand_value)
-
-        self.model.absolute_demand = pyo.Param(initialize=demand_value)
+        self.model.absolute_demand = pyo.Param(initialize=self.demand)
         self.model.thermal_demand = pyo.Param(
             self.model.time_steps,
             initialize={
                 t: value
-                for t, value in enumerate(
-                    self._values_for_model(self.thermal_demand)
-                )
+                for t, value in enumerate(self._values_for_model(self.thermal_demand))
             },
         )
 
