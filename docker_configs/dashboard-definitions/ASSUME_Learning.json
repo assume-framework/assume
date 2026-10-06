@@ -669,20 +669,6 @@
         }
       ],
       "title": "Average training REWARD",
-      "transformations": [
-        {
-          "id": "partitionByValues",
-          "options": {
-            "fields": [
-              "unit"
-            ],
-            "keepFields": false,
-            "naming": {
-              "asLabels": false
-            }
-          }
-        }
-      ],
       "type": "xychart"
     },
     {
@@ -868,20 +854,6 @@
         }
       ],
       "title": "Average evaluation REWARD",
-      "transformations": [
-        {
-          "id": "partitionByValues",
-          "options": {
-            "fields": [
-              "unit"
-            ],
-            "keepFields": false,
-            "naming": {
-              "asLabels": false
-            }
-          }
-        }
-      ],
       "type": "xychart"
     },
     {
@@ -2309,8 +2281,6 @@
             }
           },
           "mappings": [],
-          "max": 1,
-          "min": -1,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -2354,7 +2324,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \r\n    --datetime,\r\n    unit as unit, \r\n    reward as reward\r\nFROM rl_params\r\nWHERE \r\n    $__timeFilter(datetime)  -- Ensures time filtering aligns with Grafana's dashboard\r\n    AND simulation = '$simulation'\r\n    AND evaluation_mode = FALSE\r\n    AND unit IN (${rl_unit})  -- Supports multiple units\r\n    AND episode = ${episode}  -- Filtering for the specific episode\r\n\r\n--ORDER BY datetime, unit;\r\n",
+          "rawSql": "SELECT\n    unit,\n    reward\nFROM rl_params\nWHERE\n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE\n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${episode}  -- Filtering for the specific episode\nORDER BY unit;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2375,7 +2345,18 @@
           }
         }
       ],
-      "title": "Training REWARD during Episode ${episode}",
+      "title": "Histogram of Training REWARD during Episode ${episode}",
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "unit"
+            ],
+            "keepFields": false
+          }
+        }
+      ],
       "type": "histogram"
     },
     {
@@ -2403,8 +2384,6 @@
             }
           },
           "mappings": [],
-          "max": 1,
-          "min": -1,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -2448,7 +2427,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \r\n    datetime,\r\n    unit, \r\n    reward\r\nFROM rl_params\r\nWHERE \r\n    $__timeFilter(datetime)\r\n    AND simulation = '$simulation'\r\n    AND evaluation_mode = TRUE\r\n    AND unit IN (${rl_unit})  -- Supports multiple units\r\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\r\nORDER BY datetime, unit;\r\n",
+          "rawSql": "SELECT\n    unit,\n    reward\nFROM rl_params\nWHERE\n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = TRUE\n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\nORDER BY unit;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2469,7 +2448,18 @@
           }
         }
       ],
-      "title": "Evaluation REWARD during Eval Episode ${eval_episode}",
+      "title": "Histogram of Evaluation REWARD during Eval Episode ${eval_episode}",
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "unit"
+            ],
+            "keepFields": false
+          }
+        }
+      ],
       "type": "histogram"
     },
     {
@@ -3044,7 +3034,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    $__timeGroupAlias(datetime, $__interval),\n    unit AS \"Unit\", \n    avg(actions_1) AS \"noisy_action_1\",\n    avg(actions_1 - exploration_noise_1) AS \"action_1\"\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE \n    AND unit IN (${rl_unit})\n    AND episode = ${episode}\nGROUP BY 1, unit\nORDER BY 1, unit;",
+          "rawSql": "-- actions_1 only exists if a unit has a second action, so it is read via to_jsonb (NULL instead of an error)\nSELECT \n    $__timeGroupAlias(datetime, $__interval),\n    unit AS \"Unit\", \n    avg((to_jsonb(r) ->> 'actions_1')::float) AS \"noisy_action_1\",\n    avg((to_jsonb(r) ->> 'actions_1')::float - (to_jsonb(r) ->> 'exploration_noise_1')::float) AS \"action_1\"\nFROM rl_params r\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE \n    AND unit IN (${rl_unit})\n    AND episode = ${episode}\n    AND to_jsonb(r) ->> 'actions_1' IS NOT NULL\nGROUP BY 1, unit\nORDER BY 1, unit;",
           "refId": "B",
           "sql": {
             "columns": [
@@ -3254,7 +3244,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    $__timeGroupAlias(datetime, $__interval),\n    unit AS \"Unit\", \n    avg(actions_1 - exploration_noise_1) AS \"action_1\"\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = TRUE \n    AND unit IN (${rl_unit})\n    AND episode = ${eval_episode}\nGROUP BY 1, unit\nORDER BY 1, unit;",
+          "rawSql": "-- actions_1 only exists if a unit has a second action, so it is read via to_jsonb (NULL instead of an error)\nSELECT \n    $__timeGroupAlias(datetime, $__interval),\n    unit AS \"Unit\", \n    avg((to_jsonb(r) ->> 'actions_1')::float - (to_jsonb(r) ->> 'exploration_noise_1')::float) AS \"action_1\"\nFROM rl_params r\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = TRUE \n    AND unit IN (${rl_unit})\n    AND episode = ${eval_episode}\n    AND to_jsonb(r) ->> 'actions_1' IS NOT NULL\nGROUP BY 1, unit\nORDER BY 1, unit;",
           "refId": "B",
           "sql": {
             "columns": [
@@ -3275,7 +3265,7 @@
           }
         }
       ],
-      "title": "Evaluation ACTIONS during Episode ${eval_episode}",
+      "title": "Evaluation ACTIONS during Eval Episode ${eval_episode}",
       "transformations": [
         {
           "id": "prepareTimeSeries",
@@ -3352,7 +3342,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \r\n    datetime,\r\n    unit,\r\n    --actions_1 AS noisy_action_1,  -- Handle missing actions_1\r\n    actions_0 - exploration_noise_0 AS action_0\r\nFROM rl_params\r\nWHERE \r\n    $__timeFilter(datetime)\r\n    AND simulation = '$simulation'\r\n    AND evaluation_mode = FALSE \r\n    AND unit IN (${rl_unit})  -- Supports multiple units\r\n    AND episode = ${episode}  -- Filtering for the specific episode\r\n--ORDER BY datetime, unit;",
+          "rawSql": "SELECT\n    unit,\n    actions_0 - exploration_noise_0 AS action_0\nFROM rl_params\nWHERE\n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE\n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${episode}  -- Filtering for the specific episode\nORDER BY unit;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -3381,7 +3371,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \r\n    datetime,\r\n    unit,\r\n    --actions_1 AS noisy_action_1,  -- Handle missing actions_1\r\n    actions_1 - exploration_noise_1 AS action_1\r\nFROM rl_params\r\nWHERE \r\n    $__timeFilter(datetime)\r\n    AND simulation = '$simulation'\r\n    AND evaluation_mode = FALSE \r\n    AND unit IN (${rl_unit})  -- Supports multiple units\r\n    AND episode = ${episode}  -- Filtering for the specific episode\r\n--ORDER BY datetime, unit;",
+          "rawSql": "-- actions_1 only exists if a unit has a second action, so it is read via to_jsonb (no rows instead of an error)\nSELECT\n    unit,\n    (to_jsonb(r) ->> 'actions_1')::float - (to_jsonb(r) ->> 'exploration_noise_1')::float AS action_1\nFROM rl_params r\nWHERE\n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE\n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${episode}  -- Filtering for the specific episode\n    AND to_jsonb(r) ->> 'actions_1' IS NOT NULL\nORDER BY unit;",
           "refId": "B",
           "sql": {
             "columns": [
@@ -3402,11 +3392,16 @@
           }
         }
       ],
-      "title": "Histrogram of Training ACTIONS during Episode ${episode}",
+      "title": "Histogram of Training ACTIONS during Episode ${episode}",
       "transformations": [
         {
           "id": "partitionByValues",
-          "options": {}
+          "options": {
+            "fields": [
+              "unit"
+            ],
+            "keepFields": false
+          }
         }
       ],
       "type": "histogram"
@@ -3481,7 +3476,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \r\n    datetime,\r\n    unit,\r\n    --actions_1 AS noisy_action_1,  -- Handle missing actions_1\r\n    actions_0 - exploration_noise_0 AS action_0\r\nFROM rl_params\r\nWHERE \r\n    $__timeFilter(datetime)\r\n    AND simulation = '$simulation'\r\n    AND evaluation_mode = TRUE \r\n    AND unit IN (${rl_unit})  -- Supports multiple units\r\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\r\n--ORDER BY datetime, unit;",
+          "rawSql": "SELECT\n    unit,\n    actions_0 - exploration_noise_0 AS action_0\nFROM rl_params\nWHERE\n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = TRUE\n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\nORDER BY unit;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -3510,7 +3505,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \r\n    datetime,\r\n    unit,\r\n    --actions_1 AS noisy_action_1,  -- Handle missing actions_1\r\n    actions_1 - exploration_noise_1 AS action_1\r\nFROM rl_params\r\nWHERE \r\n    $__timeFilter(datetime)\r\n    AND simulation = '$simulation'\r\n    AND evaluation_mode = TRUE \r\n    AND unit IN (${rl_unit})  -- Supports multiple units\r\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\r\n--ORDER BY datetime, unit;",
+          "rawSql": "-- actions_1 only exists if a unit has a second action, so it is read via to_jsonb (no rows instead of an error)\nSELECT\n    unit,\n    (to_jsonb(r) ->> 'actions_1')::float - (to_jsonb(r) ->> 'exploration_noise_1')::float AS action_1\nFROM rl_params r\nWHERE\n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = TRUE\n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\n    AND to_jsonb(r) ->> 'actions_1' IS NOT NULL\nORDER BY unit;",
           "refId": "B",
           "sql": {
             "columns": [
@@ -3531,7 +3526,18 @@
           }
         }
       ],
-      "title": "Evaluation ACTIONS during Eval Episode ${eval_episode}",
+      "title": "Histogram of Evaluation ACTIONS during Eval Episode ${eval_episode}",
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "unit"
+            ],
+            "keepFields": false
+          }
+        }
+      ],
       "type": "histogram"
     }
   ],
