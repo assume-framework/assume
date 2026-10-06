@@ -153,52 +153,44 @@ class TD3(RLAlgorithm):
 
             try:
                 critic_params = th.load(critic_path, weights_only=True)
-                for key in ("critic", "critic_target", "critic_optimizer"):
-                    if key not in critic_params:
-                        logger.warning(
-                            f"Missing {key} in critic params for {u_id}; skipping."
-                        )
-                        continue
-
+                critic = critic_params["critic"]
+                critic_target = critic_params["critic_target"]
+                critic_optimizer = critic_params["critic_optimizer"]
                 if direct_load:
-                    strategy.critics.load_state_dict(critic_params["critic"])
-                    strategy.target_critics.load_state_dict(
-                        critic_params["critic_target"]
-                    )
-                    strategy.critics.optimizer.load_state_dict(
-                        critic_params["critic_optimizer"]
-                    )
+                    strategy.critics.load_state_dict(critic)
+                    strategy.target_critics.load_state_dict(critic_target)
+                    strategy.critics.optimizer.load_state_dict(critic_optimizer)
                     logger.debug(f"Loaded critic for {u_id} directly.")
-                else:
-                    critic_weights = transfer_weights(
-                        model=strategy.critics,
-                        loaded_state=critic_params["critic"],
-                        loaded_id_order=loaded_id_order,
-                        new_id_order=new_id_order,
-                        obs_base=strategy.obs_dim,
-                        act_dim=strategy.act_dim,
-                        unique_obs=strategy.unique_obs_dim,
+                    continue
+
+                critic_weights = transfer_weights(
+                    model=strategy.critics,
+                    loaded_state=critic,
+                    loaded_id_order=loaded_id_order,
+                    new_id_order=new_id_order,
+                    obs_base=strategy.obs_dim,
+                    act_dim=strategy.act_dim,
+                    unique_obs=strategy.unique_obs_dim,
+                )
+                target_critic_weights = transfer_weights(
+                    model=strategy.target_critics,
+                    loaded_state=critic_target,
+                    loaded_id_order=loaded_id_order,
+                    new_id_order=new_id_order,
+                    obs_base=strategy.obs_dim,
+                    act_dim=strategy.act_dim,
+                    unique_obs=strategy.unique_obs_dim,
+                )
+
+                if critic_weights is None or target_critic_weights is None:
+                    logger.warning(
+                        f"Critic weights transfer failed for {u_id}; skipping."
                     )
-                    target_critic_weights = transfer_weights(
-                        model=strategy.target_critics,
-                        loaded_state=critic_params["critic_target"],
-                        loaded_id_order=loaded_id_order,
-                        new_id_order=new_id_order,
-                        obs_base=strategy.obs_dim,
-                        act_dim=strategy.act_dim,
-                        unique_obs=strategy.unique_obs_dim,
-                    )
+                    continue
 
-                    if critic_weights is None or target_critic_weights is None:
-                        logger.warning(
-                            f"Critic weights transfer failed for {u_id}; skipping."
-                        )
-                        continue
-
-                    strategy.critics.load_state_dict(critic_weights)
-                    strategy.target_critics.load_state_dict(target_critic_weights)
-                    logger.debug(f"Critic weights transferred for {u_id}.")
-
+                strategy.critics.load_state_dict(critic_weights)
+                strategy.target_critics.load_state_dict(target_critic_weights)
+                logger.debug(f"Critic weights transferred for {u_id}.")
             except Exception as e:
                 logger.warning(f"Failed to load critic for {u_id}: {e}")
 
