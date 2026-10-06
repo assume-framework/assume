@@ -844,46 +844,50 @@ def test_adaptive_empirical_fallback_and_time_varying_scale():
     assert low["residual_std_forecast"] < high["residual_std_forecast"]
 
 
-def test_adaptive_forecast_uses_requested_horizon_without_changing_price(
+def test_adaptive_forecast_price_signal_usage_does_not_change_merit_order(
     market_setup, forecast_setup, shared_FastIndex
 ):
+    """Show the public adaptive price-signal interface used by simulations."""
     forecaster = UnitsOperatorForecaster(
         index=shared_FastIndex, forecast_registries=get_forecast_registries()
     )
     forecaster.initialize(forecast_setup["units"], market_setup["empty_grid_markets"])
     original_price = forecaster.price["EOM"].data.copy()
+
+    # Enable once before the simulation starts. Gaussian uncertainty is the
+    # built-in default and need not be selected by the caller.
+    forecaster.enable_adaptive_merit_order_correction()
+
+    # UnitsOperator calls this at market opening. A day-ahead opening would
+    # use timedelta(hours=24); this compact fixture issues two products.
+    issue_time = shared_FastIndex.start
     forecasts = forecaster.get_adaptive_merit_order_forecast(
-        "EOM", shared_FastIndex.start, timedelta(hours=2)
+        "EOM", issue_time, timedelta(hours=2)
     )
 
     assert len(forecasts) == 2
     assert forecasts[0]["product_start"] == shared_FastIndex.start + timedelta(hours=1)
     assert "EOM" in forecaster.adaptive_merit_order_state["markets"]
     assert np.array_equal(forecaster.price["EOM"].data, original_price)
+
+    # Read one issued price just like forecaster.price["EOM"][delivery_time].
     adaptive_price = forecaster.adaptive_forecast.price["EOM"]
-    assert adaptive_price[shared_FastIndex.start + timedelta(hours=1)] == pytest.approx(
+    delivery_time = issue_time + timedelta(hours=1)
+    one_hour_price = adaptive_price[delivery_time]
+    assert one_hour_price == pytest.approx(
         forecasts[0]["corrected_price_mean_forecast"]
     )
+
+    # Read every issued price in the forecast window. For a 24-hour auction,
+    # use delivery_time : delivery_time + timedelta(hours=23).
+    issued_price_window = adaptive_price[
+        delivery_time : delivery_time + timedelta(hours=1)
+    ]
     assert np.allclose(
-        adaptive_price[
-            shared_FastIndex.start + timedelta(hours=1) : shared_FastIndex.start
-            + timedelta(hours=2)
-        ],
+        issued_price_window,
         [forecast["corrected_price_mean_forecast"] for forecast in forecasts],
     )
     assert np.isnan(adaptive_price[shared_FastIndex.start])
-
-
-def test_enable_adaptive_merit_order_correction_uses_gaussian_default(
-    market_setup, forecast_setup, shared_FastIndex
-):
-    forecaster = UnitsOperatorForecaster(
-        index=shared_FastIndex, forecast_registries=get_forecast_registries()
-    )
-    forecaster.initialize(forecast_setup["units"], market_setup["empty_grid_markets"])
-
-    forecaster.enable_adaptive_merit_order_correction()
-
     assert forecaster.adaptive_merit_order_correction_enabled is True
     assert forecaster.adaptive_merit_order_settings["distribution"] == "gaussian"
 
