@@ -155,6 +155,7 @@ def test_adaptive_merit_order_forecast_lifecycle():
         market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
     )
     forecaster = Mock()
+    forecaster.adaptive_merit_order_correction_enabled = False
     forecaster.update_adaptive_merit_order_forecast.return_value = []
     units_operator = UnitsOperator([marketconfig], forecaster=forecaster)
     units_operator.id = "operator"
@@ -168,6 +169,31 @@ def test_adaptive_merit_order_forecast_lifecycle():
     units_operator.write_actual_dispatch = Mock()
     units_operator.calculate_unit_cashflow_and_reward = Mock()
 
+    # The normal UnitsOperator lifecycle remains unchanged until the caller
+    # explicitly enables the adaptive correction on its forecaster.
+    units_operator.handle_opening(
+        {
+            "market_id": "EOM",
+            "start_time": start,
+            "end_time": start + timedelta(hours=1),
+            "products": [
+                (start + timedelta(hours=1), start + timedelta(hours=2), None)
+            ],
+        },
+        {},
+    )
+    forecaster.get_adaptive_merit_order_forecast.assert_not_called()
+    units_operator.handle_market_feedback(
+        {
+            "market_id": "EOM",
+            "accepted_orders": [],
+            "rejected_orders": [],
+        },
+        {},
+    )
+    forecaster.update_adaptive_merit_order_forecast.assert_not_called()
+
+    forecaster.adaptive_merit_order_correction_enabled = True
     units_operator.handle_opening(
         {
             "market_id": "EOM",
