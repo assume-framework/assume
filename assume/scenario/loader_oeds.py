@@ -417,8 +417,8 @@ if __name__ == "__main__":
             "pay_as_clear",
             [MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))],
             additional_fields=["block_id", "link", "exclusive_id"],
-            maximum_bid_volume=1e9,
-            maximum_bid_price=1e9,
+            maximum_bid_volume=1e6,
+            maximum_bid_price=3000,
         )
     ]
 
