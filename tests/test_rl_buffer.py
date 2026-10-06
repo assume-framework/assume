@@ -14,6 +14,41 @@ except ImportError:
 
 
 @pytest.mark.require_learning
+@pytest.mark.parametrize("batch_sizes", [(5, 5, 5), (3, 3, 3, 3, 3), (3, 3, 5)])
+def test_replay_buffer_wraparound(batch_sizes):
+    buffer = ReplayBuffer(10, 1, 1, 1, "cpu", th.float32)
+    total = 0
+    for batch_size in batch_sizes:
+        values = np.arange(total + 1, total + batch_size + 1, dtype=np.float32)
+        obs = values.reshape(-1, 1, 1)
+        buffer.add(obs, obs + 100, obs + 200)
+        total += batch_size
+
+        assert buffer.pos == total % 10
+        assert buffer.full == (total >= 10)
+        assert buffer.size() == min(total, 10)
+        # Read retained entries in chronological order.
+        indices = np.arange(max(0, total - 10), total) % 10
+        expected = np.arange(max(1, total - 9), total + 1)
+        np.testing.assert_array_equal(buffer.observations[indices, 0, 0], expected)
+        np.testing.assert_array_equal(buffer.actions[indices, 0, 0], expected + 100)
+        np.testing.assert_array_equal(buffer.rewards[indices, 0], expected + 200)
+
+
+@pytest.mark.require_learning
+def test_replay_buffer_rejects_oversized_batch():
+    buffer = ReplayBuffer(10, 1, 1, 1, "cpu", th.float32)
+    values = np.ones((11, 1, 1), dtype=np.float32)
+    with pytest.raises(ValueError, match="Batch size exceeds replay buffer capacity"):
+        buffer.add(values, values, values)
+    assert buffer.size() == 0
+    assert not buffer.full
+    assert not buffer.observations.any()
+    assert not buffer.actions.any()
+    assert not buffer.rewards.any()
+
+
+@pytest.mark.require_learning
 def test_replay_buffer_init():
     buffer = ReplayBuffer(
         10,
