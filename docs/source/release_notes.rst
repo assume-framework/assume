@@ -1,6 +1,6 @@
 .. SPDX-FileCopyrightText: ASSUME Developers
 ..
-.. SPDX-License-Identifier: AGPL-3.0-or-later
+.. SPDX-License-Identifier: MIT
 
 #############
 Release Notes
@@ -11,6 +11,10 @@ Upcoming Release
 .. warning::
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
+
+
+**License:**
+  - **ASSUME is now licensed under the MIT License** instead of the GNU Affero General Public License v3.0 (AGPL-3.0-or-later). The SPDX headers, the package metadata and the documentation have been updated accordingly. The code of conduct, which is adapted from the Contributor Covenant, is licensed under CC-BY-4.0.
 
 
 **New Features:**

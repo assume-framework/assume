@@ -1,13 +1,13 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 repos:
   - repo: https://github.com/fsfe/reuse-tool
     rev: v6.2.0
     hooks:
       - id: reuse
-        args: ["annotate", "--license", "AGPL-3.0-or-later", "--recursive", "--copyright", "ASSUME Developers", "--exclude-year", "--skip-unrecognised", "--skip-existing", "."]
+        args: ["annotate", "--license", "MIT", "--recursive", "--copyright", "ASSUME Developers", "--exclude-year", "--skip-unrecognised", "--skip-existing", "."]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.

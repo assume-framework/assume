@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 [build-system]
 requires = ["setuptools>=80", "setuptools-scm>=8"]
@@ -11,7 +11,7 @@ name = "assume-framework"
 dynamic = ["version"]
 description = "ASSUME - Agent-Based Electricity Markets Simulation Toolbox"
 authors = [{ name = "ASSUME Developers", email = "contact@assume-project.de"}]
-license = "AGPL-3.0-or-later"
+license = "MIT"
 readme = "README.md"
 keywords = ["agent based simulation", "energy market", "reinforcement learning", "market simulation", "simulation"]
 
