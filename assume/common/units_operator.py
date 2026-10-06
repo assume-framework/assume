@@ -225,6 +225,10 @@ class UnitsOperator(Role):
         marketconfig = self.registered_markets.get(opening["market_id"])
         if (
             self.forecaster
+            and getattr(
+                self.forecaster, "adaptive_merit_order_correction_enabled", False
+            )
+            is True
             and marketconfig
             and marketconfig.product_type == "energy"
             and opening["products"]
@@ -254,7 +258,14 @@ class UnitsOperator(Role):
             order["market_id"] = content["market_id"]
 
         marketconfig = self.registered_markets[content["market_id"]]
-        if self.forecaster and marketconfig.product_type == "energy":
+        if (
+            self.forecaster
+            and getattr(
+                self.forecaster, "adaptive_merit_order_correction_enabled", False
+            )
+            is True
+            and marketconfig.product_type == "energy"
+        ):
             clearing_prices = {}
             for order in accepted_orders:
                 accepted_price = order.get("accepted_price")

@@ -1195,6 +1195,7 @@ class UnitsOperatorForecaster(UnitForecaster):
         )
         self.adaptive_merit_order_state: dict = {"markets": {}}
         self.adaptive_merit_order_settings: dict = {}
+        self.adaptive_merit_order_correction_enabled = False
         self._adaptive_merit_order_units: tuple[BaseUnit, ...] = ()
         self._adaptive_merit_order_markets: dict[str, MarketConfig] = {}
         self.unit_operator_id = "operator"
@@ -1227,11 +1228,12 @@ class UnitsOperatorForecaster(UnitForecaster):
     def set_adaptive_merit_order_uncertainty_model(
         self, uncertainty_model: str, **settings
     ) -> None:
-        """Select the uncertainty model before adaptive forecasts are issued.
+        """Enable adaptive correction and select its uncertainty model.
 
         Supported distributions are ``gaussian`` (the default), ``johnson_su``
         and ``nonlinear_quantile``. Additional keyword settings can tune the
-        selected method without adding simulation YAML configuration.
+        selected method without adding simulation YAML configuration. Calling
+        this before simulation start also enables the UnitsOperator lifecycle.
         """
         if self.adaptive_merit_order_state["markets"]:
             raise RuntimeError(
@@ -1256,6 +1258,7 @@ class UnitsOperatorForecaster(UnitForecaster):
         self.adaptive_merit_order_settings = settings | {
             "distribution": uncertainty_model
         }
+        self.adaptive_merit_order_correction_enabled = True
 
     def get_adaptive_merit_order_forecast(
         self,

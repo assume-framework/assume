@@ -501,15 +501,13 @@ ADAPTIVE_MERIT_ORDER_FEATURES = (
     # Selected by chronological LASSO screening on example_03, using January
     # through September 2019 for selection and a separate October--December
     # holdout for confirmation. Together they model system tightness, daily
-    # persistence, and the weekday/weekend market regime.
+    # persistence, and the weekday market regime.
     "merit_order_price",
     "wind_availability_factor",
     "solar_availability_factor",
     "residual_load",
-    "previous_day_same_hour_residual",
     "previous_day_same_hour_price",
     "weekday",
-    "weekend",
 )
 
 ADAPTIVE_MERIT_ORDER_SUPPORTED_FEATURES = (
@@ -519,8 +517,7 @@ ADAPTIVE_MERIT_ORDER_SUPPORTED_FEATURES = (
     "residual_load",
     "previous_day_same_hour_residual",
     "previous_day_same_hour_price",
-    # Evaluated but not selected as a default: its incremental contribution
-    # was inconsistent once weekday and weekend were included.
+    # Evaluated but not selected as default predictors.
     "hour",
     "weekday",
     "weekend",

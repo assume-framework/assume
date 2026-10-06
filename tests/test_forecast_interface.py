@@ -770,10 +770,8 @@ def test_adaptive_default_features_match_lasso_selection():
         "wind_availability_factor",
         "solar_availability_factor",
         "residual_load",
-        "previous_day_same_hour_residual",
         "previous_day_same_hour_price",
         "weekday",
-        "weekend",
     )
 
 
@@ -929,6 +927,7 @@ def test_adaptive_uncertainty_model_is_selected_before_first_forecast(
         index=shared_FastIndex, forecast_registries=get_forecast_registries()
     )
     forecaster.initialize(forecast_setup["units"], market_setup["empty_grid_markets"])
+    assert forecaster.adaptive_merit_order_correction_enabled is False
     forecaster.set_adaptive_merit_order_uncertainty_model(
         "nonlinear_quantile", quantile_hidden_size=8
     )
@@ -939,6 +938,7 @@ def test_adaptive_uncertainty_model_is_selected_before_first_forecast(
     model = forecaster.adaptive_merit_order_state["markets"]["EOM"]
     assert model["config"]["distribution"] == "nonlinear_quantile"
     assert model["config"]["quantile_hidden_size"] == 8
+    assert forecaster.adaptive_merit_order_correction_enabled is True
     assert ADAPTIVE_MERIT_ORDER_SETTINGS["distribution"] == "gaussian"
     with pytest.raises(RuntimeError, match="cannot change"):
         forecaster.set_adaptive_merit_order_uncertainty_model("gaussian")

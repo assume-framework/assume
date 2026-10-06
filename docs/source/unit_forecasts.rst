@@ -118,9 +118,17 @@ Specify which algorithms to use in the ``forecast_algorithms`` section of your s
 Adaptive merit-order correction
 ===============================
 
-The adaptive correction is requested directly from an operator forecaster. It
+The adaptive correction is an opt-in feature of an operator forecaster. It
 does not require a YAML setting and does not replace the existing ``price``
-series used by bidding strategies:
+series used by bidding strategies. Before starting the simulation, select the
+uncertainty model; this also enables the automatic opening/clearing lifecycle:
+
+.. code-block:: python
+
+    forecaster.set_adaptive_merit_order_uncertainty_model("gaussian")
+
+The explicit forecast method remains available for experiments and manual
+evaluation:
 
 .. code-block:: python
 
@@ -138,21 +146,23 @@ one immutable forecast row per product in that delivery window.
 For every selected energy product, the operator forecaster first calculates
 the existing merit-order forecast :math:`P^{MO}`. After clearing it observes
 the day-ahead price :math:`P^{DA}` and learns the residual
-:math:`r=P^{DA}-P^{MO}`. A separate Elastic-Net model learns residual location,
-while a second model learns log scale. The corrected mean is
-:math:`P^{MO}+\hat{r}`; q10, q50, and q90 use a Gaussian residual distribution.
+:math:`r=P^{DA}-P^{MO}`. Separate distributional equations learn residual
+location and log scale using online coordinate descent, LASSO (L1) feature
+selection, and L2 coefficient stabilisation. The corrected mean is
+:math:`P^{MO}+\hat{r}`; the default q10, q50, and q90 use a Gaussian residual
+distribution. ``johnson_su`` and ``nonlinear_quantile`` can be selected with
+the same method before the first forecast is issued.
 Feature matrices, discounted sufficient statistics, coordinate descent, and
 Gaussian inverse-CDF calculations use ``torch.float64`` tensors on CPU by
 default. The double precision is intentional because online discounted
 statistics are updated repeatedly over long simulations.
 
 The default features are merit-order price, separate capacity-weighted wind
-and solar availability factors, forecast residual load, previous-day
-same-hour realised residual and price, cyclic hour and weekday terms, and a
-weekend indicator. General generator availability is deliberately excluded.
-The initial implementation uses built-in settings: 168 training samples,
-``0.995`` forgetting, Gaussian residuals, and a ``0.01`` minimum standard
-deviation.
+and solar availability factors, forecast residual load, previous-day same-hour
+realised price, and cyclic weekday terms. General generator availability is
+deliberately excluded. The initial implementation uses built-in settings: 504
+training samples (21 daily 24-hour auctions), ``0.995`` forgetting, Gaussian
+residuals, and a ``0.01`` minimum standard deviation.
 
 Information timing and statuses
 --------------------------------
