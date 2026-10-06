@@ -123,8 +123,8 @@ An example configuration of how this can be used is shown here:
             "pay_as_clear",
             [MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))],
             additional_fields=["block_id", "link", "exclusive_id"],
-            maximum_bid_volume=1e9,
-            maximum_bid_price=1e9,
+            maximum_bid_volume=1e6,
+            maximum_bid_price=3000,
         )
     ]
 
@@ -190,8 +190,8 @@ The loader creates one node per country without network constraints.
             "pay_as_clear",
             [MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))],
             additional_fields=["block_id", "link", "exclusive_id"],
-            maximum_bid_volume=1e9,
-            maximum_bid_price=1e9,
+            maximum_bid_volume=1e6,
+            maximum_bid_price=3000,
         )
     ]
 
@@ -287,8 +287,8 @@ An example can be seen from the pypsa scigrid case:
             "redispatch",
             [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
             additional_fields=["node"],
-            maximum_bid_volume=1e9,
-            maximum_bid_price=1e9,
+            maximum_bid_volume=1e6,
+            maximum_bid_price=3000,
         )
     ]
 
