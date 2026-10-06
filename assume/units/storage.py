@@ -289,52 +289,15 @@ class Storage(SupportsMinMaxCharge):
             np.ndarray: The volume of the unit within the given time range.
         """
         start = max(start, self.index[0])
-        time_delta = self.index.freq / timedelta(hours=1)
 
         for t in self.index[start:end]:
-            current_power = self.outputs["energy"].at[t]
-
-            # adjust power to constraints of the unit
-            if current_power > self.max_power_discharge:
-                current_power = self.max_power_discharge
-            elif current_power < self.max_power_charge:
-                current_power = self.max_power_charge
-            elif (
-                self.min_power_discharge > current_power > self.min_power_charge
-                and current_power != 0
-            ):
-                current_power = 0
-
-            # calculate the change in state of charge
-            delta_soc = 0
             soc = self.outputs["soc"].at[t]
-
-            # discharging
-            if current_power > 0:
-                max_soc_discharge = self.calculate_soc_max_discharge(soc)
-
-                if current_power > max_soc_discharge:
-                    current_power = max_soc_discharge
-
-                delta_soc = (
-                    -current_power * time_delta / self.efficiency_discharge
-                ) / self.capacity
-
-            # charging
-            elif current_power < 0:
-                max_soc_charge = self.calculate_soc_max_charge(soc)
-
-                if current_power < max_soc_charge:
-                    current_power = max_soc_charge
-
-                delta_soc = (
-                    -current_power * time_delta * self.efficiency_charge
-                ) / self.capacity
+            current_power = self.feasible_power(self.outputs["energy"].at[t], soc)
 
             # update the values of the state of charge and the energy
             next_freq = t + self.index.freq
             if next_freq in self.index:
-                self.outputs["soc"].at[next_freq] = soc + delta_soc
+                self.outputs["soc"].at[next_freq] = soc + self.delta_soc(current_power)
             self.outputs["energy"].at[t] = current_power
 
         return self.outputs["energy"].loc[start:end]

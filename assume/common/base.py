@@ -627,6 +627,73 @@ class SupportsMinMaxCharge(BaseUnit):
             power_charge = min(power_charge, minimum_required - current_power, 0)
         return power_charge
 
+    def feasible_power(self, current_power: float, soc: float) -> float:
+        """
+        Clips a planned power to what the unit can actually run at.
+
+        Both limits apply: the power limits of the unit, and what the current
+        SOC can back. The result is what a following SOC has to be derived from.
+
+        Args:
+            current_power (float): The planned power, negative when charging.
+            soc (float): The state of charge the power would run from.
+
+        Returns:
+            float: The power the unit can actually run at.
+        """
+        current_power = self.apply_power_limits(current_power)
+
+        if current_power > 0:
+            return min(current_power, self.calculate_soc_max_discharge(soc))
+        if current_power < 0:
+            return max(current_power, self.calculate_soc_max_charge(soc))
+        return current_power
+
+    def delta_soc(self, current_power: float) -> float:
+        """
+        The change in state of charge caused by running at ``current_power``.
+
+        Args:
+            current_power (float): A feasible power, negative when charging.
+
+        Returns:
+            float: The change in state of charge.
+        """
+        time_delta = self.index.freq / timedelta(hours=1)
+        if current_power > 0:
+            return (
+                -current_power * time_delta / self.efficiency_discharge
+            ) / self.capacity
+        if current_power < 0:
+            return (
+                -current_power * time_delta * self.efficiency_charge
+            ) / self.capacity
+        return 0.0
+
+    def apply_power_limits(self, current_power: float) -> float:
+        """
+        Clips a planned power to the power limits of the unit.
+
+        A power between the two minimum powers - but not zero - cannot be run
+        at all and therefore becomes zero.
+
+        Args:
+            current_power (float): The planned power, negative when charging.
+
+        Returns:
+            float: The power the unit can actually run at.
+        """
+        if current_power > self.max_power_discharge:
+            return self.max_power_discharge
+        if current_power < self.max_power_charge:
+            return self.max_power_charge
+        if (
+            self.min_power_discharge > current_power > self.min_power_charge
+            and current_power != 0
+        ):
+            return 0
+        return current_power
+
     def set_dispatch_plan(
         self, marketconfig: MarketConfig, orderbook: Orderbook
     ) -> None:
