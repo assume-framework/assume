@@ -14,7 +14,7 @@ Upcoming Release
 
 
 **License:**
-  - **ASSUME is now licensed under the MIT License** instead of the GNU Affero General Public License v3.0 (AGPL-3.0-or-later). All SPDX headers, the package metadata and the documentation have been updated accordingly.
+  - **ASSUME is now licensed under the MIT License** instead of the GNU Affero General Public License v3.0 (AGPL-3.0-or-later). The SPDX headers, the package metadata and the documentation have been updated accordingly. The code of conduct, which is adapted from the Contributor Covenant, is licensed under CC-BY-4.0.
 
 
 **New Features:**

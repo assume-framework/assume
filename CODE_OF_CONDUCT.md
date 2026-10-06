@@ -1,7 +1,8 @@
 <!--
+SPDX-FileCopyrightText: Contributor Covenant contributors
 SPDX-FileCopyrightText: ASSUME Developers
 
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: CC-BY-4.0
 -->
 
 # Contributor Covenant Code of Conduct
