@@ -1230,8 +1230,8 @@ class UnitsOperatorForecaster(UnitForecaster):
     ) -> None:
         """Enable adaptive correction and select its uncertainty model.
 
-        Supported distributions are ``gaussian`` (the default), ``johnson_su``
-        and ``nonlinear_quantile``. Additional keyword settings can tune the
+        Supported distributions are ``gaussian`` (the default) and
+        ``nonlinear_quantile``. Additional keyword settings can tune the
         selected method without adding simulation YAML configuration. Calling
         this before simulation start also enables the UnitsOperator lifecycle.
         """

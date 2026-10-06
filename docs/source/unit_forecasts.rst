@@ -150,8 +150,8 @@ the day-ahead price :math:`P^{DA}` and learns the residual
 location and log scale using online coordinate descent, LASSO (L1) feature
 selection, and L2 coefficient stabilisation. The corrected mean is
 :math:`P^{MO}+\hat{r}`; the default q10, q50, and q90 use a Gaussian residual
-distribution. ``johnson_su`` and ``nonlinear_quantile`` can be selected with
-the same method before the first forecast is issued.
+distribution. ``nonlinear_quantile`` can be selected with the same method
+before the first forecast is issued.
 Feature matrices, discounted sufficient statistics, coordinate descent, and
 Gaussian inverse-CDF calculations use ``torch.float64`` tensors on CPU by
 default. The double precision is intentional because online discounted

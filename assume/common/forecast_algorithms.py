@@ -541,12 +541,8 @@ ADAPTIVE_MERIT_ORDER_SETTINGS = {
     "residual_scale_l2_regularization": 0.001,
     # Uncertainty method used to derive price quantiles. ``nonlinear_quantile``
     # learns asymmetric quantiles of the error around the unchanged corrected
-    # mean forecast; Gaussian and Johnson SU retain their existing behaviour.
+    # mean forecast; Gaussian is the default distributional alternative.
     "distribution": "gaussian",
-    # Johnson SU shape fitting uses only previous standardised forecast errors.
-    "johnson_su_history_size": 1008,
-    "johnson_su_solver_iterations": 5,
-    "johnson_su_learning_rate": 0.01,
     # Small nonlinear PyTorch model for direct q10/q50/q90 error forecasts.
     # Its ordered output layer prevents quantile crossing by construction.
     "quantile_hidden_size": 16,
@@ -576,7 +572,6 @@ ADAPTIVE_MERIT_ORDER_SETTINGS = {
 
 ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS = (
     "gaussian",
-    "johnson_su",
     "nonlinear_quantile",
 )
 
@@ -839,91 +834,6 @@ def gaussian_residual_quantile(mean, standard_deviation, probability):
     )
 
 
-def johnson_su_standardised_moments(shape_a, shape_b):
-    """Return mean and standard deviation of a Johnson SU variate."""
-    shape_a = th.as_tensor(shape_a, dtype=th.float64)
-    shape_b = th.as_tensor(shape_b, dtype=th.float64)
-    inverse_shape_b = 1 / shape_b
-    mean = -th.exp(inverse_shape_b.square() / 2) * th.sinh(shape_a * inverse_shape_b)
-    second_moment = (
-        th.exp(2 * inverse_shape_b.square()) * th.cosh(2 * shape_a * inverse_shape_b)
-        - 1
-    ) / 2
-    standard_deviation = th.sqrt(th.clamp(second_moment - mean.square(), min=1e-12))
-    return mean, standard_deviation
-
-
-def johnson_su_residual_quantile(
-    mean, standard_deviation, shape_a, shape_b, probability
-):
-    """Calculate a mean-standardised Johnson SU residual quantile."""
-    if not 0 < probability < 1 or standard_deviation < 0 or shape_b <= 0:
-        raise ValueError("Invalid Johnson SU quantile parameters")
-    normal = th.distributions.Normal(
-        th.tensor(0.0, dtype=th.float64),
-        th.tensor(1.0, dtype=th.float64),
-    )
-    raw_mean, raw_standard_deviation = johnson_su_standardised_moments(shape_a, shape_b)
-    raw_quantile = th.sinh(
-        (normal.icdf(th.tensor(probability, dtype=th.float64)) - shape_a) / shape_b
-    )
-    return (
-        mean
-        + standard_deviation
-        * ((raw_quantile - raw_mean) / raw_standard_deviation).item()
-    )
-
-
-def fit_johnson_su_shape(model: dict) -> None:
-    """Update Johnson SU shape from past standardised forecast errors only."""
-    errors = model["johnson_su_standardised_errors"]
-    if not errors:
-        return
-    config = model["config"]
-    errors = th.tensor(errors[-config["johnson_su_history_size"] :], dtype=th.float64)
-    age = th.arange(len(errors) - 1, -1, -1, dtype=th.float64)
-    weights = th.tensor(config["forgetting_factor"], dtype=th.float64) ** age
-    parameters = th.tensor(
-        [model["johnson_su_shape_a"], model["johnson_su_log_shape_b"]],
-        dtype=th.float64,
-        requires_grad=True,
-    )
-    iterations = config["johnson_su_solver_iterations"]
-    if model["johnson_su_shape"] is None:
-        iterations *= 20
-    for _ in range(iterations):
-        shape_a = th.clamp(parameters[0], min=-5.0, max=5.0)
-        log_shape_b = th.clamp(
-            parameters[1], min=th.log(th.tensor(0.5)), max=th.log(th.tensor(20.0))
-        )
-        shape_b = th.exp(log_shape_b)
-        raw_mean, raw_standard_deviation = johnson_su_standardised_moments(
-            shape_a, shape_b
-        )
-        raw_errors = raw_mean + raw_standard_deviation * errors
-        transformed_errors = shape_a + shape_b * th.asinh(raw_errors)
-        log_density = (
-            log_shape_b
-            - 0.5 * th.log1p(raw_errors.square())
-            - 0.5 * transformed_errors.square()
-        )
-        loss = -(weights * log_density).sum() / weights.sum()
-        gradient = th.autograd.grad(loss, parameters)[0]
-        parameters = (
-            (parameters - config["johnson_su_learning_rate"] * gradient)
-            .detach()
-            .requires_grad_()
-        )
-    model["johnson_su_shape_a"] = th.clamp(parameters[0], min=-5.0, max=5.0).item()
-    model["johnson_su_log_shape_b"] = th.clamp(
-        parameters[1], min=th.log(th.tensor(0.5)), max=th.log(th.tensor(20.0))
-    ).item()
-    model["johnson_su_shape"] = (
-        model["johnson_su_shape_a"],
-        th.exp(th.tensor(model["johnson_su_log_shape_b"])).item(),
-    )
-
-
 def initialize_nonlinear_quantile_model(n_features: int, config: dict) -> dict:
     """Create the nonlinear non-crossing residual-error quantile model."""
     if (
@@ -1042,10 +952,6 @@ def initialize_adaptive_merit_order_model(market_id, forecast_inputs, config) ->
         "residual_quantile_model": None,
         "initial_inputs": [],
         "initial_residuals": [],
-        "johnson_su_standardised_errors": [],
-        "johnson_su_shape_a": 0.0,
-        "johnson_su_log_shape_b": th.log(th.tensor(5.0)).item(),
-        "johnson_su_shape": None,
         "residual_by_product": {},
         "price_by_product": {},
         "residual_history": [],
@@ -1188,20 +1094,6 @@ def issue_adaptive_merit_order_correction(
         }
         if residual_std is not None:
             if (
-                model["config"]["distribution"] == "johnson_su"
-                and model["johnson_su_shape"] is not None
-            ):
-                shape_a, shape_b = model["johnson_su_shape"]
-                issued["price_q10"] = johnson_su_residual_quantile(
-                    corrected_mean, residual_std, shape_a, shape_b, 0.1
-                )
-                issued["price_q50"] = johnson_su_residual_quantile(
-                    corrected_mean, residual_std, shape_a, shape_b, 0.5
-                )
-                issued["price_q90"] = johnson_su_residual_quantile(
-                    corrected_mean, residual_std, shape_a, shape_b, 0.9
-                )
-            elif (
                 model["config"]["distribution"] == "nonlinear_quantile"
                 and model["residual_quantile_model"] is not None
             ):
@@ -1356,24 +1248,6 @@ def fit_initial_adaptive_merit_order_models(model: dict) -> None:
             config["quantile_initial_iterations"],
         )
 
-    if model["config"]["distribution"] == "johnson_su":
-        initial_standard_deviations = th.exp(
-            th.clamp(
-                predict_online_regularized_regression(
-                    model["residual_scale_model"], scale_matrix
-                ),
-                min=th.log(th.tensor(config["sigma_floor"], dtype=th.float64)),
-                max=th.log(th.tensor(1e6, dtype=th.float64)),
-            )
-        )
-        errors = residuals - predict_online_regularized_regression(
-            model["residual_mean_model"], residual_mean_matrix
-        )
-        model["johnson_su_standardised_errors"] = (
-            errors / initial_standard_deviations
-        ).tolist()
-        fit_johnson_su_shape(model)
-
 
 def update_adaptive_merit_order_correction(state, market_id, market_meta) -> list[dict]:
     """Link realised prices and update only forecasts issued subsequently."""
@@ -1453,12 +1327,7 @@ def update_adaptive_merit_order_correction(state, market_id, market_meta) -> lis
             scale_vector = transform_adaptive_merit_order_features(
                 model["residual_scale_features"], pending["inputs"]
             )
-        if model["config"]["distribution"] == "johnson_su":
-            model["johnson_su_standardised_errors"].append(
-                post_forecast_residual / issued["residual_std_forecast"]
-            )
-            fit_johnson_su_shape(model)
-        elif model["config"]["distribution"] == "nonlinear_quantile":
+        if model["config"]["distribution"] == "nonlinear_quantile":
             quantile_features.append(scale_vector)
             quantile_targets.append(post_forecast_residual)
         # Freeze the pre-outcome statistics. IRLS may reconsider the current

@@ -31,7 +31,6 @@ from assume.common.forecast_algorithms import (
     initialize_adaptive_merit_order_model,
     initialize_online_regularized_regression,
     issue_adaptive_merit_order_correction,
-    johnson_su_residual_quantile,
     transform_adaptive_merit_order_features,
     update_adaptive_merit_order_correction,
     update_online_regularized_regression,
@@ -684,16 +683,6 @@ def test_online_irls_reuses_pre_outcome_statistics():
     assert model["gram"].item() == pytest.approx(0.9 * 2 + 2)
     assert model["target_moment"].item() == pytest.approx(20)
     assert model["effective_weight"] == pytest.approx(0.9 * 2 + 2)
-
-
-def test_johnson_su_quantiles_allow_asymmetric_uncertainty():
-    q10 = johnson_su_residual_quantile(50, 2, 1, 2, 0.1)
-    q50 = johnson_su_residual_quantile(50, 2, 1, 2, 0.5)
-    q90 = johnson_su_residual_quantile(50, 2, 1, 2, 0.9)
-
-    assert q10 < q50 < q90
-    assert q50 != pytest.approx(50)
-    assert (50 - q10) != pytest.approx(q90 - 50)
 
 
 def test_nonlinear_quantiles_are_asymmetric_non_crossing_and_keep_point_forecast():
