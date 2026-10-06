@@ -801,10 +801,10 @@ class LearningConfig:
             decay is available, which linearly decreases the learning rate over time. Default is None (constant learning rate).
         early_stopping_steps (int | None): The number of validation steps over which the moving average reward
             is calculated for early stopping. If the reward doesn't change by early_stopping_threshold over
-            this many steps, training stops. If None, defaults to training_episodes / validation_episodes_interval + 1.
+            this many steps, training stops. If None, early stopping is disabled. Default is None.
         early_stopping_threshold (float): The minimum improvement in moving average reward required to avoid
             early stopping. If the reward improvement is less than this threshold over early_stopping_steps,
-            training is terminated early. Default is 0.05.
+            training is terminated early. Default is 0.05. Only available if early_stopping_steps is set.
 
         algorithm (str): Specifies which reinforcement learning algorithm to use. Currently, only "matd3"
             (Multi-Agent Twin Delayed Deep Deterministic Policy Gradient) is implemented. Default is "matd3".
@@ -816,14 +816,17 @@ class LearningConfig:
             "mlp" (Multi-Layer Perceptron) and "lstm" (Long Short-Term Memory). Default is "mlp".
         policy_delay (int): The frequency (in gradient steps) at which the actor policy is updated.
             TD3 updates the critic more frequently than the actor to stabilize training. Default is 2.
-        noise_sigma (float): The standard deviation of the Ornstein-Uhlenbeck or Gaussian noise distribution
-            used to generate exploration noise added to actions. Default is 0.1.
-        noise_scale (int): The scale factor multiplied by the noise drawn from the distribution.
-            Larger values increase exploration. Default is 1.
-        noise_dt (int): The time step parameter for the Ornstein-Uhlenbeck process, which determines how
-            quickly the noise decays over time. Used for noise scheduling. Default is 1.
+        noise_sigma (float): Standard deviation of the Gaussian exploration noise added to the actor's actions.
+            The effective noise std is noise_sigma * noise_scale * noise_dt. Default is 0.1.
+        noise_scale (float): Constant factor multiplied onto the sampled noise. Larger values increase exploration.
+            Default is 1.
+        noise_dt (float): Noise multiplier that is subject to the action noise schedule. With
+            action_noise_schedule="linear" it decays linearly from noise_dt to 0 over the training episodes;
+            with None it stays constant at noise_dt.
+            Default is 1.
         action_noise_schedule (str | None): Which action noise decay schedule to use. Currently only "linear"
-            decay is available, which linearly decreases exploration noise over training. Default is "linear".
+            is available, which linearly decreases noise_dt (and with it the exploration noise) to 0 over training.
+            Default is None (constant exploration noise).
         tau (float): The soft update coefficient for updating target networks. Controls how slowly target
             networks track the main networks. Smaller values mean slower updates. Default is 0.005.
         target_policy_noise (float): The standard deviation of noise added to target policy actions during
@@ -869,12 +872,6 @@ class LearningConfig:
     target_noise_clip: float = 0.5
 
     def __post_init__(self):
-        """Calculate defaults that depend on other fields and validate inputs."""
-        if self.early_stopping_steps is None:
-            self.early_stopping_steps = int(
-                self.training_episodes / self.validation_episodes_interval + 1
-            )
-
         # if we do not have initial experience collected we will get an error as no samples are available on the
         # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
         if self.episodes_collecting_initial_experience < 1:

@@ -329,3 +329,72 @@ async def test_atomic_swap_concurrent_writes(learning_role):
     assert th.equal(
         learning_role.all_obs[concurrent_data_ts]["unit_1"][0], concurrent_obs
     )
+
+
+def _make_learning_for_eval(early_stopping_steps=2, early_stopping_threshold=0.05):
+    learn = Learning(
+        LearningConfig(
+            train_freq="1h",
+            algorithm="matd3",
+            actor_architecture="mlp",
+            learning_mode=True,
+            evaluation_mode=False,
+            training_episodes=3,
+            episodes_collecting_initial_experience=1,
+            continue_learning=False,
+            trained_policies_save_path="saved",
+            early_stopping_steps=early_stopping_steps,
+            early_stopping_threshold=early_stopping_threshold,
+        ),
+        start=start,
+        end=end,
+    )
+    # avoid touching the disk: we only care about the bookkeeping
+    learn.rl_algorithm = MagicMock()
+    return learn
+
+
+@pytest.mark.require_learning
+def test_compare_and_save_policies_empty_metrics():
+    learn = _make_learning_for_eval()
+    assert learn.compare_and_save_policies({}) is False
+    learn.rl_algorithm.save_params.assert_not_called()
+
+
+@pytest.mark.require_learning
+def test_compare_and_save_policies_records_all_metrics():
+    learn = _make_learning_for_eval()
+
+    assert learn.compare_and_save_policies({"avg_reward": 1.0, "profit": 5.0}) is False
+    assert learn.compare_and_save_policies({"avg_reward": 2.0, "profit": 3.0}) is False
+
+    # every metric must be recorded, not only the first one
+    assert learn.rl_eval["avg_reward"] == [1.0, 2.0]
+    assert learn.rl_eval["profit"] == [5.0, 3.0]
+    assert learn.max_eval["avg_reward"] == 2.0
+    assert learn.max_eval["profit"] == 5.0
+
+    # only the default (first) metric triggers saving, and only on improvement
+    saved_dirs = [
+        c.kwargs["directory"] for c in learn.rl_algorithm.save_params.call_args_list
+    ]
+    assert saved_dirs == ["saved/avg_reward_eval_policies"] * 2
+
+
+@pytest.mark.require_learning
+def test_compare_and_save_policies_early_stopping_still_records_other_metrics():
+    learn = _make_learning_for_eval(early_stopping_steps=2)
+
+    assert learn.compare_and_save_policies({"avg_reward": 10.0, "profit": 1.0}) is False
+    # second identical evaluation: no improvement within the threshold -> stop
+    assert learn.compare_and_save_policies({"avg_reward": 10.0, "profit": 2.0}) is False
+    # avg_rewards needs early_stopping_steps entries before it can decide
+    assert learn.compare_and_save_policies({"avg_reward": 10.0, "profit": 3.0}) is True
+
+    # the later metric of the terminating call was still recorded
+    assert learn.rl_eval["profit"] == [1.0, 2.0, 3.0]
+    assert learn.rl_eval["avg_reward"] == [10.0, 10.0, 10.0]
+    saved_dirs = [
+        c.kwargs["directory"] for c in learn.rl_algorithm.save_params.call_args_list
+    ]
+    assert saved_dirs[-1] == "saved/last_policies"

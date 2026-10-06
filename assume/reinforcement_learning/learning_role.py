@@ -522,75 +522,92 @@ class Learning(Role):
         """
         if not metrics:
             logger.error("tried to save policies but did not get any metrics")
-            return
-        # if the current values are a new max in one of the metrics - we store them in the default folder
+            return False
 
-        # add current reward to list of all rewards
+        # the first metric is the default one: it decides which policies are saved
+        # and, as avg_rewards tracks only a single metric, also the early stopping
+        default_metric = next(iter(metrics))
+        improved = {}
+
         for metric, value in metrics.items():
+            # add current value to list of all values
             self.rl_eval[metric].append(value)
 
             # check if the current value is the best value
-            if self.rl_eval[metric][-1] > self.max_eval[metric]:
-                self.max_eval[metric] = self.rl_eval[metric][-1]
-
-                # use first metric as default
-                if metric == list(metrics.keys())[0]:
-                    # store the best for our current metric in its folder
-                    self.rl_algorithm.save_params(
-                        directory=f"{self.learning_config.trained_policies_save_path}/{metric}_eval_policies"
-                    )
-
-                    logger.info(
-                        f"New best policy saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
-                    )
+            improved[metric] = value > self.max_eval[metric]
+            if improved[metric]:
+                self.max_eval[metric] = value
             else:
                 logger.info(
                     f"Current policy not better than best policy, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
                 )
 
-            # if we do not see any improvement in the last x evaluation runs we stop the training
-            if len(self.rl_eval[metric]) >= self.learning_config.early_stopping_steps:
-                self.avg_rewards.append(
-                    sum(
-                        self.rl_eval[metric][
-                            -self.learning_config.early_stopping_steps :
-                        ]
-                    )
-                    / self.learning_config.early_stopping_steps
-                )
+        # if the current value is a new max in the default metric - we store the policies in its folder
+        if improved[default_metric]:
+            self.rl_algorithm.save_params(
+                directory=f"{self.learning_config.trained_policies_save_path}/{default_metric}_eval_policies"
+            )
+            logger.info(
+                f"New best policy saved, episode: {self.eval_episodes_done + 1}, metric={default_metric}, value={metrics[default_metric]:.2f}"
+            )
+        return self._early_stopping_triggered(default_metric)
 
-                if len(self.avg_rewards) >= self.learning_config.early_stopping_steps:
-                    recent_rewards = self.avg_rewards[
-                        -self.learning_config.early_stopping_steps :
-                    ]
-                    min_reward = min(recent_rewards)
-                    max_reward = max(recent_rewards)
+    def _early_stopping_triggered(self, metric: str) -> bool:
+        """
+        Check whether the evaluation of the given metric has stopped improving.
 
-                    # Avoid division by zero or unexpected behavior with negative values
-                    denominator = max(
-                        abs(min_reward), 1e-8
-                    )  # Use small value to avoid zero-division
+        Appends the rolling average over the last ``early_stopping_steps`` evaluations to
+        ``avg_rewards``. Training is stopped once the relative change of these averages
+        over the last ``early_stopping_steps`` entries is below ``early_stopping_threshold``.
+        In that case the current policies are saved in the ``last_policies`` folder.
 
-                    avg_change = abs((max_reward - min_reward) / denominator)
+        Args:
+            metric (str): The metric whose evaluation history is checked.
 
-                    if avg_change < self.learning_config.early_stopping_threshold:
-                        logger.info(
-                            f"Stopping training as no improvement above {self.learning_config.early_stopping_threshold * 100}% in last {self.learning_config.early_stopping_steps} evaluations for {metric}"
-                        )
-                        if (
-                            self.learning_config.learning_rate_schedule
-                            or self.learning_config.action_noise_schedule
-                        ) is not None:
-                            logger.info(
-                                f"Learning rate schedule ({self.learning_config.learning_rate_schedule}) or action noise schedule ({self.learning_config.action_noise_schedule}) were scheduled to decay, further learning improvement can be possible. End value of schedule may not have been reached."
-                            )
-
-                        self.rl_algorithm.save_params(
-                            directory=f"{self.learning_config.trained_policies_save_path}/last_policies"
-                        )
-
-                        return True
+        Returns:
+            bool: True if the early stopping criteria is triggered.
+        """
+        steps = self.learning_config.early_stopping_steps
+        if steps is None:
+            # Early stopping is disabled
             return False
+
+        # if we do not see any improvement in the last x evaluation runs we stop the training
+        if len(self.rl_eval[metric]) < steps:
+            return False
+
+        self.avg_rewards.append(sum(self.rl_eval[metric][-steps:]) / steps)
+
+        if len(self.avg_rewards) < steps:
+            return False
+
+        recent_rewards = self.avg_rewards[-steps:]
+        min_reward = min(recent_rewards)
+        max_reward = max(recent_rewards)
+
+        # Avoid division by zero or unexpected behavior with negative values
+        denominator = max(abs(min_reward), 1e-8)
+        avg_change = abs((max_reward - min_reward) / denominator)
+
+        if avg_change >= self.learning_config.early_stopping_threshold:
+            return False
+
+        logger.info(
+            f"Stopping training as no improvement above {self.learning_config.early_stopping_threshold * 100}% in last {steps} evaluations for {metric}"
+        )
+        if (
+            self.learning_config.learning_rate_schedule is not None
+            or self.learning_config.action_noise_schedule is not None
+        ):
+            logger.info(
+                f"Learning rate schedule ({self.learning_config.learning_rate_schedule}) or action noise schedule ({self.learning_config.action_noise_schedule}) were scheduled to decay, further learning improvement can be possible. End value of schedule may not have been reached."
+            )
+
+        self.rl_algorithm.save_params(
+            directory=f"{self.learning_config.trained_policies_save_path}/last_policies"
+        )
+
+        return True
 
     def init_logging(
         self,
