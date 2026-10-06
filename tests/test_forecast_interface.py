@@ -22,7 +22,6 @@ from assume.common.forecast_algorithms import (
     calculate_naive_price_inelastic,
     calculate_naive_renewable_utilisation,
     calculate_naive_residual_load,
-    evaluate_adaptive_merit_order_forecasts,
     fit_adaptive_merit_order_feature_scaling,
     fit_online_regularized_regression,
     gaussian_residual_quantile,
@@ -843,52 +842,6 @@ def test_adaptive_empirical_fallback_and_time_varying_scale():
         state, "operator", "EOM", issue_time, products
     )
     assert low["residual_std_forecast"] < high["residual_std_forecast"]
-
-
-def test_adaptive_evaluation_uses_only_earlier_issue_times():
-    records = [
-        {
-            "issue_time": "2025-01-01",
-            "product_start": "2025-01-02 00:00",
-            "merit_order_price_forecast": 50,
-            "corrected_price_mean_forecast": 51,
-            "price_q10": 45,
-            "price_q50": 51,
-            "price_q90": 57,
-            "realised_price": 52,
-        },
-        {
-            "issue_time": "2025-01-01",
-            "product_start": "2025-01-02 01:00",
-            "merit_order_price_forecast": 50,
-            "corrected_price_mean_forecast": 51,
-            "price_q10": 45,
-            "price_q50": 51,
-            "price_q90": 57,
-            "realised_price": 54,
-        },
-        {
-            "issue_time": "2025-01-02",
-            "product_start": "2025-01-03 00:00",
-            "merit_order_price_forecast": 50,
-            "corrected_price_mean_forecast": 53,
-            "price_q10": 47,
-            "price_q50": 53,
-            "price_q90": 59,
-            "realised_price": 53,
-        },
-    ]
-    evaluation = evaluate_adaptive_merit_order_forecasts(records)
-    assert list(evaluation["samples"]["constant_historical_bias_forecast"]) == [
-        50,
-        50,
-        53,
-    ]
-    assert set(evaluation["summary"]["method"]) == {
-        "merit_order_only",
-        "constant_historical_bias",
-        "adaptive_merit_order_correction",
-    }
 
 
 def test_adaptive_forecast_uses_requested_horizon_without_changing_price(

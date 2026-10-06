@@ -181,11 +181,7 @@ Finalised rows are written to ``adaptive_merit_order_forecast`` and contain the 
 and delivery timestamps, operator and market identifiers, immutable
 ``forecast_id``, merit-order and corrected forecasts, residual location and
 scale, q10/q50/q90, realised price and residual, frozen post-forecast error,
-sample count, and status. The helper
-:func:`~assume.common.forecast_algorithms.evaluate_adaptive_merit_order_forecasts`
-reports MAE, RMSE, pinball loss, central-80% coverage and width overall and by
-delivery hour for merit order, expanding historical mean bias, and adaptive
-correction.
+sample count, and status.
 
 Only non-spatial energy markets with one scalar price per product are
 supported. The correction state belongs to each unit operator; bids, clearing,
