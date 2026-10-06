@@ -15,4 +15,4 @@ from assume.world import World
 __version__ = version("assume-framework")
 
 __author__ = "ASSUME Developers: Nick Harder, Kim Miskiw, Florian Maurer, Manish Khanra"
-__copyright__ = "AGPL-3.0 License"
+__copyright__ = "MIT License"
