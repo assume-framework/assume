@@ -860,6 +860,32 @@ def test_adaptive_forecast_uses_requested_horizon_without_changing_price(
     assert forecasts[0]["product_start"] == shared_FastIndex.start + timedelta(hours=1)
     assert "EOM" in forecaster.adaptive_merit_order_state["markets"]
     assert np.array_equal(forecaster.price["EOM"].data, original_price)
+    adaptive_price = forecaster.adaptive_forecast.price["EOM"]
+    assert adaptive_price[shared_FastIndex.start + timedelta(hours=1)] == pytest.approx(
+        forecasts[0]["corrected_price_mean_forecast"]
+    )
+    assert np.allclose(
+        adaptive_price[
+            shared_FastIndex.start + timedelta(hours=1) : shared_FastIndex.start
+            + timedelta(hours=2)
+        ],
+        [forecast["corrected_price_mean_forecast"] for forecast in forecasts],
+    )
+    assert np.isnan(adaptive_price[shared_FastIndex.start])
+
+
+def test_enable_adaptive_merit_order_correction_uses_gaussian_default(
+    market_setup, forecast_setup, shared_FastIndex
+):
+    forecaster = UnitsOperatorForecaster(
+        index=shared_FastIndex, forecast_registries=get_forecast_registries()
+    )
+    forecaster.initialize(forecast_setup["units"], market_setup["empty_grid_markets"])
+
+    forecaster.enable_adaptive_merit_order_correction()
+
+    assert forecaster.adaptive_merit_order_correction_enabled is True
+    assert forecaster.adaptive_merit_order_settings["distribution"] == "gaussian"
 
 
 def test_adaptive_uncertainty_model_is_selected_before_first_forecast(

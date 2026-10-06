@@ -23,6 +23,13 @@ ForecastSeries: TypeAlias = FastSeries | list | float | pd.Series
 log = logging.getLogger(__name__)
 
 
+class AdaptiveForecast:
+    """Adaptive market-price forecasts issued during the simulation."""
+
+    def __init__(self):
+        self.price: dict[str, FastSeries] = {}
+
+
 def _ensure_not_none(
     df: pd.DataFrame | None, index: ForecastIndex, check_index=False
 ) -> pd.DataFrame:
@@ -1196,6 +1203,7 @@ class UnitsOperatorForecaster(UnitForecaster):
         self.adaptive_merit_order_state: dict = {"markets": {}}
         self.adaptive_merit_order_settings: dict = {}
         self.adaptive_merit_order_correction_enabled = False
+        self.adaptive_forecast = AdaptiveForecast()
         self._adaptive_merit_order_units: tuple[BaseUnit, ...] = ()
         self._adaptive_merit_order_markets: dict[str, MarketConfig] = {}
         self.unit_operator_id = "operator"
@@ -1224,6 +1232,10 @@ class UnitsOperatorForecaster(UnitForecaster):
         self._adaptive_merit_order_markets = {
             market.market_id: market for market in market_configs
         }
+
+    def enable_adaptive_merit_order_correction(self, **settings) -> None:
+        """Enable adaptive merit-order correction with Gaussian uncertainty."""
+        self.set_adaptive_merit_order_uncertainty_model("gaussian", **settings)
 
     def set_adaptive_merit_order_uncertainty_model(
         self, uncertainty_model: str, **settings
@@ -1313,13 +1325,23 @@ class UnitsOperatorForecaster(UnitForecaster):
             issue_adaptive_merit_order_correction,
         )
 
-        return issue_adaptive_merit_order_correction(
+        forecasts = issue_adaptive_merit_order_correction(
             self.adaptive_merit_order_state,
             self.unit_operator_id,
             market_id,
             issue_time,
             list(products.values()),
         )
+        price = self.adaptive_forecast.price.setdefault(
+            market_id,
+            FastSeries(index=self.index, value=float("nan"), name=market_id),
+        )
+        for forecast in forecasts:
+            if forecast["product_start"] in self.index:
+                price[forecast["product_start"]] = forecast[
+                    "corrected_price_mean_forecast"
+                ]
+        return forecasts
 
     def update_adaptive_merit_order_forecast(
         self, market_id: str, market_meta: list[dict]

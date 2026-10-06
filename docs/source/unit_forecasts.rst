@@ -120,12 +120,28 @@ Adaptive merit-order correction
 
 The adaptive correction is an opt-in feature of an operator forecaster. It
 does not require a YAML setting and does not replace the existing ``price``
-series used by bidding strategies. Before starting the simulation, select the
-uncertainty model; this also enables the automatic opening/clearing lifecycle:
+series used by bidding strategies. Before starting the simulation, enable it:
 
 .. code-block:: python
 
-    forecaster.set_adaptive_merit_order_uncertainty_model("gaussian")
+    forecaster.enable_adaptive_merit_order_correction()
+
+This creates the separate ``adaptive_forecast.price`` signal. It is populated
+only for products whose forecast has been issued at a market opening:
+
+.. code-block:: python
+
+    from datetime import timedelta
+
+    one_hour_price = forecaster.adaptive_forecast.price["EOM"][delivery_time]
+    next_24_hours = forecaster.adaptive_forecast.price["EOM"][
+        delivery_time : delivery_time + timedelta(hours=23)
+    ]
+
+The existing merit-order signal remains ``forecaster.price["EOM"]``. To use
+the nonlinear quantile uncertainty plug-in instead of the Gaussian default,
+call ``set_adaptive_merit_order_uncertainty_model("nonlinear_quantile")``
+before the first forecast is issued.
 
 The explicit forecast method remains available for experiments and manual
 evaluation:
