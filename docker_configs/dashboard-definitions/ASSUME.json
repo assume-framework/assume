@@ -589,6 +589,39 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\binflex_demand\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\(demand\\).*"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    6,
+                    4
+                  ],
+                  "fill": "dash"
+                }
+              }
+            ]
           }
         ]
       },
@@ -630,7 +663,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "-- unit metadata from all *_meta tables that exist in this database (missing tables are skipped)\nWITH unit_meta AS (\n  SELECT x.unit_id, x.technology\n  FROM (VALUES ('power_plant_meta'), ('storage_meta'), ('demand_meta'), ('exchange_meta')) AS t(tbl)\n  CROSS JOIN LATERAL xmltable(\n    '/table/row'\n    PASSING query_to_xml(\n      CASE WHEN to_regclass(t.tbl) IS NULL\n        THEN 'SELECT NULL::text AS unit_id, NULL::text AS technology WHERE false'\n        ELSE format('SELECT \"index\"::text AS unit_id, technology::text AS technology FROM %I WHERE simulation = %L', t.tbl, '$simulation')\n      END, false, false, '')\n    COLUMNS unit_id text, technology text\n  ) x\n),\nbids AS (\n  SELECT\n    mo.bid_id,\n    mo.unit_id,\n    mo.price::float AS price,\n    COALESCE(um.technology, 'unknown') AS tech,\n    sum(mo.volume)::float AS volume\n  FROM market_orders mo\n  LEFT JOIN unit_meta um ON um.unit_id = mo.unit_id\n  WHERE\n    mo.start_time = '$merit_order_select'\n    AND mo.volume > 0\n    AND mo.market_id = '$market'\n    AND mo.simulation = '$simulation'\n  GROUP BY mo.bid_id, mo.unit_id, mo.price, um.technology\n),\nranked AS (\n  SELECT\n    *,\n    COALESCE(sum(volume) OVER (ORDER BY price ASC, bid_id, unit_id ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS start_vol,\n    sum(volume) OVER (ORDER BY price ASC, bid_id, unit_id ROWS UNBOUNDED PRECEDING) AS cum_vol,\n    row_number() OVER (PARTITION BY tech ORDER BY price ASC, bid_id, unit_id) AS n\n  FROM bids\n),\n-- one series per bid, so every bid is drawn as its own horizontal segment and\n-- no lines connect different bids; the first bid of a technology carries the\n-- technology name, the others are named '<tech> #n' and hidden from the legend\nblocks AS (\n  SELECT\n    *,\n    CASE WHEN n = 1 THEN tech ELSE tech || ' #' || n END AS series\n  FROM ranked\n),\ndemand AS (\n  SELECT\n    mm.demand_volume::float AS demand_volume,\n    (SELECT max(price::float) FROM market_orders\n     WHERE market_id = '$market'\n       AND simulation = '$simulation'\n       AND accepted_volume > 0\n       AND start_time = '$merit_order_select'\n    ) AS clearing_price\n  FROM market_meta mm\n  WHERE mm.market_id = '$market'\n    AND mm.simulation = '$simulation'\n    AND mm.product_start = '$merit_order_select'\n)\n\n-- start point of each bid (shown as marker)\nSELECT\n  start_vol AS \"Cumulative Volume\",\n  price AS \"Price\",\n  series AS \"Series\",\n  tech AS \"Technology\",\n  unit_id::text AS \"Unit\",\n  volume::text AS \"Volume\",\n  bid_id::text AS \"Bid\",\n  5 AS \"Size\"\nFROM blocks\n\nUNION ALL\n\n-- end point of each bid (no marker)\nSELECT\n  cum_vol AS \"Cumulative Volume\",\n  price AS \"Price\",\n  series AS \"Series\",\n  tech AS \"Technology\",\n  unit_id::text AS \"Unit\",\n  volume::text AS \"Volume\",\n  bid_id::text AS \"Bid\",\n  0 AS \"Size\"\nFROM blocks\n\nUNION ALL\n\n-- vertical demand line over the full price range of the bids, with a marker at the clearing price\nSELECT demand_volume, (SELECT least(0, min(price)) FROM bids), 'Demand', 'Demand', '', '', '', 0 FROM demand\nUNION ALL\nSELECT demand_volume, clearing_price, 'Demand', 'Demand', '', '', '', 8 FROM demand\nUNION ALL\nSELECT demand_volume, (SELECT max(price) FROM bids), 'Demand', 'Demand', '', '', '', 0 FROM demand\n\nORDER BY \"Cumulative Volume\" ASC, \"Price\" ASC",
+          "rawSql": "-- unit metadata from all *_meta tables that exist in this database (missing tables are skipped)\nWITH unit_meta AS (\n  SELECT x.unit_id, x.technology\n  FROM (VALUES ('power_plant_meta'), ('storage_meta'), ('demand_meta'), ('exchange_meta')) AS t(tbl)\n  CROSS JOIN LATERAL xmltable(\n    '/table/row'\n    PASSING query_to_xml(\n      CASE WHEN to_regclass(t.tbl) IS NULL\n        THEN 'SELECT NULL::text AS unit_id, NULL::text AS technology WHERE false'\n        ELSE format('SELECT \"index\"::text AS unit_id, technology::text AS technology FROM %I WHERE simulation = %L', t.tbl, '$simulation')\n      END, false, false, '')\n    COLUMNS unit_id text, technology text\n  ) x\n),\nbids AS (\n  SELECT\n    mo.bid_id,\n    mo.unit_id,\n    mo.price::float AS price,\n    COALESCE(um.technology, 'unknown') AS tech,\n    sum(mo.volume)::float AS volume\n  FROM market_orders mo\n  LEFT JOIN unit_meta um ON um.unit_id = mo.unit_id\n  WHERE\n    mo.start_time = '$merit_order_select'\n    AND mo.volume > 0\n    AND mo.market_id = '$market'\n    AND mo.simulation = '$simulation'\n  GROUP BY mo.bid_id, mo.unit_id, mo.price, um.technology\n),\nranked AS (\n  SELECT\n    *,\n    COALESCE(sum(volume) OVER (ORDER BY price ASC, bid_id, unit_id ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS start_vol,\n    sum(volume) OVER (ORDER BY price ASC, bid_id, unit_id ROWS UNBOUNDED PRECEDING) AS cum_vol,\n    row_number() OVER (PARTITION BY tech ORDER BY price ASC, bid_id, unit_id) AS n\n  FROM bids\n),\n-- one series per bid, so every bid is drawn as its own horizontal segment and\n-- no lines connect different bids; the first bid of a technology carries the\n-- technology name, the others are named '<tech> #n' and hidden from the legend\nblocks AS (\n  SELECT\n    *,\n    CASE WHEN n = 1 THEN tech ELSE tech || ' #' || n END AS series\n  FROM ranked\n),\n-- demand side bids (negative volume), only if the demand curve is enabled\ndemand_bids AS (\n  SELECT\n    mo.bid_id,\n    mo.unit_id,\n    mo.price::float AS price,\n    COALESCE(um.technology, 'unknown') AS tech,\n    -sum(mo.volume)::float AS volume\n  FROM market_orders mo\n  LEFT JOIN unit_meta um ON um.unit_id = mo.unit_id\n  WHERE\n    '$show_demand_curve' = 'show'\n    AND mo.start_time = '$merit_order_select'\n    AND mo.volume < 0\n    AND mo.market_id = '$market'\n    AND mo.simulation = '$simulation'\n  GROUP BY mo.bid_id, mo.unit_id, mo.price, um.technology\n),\n-- demand curve: sorted by descending price, one series per bid named '<tech> (demand)'\ndemand_blocks AS (\n  SELECT\n    *,\n    COALESCE(sum(volume) OVER (ORDER BY price DESC, bid_id, unit_id ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS start_vol,\n    sum(volume) OVER (ORDER BY price DESC, bid_id, unit_id ROWS UNBOUNDED PRECEDING) AS cum_vol,\n    tech || ' (demand)' || CASE\n      WHEN row_number() OVER (PARTITION BY tech ORDER BY price DESC, bid_id, unit_id) = 1 THEN ''\n      ELSE ' #' || row_number() OVER (PARTITION BY tech ORDER BY price DESC, bid_id, unit_id)\n    END AS series\n  FROM demand_bids\n),\ndemand AS (\n  SELECT\n    mm.demand_volume::float AS demand_volume,\n    (SELECT max(price::float) FROM market_orders\n     WHERE market_id = '$market'\n       AND simulation = '$simulation'\n       AND accepted_volume > 0\n       AND start_time = '$merit_order_select'\n    ) AS clearing_price\n  FROM market_meta mm\n  WHERE mm.market_id = '$market'\n    AND mm.simulation = '$simulation'\n    AND mm.product_start = '$merit_order_select'\n)\n\n-- start point of each bid (shown as marker)\nSELECT\n  start_vol AS \"Cumulative Volume\",\n  price AS \"Price\",\n  series AS \"Series\",\n  tech AS \"Technology\",\n  unit_id::text AS \"Unit\",\n  volume::text AS \"Volume\",\n  bid_id::text AS \"Bid\",\n  5 AS \"Size\"\nFROM blocks\n\nUNION ALL\n\n-- end point of each bid (no marker)\nSELECT\n  cum_vol AS \"Cumulative Volume\",\n  price AS \"Price\",\n  series AS \"Series\",\n  tech AS \"Technology\",\n  unit_id::text AS \"Unit\",\n  volume::text AS \"Volume\",\n  bid_id::text AS \"Bid\",\n  0 AS \"Size\"\nFROM blocks\n\nUNION ALL\n\n-- start and end point of each demand bid\nSELECT\n  start_vol,\n  price,\n  series,\n  tech,\n  unit_id::text,\n  volume::text,\n  bid_id::text,\n  5\nFROM demand_blocks\n\nUNION ALL\n\nSELECT\n  cum_vol,\n  price,\n  series,\n  tech,\n  unit_id::text,\n  volume::text,\n  bid_id::text,\n  0\nFROM demand_blocks\n\nUNION ALL\n\n-- vertical demand line over the full price range of the bids, with a marker at the clearing price\nSELECT demand_volume, (SELECT least(0, min(price)) FROM (SELECT price FROM bids UNION ALL SELECT price FROM demand_bids) p), 'Demand', 'Demand', '', '', '', 0 FROM demand\nUNION ALL\nSELECT demand_volume, clearing_price, 'Demand', 'Demand', '', '', '', 8 FROM demand\nUNION ALL\nSELECT demand_volume, (SELECT max(price) FROM (SELECT price FROM bids UNION ALL SELECT price FROM demand_bids) p), 'Demand', 'Demand', '', '', '', 0 FROM demand\n\nORDER BY \"Cumulative Volume\" ASC, \"Price\" ASC",
           "refId": "A",
           "sql": {
             "columns": [
@@ -5782,6 +5815,31 @@
         "regex": "",
         "sort": 1,
         "type": "query"
+      },
+      {
+        "current": {
+          "text": "hide",
+          "value": "hide"
+        },
+        "description": "Show or hide the demand side bids (demand, storage charging, exports) in the merit order plot",
+        "includeAll": false,
+        "label": "demand curve",
+        "multi": false,
+        "name": "show_demand_curve",
+        "options": [
+          {
+            "selected": false,
+            "text": "show",
+            "value": "show"
+          },
+          {
+            "selected": true,
+            "text": "hide",
+            "value": "hide"
+          }
+        ],
+        "query": "show,hide",
+        "type": "custom"
       }
     ]
   },
