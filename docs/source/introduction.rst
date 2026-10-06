@@ -189,6 +189,6 @@ multiple systems, where different market participants operate independently both
 Licence
 =======
 
-Copyright 2022-2025 :doc:`developers`
+Copyright 2022-2026 :doc:`developers`
 
-ASSUME is licensed under the `GNU Affero General Public License v3.0 <https://github.com/assume-framework/assume/blob/main/LICENSES/AGPL-3.0-or-later.txt>`_.
+ASSUME is licensed under the `MIT License <https://github.com/assume-framework/assume/blob/main/LICENSES/MIT.txt>`_.

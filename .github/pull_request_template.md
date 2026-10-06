@@ -15,7 +15,7 @@ Closes #<issue‑number>
 - [ ] Documentation updated (docstrings, READMEs, user guides, inline comments, `docs` folder updates, etc.)
 - [ ] New unit/integration tests added (if applicable)
 - [ ] Changes noted in release notes (if any)
-- [ ] Consent to release this PR's code under the GNU Affero General Public License v3.0
+- [ ] Consent to release this PR's code under the MIT License
 
 ## Additional Notes (optional)
 <!-- Anything the reviewer should pay special attention to, known limitations, rollout plan, etc. -->

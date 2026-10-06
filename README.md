@@ -232,6 +232,6 @@ If you want to cite a specific version of ASSUME, all releases are archived on Z
 
 ## License
 
-Copyright 2022-2025 [ASSUME developers](https://assume.readthedocs.io/en/latest/developers.html).
+Copyright 2022-2026 [ASSUME developers](https://assume.readthedocs.io/en/latest/developers.html).
 
-ASSUME is licensed under the [GNU Affero General Public License v3.0](./LICENSES/AGPL-3.0-or-later.txt). This license is a strong copyleft license that requires that any derivative work be licensed under the same terms as the original work. It is approved by the [Open Source Initiative](https://opensource.org/licenses/AGPL-3.0).
+ASSUME is licensed under the [MIT License](./LICENSES/MIT.txt). This permissive license allows use, modification and redistribution, including in proprietary software, as long as the copyright and license notice are kept. It is approved by the [Open Source Initiative](https://opensource.org/license/mit).
