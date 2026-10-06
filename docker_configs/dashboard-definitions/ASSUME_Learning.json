@@ -25,7 +25,21 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "links": [],
+  "id": 3,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Set time filter to full simulation horizon",
+      "tooltip": "Clicking on the button will update the time range filter. The first and last timestamps of the selected simulation are used. Other filter items are preserved. The dashboard will reload: make sure to save your changes beforehand.",
+      "type": "link",
+      "url": "/d/JKQzx0q4k?orgId=1&from=${simulation_start}&to=${simulation_end}&timezone=utc"
+    }
+  ],
   "panels": [
     {
       "fieldConfig": {

@@ -24,7 +24,21 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "links": [],
+  "id": 2,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Set time filter to full simulation horizon",
+      "tooltip": "Clicking on the button will update the time range filter. The first and last timestamps of the selected simulation are used. Other filter items are preserved. The dashboard will reload: make sure to save your changes beforehand.",
+      "type": "link",
+      "url": "/d/aemnxld4ukgsga?orgId=1&from=${simulation_start}&to=${simulation_end}&timezone=utc"
+    }
+  ],
   "panels": [
     {
       "fieldConfig": {
@@ -3512,7 +3526,7 @@
       "id": 37,
       "options": {
         "afterRender": "",
-        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
+        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh_thermal <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
         "contentPartials": [],
         "defaultContent": "The query didn't return any results.",
         "editor": {
@@ -5865,6 +5879,30 @@
         ],
         "query": "show,hide",
         "type": "custom"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "2019-01-01 02:00:00",
+          "value": "2019-01-01 02:00:00"
+        },
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "P7B13B9DF907EC40C"
+        },
+        "definition": "select min(start_time)::text from market_orders where market_id = '$market' AND\n      simulation = '$simulation' and $__timeFilter(start_time)",
+        "description": "The minimum time we have in the time range.\nUsed for the merit order plot title",
+        "hide": 2,
+        "includeAll": false,
+        "multi": false,
+        "name": "min_time",
+        "options": [],
+        "query": "select min(start_time)::text from market_orders where market_id = '$market' AND\n      simulation = '$simulation' and $__timeFilter(start_time)",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
       }
     ]
   },
