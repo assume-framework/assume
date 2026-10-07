@@ -134,6 +134,9 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
             bid["accepted_price"] = expected_bid_price  # 20.0
             bid["accepted_volume"] = expected_volume  # 500
 
+            # as in the market feedback, the dispatch is set before the reward
+            storage_unit.set_dispatch_plan(mc, orderbook=bids)
+
             # Calculate rewards based on the accepted bids
             strategy.calculate_reward(storage_unit, mc, orderbook=bids)
 
@@ -237,6 +240,9 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
             # Simulate bid acceptance by setting accepted_price and accepted_volume
             bid["accepted_price"] = expected_bid_price  # 30.0
             bid["accepted_volume"] = expected_volume  # 500
+
+            # as in the market feedback, the dispatch is set before the reward
+            storage_unit.set_dispatch_plan(mc, orderbook=bids)
 
             # Calculate rewards based on the accepted bids
             strategy.calculate_reward(storage_unit, mc, orderbook=bids)

@@ -501,6 +501,9 @@ class SupportsMinMaxCharge(BaseUnit):
             if not isinstance(strategy, MinMaxChargeStrategy):
                 raise ValueError(f"strategy {strategy} is not a MinMaxChargeStrategy!")
 
+        # outputs["soc"] is only valid up to here (inclusive), see ensure_soc
+        self._soc_valid_until = self.index[0]
+
     def calculate_min_max_charge(
         self, start: datetime, end: datetime, soc: float = None
     ) -> tuple[np.ndarray, np.ndarray]:
@@ -629,10 +632,7 @@ class SupportsMinMaxCharge(BaseUnit):
 
     def feasible_power(self, current_power: float, soc: float) -> float:
         """
-        Clips a planned power to what the unit can actually run at.
-
-        Both limits apply: the power limits of the unit, and what the current
-        SOC can back. The result is what a following SOC has to be derived from.
+        Clips a planned power to the power limits and to what ``soc`` can back.
 
         Args:
             current_power (float): The planned power, negative when charging.
@@ -642,12 +642,12 @@ class SupportsMinMaxCharge(BaseUnit):
             float: The power the unit can actually run at.
         """
         current_power = self.apply_power_limits(current_power)
-
         if current_power > 0:
-            return min(current_power, self.calculate_soc_max_discharge(soc))
-        if current_power < 0:
-            return max(current_power, self.calculate_soc_max_charge(soc))
-        return current_power
+            current_power = min(current_power, self.calculate_soc_max_discharge(soc))
+        elif current_power < 0:
+            current_power = max(current_power, self.calculate_soc_max_charge(soc))
+        # the SOC clip can leave a power below the minimum power
+        return self.apply_power_limits(current_power)
 
     def delta_soc(self, current_power: float) -> float:
         """
@@ -669,6 +669,21 @@ class SupportsMinMaxCharge(BaseUnit):
                 -current_power * time_delta * self.efficiency_charge
             ) / self.capacity
         return 0.0
+
+    def _align_to_index(self, t: datetime) -> datetime:
+        """
+        Rounds ``t`` up to the first time step of the index at or after it.
+
+        Args:
+            t (datetime.datetime): The time to align.
+
+        Returns:
+            datetime.datetime: The first time step of the index at or after ``t``.
+        """
+        remainder = (t - self.index[0]) % self.index.freq
+        if remainder:
+            t += self.index.freq - remainder
+        return t
 
     def apply_power_limits(self, current_power: float) -> float:
         """
@@ -694,58 +709,103 @@ class SupportsMinMaxCharge(BaseUnit):
             return 0
         return current_power
 
+    def ensure_soc(self, until: datetime) -> None:
+        """
+        Propagates the state of charge from the frontier up to ``until``.
+
+        Each step moves the SOC by the feasible power, not by the plan in
+        ``outputs["energy"]``, which is left untouched until delivery.
+
+        Args:
+            until (datetime.datetime): The point in time the SOC is needed for.
+        """
+        last = self.index[-1]
+        until = min(self._align_to_index(until), last)
+        if until <= self._soc_valid_until:
+            return
+
+        for t in self.index[self._soc_valid_until : until - self.index.freq]:
+            soc = self.outputs["soc"].at[t]
+            current_power = self.feasible_power(self.outputs["energy"].at[t], soc)
+            self.outputs["soc"].at[t + self.index.freq] = soc + self.delta_soc(
+                current_power
+            )
+
+        self._soc_valid_until = until
+
+    def get_feasible_energy(self, start: datetime, end: datetime) -> np.ndarray:
+        """
+        Returns the energy the unit can actually run at over ``[start, end]``.
+
+        Use this instead of ``outputs["energy"]`` before delivery, as the latter
+        holds the committed plan until ``execute_current_dispatch``.
+
+        Args:
+            start (datetime.datetime): The start of the range.
+            end (datetime.datetime): The end of the range, inclusive.
+
+        Returns:
+            numpy.ndarray: The feasible energy over the range.
+        """
+        self.ensure_soc(end)
+        return np.array(
+            [
+                self.feasible_power(
+                    self.outputs["energy"].at[t], self.outputs["soc"].at[t]
+                )
+                for t in self.index[start:end]
+            ]
+        )
+
+    def set_soc(self, t: datetime, soc: float) -> None:
+        """
+        Sets a known state of charge at ``t``, invalidating everything after it.
+
+        Args:
+            t (datetime.datetime): The time to set the SOC at.
+            soc (float): The state of charge (between 0 and 1).
+        """
+        t = self._align_to_index(t)
+        # propagate up to t first, so the range before it is valid
+        self.ensure_soc(t)
+        self.outputs["soc"].at[t] = soc
+        self._soc_valid_until = t
+
+    def get_soc(self, t: datetime) -> float:
+        """
+        Returns the state of charge at ``t``, propagating it there if needed.
+
+        Prefer this over ``outputs["soc"]``, which is only up to date until
+        the last propagation.
+
+        Args:
+            t (datetime.datetime): The time to read the SOC at.
+
+        Returns:
+            float: The state of charge at ``t``.
+        """
+        if t > self._soc_valid_until:
+            self.ensure_soc(t)
+        return self.outputs["soc"].at[t]
+
     def set_dispatch_plan(
         self, marketconfig: MarketConfig, orderbook: Orderbook
     ) -> None:
-        """Updates the SOC for storage units."""
+        """
+        Adds the accepted volumes and invalidates the SOC from the earliest one on.
+
+        An empty orderbook - e.g. after ``remove_empty_bids`` - and capacity
+        products do not move the SOC and invalidate nothing.
+        """
         super().set_dispatch_plan(marketconfig, orderbook)
 
-        if not orderbook:
+        if marketconfig.product_type != "energy" or not orderbook:
             return
 
-        # also update the SOC when setting the dispatch plan
-        start = min(order["start_time"] for order in orderbook)
-        end = max(order["end_time"] for order in orderbook)
-        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-        end_excl = end - self.index.freq
-        time_delta = self.index.freq / timedelta(hours=1)
-
-        for t in self.index[start:end_excl]:
-            next_t = t + self.index.freq
-            # continue if it is the last time step
-            if next_t not in self.index:
-                continue
-            current_power = self.outputs["energy"].at[t]
-
-            # calculate the change in state of charge
-            delta_soc = 0
-            soc = self.outputs["soc"].at[t]
-
-            # discharging
-            if current_power > 0:
-                max_soc_discharge = self.calculate_soc_max_discharge(soc)
-
-                if current_power > max_soc_discharge:
-                    current_power = max_soc_discharge
-
-                delta_soc = (
-                    -current_power * time_delta / self.efficiency_discharge
-                ) / self.capacity
-
-            # charging
-            elif current_power < 0:
-                max_soc_charge = self.calculate_soc_max_charge(soc)
-
-                if current_power < max_soc_charge:
-                    current_power = max_soc_charge
-
-                delta_soc = (
-                    -current_power * time_delta * self.efficiency_charge
-                ) / self.capacity
-
-            # update the values of the state of charge and the energy
-            self.outputs["soc"].at[next_t] = soc + delta_soc
-            self.outputs["energy"].at[t] = current_power
+        earliest = min(order["start_time"] for order in orderbook)
+        self._soc_valid_until = min(
+            self._soc_valid_until, self._align_to_index(earliest)
+        )
 
 
 class BaseStrategy:
