@@ -40,6 +40,12 @@ When rolling horizon is enabled, the unit repeatedly optimises a shorter
 look-ahead window, commits only the first part of that solution, and then
 re-optimises after the next market step with updated internal states.
 
+Rolling-horizon operation is available for :class:`~assume.units.building.Building`,
+:class:`~assume.units.steel_plant.SteelPlant`,
+:class:`~assume.units.cement_plant.CementPlant`,
+:class:`~assume.units.hydrogen_plant.HydrogenPlant`, and
+:class:`~assume.units.steam_generation_plant.SteamPlant`.
+
 This is useful when the optimisation should stay responsive to market
 clearing results while still accounting for storage states, ramping limits,
 and process-coupling constraints over a wider future horizon.
@@ -128,6 +134,23 @@ unit-specific columns:
 
 These signals are copied to the unit during forecaster initialization and are
 used automatically by the rolling-horizon solver.
+
+Hydrogen and steam plants in rolling horizon
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`~assume.units.hydrogen_plant.HydrogenPlant` and
+:class:`~assume.units.steam_generation_plant.SteamPlant` use an inflexible
+per-timestep output requirement rather than a cumulative production target.
+Provide the profile at the simulation frequency and use the default
+``demand=0`` on the unit:
+
+- Hydrogen plant: ``HydrogenForecaster(hydrogen_demand=...)``.
+- Steam plant: ``SteamgenerationForecaster(thermal_demand=...)``.
+
+For each rolling window, the corresponding portion of the profile is used in
+the hydrogen or thermal balance. Thus every committed time step must meet its
+own profile value. For a steam plant with a natural-gas or hydrogen boiler,
+the matching fuel-price profile is sliced to the same window as well.
 
 Attributes
 ^^^^^^^^^^^
