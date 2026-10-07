@@ -507,6 +507,19 @@ def read_units(
     return units_dict
 
 
+def _price_zones(unit) -> dict[str, str]:
+    """Price zone per market of a unit with a zonal price forecast (``price_unit_zone``)."""
+    information = unit.forecaster.preprocess_information.get("price")
+    if not isinstance(information, dict):
+        return {}
+    return {
+        market_id: zone_information["zone"]
+        for market_id, zone_information in information.items()
+        if isinstance(zone_information, dict)
+        and zone_information.get("zone") is not None
+    }
+
+
 def save_unique_forecasts(units, save_path: Path) -> None:
     """Collect unique forecasts computed by unit forecasters and write them to CSV.
 
@@ -529,19 +542,22 @@ def save_unique_forecasts(units, save_path: Path) -> None:
     }
     for unit in units:
         algs = unit.forecaster.forecast_algorithms
-        if isinstance(unit.forecaster, DsmUnitForecaster):
-            for key in unique_forecasts:
-                forecast_name = algs.get(key, default_values[key])
-                unique_forecasts[key][forecast_name] = unit
-        else:
-            for key in ["price", "residual_load"]:
-                forecast_name = algs.get(key, default_values[key])
-                unique_forecasts[key][forecast_name] = unit
+        keys = (
+            unique_forecasts
+            if isinstance(unit.forecaster, DsmUnitForecaster)
+            else ["price", "residual_load"]
+        )
+        for key in keys:
+            forecast_name = algs.get(key, default_values[key])
+            # zonal price forecasts differ per price zone of the unit
+            zones = _price_zones(unit) if key == "price" else {}
+            unique_forecasts[key][forecast_name, tuple(sorted(zones.items()))] = unit
 
     forecast_dict = {}
     for f_type in unique_forecasts:  # price, residual_load, ...
-        for f_name in unique_forecasts[f_type]:  #
-            unit = unique_forecasts[f_type][f_name]
+        for f_name, zones in unique_forecasts[f_type]:
+            unit = unique_forecasts[f_type][f_name, zones]
+            zones = dict(zones)
             attr_name = (
                 "renewable_utilisation_signal"
                 if f_type == "renewable_utilisation"
@@ -550,9 +566,10 @@ def save_unique_forecasts(units, save_path: Path) -> None:
             forecast = getattr(unit.forecaster, attr_name)
             if isinstance(forecast, dict):
                 for f_key in forecast:
-                    forecast_dict[f"{f_name}_{f_key}"] = forecast[f_key].as_pd_series(
-                        name=f"{f_name}_{f_key}"
-                    )
+                    name = f"{f_name}_{f_key}"
+                    if f_key in zones:
+                        name = f"{name}_{zones[f_key]}"
+                    forecast_dict[name] = forecast[f_key].as_pd_series(name=name)
             else:
                 forecast_dict[f"{f_name}"] = forecast.as_pd_series(name=f"{f_name}")
 
