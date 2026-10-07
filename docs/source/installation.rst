@@ -16,6 +16,14 @@ If you intend to use the reinforcement learning capabilities of
 ASSUME and train your agents, make sure to install Torch. Detailed
 installation instructions can be found `here <https://pytorch.org/get-started/locally/>`_.
 
+The ``learning`` extra depends on a generic ``torch`` and does not choose a build.
+On Linux, the default wheel from PyPI is the CUDA build, which pulls in several GB
+of ``nvidia-*`` packages. Without a GPU, install the CPU-only build first, then
+the extra (pip keeps the already installed torch)::
+
+    pip install torch --index-url https://download.pytorch.org/whl/cpu
+    pip install assume-framework[learning]
+
 Using Pip/Python
 ================
 
