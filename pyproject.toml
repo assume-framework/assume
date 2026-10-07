@@ -63,6 +63,11 @@ oeds = [
     "windpowerlib >=0.2.1",
     "pyarrow",
 ]
+entsoe = [
+    "entsoe-py >=0.6.0",
+    "yfinance",
+    "requests",
+]
 test = [
     "ruff >=0.14.6",
     "mypy >=1.1.1",
@@ -78,7 +83,7 @@ test = [
     "pyarrow",
 ]
 all = [
-    "assume-framework[oeds, network, learning, test]",
+    "assume-framework[oeds, entsoe, network, learning, test]",
 ]
 docs = [
   "sphinx >=8",
