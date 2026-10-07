@@ -121,6 +121,8 @@ jobs:
 
     - name: Install torch dependencies
       run: |
+        # CPU-only wheel first: the default PyPI wheel on Linux bundles CUDA (~5 GB) and CI has no GPU
+        python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
         python -m pip install -e .[learning]
 
     - name: Test pytest with torch & integration tests
