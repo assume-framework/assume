@@ -641,7 +641,6 @@ class SupportsMinMaxCharge(BaseUnit):
         Returns:
             float: The power the unit can actually run at.
         """
-        current_power = self.apply_power_limits(current_power)
         if current_power > 0:
             current_power = min(current_power, self.calculate_soc_max_discharge(soc))
         elif current_power < 0:
