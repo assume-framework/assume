@@ -670,21 +670,6 @@ class SupportsMinMaxCharge(BaseUnit):
             ) / self.capacity
         return 0.0
 
-    def _align_to_index(self, t: datetime) -> datetime:
-        """
-        Rounds ``t`` up to the first time step of the index at or after it.
-
-        Args:
-            t (datetime.datetime): The time to align.
-
-        Returns:
-            datetime.datetime: The first time step of the index at or after ``t``.
-        """
-        remainder = (t - self.index[0]) % self.index.freq
-        if remainder:
-            t += self.index.freq - remainder
-        return t
-
     def apply_power_limits(self, current_power: float) -> float:
         """
         Clips a planned power to the power limits of the unit.
@@ -720,7 +705,7 @@ class SupportsMinMaxCharge(BaseUnit):
             until (datetime.datetime): The point in time the SOC is needed for.
         """
         last = self.index[-1]
-        until = min(self._align_to_index(until), last)
+        until = min(self.index.align_up(until), last)
         if until <= self._soc_valid_until:
             return
 
@@ -765,7 +750,7 @@ class SupportsMinMaxCharge(BaseUnit):
             t (datetime.datetime): The time to set the SOC at.
             soc (float): The state of charge (between 0 and 1).
         """
-        t = self._align_to_index(t)
+        t = self.index.align_up(t)
         # propagate up to t first, so the range before it is valid
         self.ensure_soc(t)
         self.outputs["soc"].at[t] = soc
@@ -820,7 +805,7 @@ class SupportsMinMaxCharge(BaseUnit):
 
         earliest = min(order["start_time"] for order in orderbook)
         self._soc_valid_until = min(
-            self._soc_valid_until, self._align_to_index(earliest)
+            self._soc_valid_until, self.index.align_up(earliest)
         )
 
 
