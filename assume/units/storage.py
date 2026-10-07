@@ -420,7 +420,7 @@ class Storage(SupportsMinMaxCharge):
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
 
-        base_load = self.outputs["energy"].loc[start:end_excl]
+        base_load = self.get_feasible_energy(start, end_excl)
         capacity_pos = self.outputs["capacity_pos"].loc[start:end_excl]
         capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
 
@@ -462,7 +462,7 @@ class Storage(SupportsMinMaxCharge):
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
 
-        base_load = self.outputs["energy"].loc[start:end_excl]
+        base_load = self.get_feasible_energy(start, end_excl)
         capacity_pos = self.outputs["capacity_pos"].loc[start:end_excl]
         capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
 

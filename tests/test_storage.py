@@ -1113,3 +1113,22 @@ def test_float_noise_in_the_plan_is_not_reported(caplog):
         unit.execute_current_dispatch(start, start)
 
     assert not [r for r in caplog.records if "not feasible" in r.getMessage()]
+
+
+def test_planning_reads_the_feasible_energy(mock_market_config):
+    """
+    Bids building on volume already committed to a time step - the previous
+    power for ramping and the remaining power for further markets - have to
+    start from what the unit can run at, not from a plan the SoC cannot back.
+    """
+    # 50 MWh stored, so the SoC only backs 47.5 MW of discharge in one hour
+    unit = _storage(initial_soc=0.05)
+    t0, t1 = unit.index[0], unit.index[1]
+    unit.set_dispatch_plan(mock_market_config, [_energy_order(t0, t1, 100)])
+    feasible = unit.get_feasible_energy(t0, t0)[0]
+    assert 0 < feasible < 100
+
+    assert unit.get_output_before(t1) == pytest.approx(feasible)
+
+    _, max_power_charge = unit.calculate_min_max_charge(t0, t1)
+    assert max_power_charge[0] == pytest.approx(unit.max_power_charge - feasible)

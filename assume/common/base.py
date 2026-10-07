@@ -788,6 +788,22 @@ class SupportsMinMaxCharge(BaseUnit):
             self.ensure_soc(t)
         return self.outputs["soc"].at[t]
 
+    def get_output_before(self, dt: datetime, product_type: str = "energy") -> float:
+        """
+        Returns the feasible energy of the time step before ``dt``.
+
+        Args:
+            dt: The datetime.
+            product_type: The product type (default is "energy").
+
+        Returns:
+            The output before the given datetime.
+        """
+        if product_type != "energy" or dt - self.index.freq < self.index[0]:
+            return super().get_output_before(dt, product_type)
+        before = dt - self.index.freq
+        return self.get_feasible_energy(before, before)[0]
+
     def set_dispatch_plan(
         self, marketconfig: MarketConfig, orderbook: Orderbook
     ) -> None:
