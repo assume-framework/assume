@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, TypeAlias
 
 import pandas as pd
@@ -20,6 +21,13 @@ ForecastIndex: TypeAlias = FastIndex | pd.DatetimeIndex | pd.Series
 ForecastSeries: TypeAlias = FastSeries | list | float | pd.Series
 
 log = logging.getLogger(__name__)
+
+
+class AdaptiveForecast:
+    """Adaptive market-price forecasts issued during the simulation."""
+
+    def __init__(self):
+        self.price: dict[str, FastSeries] = {}
 
 
 def _ensure_not_none(
@@ -1192,8 +1200,159 @@ class UnitsOperatorForecaster(UnitForecaster):
             market_prices=market_prices,
             residual_load=residual_load,
         )
+        self.adaptive_merit_order_state: dict = {"markets": {}}
+        self.adaptive_merit_order_settings: dict = {}
+        self.adaptive_merit_order_correction_enabled = False
+        self.adaptive_forecast = AdaptiveForecast()
+        self._adaptive_merit_order_units: tuple[BaseUnit, ...] = ()
+        self._adaptive_merit_order_markets: dict[str, MarketConfig] = {}
+        self.unit_operator_id = "operator"
 
         for k, v in kwargs.items():
             if isinstance(v, pd.Series):
                 v = self._to_series(v)
             self.__setattr__(k, v)
+
+    def initialize(
+        self,
+        units: list[BaseUnit],
+        market_configs: list[MarketConfig],
+        forecast_df: ForecastSeries = None,
+        initializing_unit: BaseUnit = None,
+    ):
+        """Initialize existing static forecasts and retain market inputs."""
+
+        super().initialize(
+            units,
+            market_configs,
+            forecast_df,
+            initializing_unit,
+        )
+        self._adaptive_merit_order_units = tuple(units)
+        self._adaptive_merit_order_markets = {
+            market.market_id: market for market in market_configs
+        }
+
+    def enable_adaptive_merit_order_correction(self, **settings) -> None:
+        """Enable adaptive merit-order correction with Gaussian uncertainty."""
+        self.set_adaptive_merit_order_uncertainty_model("gaussian", **settings)
+
+    def set_adaptive_merit_order_uncertainty_model(
+        self, uncertainty_model: str, **settings
+    ) -> None:
+        """Enable adaptive correction and select its uncertainty model.
+
+        Supported distributions are ``gaussian`` (the default) and
+        ``nonlinear_quantile``. Additional keyword settings can tune the
+        selected method without adding simulation YAML configuration. Calling
+        this before simulation start also enables the UnitsOperator lifecycle.
+        """
+        if self.adaptive_merit_order_state["markets"]:
+            raise RuntimeError(
+                "The adaptive uncertainty model cannot change after forecasts "
+                "have been issued"
+            )
+        from assume.common.forecast_algorithms import (
+            ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS,
+            ADAPTIVE_MERIT_ORDER_SETTINGS,
+        )
+
+        if uncertainty_model not in ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS:
+            raise ValueError(
+                "Adaptive merit-order distribution must be one of "
+                f"{ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS}"
+            )
+        unknown = set(settings) - set(ADAPTIVE_MERIT_ORDER_SETTINGS)
+        if unknown:
+            raise ValueError(
+                f"Unknown adaptive merit-order settings: {sorted(unknown)}"
+            )
+        self.adaptive_merit_order_settings = settings | {
+            "distribution": uncertainty_model
+        }
+        self.adaptive_merit_order_correction_enabled = True
+
+    def get_adaptive_merit_order_forecast(
+        self,
+        market_id: str,
+        issue_time: datetime,
+        horizon: timedelta,
+    ) -> list[dict]:
+        """Issue corrected price forecasts for the requested delivery horizon."""
+        if not isinstance(horizon, timedelta) or horizon <= timedelta():
+            raise ValueError("horizon must be a positive timedelta")
+        market = self._adaptive_merit_order_markets.get(market_id)
+        if market is None:
+            raise ValueError(
+                f"Unknown market for adaptive merit-order forecast: {market_id}"
+            )
+        if market_id not in self.adaptive_merit_order_state["markets"]:
+            from assume.common.forecast_algorithms import (
+                initialize_adaptive_merit_order_correction,
+            )
+
+            self.adaptive_merit_order_state["markets"].update(
+                initialize_adaptive_merit_order_correction(
+                    self.index,
+                    self._adaptive_merit_order_units,
+                    market,
+                    self.adaptive_merit_order_settings,
+                )["markets"]
+            )
+
+        products = {}
+        for market_product in market.market_products:
+            product_start = issue_time + market_product.first_delivery
+            delivery_end = product_start + horizon
+            while product_start < delivery_end:
+                try:
+                    product_end = product_start + market_product.duration
+                except TypeError as error:
+                    raise ValueError(
+                        "Adaptive merit-order forecasts require fixed-duration "
+                        "market products"
+                    ) from error
+                product = (product_start, product_end, market_product.only_hours)
+                existing_product = products.setdefault(product_start, product)
+                if existing_product != product:
+                    raise ValueError(
+                        "Adaptive merit-order forecasts require one product per "
+                        "delivery time"
+                    )
+                product_start = product_end
+
+        from assume.common.forecast_algorithms import (
+            issue_adaptive_merit_order_correction,
+        )
+
+        forecasts = issue_adaptive_merit_order_correction(
+            self.adaptive_merit_order_state,
+            self.unit_operator_id,
+            market_id,
+            issue_time,
+            list(products.values()),
+        )
+        price = self.adaptive_forecast.price.setdefault(
+            market_id,
+            FastSeries(index=self.index, value=float("nan"), name=market_id),
+        )
+        for forecast in forecasts:
+            if forecast["product_start"] in self.index:
+                price[forecast["product_start"]] = forecast[
+                    "corrected_price_mean_forecast"
+                ]
+        return forecasts
+
+    def update_adaptive_merit_order_forecast(
+        self, market_id: str, market_meta: list[dict]
+    ) -> list[dict]:
+        """Update issued adaptive forecasts from realised clearing prices."""
+        if market_id not in self.adaptive_merit_order_state["markets"]:
+            return []
+        from assume.common.forecast_algorithms import (
+            update_adaptive_merit_order_correction,
+        )
+
+        return update_adaptive_merit_order_correction(
+            self.adaptive_merit_order_state, market_id, market_meta
+        )

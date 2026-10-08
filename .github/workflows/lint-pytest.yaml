@@ -74,7 +74,9 @@ jobs:
         cache-dependency-path: '**/pyproject.toml'
     - name: Run Jupyter notebooks
       run: |
-        pip install -e .
+        # CPU-only wheel first: the default PyPI wheel on Linux bundles CUDA (~5 GB) and CI has no GPU
+        pip install torch --index-url https://download.pytorch.org/whl/cpu
+        pip install -e .[learning]
         pip install jupyter
         cd examples/notebooks
         jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=60 --output output.ipynb 01_minimal_manual_example.ipynb
@@ -105,7 +107,9 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        python -m pip install -e .[test]
+        # CPU-only wheel first: the default PyPI wheel on Linux bundles CUDA (~5 GB) and CI has no GPU
+        python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+        python -m pip install -e .[test,learning]
 
     - name: Test with pytest & integration tests
       run: |
@@ -118,12 +122,6 @@ jobs:
     - name: Test with pypsa
       run: |
         pytest -m "require_network and not require_learning"
-
-    - name: Install torch dependencies
-      run: |
-        # CPU-only wheel first: the default PyPI wheel on Linux bundles CUDA (~5 GB) and CI has no GPU
-        python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
-        python -m pip install -e .[learning]
 
     - name: Test pytest with torch & integration tests
       run: |

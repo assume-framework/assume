@@ -85,6 +85,10 @@ The resolution flow is:
 
 This design lets you swap algorithms via configuration without touching code.
 
+The optional adaptive merit-order correction is a stateful shadow
+forecast driven by market openings and clearings. It does not replace the
+static ``price`` series used by bidding strategies.
+
 ***********************************
 Configuration
 ***********************************
@@ -110,6 +114,102 @@ Specify which algorithms to use in the ``forecast_algorithms`` section of your s
             preprocess_price: price_default
             update_price: price_default
             update_congestion_signal: congestion_signal_default
+
+Adaptive merit-order correction
+===============================
+
+The adaptive correction is an opt-in feature of an operator forecaster. It
+does not require a YAML setting and does not replace the existing ``price``
+series used by bidding strategies. Before starting the simulation, enable it:
+
+.. code-block:: python
+
+    forecaster.enable_adaptive_merit_order_correction()
+
+This creates the separate ``adaptive_forecast.price`` signal. It is populated
+only for products whose forecast has been issued at a market opening:
+
+.. code-block:: python
+
+    from datetime import timedelta
+
+    one_hour_price = forecaster.adaptive_forecast.price["EOM"][delivery_time]
+    next_24_hours = forecaster.adaptive_forecast.price["EOM"][
+        delivery_time : delivery_time + timedelta(hours=23)
+    ]
+
+The existing merit-order signal remains ``forecaster.price["EOM"]``. To use
+the nonlinear quantile uncertainty plug-in instead of the Gaussian default,
+call ``set_adaptive_merit_order_uncertainty_model("nonlinear_quantile")``
+before the first forecast is issued.
+
+Each unit managed by that operator receives a reference to the same adaptive
+signal. A custom unit strategy can therefore use the issued price directly:
+
+.. code-block:: python
+
+    price = unit.forecaster.adaptive_forecast.price["EOM"][delivery_time]
+
+The explicit forecast method remains available for experiments and manual
+evaluation:
+
+.. code-block:: python
+
+    from datetime import timedelta
+
+    forecasts = forecaster.get_adaptive_merit_order_forecast(
+        market_id="EOM",
+        issue_time=current_time,
+        horizon=timedelta(hours=24),
+    )
+
+``horizon`` starts at the market product's first delivery. The method returns
+one immutable forecast row per product in that delivery window.
+
+For every selected energy product, the operator forecaster first calculates
+the existing merit-order forecast :math:`P^{MO}`. After clearing it observes
+the day-ahead price :math:`P^{DA}` and learns the residual
+:math:`r=P^{DA}-P^{MO}`. Separate distributional equations learn residual
+location and log scale using online coordinate descent, LASSO (L1) feature
+selection, and L2 coefficient stabilisation. The corrected mean is
+:math:`P^{MO}+\hat{r}`; the default q10, q50, and q90 use a Gaussian residual
+distribution. ``nonlinear_quantile`` can be selected with the same method
+before the first forecast is issued.
+Feature matrices, discounted sufficient statistics, coordinate descent, and
+Gaussian inverse-CDF calculations use ``torch.float64`` tensors on CPU by
+default. The double precision is intentional because online discounted
+statistics are updated repeatedly over long simulations.
+
+The default features are merit-order price, separate capacity-weighted wind
+and solar availability factors, forecast residual load, previous-day same-hour
+realised price, and cyclic weekday terms. General generator availability is
+deliberately excluded. The initial implementation uses built-in settings: 504
+training samples (21 daily 24-hour auctions), ``0.995`` forgetting, Gaussian
+residuals, and a ``0.01`` minimum standard deviation.
+
+Information timing and statuses
+--------------------------------
+
+Forecast rows are issued and frozen when
+``get_adaptive_merit_order_forecast`` is called. Cleared prices can therefore
+update only later forecasts. Before the
+initial window is complete, the corrected mean equals merit order. Fewer than
+two outcomes produce ``fallback_no_uncertainty``; two or more produce
+``fallback_empirical_uncertainty`` with expanding residual uncertainty. At the
+configured sample count, scaling is fitted once and frozen and both models are
+activated. Later outcomes update discounted sufficient statistics with the
+configured forgetting factor and use ``trained`` status.
+
+Finalised rows are written to ``adaptive_merit_order_forecast`` and contain the issue
+and delivery timestamps, operator and market identifiers, immutable
+``forecast_id``, merit-order and corrected forecasts, residual location and
+scale, q10/q50/q90, realised price and residual, frozen post-forecast error,
+sample count, and status.
+
+Only non-spatial energy markets with one scalar price per product are
+supported. The correction state belongs to each unit operator; bids, clearing,
+dispatch, and ``forecaster.price`` are unchanged. This is a two-stage Gaussian
+location/scale residual model, not full joint Online Distributional Regression.
 
 Via unit CSV files
 ==================
