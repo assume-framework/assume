@@ -867,13 +867,22 @@ def test_execute_current_dispatch_unaligned_end_does_not_advance_past_executed(
 
 
 def test_execute_current_dispatch_after_the_horizon(mock_market_config, storage_unit):
-    """Executing past the end of the index must not move the frontier past it."""
+    """
+    A window past the end of the index executes nothing - in particular not
+    the last time step - and leaves the frontier on the index.
+    """
     t0, t1 = storage_unit.index[:2]
     last, freq = storage_unit.index[-1], storage_unit.index.freq
-    storage_unit.set_dispatch_plan(mock_market_config, [_energy_order(t0, t1, -100)])
+    storage_unit.set_dispatch_plan(
+        mock_market_config,
+        [_energy_order(t0, t1, -100), _energy_order(last, last + freq, 250)],
+    )
 
-    storage_unit.execute_current_dispatch(last + freq, last + 2 * freq)
-    assert storage_unit._soc_valid_until == last
+    dispatch = storage_unit.execute_current_dispatch(last + freq, last + 2 * freq)
+    assert len(dispatch) == 0
+    # the plan of the last step is still the plan, not clipped to the power limit
+    assert storage_unit.outputs["energy"].at[last] == 250
+    assert storage_unit._soc_valid_until in storage_unit.index
 
     charged = 100 * storage_unit.efficiency_charge / storage_unit.capacity
     assert storage_unit.get_soc(t1) == pytest.approx(storage_unit.initial_soc + charged)

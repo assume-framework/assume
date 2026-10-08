@@ -534,6 +534,28 @@ class SupportsMinMaxCharge(BaseUnit):
             tuple[np.ndarray, np.ndarray]: The min and max discharging power for the given time period.
         """
 
+    def calculate_soc_max_discharge(self, soc: float) -> float:
+        """
+        Calculates the maximum discharge power the state of charge can back.
+
+        Args:
+            soc (float): The current state of charge (between 0 and 1).
+
+        Returns:
+            float: The maximum discharge power, not negative.
+        """
+
+    def calculate_soc_max_charge(self, soc: float) -> float:
+        """
+        Calculates the maximum charge power the state of charge can back.
+
+        Args:
+            soc (float): The current state of charge (between 0 and 1).
+
+        Returns:
+            float: The maximum charge power, not positive.
+        """
+
     def calculate_ramp_discharge(
         self,
         previous_power: float,
@@ -768,8 +790,7 @@ class SupportsMinMaxCharge(BaseUnit):
         Returns:
             float: The state of charge at ``t``.
         """
-        if t > self._soc_valid_until:
-            self.ensure_soc(t)
+        self.ensure_soc(t)
         return self.outputs["soc"].at[t]
 
     def get_output_before(self, dt: datetime, product_type: str = "energy") -> float:

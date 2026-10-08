@@ -290,7 +290,10 @@ class Storage(SupportsMinMaxCharge):
             np.ndarray: The volume of the unit within the given time range.
         """
         last = self.index[-1]
-        start = min(self.index.align_up(max(start, self.index[0])), last)
+        start = self.index.align_up(max(start, self.index[0]))
+        if start > last:
+            # nothing left to execute, the returned range is empty
+            return self.outputs["energy"].loc[start:end]
 
         # the SOC has to be valid at `start`, everything after it is replaced
         self.ensure_soc(start)
