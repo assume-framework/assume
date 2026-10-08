@@ -76,6 +76,10 @@ When the outputs are stored in CSV files, the data is organized in a similar str
      - Unit-level dispatch data.
      - simulation, unit, power, heat, soc, energy_generation_costs, energy_cashflow, total_costs
 
+   * - dsm_dispatch
+     - Dispatch per technology of the demand-side units (steel plant, cement plant, building, ...) in long format: one row per time step, unit, technology and variable. Only written if DSM units are part of the simulation. ``baseline`` is the optimal operation without flexibility; ``flex`` is the flexible operation and is empty as long as the unit did not determine it. Every continuous variable of a technology block is reported, e.g. ``power_in``, material and fuel flows, ``co2_emission``, ``operating_cost`` or storage levels. The schedule is the one planned by the unit and can differ from ``unit_dispatch`` if a bid is only partly accepted.
+     - simulation, time, unit, technology, variable, baseline, flex
+
    * - market_orders
      - Market order details.
      - simulation, market_id, node, bid_id, unit_id, parent_bid_id, bid_type, end_time, price, volume, accepted_price, accepted_volume, min_acceptance_ratio

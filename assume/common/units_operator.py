@@ -68,6 +68,8 @@ class UnitsOperator(Role):
         self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
         self.last_sent_dispatch = defaultdict(lambda: 0)
+        # DSM component dispatch is not tied to a product type, so it is tracked separately
+        self.last_sent_dsm_dispatch = 0
         self.forecaster = forecaster
 
         self.portfolio_strategies = portfolio_strategies
@@ -401,6 +403,24 @@ class UnitsOperator(Role):
 
         return market_dispatch, unit_dispatch
 
+    def get_dsm_dispatch(self, last: int) -> list[dict]:
+        """
+        Collects the per-technology dispatch of all DSM units since the last export.
+
+        Args:
+            last (int): The timestamp until which the DSM dispatch was already sent.
+
+        Returns:
+            list[dict]: The dispatch per unit, technology and variable.
+        """
+        now = timestamp2datetime(self.context.current_timestamp)
+        start = timestamp2datetime(last + 1)
+        dsm_dispatch = []
+        for unit in self.units.values():
+            if hasattr(unit, "get_component_dispatch"):
+                dsm_dispatch.extend(unit.get_component_dispatch(start, now))
+        return dsm_dispatch
+
     def write_actual_dispatch(self, product_type: str) -> None:
         """
         Sends the actual aggregated dispatch curve to the output agent.
@@ -442,6 +462,18 @@ class UnitsOperator(Role):
                         "context": "write_results",
                         "type": "unit_dispatch",
                         "data": unit_dispatch,
+                    },
+                )
+
+            dsm_dispatch = self.get_dsm_dispatch(self.last_sent_dsm_dispatch)
+            self.last_sent_dsm_dispatch = self.context.current_timestamp
+            if dsm_dispatch:
+                self.context.schedule_instant_message(
+                    receiver_addr=db_addr,
+                    content={
+                        "context": "write_results",
+                        "type": "dsm_dispatch",
+                        "data": dsm_dispatch,
                     },
                 )
 

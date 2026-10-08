@@ -233,6 +233,7 @@ class WriteOutput(Role):
             "market_meta",
             "market_dispatch",
             "unit_dispatch",
+            "dsm_dispatch",
             "rl_params",
             "rl_grad_params",
         ]:
@@ -412,6 +413,23 @@ class WriteOutput(Role):
 
         return data
 
+    def convert_dsm_dispatch(self, dsm_dispatch: list[dict]):
+        """
+        Convert the per-technology dispatch of the DSM units to a DataFrame in long format.
+
+        Args:
+            dsm_dispatch (list): One dictionary per unit, technology and variable. It holds
+                the scalars ``unit``, ``technology``, ``variable`` and the arrays ``time``,
+                ``baseline`` and ``flex``.
+        """
+        data = pd.concat(
+            [pd.DataFrame(entry) for entry in dsm_dispatch], ignore_index=True
+        )
+        data.set_index("time", inplace=True)
+        data["simulation"] = self.simulation_id
+
+        return data
+
     def convert_flows(self, data: dict[tuple[datetime, str], float]):
         """
         Convert the flows of the grid results into a dataframe.
@@ -474,6 +492,8 @@ class WriteOutput(Role):
                         df = self.convert_market_dispatch(data_list)
                     case "unit_dispatch":
                         df = self.convert_unit_dispatch(data_list)
+                    case "dsm_dispatch":
+                        df = self.convert_dsm_dispatch(data_list)
                     case "rl_params":
                         df = self.convert_rl_params(data_list)
                     case "rl_grad_params":

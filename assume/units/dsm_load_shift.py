@@ -1415,6 +1415,7 @@ class DSMFlex:
                     pass
 
         _pending_opr_updates: dict = {}
+        pending_component_values: dict = {}
         window_production = 0.0
 
         try:
@@ -1499,6 +1500,10 @@ class DSMFlex:
                     instance, window_start, commit_end, saved_index
                 )
 
+            pending_component_values = self._component_dispatch_values(
+                instance, n_commit
+            )
+
             self._update_init_states(instance, n_commit - 1, init_states)
 
         finally:
@@ -1517,6 +1522,10 @@ class DSMFlex:
                 logger.debug(
                     "Could not update opt_power_requirement[%d]: %s", global_t, e
                 )
+
+        if not hasattr(self, "_component_dispatch"):
+            self._component_dispatch = {}
+        self._commit_component_dispatch(pending_component_values, window_start)
 
         self._rh_optimized_until_step = commit_end
         logger.info(
@@ -1616,6 +1625,87 @@ class DSMFlex:
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
 
+        self._capture_component_dispatch(instance, "baseline")
+
+    @staticmethod
+    def _component_dispatch_values(instance, n_steps: int) -> dict[tuple, list]:
+        """Read the first *n_steps* values of every dispatch variable of *instance*.
+
+        Dispatch variables are the continuous variables indexed by time of each
+        technology block (power, material and fuel flows, emissions, operating cost,
+        storage levels, ...). Binary and integer variables are left out.
+
+        Returns:
+            dict: ``{(technology, variable): [value per step]}``, NaN where a variable
+            has no value. ``+ 0.0`` turns solver noise like ``-0.0`` into ``0.0``.
+        """
+        values = {}
+        for technology, block in instance.dsm_blocks.items():
+            for var in block.component_objects(pyo.Var, descend_into=False):
+                if not var.is_indexed() or len(var) < n_steps:
+                    continue
+                if not next(iter(var.values())).is_continuous():
+                    continue
+                values[(technology, var.local_name)] = [
+                    float("nan") if var[t].value is None else var[t].value + 0.0
+                    for t in range(n_steps)
+                ]
+        return values
+
+    def _capture_component_dispatch(self, instance, mode: str) -> None:
+        """Store the schedule of every component block of a solved full-horizon *instance*.
+
+        Args:
+            instance: The solved Pyomo instance holding ``dsm_blocks``.
+            mode (str): ``"baseline"`` (optimal operation) or ``"flex"`` (flexible operation).
+        """
+        if not hasattr(self, "_component_dispatch"):
+            self._component_dispatch = {}
+
+        for key, values in self._component_dispatch_values(
+            instance, len(self.index)
+        ).items():
+            self._component_dispatch.setdefault(key, {})[mode] = FastSeries(
+                index=self.index, value=values
+            )
+
+    def _commit_component_dispatch(
+        self, values: dict[tuple, list], window_start: int
+    ) -> None:
+        """Overwrite the baseline schedule with the steps committed by a rolling window."""
+        for key, window_values in values.items():
+            series = self._component_dispatch.setdefault(key, {}).setdefault(
+                "baseline", FastSeries(index=self.index, value=float("nan"))
+            )
+            series.iloc[window_start : window_start + len(window_values)] = (
+                window_values
+            )
+
+    def get_component_dispatch(self, start: datetime, end: datetime) -> list[dict]:
+        """Per-technology dispatch of the unit between *start* and *end* (inclusive).
+
+        Returns:
+            list[dict]: One entry per technology and variable with the keys ``unit``,
+            ``technology``, ``variable``, ``time`` and the arrays ``baseline`` and
+            ``flex``. ``flex`` is NaN as long as no flexible operation was determined.
+        """
+        dispatch = []
+        times = self.index.get_date_list(start, end)
+        not_determined = FastSeries(index=self.index, value=float("nan"))
+        for (technology, variable), modes in getattr(
+            self, "_component_dispatch", {}
+        ).items():
+            entry = {
+                "unit": self.id,
+                "technology": technology,
+                "variable": variable,
+                "time": times,
+            }
+            for mode in ("baseline", "flex"):
+                entry[mode] = modes.get(mode, not_determined).loc[start:end]
+            dispatch.append(entry)
+        return dispatch
+
     def determine_optimal_operation_with_flex(self):
         """
         Determines the optimal operation of the steel plant without considering flexibility.
@@ -1704,6 +1794,8 @@ class DSMFlex:
         self.flex_variable_cost_series = FastSeries(
             index=self.index, value=flex_variable_cost
         )
+
+        self._capture_component_dispatch(instance, "flex")
 
     def switch_to_opt(self, instance):
         if hasattr(instance, "obj_rule_flex"):
