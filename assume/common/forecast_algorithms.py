@@ -357,6 +357,10 @@ def calculate_naive_price_elastic(
                     continue
             elif bid["volume"] == 0:
                 continue
+            # the forecast skips validate_orderbook, so add the additional fields
+            # required by the market (e.g. min_acceptance_ratio for complex clearing)
+            for field in config.additional_fields:
+                bid.setdefault(field, None)
             cleaned_orderbook.append(bid)
 
         mps = get_available_products(

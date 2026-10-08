@@ -366,6 +366,40 @@ def test_forecast_interface__elastic_demand(index, market_setup, forecast_setup)
     assert np.isclose(list(market_forecast["EOM"]), [8.0] * 7).all()
 
 
+def test_forecast_interface__elastic_demand_complex_clearing(
+    market_setup, forecast_setup
+):
+    """
+    The elastic price forecast clears its own orderbook without validate_orderbook,
+    so the generated orders must contain the additional fields of the market,
+    e.g. min_acceptance_ratio for complex clearing.
+    """
+    market_config = next(iter(market_setup["empty_grid_markets"]))
+    market_config.market_mechanism = "complex_clearing"
+    market_config.additional_fields = [
+        "bid_type",
+        "min_acceptance_ratio",
+        "parent_bid_id",
+    ]
+    market_config.param_dict = {"grid_data": {}, "solver_name": "appsi_highs"}
+
+    mock_dsm_forecaster = forecast_setup["mock_dsm_forecaster"]
+    mock_dsm_forecaster.initialize(
+        forecast_setup["units_elastic_case"],
+        {"EOM": market_config}.values(),
+        None,
+        None,
+    )
+
+    price_forecast = np.array(list(mock_dsm_forecaster.price["EOM"]))
+
+    # supply is fully dispatched, so the price is set by the elastic demand bids
+    assert len(price_forecast) == 7
+    assert np.isfinite(price_forecast).all()
+    assert (price_forecast >= 8.0).all()
+    assert (price_forecast <= market_config.maximum_bid_price).all()
+
+
 def test_forecast_interface__cache(market_setup, forecast_setup, shared_FastIndex):
     # clear cache uses
     calculate_naive_price.cache_clear()
