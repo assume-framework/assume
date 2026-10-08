@@ -491,13 +491,14 @@ class Learning(Role):
             self.learning_config.continue_learning is True
             and actors_and_critics is None
         ):
-            directory = self.learning_config.trained_policies_load_path
-            if directory and Path(directory).is_dir():
+            load_path = self.learning_config.trained_policies_load_path
+            directory = Path(load_path) if load_path else None
+            if directory and directory.is_dir():
                 logger.info(f"Loading pretrained policies from {directory}!")
                 self.rl_algorithm.load_params(directory)
             else:
                 raise FileNotFoundError(
-                    f"Directory {directory} does not exist! Cannot load pretrained policies from trained_policies_load_path!"
+                    f"Directory {load_path} does not exist! Cannot load pretrained policies from trained_policies_load_path!"
                 )
 
     def compare_and_save_policies(self, metrics: dict) -> bool:
