@@ -230,7 +230,11 @@ class Learning(Role):
         self.rl_strats[strategy.unit_id] = strategy
 
     async def store_to_buffer_and_update(self) -> None:
-        # wait for rewards to be added to cache
+        # The units operators execute the dispatch and calculate the rewards of the
+        # previous timestep in a task which fires at the same time as this one.
+        # Yielding once lets those tasks run first, so their rewards are processed in
+        # this update. Otherwise they are carried over to the next update, and the
+        # final timestep of an episode would never reach the buffer.
         await asyncio.sleep(0)
 
         # Atomic dict operations - create new references
@@ -252,20 +256,34 @@ class Learning(Role):
         # Get timestamps from cache we took
         all_timestamps = sorted(current_obs.keys())
         if len(all_timestamps) > 1:
-            # Identify all incomplete timesteps (no reward yet)
+            # Identify all incomplete timesteps, where not every unit with an
+            # observation has a reward yet. Rewards are calculated per units operator,
+            # so some units of a timestep can already be rewarded while others are not.
             incomplete_timestamps = [
-                ts for ts in all_timestamps if ts not in current_rewards
+                ts
+                for ts in all_timestamps
+                if not current_obs[ts].keys() <= current_rewards.get(ts, {}).keys()
             ]
 
             # Process only complete timesteps
             timestamps_to_process = [
                 ts for ts in all_timestamps if ts not in incomplete_timestamps
             ]
-            # Carry over incomplete timesteps to new cache dicts
+            # Carry over incomplete timesteps, including the rewards already
+            # received for them, to new cache dicts
             for ts in incomplete_timestamps:
                 self.all_obs[ts] = current_obs[ts]
                 self.all_actions[ts] = current_actions[ts]
                 self.all_noises[ts] = current_noises[ts]
+                if ts in current_rewards:
+                    self.all_rewards[ts] = current_rewards[ts]
+                    self.all_regrets[ts] = current_regrets[ts]
+                    self.all_profits[ts] = current_profits[ts]
+
+            # Rewards are calculated after delivery, so with products delivered
+            # later than train_freq no timestep may be complete yet
+            if not timestamps_to_process:
+                return
 
             # Create filtered cache (only complete timesteps)
             cache = {

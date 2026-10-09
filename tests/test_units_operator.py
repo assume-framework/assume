@@ -381,6 +381,42 @@ async def test_dispatch_of_the_clearing_time_step_is_not_executed_early(
     assert len(rewarded) == 1
 
 
+async def test_last_product_is_rewarded_at_market_end(units_operator: UnitsOperator):
+    """
+    The last product delivers [end - 1h, end). The final execution at `end` must
+    still execute its time step and reward it, so no order stays pending.
+    """
+    marketconfig = units_operator.available_markets[0]
+    units_operator.registered_markets[marketconfig.market_id] = marketconfig
+    rewarded = track_rewards(units_operator)
+
+    last_order = make_order()
+    last_order["start_time"] = end - rd(hours=1)
+    last_order["end_time"] = end
+
+    clock = units_operator.context.context.clock
+    clock.set_time(datetime2timestamp(end - rd(hours=1)))
+    units_operator.last_executed_dispatch = datetime2timestamp(end - rd(hours=2))
+    units_operator.handle_market_feedback(
+        {
+            "context": "clearing",
+            "market_id": "EOM",
+            "accepted_orders": [last_order],
+            "rejected_orders": [],
+        },
+        {},
+    )
+
+    clock.set_time(datetime2timestamp(end))
+    await units_operator.execute_dispatch()
+
+    assert units_operator.last_executed_dispatch == datetime2timestamp(
+        end - rd(hours=1)
+    )
+    assert len(rewarded) == 1
+    assert units_operator.pending_orders["EOM"] == []
+
+
 async def test_get_market_dispatch(units_operator: UnitsOperator):
     clock = units_operator.context.context.clock
 

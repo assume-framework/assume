@@ -243,9 +243,7 @@ class BaseUnit:
         self.total_op_time += (self.outputs["energy"].loc[start:end] > 0).sum()
 
         # Update the average operation time
-        total_periods = (
-            len(self.index[:end]) + 1
-        )  # Total periods up to and including 'end'
+        total_periods = len(self.index[:end])  # Total periods up to and including 'end'
         self.avg_op_time = self.total_op_time / total_periods
 
     def execute_current_dispatch(

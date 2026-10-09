@@ -249,3 +249,22 @@ def test_clear_empty_bids(base_unit, mock_market_config):
 
 if __name__ == "__main__":
     pytest.main(["-s", __file__])
+
+
+def test_update_avg_op_time(base_unit):
+    index = base_unit.index
+    base_unit.outputs["energy"].loc[index[0] : index[3]] = [10, 0, 10, 10]
+
+    # the first execution may start before the index
+    base_unit.update_avg_op_time(index[0] - index.freq, index[0])
+    assert base_unit.total_op_time == 1
+    assert base_unit.avg_op_time == 1
+
+    base_unit.update_avg_op_time(index[1], index[1])
+    assert base_unit.total_op_time == 1
+    assert base_unit.avg_op_time == 1 / 2
+
+    # executing several time steps at once counts each of them
+    base_unit.update_avg_op_time(index[2], index[3])
+    assert base_unit.total_op_time == 3
+    assert base_unit.avg_op_time == 3 / 4

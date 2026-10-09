@@ -564,7 +564,7 @@ class UnitsOperator(Role):
             # no export follows which could aggregate the rest, so the dispatch is final
             # until the market end. The closing delta there lies beyond the simulation
             # and is excluded by the aggregation.
-            until = marketconfig.opening_hours._until
+            until = marketconfig.market_end
 
         market_id = marketconfig.market_id
         last = timestamp2datetime(self.last_sent_market_dispatch[market_id])

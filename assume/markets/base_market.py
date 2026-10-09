@@ -234,7 +234,7 @@ class MarketRole(MarketMechanism, Role):
         products = get_available_products(
             self.marketconfig.market_products, market_open
         )
-        until = self.marketconfig.opening_hours._until
+        until = self.marketconfig.market_end
         if until and market_closing > until:
             # this market should not open, as the clearing is after the markets end time
             return
