@@ -467,7 +467,16 @@ class PPO(ActorCriticAlgorithm):
         loss_clipped = F.mse_loss(values_clipped, returns, reduction="none")
         return th.maximum(loss, loss_clipped).mean()
 
-    def update_policy(self) -> None:
+    def close_rollout(self) -> None:
+        """Train any transition left at the end of an episode, then clear the buffer.
+
+        The leftover row has no following observation, so its bootstrap value is zero.
+        """
+        if self.buffer is None or self.buffer.pos == 0:
+            return
+        self.update_policy(terminal=True)
+
+    def update_policy(self, terminal: bool = False) -> None:
         """Update actor and critic networks using Proximal Policy Optimization (PPO).
 
         Performs one complete training iteration consisting of:
@@ -493,14 +502,11 @@ class PPO(ActorCriticAlgorithm):
             logger.debug("Rollout buffer is empty, skipping policy update")
             return
 
-        # Require at least two transitions because we reserve the final one
-        # for bootstrapping V(s_{t+1}) and train on the remaining rollout.
-        if rollout_buffer.pos < 2:
+        # a single stored transition is the row carried over from the previous window. Keep it until a later observation can bootstrap it. At the end of an episode there is no later observation, so train it below.
+        if rollout_buffer.pos < 2 and not terminal:
             logger.debug(
-                "Discarding rollout with fewer than 2 samples; MAPPO needs a "
-                "separate bootstrap observation."
+                "Keeping the carried rollout transition until the next observation."
             )
-            rollout_buffer.reset()
             return
 
         # Update learning rate
@@ -523,21 +529,17 @@ class PPO(ActorCriticAlgorithm):
             else rollout_buffer.buffer_size
         )
 
-        if buffer_size > 0:
-            # Use the LAST observation as the bootstrap for the REST of the buffer.
-            # We sacrifice the last step (pos-1) to serve as s_{t+1} for the step before it.
-            # This ensures V(s_{t+1}) is calculated using the REAL next state, not a self-
-            # referential V(s_{t}).
+        carried_index = None
+        if buffer_size > 0 and not terminal:
+            # Use the last observation as V(s_{t+1}) for the steps before it. That row is a real transition, so it is carried into the next window instead of being dropped.
             last_idx = buffer_size - 1
+            carried_index = last_idx
             last_obs = rollout_buffer.observations[last_idx]
 
-            # Reduce buffer size by 1 so as to not train on the bootstrap step
             rollout_buffer.pos -= 1
             if rollout_buffer.full:
-                rollout_buffer.full = False  # If it was full, it's not anymore
+                rollout_buffer.full = False
 
-            # Bootstrap value, from the same centralized critics that produced
-            # the V(s_t) already stored in the buffer by store_experience.
             last_values = self._centralized_values(last_obs)
 
         # Compute advantages and returns
@@ -731,8 +733,10 @@ class PPO(ActorCriticAlgorithm):
         # Write gradient params to output
         self.learning_role.write_rl_grad_params_to_output(learning_rate, unit_params)
 
-        # Clear rollout buffer
-        rollout_buffer.reset()
+        if carried_index is None:
+            rollout_buffer.reset()
+        else:
+            rollout_buffer.retain_transition_at(carried_index)
 
         logger.debug(
             f"PPO update complete. Actor loss: {np.mean(all_actor_losses):.4f}, "

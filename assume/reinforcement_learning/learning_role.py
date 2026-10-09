@@ -368,8 +368,8 @@ class Learning(Role):
 
         """
 
-        # Add validation to catch unexpected unit_ids
-        if unit_id == 0 or unit_id is None:
+        # Reject only a missing identifier. Integer 0 is a valid unit id.
+        if unit_id is None or unit_id == "":
             logger.warning(
                 f"Got invalid unit_id while storing learning experience: {unit_id}"
             )
@@ -437,7 +437,11 @@ class Learning(Role):
 
         buffer = self.rl_algorithm.buffer
         if buffer is not None and not self.rl_algorithm.retain_buffer_between_episodes:
-            buffer.reset()
+            close_rollout = getattr(self.rl_algorithm, "close_rollout", None)
+            if close_rollout is not None:
+                close_rollout()
+            else:
+                buffer.reset()
 
         return {
             "episodes_done": self.episodes_done,

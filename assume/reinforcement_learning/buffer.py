@@ -296,6 +296,25 @@ class RolloutBuffer:
         self.full = False
         self.generator_ready = False
 
+    def retain_transition_at(self, index: int) -> None:
+        """Keeping one stored transition and discard the rest of the rollout."""
+        carried = {
+            "observations": self.observations[index].copy(),
+            "actions": self.actions[index].copy(),
+            "latent_actions": self.latent_actions[index].copy(),
+            "rewards": self.rewards[index].copy(),
+            "values": self.values[index].copy(),
+            "log_probs": self.log_probs[index].copy(),
+        }
+        self.reset()
+        self.observations[0] = carried["observations"]
+        self.actions[0] = carried["actions"]
+        self.latent_actions[0] = carried["latent_actions"]
+        self.rewards[0] = carried["rewards"]
+        self.values[0] = carried["values"]
+        self.log_probs[0] = carried["log_probs"]
+        self.pos = 1
+
     def add(
         self,
         obs: np.ndarray,
