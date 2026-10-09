@@ -178,50 +178,47 @@ class BaseUnit:
             orderbook=orderbook,
         )
 
-    def calculate_costs(
-        self, start: datetime, end: datetime, product_type: str
-    ) -> None:
+    def calculate_costs(self, start: datetime, end: datetime) -> None:
         """
-        Calculates the total costs (generation and startup) for a specific product type within the given time range,
-        but only if the end is the last index in the time series.
+        Calculates the generation, start-up and total costs of the unit within the given time range.
+
+        The costs are derived from the energy dispatch of the unit and written to the
+        ``generation_costs``, ``starting_costs`` and ``total_costs`` outputs.
 
         Args:
             start (datetime.datetime): The start time for the calculation.
             end (datetime.datetime): The end time for the calculation.
-            product_type (str): The type of product for which the generation cost is to be calculated.
         """
 
         if start not in self.index:
             start = self.index[0]
 
         # Adjusted code for accessing product data and mapping over the index
-        product_data = self.outputs[product_type].loc[start:end]
+        product_data = self.outputs["energy"].loc[start:end]
 
         marginal_costs = [
             self.calculate_marginal_cost(t, product_data[idx])
             for idx, t in enumerate(self.index[start:end])
         ]
         generation_costs = np.abs(marginal_costs * product_data)
-        self.outputs[f"{product_type}_generation_costs"].loc[start:end] = (
-            generation_costs
-        )
+        self.outputs["generation_costs"].loc[start:end] = generation_costs
 
         starting_costs = np.zeros(len(self.index[start:end]))
         for idx, t in enumerate(self.index[start:end]):
             op_time = self.get_operation_time(t)
 
-            if self.outputs[product_type].loc[t] != 0 and op_time < 0:
+            if self.outputs["energy"].loc[t] != 0 and op_time < 0:
                 starting_costs[idx] = self.get_starting_costs(op_time)
 
-        self.outputs[f"{product_type}_starting_costs"].loc[start:end] = starting_costs
+        self.outputs["starting_costs"].loc[start:end] = starting_costs
 
         # future work:
         # balancing_costs = balancing_price * abs(sum(accepted_volumes across all products and markets) - product_data)
-        # self.outputs[f"{product_type}_balancing_costs"].loc[start:end] = (
+        # self.outputs[f"balancing_costs"].loc[start:end] = (
         #   balancing_costs
         # )
 
-        self.outputs[f"{product_type}_total_costs"].loc[start:end] = (
+        self.outputs["total_costs"].loc[start:end] = (
             generation_costs + starting_costs  # future work: + balancing_costs
         )
 

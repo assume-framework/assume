@@ -538,7 +538,7 @@ class UnitsOperator(Role):
 
             current_dispatch = unit.execute_current_dispatch(start, end)
             dispatch = {"power": current_dispatch}
-            unit.calculate_costs(start, end, "energy")
+            unit.calculate_costs(start, end)
             unit.update_avg_op_time(start, end)
             valid_outputs = [
                 "soc",
