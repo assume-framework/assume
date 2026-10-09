@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -12,22 +13,31 @@ from pandas._testing import assert_series_equal
 
 from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecast_algorithms import (
+    _merit_order_clearing,
     calculate_naive_congestion_signal,
     calculate_naive_price,
     calculate_naive_price_inelastic,
     calculate_naive_renewable_utilisation,
     calculate_naive_residual_load,
+    calculate_zonal_merit_order_prices,
     get_forecast_registries,
 )
 from assume.common.forecaster import (
     DemandForecaster,
     DsmUnitForecaster,
+    ExchangeForecaster,
     PowerplantForecaster,
     UnitsOperatorForecaster,
 )
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.strategies import EnergyHeuristicElasticStrategy, EnergyNaiveStrategy
+from assume.scenario.loader_csv import save_unique_forecasts
+from assume.strategies import (
+    EnergyHeuristicElasticStrategy,
+    EnergyNaiveStrategy,
+    ExchangeEnergyNaiveStrategy,
+)
 from assume.units import Demand, PowerPlant
+from assume.units.exchange import Exchange
 
 path = Path("./tests/fixtures/forecast_init")
 
@@ -505,3 +515,203 @@ def test_units_operator_forecaster__extra_kwargs(index, shared_FastIndex):
 
     assert isinstance(operator_forecaster.custom_forecast, FastSeries)
     assert list(operator_forecaster.custom_forecast) == [2.0] * len(index)
+
+
+ZONAL_ALGORITHMS = {
+    "price": "price_zonal_merit_order",
+    "preprocess_price": "price_unit_zone",
+}
+NORTH_1_PRICES = [2, 6, 6, 6, 6, 2, 2]
+# north_2 (solar and 1000 MW nuclear) is short from 10:00 to 12:00
+NORTH_2_PRICES = [8, 8, 3000, 3000, 3000, 8, 8]
+
+
+def zonal_market_configs(market_setup, zones_identifier=None):
+    """Market configs of the fixture with or without zones (``zone_id`` of the buses)."""
+    configs = {}
+    for config in market_setup["market_configs"]:
+        param_dict = dict(config.param_dict)
+        if zones_identifier:
+            param_dict["zones_identifier"] = zones_identifier
+        configs[config.market_id] = replace(config, param_dict=param_dict)
+    return configs.values()
+
+
+def initialize_zonal(forecast_setup, market_configs, forecast_df=None):
+    units = forecast_setup["units"]
+    for unit in units:
+        unit.forecaster.forecast_algorithms = dict(ZONAL_ALGORITHMS)
+        unit.forecaster.initialize(units, market_configs, forecast_df, unit)
+    return {unit.id: list(unit.forecaster.price["EOM"]) for unit in units}
+
+
+@pytest.mark.parametrize(
+    "supply, demand, expected",
+    [
+        # the second supply bid is partially accepted
+        ([(10, 100), (50, 100)], [(3000, 150)], 50),
+        # scarcity: the demand bid is not fully served
+        ([(10, 100), (50, 100)], [(3000, 250)], 3000),
+        # demand and supply are equal: the last accepted supply bid sets the price
+        ([(10, 100), (50, 100)], [(3000, 100)], 10),
+        # price-sensitive demand is partially served and sets the price
+        ([(10, 100), (50, 100)], [(3000, 80), (30, 50)], 30),
+        # supply exhausted, price-sensitive demand is not served
+        ([(10, 100)], [(3000, 100), (30, 50)], 30),
+        # price-sensitive demand below all supply bids is not served
+        ([(40, 100)], [(3000, 50), (30, 50)], 40),
+        # no demand: the cheapest supply bid sets the price
+        ([(40, 100), (20, 100)], [], 20),
+        # no supply: the highest demand bid sets the price
+        ([], [(3000, 50), (30, 50)], 3000),
+    ],
+)
+def test_merit_order_clearing(supply, demand, expected):
+    def arrays(bids):
+        return (
+            np.array([price for price, _ in bids], dtype=float),
+            np.array([volume for _, volume in bids], dtype=float),
+        )
+
+    assert _merit_order_clearing(*arrays(supply), *arrays(demand)) == expected
+
+
+def test_zonal_merit_order_forecast__single_zone_equals_naive(
+    market_setup, forecast_setup
+):
+    """Both nodes of the fixture are in zone DE_1, so the zonal forecast is the naive one."""
+    expected_price = pd.read_csv(path / "results/price.csv", **parse_date)
+    market_configs = zonal_market_configs(market_setup, zones_identifier="zone_id")
+
+    prices = initialize_zonal(forecast_setup, market_configs)
+
+    for price in prices.values():
+        assert price == list(expected_price["price"])
+
+
+def test_zonal_merit_order_forecast__nodal(market_setup, forecast_setup):
+    """Without zones every node has its own merit order."""
+    market_configs = zonal_market_configs(market_setup)
+    calculate_zonal_merit_order_prices.cache_clear()
+
+    prices = initialize_zonal(forecast_setup, market_configs)
+
+    for unit in forecast_setup["units"]:
+        expected = NORTH_1_PRICES if unit.node == "north_1" else NORTH_2_PRICES
+        assert prices[unit.id] == expected, unit.id
+    # the prices of all zones are calculated once and shared by all units
+    assert calculate_zonal_merit_order_prices.cache_info().misses == 1
+    assert calculate_zonal_merit_order_prices.cache_info().hits == len(prices) - 1
+
+
+def test_zonal_merit_order_forecast__given_zone_forecast(
+    index, market_setup, forecast_setup
+):
+    """A forecast of a zone in forecast_df (price_{market}_{zone}) is used for its units."""
+    market_configs = zonal_market_configs(market_setup)
+    forecast_df = pd.DataFrame({"price_EOM_north_1": [1.0] * len(index)}, index=index)
+
+    prices = initialize_zonal(forecast_setup, market_configs, forecast_df)
+
+    for unit in forecast_setup["units"]:
+        expected = [1.0] * len(index) if unit.node == "north_1" else NORTH_2_PRICES
+        assert prices[unit.id] == expected, unit.id
+
+
+def test_zonal_merit_order_forecast__operator_uses_naive(
+    market_setup, forecast_setup, shared_FastIndex
+):
+    """Forecasters without a unit (unit operators) use the naive forecast of the market."""
+    expected_price = pd.read_csv(path / "results/price.csv", **parse_date)
+    operator_forecaster = UnitsOperatorForecaster(
+        index=shared_FastIndex,
+        forecast_algorithms=dict(ZONAL_ALGORITHMS),
+        forecast_registries=get_forecast_registries(),
+    )
+
+    operator_forecaster.initialize(
+        forecast_setup["units"], zonal_market_configs(market_setup), None
+    )
+
+    assert list(operator_forecaster.price["EOM"]) == list(expected_price["price"])
+
+
+def test_zonal_merit_order_forecast__exchange_and_demand_price(index, shared_FastIndex):
+    """Imports are supply and exports are demand of the zone, demand bids at its price."""
+    market_config = MarketConfig(
+        market_id="EOM",
+        param_dict={
+            "grid_data": {
+                "buses": pd.DataFrame(index=pd.Index(["A", "B"], name="name")),
+                "lines": pd.DataFrame(),
+            }
+        },
+    )
+    registries = get_forecast_registries()
+    plant = PowerPlant(
+        id="plant_A",
+        unit_operator="op",
+        technology="gas",
+        bidding_strategies={"EOM": EnergyNaiveStrategy()},
+        max_power=100,
+        min_power=0,
+        efficiency=1,
+        additional_cost=20,
+        fuel_type="renewable",
+        node="A",
+        forecaster=PowerplantForecaster(
+            index=shared_FastIndex, forecast_registries=registries
+        ),
+    )
+    demand = Demand(
+        id="demand_A",
+        unit_operator="op",
+        technology="inflex_demand",
+        bidding_strategies={"EOM": EnergyNaiveStrategy()},
+        max_power=-1000,
+        min_power=0,
+        price=300,
+        node="A",
+        forecaster=DemandForecaster(
+            index=shared_FastIndex,
+            demand=pd.Series(-120.0, index=index),
+            forecast_registries=registries,
+        ),
+    )
+    exchange = Exchange(
+        id="exchange_A",
+        unit_operator="op",
+        bidding_strategies={"EOM": ExchangeEnergyNaiveStrategy()},
+        price_import=0,
+        price_export=3000,
+        node="A",
+        forecaster=ExchangeForecaster(
+            index=shared_FastIndex,
+            volume_import=pd.Series([50.0] * 3 + [0.0] * 4, index=index),
+            volume_export=pd.Series([0.0] * 3 + [40.0] * 4, index=index),
+            forecast_registries=registries,
+        ),
+    )
+
+    prices = calculate_zonal_merit_order_prices(
+        shared_FastIndex, (plant, demand, exchange), market_config
+    )
+
+    # import of 50 MW: the plant covers 70 MW of the 120 MW demand (partially accepted)
+    assert list(prices["A"][:3]) == [20] * 3
+    # export of 40 MW: the plant (100 MW) does not cover the 160 MW demand, the demand
+    # bid at 300 EUR/MWh is not fully served
+    assert list(prices["A"][3:]) == [300] * 4
+    # no bids in zone B
+    assert "B" not in prices
+
+
+def test_save_unique_forecasts__zonal(tmp_path, market_setup, forecast_setup):
+    """Zonal price forecasts are saved per zone (one column per market and zone)."""
+    initialize_zonal(forecast_setup, zonal_market_configs(market_setup))
+
+    save_unique_forecasts(forecast_setup["units"], tmp_path / "forecasts.csv")
+
+    saved = pd.read_csv(tmp_path / "forecasts.csv", index_col="datetime")
+    assert list(saved["price_zonal_merit_order_EOM_north_1"]) == NORTH_1_PRICES
+    assert list(saved["price_zonal_merit_order_EOM_north_2"]) == NORTH_2_PRICES
