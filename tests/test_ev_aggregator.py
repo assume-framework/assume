@@ -46,7 +46,7 @@ def vehicle(
 
 def test_arbitrage_driving_and_terminal_energy():
     unit = vehicle()
-    plan = EVPortfolioStrategy().optimize(
+    plan = EVPortfolioStrategy(ev_terminal_soc=unit.initial_soc).optimize(
         [unit], unit.index[0], unit.index[-1] + unit.index.freq
     )[unit.id]
     assert plan[unit.index[0]] == pytest.approx(-0.5)
@@ -58,12 +58,34 @@ def test_arbitrage_driving_and_terminal_energy():
     assert sum(plan.values()) == pytest.approx(-0.2)
 
 
+def test_none_terminal_soc_does_not_add_terminal_target():
+    unit = vehicle(
+        prices=(10, 20, 30, 40),
+        availability=(1, 1, 1, 1),
+        trips=(0, 0, 0, 0),
+    )
+    unit.max_power_discharge = 0
+    start, end = unit.index[0], unit.index[-1] + unit.index.freq
+
+    no_target = EVPortfolioStrategy(ev_terminal_soc=None).optimize(
+        [unit], start, end
+    )[unit.id]
+    target = EVPortfolioStrategy(ev_terminal_soc=0.8).optimize([unit], start, end)[
+        unit.id
+    ]
+
+    assert sum(-power for power in no_target.values()) == pytest.approx(0)
+    assert sum(-power for power in target.values()) == pytest.approx(0.3)
+
+
 def test_shared_connection_limits_include_background():
     first = vehicle(availability=(1, 1, 1, 1), trips=(0, 0, 0, 0))
     second = vehicle(availability=(1, 1, 1, 1), trips=(0, 0, 0, 0))
     second.id = "second"
     times = list(first.index)
-    plan = EVPortfolioStrategy(ev_import_limit_mw=0.5, ev_export_limit_mw=0.2).optimize(
+    plan = EVPortfolioStrategy(
+        ev_import_limit_mw=0.5, ev_export_limit_mw=0.2, ev_terminal_soc=0.5
+    ).optimize(
         [first, second],
         times[0],
         times[-1] + first.index.freq,
@@ -81,12 +103,16 @@ def test_peak_charge_flattens_charging_and_import_fee_has_no_export_credit():
     )
     unit.max_power_discharge = 0
     start, end = unit.index[0], unit.index[-1] + unit.index.freq
-    plain = EVPortfolioStrategy().optimize([unit], start, end)[unit.id]
-    peak = EVPortfolioStrategy(ev_peak_price=1000).optimize([unit], start, end)[unit.id]
+    plain = EVPortfolioStrategy(ev_terminal_soc=0.5).optimize([unit], start, end)[
+        unit.id
+    ]
+    peak = EVPortfolioStrategy(ev_peak_price=1000, ev_terminal_soc=0.5).optimize(
+        [unit], start, end
+    )[unit.id]
     assert max(-p for p in peak.values()) < max(-p for p in plain.values())
     assert sum(peak.values()) == pytest.approx(-0.4)
     unit = vehicle(prices=(10, 100, 50, 50))
-    tariff = EVPortfolioStrategy().optimize(
+    tariff = EVPortfolioStrategy(ev_terminal_soc=0.5).optimize(
         [unit],
         start,
         end,
@@ -120,7 +146,9 @@ def test_contracted_capacity_allows_cheap_charging_up_to_threshold():
         prices=(10, 20, 30, 40), availability=(1, 1, 0, 1), trips=(0, 0, 0.4, 0)
     )
     unit.max_power_discharge = 0
-    plan = EVPortfolioStrategy(ev_peak_price=1000, ev_observed_peak_mw=0.2).optimize(
+    plan = EVPortfolioStrategy(
+        ev_peak_price=1000, ev_observed_peak_mw=0.2, ev_terminal_soc=0.5
+    ).optimize(
         [unit],
         unit.index[0],
         unit.index[-1] + unit.index.freq,
@@ -311,12 +339,14 @@ def test_short_horizon_differs_from_perfect_foresight():
     )
     product = [(unit.index[0], unit.index[1], None)]
     market = MarketConfig(market_id="EOM", product_type="energy")
-    rolling = EVPortfolioStrategy(ev_look_ahead_horizon="1h").calculate_bids(
+    rolling = EVPortfolioStrategy(
+        ev_look_ahead_horizon="1h", ev_terminal_soc=0.5
+    ).calculate_bids(
         operator, market, product
     )
-    perfect = EVPortfolioStrategy(ev_horizon_mode="perfect_foresight").calculate_bids(
-        operator, market, product
-    )
+    perfect = EVPortfolioStrategy(
+        ev_horizon_mode="perfect_foresight", ev_terminal_soc=0.5
+    ).calculate_bids(operator, market, product)
     assert rolling[0]["volume"] == pytest.approx(0)
     # Hours 0 and 1 are both priced at 50, so which of them carries the early
     # discharge is an arbitrary tie-break; assert the behaviour that matters,
@@ -338,7 +368,9 @@ def test_rolling_window_extends_through_return_and_recharge():
             addr="operator",
         ),
     )
-    bids = EVPortfolioStrategy(ev_look_ahead_horizon="3h").calculate_bids(
+    bids = EVPortfolioStrategy(
+        ev_look_ahead_horizon="3h", ev_terminal_soc=0.5
+    ).calculate_bids(
         operator,
         MarketConfig(market_id="EOM", product_type="energy"),
         [(unit.index[0], unit.index[1], None)],
@@ -443,7 +475,9 @@ def test_grid_fee_is_not_credited_to_v2g_exports():
     unit.outputs["grid_fee_accepted_price"].loc[unit.index[0] : unit.index[1]] = 280.0
     unit.forecaster.price = price_plus_grid_fee(unit.forecaster.price, {}, unit=unit)
 
-    bids = EVPortfolioStrategy(ev_horizon_mode="perfect_foresight").calculate_bids(
+    bids = EVPortfolioStrategy(
+        ev_horizon_mode="perfect_foresight", ev_terminal_soc=0.5
+    ).calculate_bids(
         _operator([unit], unit.index[0] - unit.index.freq),
         MarketConfig(market_id="EOM", product_type="energy"),
         [(unit.index[0], unit.index[1], None)],

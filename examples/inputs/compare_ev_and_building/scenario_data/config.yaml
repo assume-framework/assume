@@ -54,7 +54,7 @@ test_case_1_no_tariff_ev:
   # connection and the planning window are one physical setup throughout and the
   # cases differ only in the mechanism being tested.
   bidding_strategy_params: &test_case_1_building_ev_defaults
-    ev_look_ahead_horizon: 27h
+    ev_look_ahead_horizon: 48h
     ev_background_load_mw: 0.00
 
 
@@ -64,3 +64,321 @@ test_case_1_no_tariff_building:
   forecasts_df: study_cases/test_case_1_building/forecasts_df.csv
   residential_dsm_units: study_cases/test_case_1_building/residential_dsm_units.csv
 
+test_case_3_ev:
+  simulation_id: test_case_3_ev
+  <<: *base_stump
+  electric_vehicle_units: study_cases/test_case_3_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_3_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_1_ev/unit_operators_no_tariff.csv
+  bidding_strategy_params:
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.00
+
+test_case_3_building:
+  simulation_id: test_case_3_building
+  <<: *base_stump
+  forecasts_df: study_cases/test_case_3_building/forecasts_df.csv
+  residential_dsm_units: study_cases/test_case_3_building/residential_dsm_units.csv
+
+test_case_4_ev:
+  simulation_id: test_case_4_ev
+  <<: *base_stump
+  electric_vehicle_units: study_cases/test_case_4_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_4_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_1_ev/unit_operators_no_tariff.csv
+  bidding_strategy_params:
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.00
+
+test_case_4_building:
+  simulation_id: test_case_4_building
+  <<: *base_stump
+  forecasts_df: study_cases/test_case_4_building/forecasts_df.csv
+  residential_dsm_units: study_cases/test_case_4_building/residential_dsm_units.csv
+
+# ---------------------------------------------------------------------------
+# test_case_5: the 20-EV fleet of test_case_4 with a dynamic EOM price (morning
+# bump, midday solar dip, evening peak, a pricier second day) under different
+# grid tariff designs. Only the _ev variant exists. Compare with plot_tariffs.py.
+# The GridTariff announces 45 products starting 3h ahead, i.e. 48h, which is the
+# EV look-ahead horizon, so the whole planning window carries a published fee.
+# ---------------------------------------------------------------------------
+test_case_5_no_tariff_ev:
+  simulation_id: test_case_5_no_tariff_ev
+  <<: *base_stump
+  electric_vehicle_units: study_cases/test_case_5_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_5_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_5_ev/unit_operators_no_tariff.csv
+  bidding_strategy_params: &test_case_5_ev_defaults
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.00
+    ev_terminal_soc: 0.8
+
+test_case_5_flat_tariff_ev:
+  simulation_id: test_case_5_flat_tariff_ev
+  <<: *base_stump
+  electric_vehicle_units: study_cases/test_case_5_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_5_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_5_ev/unit_operators.csv
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+  bidding_strategy_params:
+    <<: *test_case_5_ev_defaults
+    grid_fee_base: 30.0
+  markets_config:
+    EOM: *test_case_1_building_eom
+    GridTariff: &test_case_5_grid_tariff
+      operator: dso_operator
+      product_type: grid_fee
+      products:
+      - duration: 1h
+        count: 45
+        first_delivery: 3h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 100000
+      minimum_bid_price: 0
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+# Time-of-use adder on the evening price peak.
+test_case_5_tou_tariff_ev:
+  simulation_id: test_case_5_tou_tariff_ev
+  <<: *base_stump
+  electric_vehicle_units: study_cases/test_case_5_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_5_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_5_ev/unit_operators.csv
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+  bidding_strategy_params:
+    <<: *test_case_5_ev_defaults
+    grid_fee_base: 30.0
+    grid_fee_peak_adder: 120.0
+    grid_fee_peak_hours: "17,18,19,20,21"
+  markets_config:
+    EOM: *test_case_1_building_eom
+    GridTariff: *test_case_5_grid_tariff
+
+# Capacity-shaped fee: 0.15 MW at the base fee, anything above at a scarcity
+# price (the fleet can draw up to 20 x 0.022 = 0.44 MW).
+test_case_5_capacity_tariff_ev:
+  simulation_id: test_case_5_capacity_tariff_ev
+  <<: *base_stump
+  electric_vehicle_units: study_cases/test_case_5_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_5_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_5_ev/unit_operators.csv
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+  bidding_strategy_params:
+    <<: *test_case_5_ev_defaults
+    grid_fee_base: 30.0
+    grid_fee_headroom: 0.1
+    grid_fee_scarcity: 120.0
+  markets_config:
+    EOM: *test_case_1_building_eom
+    GridTariff: *test_case_5_grid_tariff
+
+# Peak-demand charge on the fleet's import above a contracted 0.15 MW.
+test_case_5_peak_price_ev:
+  simulation_id: test_case_5_peak_price_ev
+  <<: *base_stump
+  electric_vehicle_units: study_cases/test_case_5_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_5_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_5_ev/unit_operators_no_tariff.csv
+  bidding_strategy_params:
+    <<: *test_case_5_ev_defaults
+    ev_peak_price: 120.0
+    ev_observed_peak_mw: 0.15
+
+# ---------------------------------------------------------------------------
+# test_case_5a: test_case_5 with demand and generation scaled by 1000, so the
+# EV fleet (max 0.44 MW) is a price taker and cannot move the EOM price.
+# ---------------------------------------------------------------------------
+base_stump_5a: &base_stump_5a
+  <<: *base_stump
+  demand_df: common/demand_df_5a.csv
+  powerplant_units: common/powerplant_units_5a.csv
+test_case_5a_no_tariff_ev:
+  simulation_id: test_case_5a_no_tariff_ev
+  <<: *base_stump_5a
+  electric_vehicle_units: study_cases/test_case_5a_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_5a_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_5a_ev/unit_operators_no_tariff.csv
+  bidding_strategy_params: &test_case_5a_ev_defaults
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.00
+    ev_terminal_soc: 0.8
+
+test_case_5a_flat_tariff_ev:
+  simulation_id: test_case_5a_flat_tariff_ev
+  <<: *base_stump_5a
+  electric_vehicle_units: study_cases/test_case_5a_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_5a_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_5a_ev/unit_operators.csv
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+  bidding_strategy_params:
+    <<: *test_case_5a_ev_defaults
+    grid_fee_base: 30.0
+  markets_config:
+    EOM: *test_case_1_building_eom
+    GridTariff: &test_case_5a_grid_tariff
+      operator: dso_operator
+      product_type: grid_fee
+      products:
+      - duration: 1h
+        count: 45
+        first_delivery: 3h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 100000
+      minimum_bid_price: 0
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+# Time-of-use adder on the evening price peak.
+test_case_5a_tou_tariff_ev:
+  simulation_id: test_case_5a_tou_tariff_ev
+  <<: *base_stump_5a
+  electric_vehicle_units: study_cases/test_case_5a_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_5a_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_5a_ev/unit_operators.csv
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+  bidding_strategy_params:
+    <<: *test_case_5a_ev_defaults
+    grid_fee_base: 30.0
+    grid_fee_peak_adder: 120.0
+    grid_fee_peak_hours: "17,18,19,20,21"
+  markets_config:
+    EOM: *test_case_1_building_eom
+    GridTariff: *test_case_5a_grid_tariff
+
+# Capacity-shaped fee: 0.15 MW at the base fee, anything above at a scarcity
+# price (the fleet can draw up to 20 x 0.022 = 0.44 MW).
+test_case_5a_capacity_tariff_ev:
+  simulation_id: test_case_5a_capacity_tariff_ev
+  <<: *base_stump_5a
+  electric_vehicle_units: study_cases/test_case_5a_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_5a_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_5a_ev/unit_operators.csv
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+  bidding_strategy_params:
+    <<: *test_case_5a_ev_defaults
+    grid_fee_base: 30.0
+    grid_fee_headroom: 0.1
+    grid_fee_scarcity: 120.0
+  markets_config:
+    EOM: *test_case_1_building_eom
+    GridTariff: *test_case_5a_grid_tariff
+
+# Peak-demand charge on the fleet's import above a contracted 0.15 MW.
+test_case_5a_peak_price_ev:
+  simulation_id: test_case_5a_peak_price_ev
+  <<: *base_stump_5a
+  electric_vehicle_units: study_cases/test_case_5a_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_5a_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_5a_ev/unit_operators_no_tariff.csv
+  bidding_strategy_params:
+    <<: *test_case_5a_ev_defaults
+    ev_peak_price: 120.0
+    ev_observed_peak_mw: 0.15
+
+# ---------------------------------------------------------------------------
+# test_case_6: test_case_5 with two competing aggregators, each managing 20 EVs
+# (EV_0-EV_19 for aggregator_operator, EV_20-EV_39 for aggregator_operator_2),
+# on the same EOM and GridTariff. The capacity headroom is doubled to 0.3 MW so
+# it stays 0.15 MW per aggregator; the peak charge applies per aggregator.
+# ---------------------------------------------------------------------------
+test_case_6_no_tariff_ev:
+  simulation_id: test_case_6_no_tariff_ev
+  <<: *base_stump
+  electric_vehicle_units: study_cases/test_case_6_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_6_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_6_ev/unit_operators_no_tariff.csv
+  bidding_strategy_params: &test_case_6_ev_defaults
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.00
+
+test_case_6_flat_tariff_ev:
+  simulation_id: test_case_6_flat_tariff_ev
+  <<: *base_stump
+  electric_vehicle_units: study_cases/test_case_6_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_6_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_6_ev/unit_operators.csv
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+  bidding_strategy_params:
+    <<: *test_case_6_ev_defaults
+    grid_fee_base: 30.0
+  markets_config:
+    EOM: *test_case_1_building_eom
+    GridTariff: &test_case_6_grid_tariff
+      operator: dso_operator
+      product_type: grid_fee
+      products:
+      - duration: 1h
+        count: 45
+        first_delivery: 3h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 100000
+      minimum_bid_price: 0
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+# Time-of-use adder on the evening price peak.
+test_case_6_tou_tariff_ev:
+  simulation_id: test_case_6_tou_tariff_ev
+  <<: *base_stump
+  electric_vehicle_units: study_cases/test_case_6_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_6_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_6_ev/unit_operators.csv
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+  bidding_strategy_params:
+    <<: *test_case_6_ev_defaults
+    grid_fee_base: 30.0
+    grid_fee_peak_adder: 80.0
+    grid_fee_peak_hours: "17,18,19,20,21"
+  markets_config:
+    EOM: *test_case_1_building_eom
+    GridTariff: *test_case_6_grid_tariff
+
+# Capacity-shaped fee: 0.15 MW at the base fee, anything above at a scarcity
+# price (the fleet can draw up to 20 x 0.022 = 0.44 MW).
+test_case_6_capacity_tariff_ev:
+  simulation_id: test_case_6_capacity_tariff_ev
+  <<: *base_stump
+  electric_vehicle_units: study_cases/test_case_6_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_6_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_6_ev/unit_operators.csv
+  forecast_algorithms:
+    update_price: price_plus_grid_fee
+  bidding_strategy_params:
+    <<: *test_case_6_ev_defaults
+    grid_fee_base: 30.0
+    grid_fee_headroom: 0.1
+    grid_fee_scarcity: 1500000.0
+  markets_config:
+    EOM: *test_case_1_building_eom
+    GridTariff: *test_case_6_grid_tariff
+
+# Peak-demand charge on the fleet's import above a contracted 0.15 MW.
+test_case_6_peak_price_ev:
+  simulation_id: test_case_6_peak_price_ev
+  <<: *base_stump
+  electric_vehicle_units: study_cases/test_case_6_ev/electric_vehicle_units.csv
+  forecasts_df: study_cases/test_case_6_ev/forecasts_df.csv
+  unit_operators: study_cases/test_case_6_ev/unit_operators_no_tariff.csv
+  bidding_strategy_params:
+    <<: *test_case_6_ev_defaults
+    ev_peak_price: 1000.0
+    ev_observed_peak_mw: 0.15

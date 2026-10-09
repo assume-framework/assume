@@ -1,0 +1,3 @@
+,capacity,efficiency_charge,efficiency_discharge,max_power_charge,max_power_discharge,max_soc,min_power_charge,min_power_discharge,min_soc,node,simulation,technology,unit_operator
+EV_0,0.1,1,1,-0.022,0,1,0,0,0.2,lv_node,test_case_3_ev,electric_vehicle,aggregator_operator
+EV_1,0.1,1,1,-0.022,0,1,0,0,0.2,lv_node,test_case_3_ev,electric_vehicle,aggregator_operator

@@ -1,0 +1,4 @@
+,cold_start_cost,efficiency,emission_factor,fuel_type,hot_start_cost,max_heat_extraction,max_power,min_power,node,simulation,technology,unit_operator,warm_start_cost
+DSO,0,1,0,natural gas,0,0,0.001,0,node0,test_case_5a_flat_tariff_ev,grid_operator,dso_operator,0
+Solar,0,1,0,renewable,0,0,600,0,node0,test_case_5a_flat_tariff_ev,solar,renewables_operator,0
+Nuclear,0,0.33,0,uranium,0,0,800,0,node0,test_case_5a_flat_tariff_ev,nuclear,conv_operator,0

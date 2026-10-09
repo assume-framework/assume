@@ -53,11 +53,15 @@ def main():
     )
     args = parser.parse_args()
 
-    ev_output_dir = run_scenario(f"{args.study_case}_ev")
-    building_output_dir = run_scenario(f"{args.study_case}_building")
+    with open(INPUT_DIR / "config.yaml", "r") as f:
+        config = yaml.safe_load(f)
 
+    ev_output_dir = run_scenario(f"{args.study_case}_ev")
     print(f"EV output directory: {ev_output_dir}")
-    print(f"Building output directory: {building_output_dir}")
+    # Some study cases (e.g. tariff comparisons) only define the _ev variant.
+    if f"{args.study_case}_building" in config:
+        building_output_dir = run_scenario(f"{args.study_case}_building")
+        print(f"Building output directory: {building_output_dir}")
 
 
 if __name__ == "__main__":

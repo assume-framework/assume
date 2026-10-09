@@ -1,0 +1,2 @@
+,max_power,min_power,node,simulation,technology,unit_operator
+demand_EOM,-1e+06,-0,node0,test_case_5a_tou_tariff_ev,inflex_demand,eom_operator

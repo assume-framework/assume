@@ -369,17 +369,15 @@ class EVPortfolioStrategy(UnitOperatorStrategy):
         # Slacks keep the model solvable when the fleet is simply short of
         # energy; the penalty holds them at zero whenever a schedule exists.
         model.unmet = pyo.Var(model.U, model.T, domain=pyo.NonNegativeReals)
-        model.shortfall = pyo.Var(model.U, domain=pyo.NonNegativeReals)
+        if self.terminal_soc is not None:
+            model.shortfall = pyo.Var(model.U, domain=pyo.NonNegativeReals)
         model.constraints = pyo.ConstraintList()
         cost = 0
         for i, unit in enumerate(units):
-            terminal = (
-                unit.initial_soc
-                if self.terminal_soc is None
-                else float(self.terminal_soc)
-            )
-            if not unit.min_soc <= terminal <= unit.max_soc:
-                raise ValueError("EV terminal SOC must lie within SOC bounds")
+            if self.terminal_soc is not None:
+                terminal = float(self.terminal_soc)
+                if not unit.min_soc <= terminal <= unit.max_soc:
+                    raise ValueError("EV terminal SOC must lie within SOC bounds")
             initial_energy = unit.energy_at(start)
             # The fee is charged on net import below, so read the price without
             # the fee that price_plus_grid_fee may have folded into it.
@@ -427,11 +425,12 @@ class EVPortfolioStrategy(UnitOperatorStrategy):
                     + unit.additional_cost_discharge * d
                 )
                 cost += self.slack_penalty * model.unmet[i, k]
-            model.constraints.add(
-                model.energy[i, len(times) - 1] + model.shortfall[i]
-                >= terminal * unit.capacity
-            )
-            cost += self.slack_penalty * model.shortfall[i]
+            if self.terminal_soc is not None:
+                model.constraints.add(
+                    model.energy[i, len(times) - 1] + model.shortfall[i]
+                    >= terminal * unit.capacity
+                )
+                cost += self.slack_penalty * model.shortfall[i]
         model.imports = pyo.Var(model.T, domain=pyo.NonNegativeReals)
         model.peak = pyo.Var(domain=pyo.NonNegativeReals, bounds=(floor, None))
         for k in model.T:
@@ -469,7 +468,11 @@ class EVPortfolioStrategy(UnitOperatorStrategy):
 
         for i, unit in enumerate(units):
             unserved = sum(pyo.value(model.unmet[i, k]) for k in model.T)
-            missed = pyo.value(model.shortfall[i])
+            missed = (
+                pyo.value(model.shortfall[i])
+                if self.terminal_soc is not None
+                else 0.0
+            )
             if unserved > SIMULTANEITY_TOLERANCE or missed > SIMULTANEITY_TOLERANCE:
                 logger.warning(
                     "EV %s cannot be kept charged over %s..%s: %.6g MWh of driving "

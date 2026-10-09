@@ -40,7 +40,7 @@ test_case_1_building_no_tariff:
     # published one, which is the same defect as a short `count` - just moved to
     # the other end. Non-tariff cases keep 27h too: a case that plans over a
     # different horizon is not comparable with one that does not.
-    ev_look_ahead_horizon: 27h
+    ev_look_ahead_horizon: 48h
     # The other load behind the same meter. In *this* case nothing prices or
     # limits the connection, so it cannot move a single MWh; it is a reporting
     # quantity that keeps the peak comparable. In the tariff and capacity cases

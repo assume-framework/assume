@@ -147,6 +147,113 @@ def load_trip_energy(config, scenario_name, curve_columns):
     return result
 
 
+def load_eom_prices(config, scenario_name):
+    """Load the scenario's EOM price forecast indexed by delivery timestamp."""
+    scenario = config.get(scenario_name)
+    if scenario is None:
+        raise ValueError(f"Scenario {scenario_name!r} is not defined in config.yaml")
+    relative_path = scenario.get("forecasts_df")
+    if not relative_path:
+        raise ValueError(
+            f"Scenario {scenario_name!r} does not define 'forecasts_df'"
+        )
+
+    forecast_file = INPUT_DIR / relative_path
+    if not forecast_file.is_file():
+        raise FileNotFoundError(f"Forecast file not found: {forecast_file}")
+    forecasts = pd.read_csv(forecast_file, parse_dates=["datetime"])
+    if "price_EOM" not in forecasts.columns:
+        raise ValueError(f"{forecast_file} does not contain a 'price_EOM' column")
+    if forecasts["datetime"].duplicated().any():
+        raise ValueError(f"{forecast_file} contains duplicate forecast timestamps")
+
+    prices = pd.to_numeric(forecasts["price_EOM"], errors="raise")
+    if not prices.map(math.isfinite).all():
+        raise ValueError(f"{forecast_file} contains non-finite EOM prices")
+    return pd.Series(
+        prices.to_numpy(),
+        index=pd.DatetimeIndex(forecasts["datetime"]),
+        name="price_EOM",
+    ).sort_index()
+
+
+def validate_matching_price_forecasts(first, second):
+    """Require both scenarios to have the same EOM forecast time series."""
+    if not first.index.equals(second.index):
+        raise ValueError("EV and building EOM price forecasts have different timestamps")
+    for timestamp, first_price, second_price in zip(
+        first.index, first.values, second.values
+    ):
+        if not math.isclose(first_price, second_price, rel_tol=1e-9, abs_tol=1e-9):
+            raise ValueError(
+                f"EV and building EOM price forecasts differ at {timestamp}: "
+                f"{first_price} != {second_price}"
+            )
+
+
+def load_accepted_eom_prices(output_dir):
+    """Load EOM clearing prices, validating agreement across all unit orders."""
+    orders_file = output_dir / "market_orders.csv"
+    if not orders_file.is_file():
+        raise FileNotFoundError(f"Market orders file not found: {orders_file}")
+
+    orders = pd.read_csv(orders_file)
+    required_columns = {"market_id", "start_time", "unit_id", "accepted_price"}
+    missing_columns = required_columns - set(orders.columns)
+    if missing_columns:
+        raise ValueError(
+            f"{orders_file} is missing required columns: {', '.join(sorted(missing_columns))}"
+        )
+
+    eom_orders = orders[orders["market_id"].eq("EOM")].copy()
+    if eom_orders.empty:
+        raise ValueError(f"No EOM orders found in {orders_file}")
+    eom_orders["start_time"] = pd.to_datetime(
+        eom_orders["start_time"], errors="raise"
+    )
+    eom_orders["accepted_price"] = pd.to_numeric(
+        eom_orders["accepted_price"], errors="raise"
+    )
+    if not eom_orders["accepted_price"].map(math.isfinite).all():
+        raise ValueError(f"{orders_file} contains non-finite accepted EOM prices")
+
+    price_counts = eom_orders.groupby("start_time")["accepted_price"].nunique()
+    inconsistent = price_counts[price_counts != 1]
+    if not inconsistent.empty:
+        timestamp = inconsistent.index[0]
+        prices = eom_orders.loc[
+            eom_orders["start_time"].eq(timestamp),
+            ["unit_id", "accepted_price"],
+        ]
+        raise ValueError(
+            f"Accepted EOM prices differ across units at {timestamp} in "
+            f"{orders_file}:\n{prices.to_string(index=False)}"
+        )
+
+    return (
+        eom_orders.drop_duplicates("start_time")
+        .set_index("start_time")["accepted_price"]
+        .sort_index()
+        .rename("accepted_price")
+    )
+
+
+def cumulative_revenue(orders, start_time):
+    """Return cumulative signed EOM settlement value at each delivery end."""
+    if "accepted_price" not in orders.columns:
+        raise ValueError("Market orders are missing the 'accepted_price' column")
+    prices = pd.to_numeric(orders["accepted_price"], errors="raise")
+    if not prices.map(math.isfinite).all():
+        raise ValueError("Market orders contain non-finite accepted prices")
+
+    settlement = orders.assign(
+        revenue=orders["accepted_volume"] * prices
+    ).groupby("end_time")["revenue"].sum().sort_index()
+    index = pd.DatetimeIndex([pd.Timestamp(start_time), *settlement.index])
+    values = [0.0, *settlement.cumsum().tolist()]
+    return pd.Series(values, index=index, name="cumulative_revenue")
+
+
 def reconstruct_soc(
     orders,
     trip_energy,
@@ -321,27 +428,45 @@ def reconstruct_building_soc(building_parameters, orders, trip_energy, start_tim
     return curves
 
 
-def plot_curves(ax, curves, title):
+def plot_curves(ax, curves, method, color):
     for name, trace in curves.items():
-        color = None
         for i, trip_step in enumerate(trace.trip_steps):
-            (line,) = ax.plot(
+            ax.plot(
                 trace.values.index[i : i + 2],
                 trace.values.iloc[i : i + 2],
                 color=color,
                 linestyle="--" if trip_step else "-",
-                label=name if i == 0 else "_nolegend_",
+                label=f"{method}: {name}" if i == 0 else "_nolegend_",
             )
-            color = line.get_color()
-    ax.set_title(title)
-    ax.set_ylabel("State of charge")
-    ax.set_ylim(0, 2)
-    ax.legend(
-        handles=[
-            *ax.get_legend_handles_labels()[0],
-            Line2D([0], [0], color="black", linestyle="--", label="Driving loss"),
-        ]
-    )
+
+
+def aggregate_energy_curve(curves, capacities):
+    """Sum reconstructed EV SOC curves as stored energy in kWh."""
+    if set(curves) != set(capacities):
+        raise ValueError("EV curves and capacities do not contain the same units")
+
+    first_trace = next(iter(curves.values()))
+    energy = pd.Series(0.0, index=first_trace.values.index)
+    trip_steps = pd.Series(False, index=first_trace.trip_steps.index)
+    for name, trace in curves.items():
+        if not trace.values.index.equals(first_trace.values.index):
+            raise ValueError("EV SOC curves do not share the same timestamps")
+        energy = energy.add(trace.values * capacities[name] * 1000)
+        trip_steps |= trace.trip_steps
+
+    return SOCTrace(values=energy, trip_steps=trip_steps)
+
+
+def plot_energy_curve(ax, curves, capacities, method, color):
+    trace = aggregate_energy_curve(curves, capacities)
+    for i, trip_step in enumerate(trace.trip_steps):
+        ax.plot(
+            trace.values.index[i : i + 2],
+            trace.values.iloc[i : i + 2],
+            color=color,
+            linestyle="--" if trip_step else "-",
+            label=method if i == 0 else "_nolegend_",
+        )
 
 
 def plot_soc_comparison(study_case):
@@ -403,17 +528,112 @@ def plot_soc_comparison(study_case):
     building_curves = reconstruct_building_soc(
         building_parameters, building_orders, building_trip_energy, start_time
     )
+    plot_total_energy = len(ev_parameters) > 3
+    ev_prices = load_eom_prices(config, ev_scenario_name)
+    building_prices = load_eom_prices(config, building_scenario_name)
+    validate_matching_price_forecasts(ev_prices, building_prices)
+    ev_accepted_prices = load_accepted_eom_prices(
+        OUTPUT_DIR / config[ev_scenario_name]["simulation_id"]
+    )
+    building_accepted_prices = load_accepted_eom_prices(
+        OUTPUT_DIR / config[building_scenario_name]["simulation_id"]
+    )
+    ev_revenue = cumulative_revenue(ev_orders, start_time)
+    building_revenue = cumulative_revenue(building_orders, start_time)
 
-    fig, (ev_ax, building_ax) = plt.subplots(
-        2, 1, sharex=True, figsize=(12, 8)
+    ev_color = "tab:blue"
+    building_color = "tab:orange"
+    fig, (soc_ax, revenue_ax, price_ax) = plt.subplots(
+        3, 1, sharex=True, figsize=(13, 12)
     )
-    plot_curves(ev_ax, ev_curves, f"{study_case}: EV SOC")
-    plot_curves(
-        building_ax,
-        building_curves,
-        f"{study_case}: Building EV fleet SOC",
+    if plot_total_energy:
+        ev_capacities = {
+            str(row["name"]): parameter_value(row, "capacity", str(row["name"]))
+            for row in ev_parameters.to_dict(orient="records")
+        }
+        building_capacities = {
+            str(building_name): sum(
+                parameter_value(row, "capacity", str(building_name))
+                for row in rows.to_dict(orient="records")
+            )
+            for building_name, rows in ev_rows.groupby("name", sort=True)
+        }
+        plot_energy_curve(
+            soc_ax, ev_curves, ev_capacities, "EV portfolio", ev_color
+        )
+        plot_energy_curve(
+            soc_ax,
+            building_curves,
+            building_capacities,
+            "Building optimization",
+            building_color,
+        )
+        soc_ax.set_title(f"{study_case}: total EV stored energy")
+        soc_ax.set_ylabel("Stored energy (kWh)")
+    else:
+        plot_curves(soc_ax, ev_curves, "EV portfolio", ev_color)
+        plot_curves(soc_ax, building_curves, "Building optimization", building_color)
+        soc_ax.set_title(f"{study_case}: EV state of charge")
+        soc_ax.set_ylabel("SOC")
+        soc_ax.set_ylim(0, 1.05)
+    soc_handles, soc_labels = soc_ax.get_legend_handles_labels()
+    soc_ax.legend(
+        handles=[
+            *soc_handles,
+            Line2D([0], [0], color="black", linestyle="--", label="Driving loss"),
+        ],
+        labels=[*soc_labels, "Driving loss"],
     )
-    building_ax.set_xlabel("Time")
+
+    revenue_ax.step(
+        ev_revenue.index,
+        ev_revenue.values,
+        where="post",
+        color=ev_color,
+        label="EV portfolio",
+    )
+    revenue_ax.step(
+        building_revenue.index,
+        building_revenue.values,
+        where="post",
+        color=building_color,
+        label="Building optimization",
+    )
+    revenue_ax.axhline(0, color="black", linewidth=0.8)
+    revenue_ax.set_title("Cumulative EOM net revenue")
+    revenue_ax.set_ylabel("EUR")
+    revenue_ax.legend()
+
+    price_ax.step(
+        ev_prices.index,
+        ev_prices.values,
+        where="post",
+        color="black",
+        linestyle=":",
+        label="EOM price forecast (shared)",
+    )
+    price_ax.step(
+        ev_accepted_prices.index,
+        ev_accepted_prices.values,
+        where="post",
+        color=ev_color,
+        label="EV portfolio accepted price",
+    )
+    price_ax.step(
+        building_accepted_prices.index,
+        building_accepted_prices.values,
+        where="post",
+        color=building_color,
+        linestyle="--",
+        marker="o",
+        markersize=3,
+        markevery=4,
+        label="Building optimization accepted price",
+    )
+    price_ax.set_title("EOM forecast and accepted prices")
+    price_ax.set_ylabel("EUR/MWh")
+    price_ax.set_xlabel("Time")
+    price_ax.legend()
     fig.tight_layout()
 
     PLOT_DIR.mkdir(parents=True, exist_ok=True)
