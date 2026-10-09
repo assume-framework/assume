@@ -19,4 +19,31 @@ The primary unit types in this context include:
 Each unit type has specific characteristics that affect how the power system operates, and understanding these is key to modeling and optimizing grid performance.
 
 
+Start-up costs and operating times of power plants
+==================================================
+
+Power plants which track their operation can have start-up costs and minimum operating and down times. The time parameters are given in **hours**, independent of the simulation resolution, and are converted to time steps of the simulation index. The minimum times are rounded up to whole time steps.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Parameter
+     - Unit
+     - Meaning
+   * - ``hot_start_cost``, ``warm_start_cost``, ``cold_start_cost``
+     - €/MW of ``max_power``
+     - Cost of one start-up, scaled with the installed capacity of the unit.
+   * - ``downtime_hot_start``
+     - h
+     - A start after a downtime of up to this duration is a hot start.
+   * - ``downtime_warm_start``
+     - h
+     - A start after a downtime of more than ``downtime_hot_start`` and up to this duration is a warm start. A longer downtime is a cold start.
+   * - ``min_operating_time``, ``min_down_time``
+     - h
+     - Minimum time the unit has to run after a start, or stay off after a shutdown.
+
+The start-up costs are written to the ``starting_costs`` column of the unit dispatch, once per start at the first time step in which the unit produces again. They are part of ``total_costs``. Storage units have no start-up costs.
+
+
 .. include:: demand_side_agent.rst

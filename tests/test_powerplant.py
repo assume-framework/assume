@@ -655,3 +655,130 @@ def test_initialising_invalid_powerplants():
 if __name__ == "__main__":
     # run pytest and enable prints
     pytest.main(["-s", __file__])
+
+
+def _make_start_cost_plant(freq: str = "h", periods: int = 40, **kwargs) -> PowerPlant:
+    index = pd.date_range("2022-01-01", periods=periods, freq=freq)
+    forecaster = PowerplantForecaster(
+        index=index,
+        availability=1,
+        fuel_prices={"lignite": 10, "co2": 0},
+        market_prices={"EOM": 0},
+    )
+    params = {
+        "hot_start_cost": 10,
+        "warm_start_cost": 20,
+        "cold_start_cost": 30,
+        "downtime_hot_start": 2,
+        "downtime_warm_start": 4,
+        "min_operating_time": 1,
+        "min_down_time": 1,
+    }
+    params.update(kwargs)
+    return PowerPlant(
+        id="test_pp",
+        unit_operator="test_operator",
+        technology="coal",
+        bidding_strategies={"EOM": EnergyNaiveStrategy()},
+        index=forecaster.index,
+        max_power=500,
+        min_power=50,
+        efficiency=0.5,
+        additional_cost=0,
+        fuel_type="lignite",
+        emission_factor=0,
+        ramp_down=500,
+        ramp_up=500,
+        forecaster=forecaster,
+        **params,
+    )
+
+
+def _start_costs(pp: PowerPlant, off_steps: int, on_steps: int = 2) -> list[float]:
+    """Runs on, off for off_steps, and on again, and returns the booked start costs"""
+    values = [200] * 3 + [0] * off_steps + [200] * on_steps
+    for t, value in zip(pp.index, values):
+        pp.outputs["energy"].at[t] = value
+    pp.calculate_costs(pp.index[0], pp.index[len(values) - 1])
+    return [float(pp.outputs["starting_costs"].at[t]) for t in pp.index[: len(values)]]
+
+
+@pytest.mark.parametrize(
+    "off_steps, cost",
+    [
+        (1, 10),  # hot start
+        (2, 10),  # on the hot start threshold
+        (3, 20),  # warm start
+        (4, 20),  # on the warm start threshold
+        (5, 30),  # cold start, beyond the min_down_time of one step
+        (20, 30),  # the downtime is not capped by the lookback window
+    ],
+)
+def test_start_costs_tier_by_downtime(off_steps, cost):
+    pp = _make_start_cost_plant()
+    series = _start_costs(pp, off_steps)
+
+    restart = 3 + off_steps
+    assert series[restart] == cost * pp.max_power
+    assert sum(series) == cost * pp.max_power
+
+
+def test_operation_time_is_not_capped_by_min_times():
+    pp = _make_start_cost_plant()
+    _start_costs(pp, off_steps=10)
+
+    # min_down_time is only one step, but the window reaches one step beyond the
+    # warm start threshold, so a downtime of more than 4 steps can be told apart
+    assert pp.min_down_time == 1
+    assert pp.get_max_lookback_op_time() == 5
+    assert pp.get_operation_time(pp.index[3 + 10]) == -5
+    assert pp.get_operation_time(pp.index[3 + 10 + 2]) == 2
+
+
+def test_operation_time_lookback_covers_longest_min_time():
+    pp = _make_start_cost_plant(min_operating_time=8, min_down_time=6)
+    assert pp.get_max_lookback_op_time() == 8
+
+
+def test_start_costs_in_quarter_hourly_simulation():
+    # thresholds are given in hours: 2 h = 8 steps, 4 h = 16 steps
+    pp = _make_start_cost_plant(freq="15min", periods=80)
+
+    assert pp.downtime_hot_start == 8
+    assert pp.downtime_warm_start == 16
+    # 1 h = 4 steps
+    assert pp.min_operating_time == 4
+    assert pp.min_down_time == 4
+
+    for off_steps, cost in [(6, 10), (8, 10), (12, 20), (16, 20), (17, 30), (40, 30)]:
+        pp = _make_start_cost_plant(freq="15min", periods=80)
+        series = _start_costs(pp, off_steps)
+        assert sum(series) == cost * pp.max_power, off_steps
+        assert series[3 + off_steps] == cost * pp.max_power, off_steps
+
+
+def test_min_times_are_converted_to_steps():
+    pp = _make_start_cost_plant(
+        freq="15min", periods=8, min_operating_time=1.5, min_down_time=0.25
+    )
+    assert pp.min_operating_time == 6
+    assert pp.min_down_time == 1
+
+    # a fraction of a step is rounded up to a whole step
+    pp = _make_start_cost_plant(freq="h", periods=8, min_operating_time=0.25)
+    assert pp.min_operating_time == 1
+
+
+def test_min_down_time_in_quarter_hourly_ramping():
+    pp = _make_start_cost_plant(freq="15min", periods=12, min_down_time=1)
+    for t, value in zip(pp.index, [200, 200, 0, 0, 0, 0]):
+        pp.outputs["energy"].at[t] = value
+
+    # off for 3 steps at index 5, less than min_down_time of 4 steps
+    op_time = pp.get_operation_time(pp.index[5])
+    assert op_time == -3
+    assert pp.calculate_ramp(op_time, 0, 200, current_power=0) == 0
+    # off for 4 steps at index 6
+    op_time = pp.get_operation_time(pp.index[6])
+    assert op_time == -4
+    assert pp.calculate_ramp(op_time, 0, 200, current_power=0) == 200
