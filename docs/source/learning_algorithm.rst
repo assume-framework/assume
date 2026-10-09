@@ -1,6 +1,6 @@
 .. SPDX-FileCopyrightText: ASSUME Developers
 ..
-.. SPDX-License-Identifier: AGPL-3.0-or-later
+.. SPDX-License-Identifier: MIT
 
 ##################################
 Reinforcement Learning Algorithms
@@ -46,7 +46,7 @@ The following table shows the options that can be adjusted and gives a short exp
   batch_size                        The batch size of experiences sampled from the buffer for each training update. Default is 128.
   learning_rate                     The learning rate for the optimizer. Note: Start around 1e-3. Decrease (e.g. 3e-4, 1e-4) if training oscillates or diverges. Default is 0.001.
   learning_rate_schedule            Which learning rate decay schedule to use. Currently only "linear" decay is available. Default is None (constant learning rate).
-  early_stopping_steps              The number of validation steps over which the moving average reward is checked for early stopping. If None, defaults to training_episodes / validation_episodes_interval + 1.
+  early_stopping_steps              The number of validation steps over which the moving average reward is checked for early stopping. If None, early stopping is disabled.
   early_stopping_threshold          The minimum improvement in moving average reward required to avoid early stopping. Default is 0.05.
   algorithm                         Specifies which reinforcement learning algorithm to use. Options: ``"matd3"`` (Multi-Agent Twin Delayed DDPG, off-policy), ``"maddpg"`` (Multi-Agent DDPG, off-policy), ``"mappo"`` (Multi-Agent PPO, on-policy). Default is ``"matd3"``.
   gamma                             The discount factor for future rewards (0–1). Higher values weight long-term rewards more. Default is 0.99.
@@ -83,7 +83,6 @@ The following table shows the options that can be adjusted and gives a short exp
   vf_coef                Coefficient for the value function loss term. Default is 0.5.
   n_epochs               Number of optimization epochs performed over each rollout batch. Default is 10.
  ====================== ==========================================================================================================
-
 Note: We advise to not use the setting of a seed in the general config (``seed=null``) when using learning, as it will decrease performance, see https://docs.pytorch.org/docs/stable/notes/randomness.html. Completely reproducible results are not guaranteed across different PyTorch versions, hardware, or CUDA configurations.
 
 
@@ -129,12 +128,41 @@ target value of actions selected by the current target policy:
 
 
 Every :math:`d` iterations, which is implemented with the train_freq, the policy is updated with respect to :math:`Q_{\theta_1}` following the deterministic policy gradient algorithm (Silver et al., 2014).
-TD3 is summarized in the following picture from the authors of the original paper (Fujimoto, Hoof and Meger, 2018).
+TD3 is summarized in the following algorithm, as given by the authors of the original paper (Fujimoto, van Hoof and Meger, 2018) [#td3]_.
 
 
-.. image:: img/TD3_algorithm.jpeg
-    :align: center
-    :width: 500px
+.. math::
+
+    \begin{array}{l}
+    \hline
+    \textbf{Algorithm 1} \text{ TD3} \\
+    \hline
+    \text{Initialize critic networks } Q_{\theta_1}, Q_{\theta_2} \text{, and actor network } \pi_\phi \\
+    \text{with random parameters } \theta_1, \theta_2, \phi \\
+    \text{Initialize target networks } \theta'_1 \leftarrow \theta_1, \theta'_2 \leftarrow \theta_2, \phi' \leftarrow \phi \\
+    \text{Initialize replay buffer } \mathcal{B} \\
+    \textbf{for } t = 1 \textbf{ to } T \textbf{ do} \\
+    \quad \text{Select action with exploration noise } a \sim \pi_\phi(s) + \epsilon, \\
+    \quad \epsilon \sim \mathcal{N}(0, \sigma) \text{ and observe reward } r \text{ and new state } s' \\
+    \quad \text{Store transition tuple } (s, a, r, s') \text{ in } \mathcal{B} \\
+    \\
+    \quad \text{Sample mini-batch of } N \text{ transitions } (s, a, r, s') \text{ from } \mathcal{B} \\
+    \quad \tilde{a} \leftarrow \pi_{\phi'}(s') + \epsilon, \quad \epsilon \sim \operatorname{clip}(\mathcal{N}(0, \tilde{\sigma}), -c, c) \\
+    \quad y \leftarrow r + \gamma \min_{i=1,2} Q_{\theta'_i}(s', \tilde{a}) \\
+    \quad \text{Update critics } \theta_i \leftarrow \operatorname{argmin}_{\theta_i} N^{-1} \sum (y - Q_{\theta_i}(s, a))^2 \\
+    \quad \textbf{if } t \bmod d \textbf{ then} \\
+    \qquad \text{Update } \phi \text{ by the deterministic policy gradient:} \\
+    \qquad \nabla_\phi J(\phi) = N^{-1} \sum \nabla_a Q_{\theta_1}(s, a)|_{a=\pi_\phi(s)} \nabla_\phi \pi_\phi(s) \\
+    \qquad \text{Update target networks:} \\
+    \qquad \theta'_i \leftarrow \tau \theta_i + (1 - \tau) \theta'_i \\
+    \qquad \phi' \leftarrow \tau \phi + (1 - \tau) \phi' \\
+    \quad \textbf{end if} \\
+    \textbf{end for} \\
+    \hline
+    \end{array}
+
+.. [#td3] Fujimoto, S.; van Hoof, H.; Meger, D. *Addressing Function Approximation Error in Actor-Critic Methods*.
+   Proceedings of the 35th International Conference on Machine Learning (ICML), PMLR 80:1587–1596, **2018**. https://arxiv.org/abs/1802.09477
 
 
 The steps in the algorithm are translated to implementations in ASSUME in the following way.

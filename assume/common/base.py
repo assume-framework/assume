@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import logging
 import warnings
@@ -916,10 +916,10 @@ class LearningConfig:
             decay is available, which linearly decreases the learning rate over time. Default is None (constant learning rate).
         early_stopping_steps (int | None): The number of validation steps over which the moving average reward
             is calculated for early stopping. If the reward doesn't change by early_stopping_threshold over
-            this many steps, training stops. If None, defaults to training_episodes / validation_episodes_interval + 1.
+            this many steps, training stops. If None, early stopping is disabled. Default is None.
         early_stopping_threshold (float): The minimum improvement in moving average reward required to avoid
             early stopping. If the reward improvement is less than this threshold over early_stopping_steps,
-            training is terminated early. Default is 0.05.
+            training is terminated early. Default is 0.05. Only available if early_stopping_steps is set.
 
         algorithm (str): Specifies which reinforcement learning algorithm to use. Options include "matd3"
             (Multi-Agent Twin Delayed Deep Deterministic Policy Gradient), "maddpg" (Multi-Agent Deep Deterministic Policy Gradient), and "mappo" (Multi-Agent Proximal Policy Optimization). Default is "matd3".
@@ -1021,13 +1021,6 @@ class LearningConfig:
         # Keeping all values from an existing OffPolicyConfig over legacy settings
         if isinstance(self.on_policy, dict):
             self.on_policy = OnPolicyConfig(**self.on_policy)
-
-        if self.early_stopping_steps is None:
-            self.early_stopping_steps = int(
-                self.training_episodes / self.validation_episodes_interval + 1
-            )
-
-        # check that gradient_steps is positive (now checked in off_policy config)
 
 
 class LearningStrategy(BaseStrategy):

@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 name: Release to PyPI
 
@@ -31,6 +31,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        # CPU-only wheel first: the default PyPI wheel on Linux bundles CUDA (~5 GB) and CI has no GPU
+        python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
         python -m pip install .[test,learning,network,oeds]
 
     - name: Lint with ruff

@@ -1,6 +1,6 @@
 .. SPDX-FileCopyrightText: ASSUME Developers
 ..
-.. SPDX-License-Identifier: AGPL-3.0-or-later
+.. SPDX-License-Identifier: MIT
 
 #######################################
 Introduction to Reinforcement Learning
@@ -264,3 +264,4 @@ avoid selecting a high-reward snapshot that may be far from stable.
 
 The most robust learning performance can be achieved through **early stopping** with a very large number of episodes. In that case, training halts once results
 are stable, and the final policy is likely also the stable one. This behavior should be monitored by the modeler in TensorBoard.
+Early stopping is disabled by default and is only active if ``early_stopping_steps`` is set in the learning config.

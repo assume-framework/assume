@@ -1,6 +1,6 @@
 .. SPDX-FileCopyrightText: ASSUME Developers
 ..
-.. SPDX-License-Identifier: AGPL-3.0-or-later
+.. SPDX-License-Identifier: MIT
 
 #############
 Release Notes
@@ -11,6 +11,10 @@ Upcoming Release
 .. warning::
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
+
+
+**License:**
+  - **ASSUME is now licensed under the MIT License** instead of the GNU Affero General Public License v3.0 (AGPL-3.0-or-later). The SPDX headers, the package metadata and the documentation have been updated accordingly. The code of conduct, which is adapted from the Contributor Covenant, is licensed under CC-BY-4.0.
 
 
 **New Features:**
@@ -25,9 +29,11 @@ Upcoming Release
 
   - **Building-specific flexible electricity-price support**: Added support for ``electricity_price_flex`` in ``BuildingForecaster`` for use with the ``electricity_price_signal`` flexibility measure.
   - **Generic Forecasting Interface**: This interface enables to specify different forecast algorithms for preprocess, initialization and update during runtime. They can be specified in the config.yaml or unit csv files. For more information about currently implemented algorithms and how to specify them please read the documentation on Unit forecasts.
+  - **Directional transfer capacities in complex clearing**: ``complex_clearing`` can now use asymmetric line limits from ``s_nom_forward`` and ``s_nom_reverse`` instead of assuming the same transfer capacity in both directions. ``s_max_pu`` (defaulting to 1) is still applied to scale the directional limits.
   - **Operator-level forecaster**: Unit operators can now own a ``UnitsOperatorForecaster`` providing their own market price and residual load forecasts (accessible via ``units_operator.forecaster``), instead of reading them from a managed unit. Forecast algorithms can be set per operator via ``forecast_*`` columns in ``unit_operators.csv``, and the portfolio learning strategy now reads its price/residual-load observations from this operator forecaster.
 
 **Improvements:**
+  - **Rolling-horizon optimisation for DSM units**: Rolling-horizon operation is available for ``Building``, ``SteelPlant``, ``CementPlant``, ``HydrogenPlant``, and ``SteamPlant``. Hydrogen and steam plants use per-timestep hydrogen and thermal-demand forecasts; Steam-plant thermal-demand and boiler fuel-price profiles are aligned to each optimisation window. See :doc:`demand_side_agent` for configuration and demand-profile details.
   - **Extend building units to support multiple sub-assets**: Building units can now include multiple components of the same technology type using prefix-based component handling. This enables configurations with multiple electric vehicles and multiple charging stations within the same building unit.
   - **Improve building forecast handling**: The building forecasting workflow has been extended to support aggregate building profiles as well as component-specific profiles such as EV availability, EV range, charging-station availability, and flexible electricity-price signals.
   - **Clarify building forecast naming conventions**: Aggregate building forecast columns now use explicit names such as ``<building_id>_load_profile`` instead of ambiguous bare building identifiers.
@@ -44,8 +50,15 @@ Upcoming Release
   - **Grafana dashboard improvements**: Added button to automatically update the time range filter to the full simulation horizon.
   - **Replace GPL-licensed ``pyyaml-include`` dependency**: AMIRIS scenario loading no longer depends on the GPLv3-licensed ``pyyaml-include`` package, which was incompatible with distributing ASSUME under a permissive license. The subset of ``!include`` YAML-tag behavior AMIRIS scenario files rely on is now implemented in-house in ``assume.scenario.yaml_include``.
   - **Rework the redispatch use case in the DSU & flexibility tutorial**: The redispatch example in ``examples/notebooks/10_DSU_and_flexibility.ipynb`` now places the renewable surplus in the north and the load plus dispatchable plants in the south, so the redispatch is balanced (total upward volume equals total downward volume) and clearly demonstrates renewable curtailment on the congested side together with dispatchable ramp-up on the other. A summary table of the redispatch volumes per energy source was added below the redispatch plot, and the explanatory text was updated accordingly.
+  - **OEDS loader uses the open-mastr schema**: The OEDS infrastructure queries were migrated to the open-mastr MaStR export. ``area=None`` selects all units without a postcode filter, and missing coordinates fall back to the postcode centroid.
+  - **More realistic PV and wind series from MaStR**: PV is modelled from the installed DC capacity (``Bruttoleistung``) with inverter losses (0.9) and module aging (0.5 %/year), and each unit is clipped at its feed-in limit and its AC capacity (``Nettonennleistung``). Tilt classes map to their midpoints, and east-west systems are split into an east- and a west-facing row. Units only produce between their commissioning and decommissioning date, so a fleet growing during the simulated year is no longer applied to the whole year. Simulated PV energy changes by about -15 % (2023, Aachen region), wind by about -4 %.
+  - **Remove unused OUNoise**: The ``OUNoise`` class in ``learning_utils.py`` was not used anywhere and could not be instantiated, as ``__init__`` referenced the undefined attribute ``initial_noise``. It was removed instead of fixed. ``NormalActionNoise`` is the action noise used by the framework.
+  - **Early stopping is disabled by default**: ``early_stopping_steps`` no longer falls back to ``training_episodes / validation_episodes_interval + 1`` when it is ``None``. Previously, early stopping was therefore always active unless a value was set. Now ``None`` disables it, and ``early_stopping_threshold`` only has an effect if ``early_stopping_steps`` is set. Configs that relied on the implicit default must set ``early_stopping_steps`` explicitly to keep the previous behavior. ``Learning.compare_and_save_policies`` was also refactored for readability, with the early stopping check moved to ``Learning._early_stopping_triggered``.
 
 **Bug Fixes:**
+  - **Fix critic loading skipping only the inner key loop**: In ``TD3.load_critic_params`` the ``continue`` for a checkpoint with missing keys only skipped the inner key loop, so the incomplete critic was still loaded and failed with a ``KeyError``. The agent is now skipped as a whole, with one warning listing all missing keys.
+  - **Fix compare_and_save_policies only processing the first metric**: A ``return`` inside the metric loop ended the evaluation after the first metric. All metrics are now recorded and best-tracked, while saving policies and early stopping remain tied to the default (first) metric. The method now also returns ``False`` instead of ``None`` when no metrics are passed.
+  - **Fix replay buffer insertion**: Prevent premature wraparound and correctly split batches crossing the buffer capacity, avoiding unwritten entries being sampled and insertion errors.
   - **Fix ramp constraint at the first time step**: For every ramp-limited DSM component, the first time step was incorrectly capped by ``min(ramp_up, ramp_down)`` instead of just ``ramp_up``, since the ramp-down constraint also applied an absolute cap on the first step even though there is no previous value to decrease from. This could artificially choke off a legitimately high first-step value whenever ``ramp_down`` was tighter than ``ramp_up``. Fixed across all affected components (``GenericStorage``, ``ChargingStation``, ``Boiler``, and the shared ``add_ramping_constraints`` helper used by most other DSM components).
   - **Fix rolling-horizon min-demand strategy for non-steel-plant units**: The rolling-horizon function's per-timestep demand-strategy detection hard-coded the steel plant's own ``steel_demand_per_timestep`` attribute name, so any other DSM unit using the ``min_demand`` strategy in rolling-horizon mode silently read the wrong (already window-sliced) series. Generalized to use each unit's own demand attribute.
   - **Fix building flexibility initialization under electricity price signals**: Fixed building flexibility initialization so that the ``electricity_price_signal`` flexibility measure works with building-specific flexible electricity-price inputs.
@@ -59,6 +72,10 @@ Upcoming Release
   - **Fix errors in portfolio learning strategies**: The ``min_max_rescale`` function was missing from ``utils.py``, causing an ``ImportError`` in ``portfolio_learning_strategies.py``. Resolved by extending ``min_max_scale`` to cover the rescaling use case. And fix minor construction bug for observation space.
   - **Skip torch seeding when torch is installed but not used**: Irrelevant seeding was performed and a warning was thrown about deterministic PyTorch behavior, even though simulation does not use RL. This is fixed by only setting the PyTorch seeds when learning is active.
   - **Fix bug in redispatch mechanism**: Fixed the bug in redispatch evaluation due to PyPSA's version upgrade. In ``PyPSA >= 0.35.2`` (released in February 2025) the sign of load was not taken into account correctly & since the fixed EOM dispatch was modelled as a load with positive sign which was resulting in incorrect redispatch amounts.
+  - **Fix bug in flexable balancing market strategies**: Flexables balancing market strategies queried ``get_specific_revenue`` with forecasted market prices from their own markets instead of from the "EOM" market.
+  - **Fix loss of the last ``train_freq`` window during learning**: Tasks scheduled at exactly the simulation end were started by the run loop but never awaited, because tasks registered with ``src="no_wait"`` are excluded from mango's termination detection. The run loop now drains all remaining tasks before shutting the container down.
+  - **Fix nodal clearing for units without a bid**: Generators, loads and storage units present in the grid data but without a bid in a snapshot kept the default availability they were added to the network with, and a unit bidding in only some snapshots passed NaN availability to the optimization. Such units now have zero availability in the snapshots without a bid.
+  - **Fix OEDS queries after the open-mastr migration**: Postcodes with a leading zero (eastern Germany) were excluded, PV units without EEG payments were dropped, appended date filters produced invalid SQL, tracked PV units got a tilt of 180°, the battery of east-west PV+battery units was counted twice, and planned units were counted as built capacity.
 
 0.6.0 - (18th March 2026)
 =========================

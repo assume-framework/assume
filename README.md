@@ -1,7 +1,7 @@
 <!--
 SPDX-FileCopyrightText: ASSUME Developers
 
-SPDX-License-Identifier: AGPL-3.0-or-later
+SPDX-License-Identifier: MIT
 -->
 
 # ASSUME: Agent-Based Electricity Markets Simulation Toolbox
@@ -72,8 +72,16 @@ pip install assume-framework
 pip install 'assume-framework[learning]'
 ```
 
-Please keep in mind that the above installation method will install the PyTorch package without CUDA support.
-If you want to make use of your GPU with CUDA cores, please install PyTorch with GPU support separately as described [here](https://pytorch.org/get-started/locally/).
+The `learning` extra depends on a generic `torch` and leaves the choice of build to you.
+On Linux, the default wheel from PyPI is the CUDA build, which pulls in several GB of `nvidia-*` packages.
+If you do not have a GPU, install the CPU-only build first, then the extra (pip keeps the already installed torch):
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install 'assume-framework[learning]'
+```
+
+If you want to make use of your GPU with CUDA cores, install PyTorch with GPU support as described [here](https://pytorch.org/get-started/locally/).
 
 We also include **network-based market clearing algorithms** such as for the re-dispatch, zonal clearing with NTCs and nodal market clearing, which all require the PyPSA library.
 To install the package with these capabilities, use:
@@ -232,6 +240,6 @@ If you want to cite a specific version of ASSUME, all releases are archived on Z
 
 ## License
 
-Copyright 2022-2025 [ASSUME developers](https://assume.readthedocs.io/en/latest/developers.html).
+Copyright 2022-2026 [ASSUME developers](https://assume.readthedocs.io/en/latest/developers.html).
 
-ASSUME is licensed under the [GNU Affero General Public License v3.0](./LICENSES/AGPL-3.0-or-later.txt). This license is a strong copyleft license that requires that any derivative work be licensed under the same terms as the original work. It is approved by the [Open Source Initiative](https://opensource.org/licenses/AGPL-3.0).
+ASSUME is licensed under the [MIT License](./LICENSES/MIT.txt). This permissive license allows use, modification and redistribution, including in proprietary software, as long as the copyright and license notice are kept. It is approved by the [Open Source Initiative](https://opensource.org/license/mit).
