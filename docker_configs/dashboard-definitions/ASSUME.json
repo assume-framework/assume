@@ -41,7 +41,10 @@
   ],
   "panels": [
     {
-      "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 5,
         "w": 24,
@@ -58,7 +61,7 @@
         "content": "# Welcome to our ASSUME demo\n\nThis is the Grafana Dashboard which makes interacting with the simulation data very easy.\n\n*IMPORTANT NOTE:* Grafana uses automated aggregation of data into time buckets with large time horizons displayed, e.g. time horizon > 1 month. It will display the average of the selected metric in the time bucket which underestimates the variance of the data and smoothes it. ",
         "mode": "markdown"
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "12.4.1",
       "title": "Overview Dashboard",
       "type": "text"
     },
@@ -76,6 +79,10 @@
       "type": "row"
     },
     {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 3,
         "w": 24,
@@ -92,7 +99,8 @@
         "content": "# Market-specific Data\n\nData specific for the market depending on the choice made at te top of the panel\n\n",
         "mode": "markdown"
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "12.4.1",
+      "title": "",
       "type": "text"
     },
     {
@@ -113,6 +121,7 @@
             "axisLabel": "",
             "axisPlacement": "left",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 1,
             "gradientMode": "none",
@@ -132,6 +141,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -147,7 +157,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -199,12 +209,13 @@
           ""
         ],
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "multi",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -262,10 +273,9 @@
     },
     {
       "datasource": {
-        "type": "postgres",
+        "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
-      "description": "Big Point Size is demand match. Unused generation after that point",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -277,6 +287,7 @@
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
+            "fillOpacity": 50,
             "hideFrom": {
               "legend": false,
               "tooltip": false,
@@ -285,41 +296,360 @@
             "lineStyle": {
               "fill": "solid"
             },
+            "lineWidth": 2,
+            "pointShape": "circle",
             "pointSize": {
-              "fixed": 2
+              "fixed": 1,
+              "max": 10,
+              "min": 0
             },
+            "pointStrokeWidth": 1,
             "scaleDistribution": {
               "type": "linear"
             },
             "show": "points+lines"
           },
-          "fieldMinMax": false,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
                 "value": 80
               }
             ]
-          },
-          "unit": "megwatt"
+          }
         },
         "overrides": [
           {
             "matcher": {
-              "id": "byName",
-              "options": "Price"
+              "id": "byRegexp",
+              "options": ".*Demand.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 5
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    10,
+                    10
+                  ],
+                  "fill": "dash"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*Price.*"
             },
             "properties": [
               {
                 "id": "unit",
                 "value": "€/MWh"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*Cumulative Volume.*"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "megwatt"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".* #\\d+\\b.*"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\bsolar\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\bwind_offshore\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\bwind_onshore\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "super-light-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\bbiomass\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\bcombined cycle gas turbine\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\bopen cycle gas turbine\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\bhard coal\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\bhydro\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\blignite\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#a52a2a",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\bnuclear\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\boil\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#120c12",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\bexchange\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\bBESS\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "super-light-purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\bPSPP\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#130987",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\binflex_demand\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\(demand\\).*"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    6,
+                    4
+                  ],
+                  "fill": "dash"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*Cumulative Volume.*"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": true,
+                  "viz": false
+                }
               }
             ]
           }
@@ -331,149 +661,40 @@
         "x": 0,
         "y": 21
       },
-      "id": 100,
-      "maxPerRow": 4,
+      "id": 105,
       "options": {
         "legend": {
-          "calcs": [
-            "max",
-            "min"
-          ],
+          "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
-        "mapping": "manual",
+        "mapping": "auto",
         "series": [
           {
-            "frame": {
-              "matcher": {
-                "id": "byIndex",
-                "options": 1
-              }
-            },
-            "name": {
-              "fixed": "Demand"
-            },
             "size": {
               "matcher": {
                 "id": "byName",
-                "options": "size"
-              }
-            },
-            "x": {
-              "matcher": {
-                "id": "byName",
-                "options": "Volume"
-              }
-            },
-            "y": {
-              "matcher": {
-                "id": "byName",
-                "options": "Price"
-              }
-            }
-          },
-          {
-            "frame": {
-              "matcher": {
-                "id": "byIndex",
-                "options": 0
-              }
-            },
-            "name": {
-              "fixed": "Generation"
-            },
-            "size": {
-              "matcher": {
-                "id": "byName",
-                "options": "size"
-              }
-            },
-            "x": {
-              "matcher": {
-                "id": "byName",
-                "options": "Volume"
-              }
-            },
-            "y": {
-              "matcher": {
-                "id": "byName",
-                "options": "Price"
+                "options": "Size"
               }
             }
           }
         ],
-        "seriesMapping": "auto",
         "tooltip": {
-          "maxHeight": 600,
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
+          "dataset": "assume",
           "editorMode": "code",
           "format": "table",
-          "group": [],
-          "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  \n  sum(volume::float) OVER (PARTITION BY market_id ORDER BY price asc, unit_id) AS \"Volume\",\n  price::float AS \"Price\", unit_id,\n  1/(volume - accepted_volume +1)/2 as size\n  --'rgba(255,255,255,1)' as delta\nFROM market_orders\nWHERE\n  \n  start_time = (select min(start_time) from market_orders where market_id = '$market' AND\n      simulation = '$simulation' and $__timeFilter(start_time))\n  AND\n  volume > 0 AND\n  --accepted_volume != 0 AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY unit_id, volume, accepted_volume, price, market_id --, bid_id\nORDER BY price asc\n\n-- ",
-          "refId": "Volume",
-          "select": [
-            [
-              {
-                "params": [
-                  "supply_volume"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          },
-          "table": "market_meta",
-          "timeColumn": "product_start",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        },
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "hide": false,
-          "rawQuery": true,
-          "rawSql": "SELECT\n  -sum(volume::float) OVER (PARTITION BY market_id ORDER BY accepted_price asc, unit_id) AS \"Volume\",\n  accepted_price::float AS \"Price\", unit_id,\n  10 as size\nFROM market_orders\nWHERE\n  \n  start_time = (select min(start_time) from market_orders where market_id = '$market' AND\n  simulation = '$simulation' and $__timeFilter(start_time))\n  AND\n  volume < 0 AND\n  --accepted_volume != 0 AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY unit_id, volume, accepted_volume, accepted_price, market_id --, bid_id\nORDER BY accepted_price asc\n\n-- ",
-          "refId": "Demand",
+          "rawSql": "-- unit metadata from all *_meta tables that exist in this database (missing tables are skipped)\nWITH unit_meta AS (\n  SELECT x.unit_id, x.technology\n  FROM (VALUES ('power_plant_meta'), ('storage_meta'), ('demand_meta'), ('exchange_meta')) AS t(tbl)\n  CROSS JOIN LATERAL xmltable(\n    '/table/row'\n    PASSING query_to_xml(\n      CASE WHEN to_regclass(t.tbl) IS NULL\n        THEN 'SELECT NULL::text AS unit_id, NULL::text AS technology WHERE false'\n        ELSE format('SELECT \"index\"::text AS unit_id, technology::text AS technology FROM %I WHERE simulation = %L', t.tbl, '$simulation')\n      END, false, false, '')\n    COLUMNS unit_id text, technology text\n  ) x\n),\nbids AS (\n  SELECT\n    mo.bid_id,\n    mo.unit_id,\n    mo.price::float AS price,\n    COALESCE(um.technology, 'unknown') AS tech,\n    sum(mo.volume)::float AS volume\n  FROM market_orders mo\n  LEFT JOIN unit_meta um ON um.unit_id = mo.unit_id\n  WHERE\n    mo.start_time = '$merit_order_select'\n    AND mo.volume > 0\n    AND mo.market_id = '$market'\n    AND mo.simulation = '$simulation'\n  GROUP BY mo.bid_id, mo.unit_id, mo.price, um.technology\n),\nranked AS (\n  SELECT\n    *,\n    COALESCE(sum(volume) OVER (ORDER BY price ASC, bid_id, unit_id ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS start_vol,\n    sum(volume) OVER (ORDER BY price ASC, bid_id, unit_id ROWS UNBOUNDED PRECEDING) AS cum_vol,\n    row_number() OVER (PARTITION BY tech ORDER BY price ASC, bid_id, unit_id) AS n\n  FROM bids\n),\n-- one series per bid, so every bid is drawn as its own horizontal segment and\n-- no lines connect different bids; the first bid of a technology carries the\n-- technology name, the others are named '<tech> #n' and hidden from the legend\nblocks AS (\n  SELECT\n    *,\n    CASE WHEN n = 1 THEN tech ELSE tech || ' #' || n END AS series\n  FROM ranked\n),\n-- demand side bids (negative volume), only if the demand curve is enabled\ndemand_bids AS (\n  SELECT\n    mo.bid_id,\n    mo.unit_id,\n    mo.price::float AS price,\n    COALESCE(um.technology, 'unknown') AS tech,\n    -sum(mo.volume)::float AS volume\n  FROM market_orders mo\n  LEFT JOIN unit_meta um ON um.unit_id = mo.unit_id\n  WHERE\n    '$show_demand_curve' = 'show'\n    AND mo.start_time = '$merit_order_select'\n    AND mo.volume < 0\n    AND mo.market_id = '$market'\n    AND mo.simulation = '$simulation'\n  GROUP BY mo.bid_id, mo.unit_id, mo.price, um.technology\n),\n-- demand curve: sorted by descending price, one series per bid named '<tech> (demand)'\ndemand_blocks AS (\n  SELECT\n    *,\n    COALESCE(sum(volume) OVER (ORDER BY price DESC, bid_id, unit_id ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS start_vol,\n    sum(volume) OVER (ORDER BY price DESC, bid_id, unit_id ROWS UNBOUNDED PRECEDING) AS cum_vol,\n    tech || ' (demand)' || CASE\n      WHEN row_number() OVER (PARTITION BY tech ORDER BY price DESC, bid_id, unit_id) = 1 THEN ''\n      ELSE ' #' || row_number() OVER (PARTITION BY tech ORDER BY price DESC, bid_id, unit_id)\n    END AS series\n  FROM demand_bids\n),\ndemand AS (\n  SELECT\n    mm.demand_volume::float AS demand_volume,\n    (SELECT max(price::float) FROM market_orders\n     WHERE market_id = '$market'\n       AND simulation = '$simulation'\n       AND accepted_volume > 0\n       AND start_time = '$merit_order_select'\n    ) AS clearing_price\n  FROM market_meta mm\n  WHERE mm.market_id = '$market'\n    AND mm.simulation = '$simulation'\n    AND mm.product_start = '$merit_order_select'\n)\n\n-- start point of each bid (shown as marker)\nSELECT\n  start_vol AS \"Cumulative Volume\",\n  price AS \"Price\",\n  series AS \"Series\",\n  tech AS \"Technology\",\n  unit_id::text AS \"Unit\",\n  volume::text AS \"Volume\",\n  bid_id::text AS \"Bid\",\n  5 AS \"Size\"\nFROM blocks\n\nUNION ALL\n\n-- end point of each bid (no marker)\nSELECT\n  cum_vol AS \"Cumulative Volume\",\n  price AS \"Price\",\n  series AS \"Series\",\n  tech AS \"Technology\",\n  unit_id::text AS \"Unit\",\n  volume::text AS \"Volume\",\n  bid_id::text AS \"Bid\",\n  0 AS \"Size\"\nFROM blocks\n\nUNION ALL\n\n-- start and end point of each demand bid\nSELECT\n  start_vol,\n  price,\n  series,\n  tech,\n  unit_id::text,\n  volume::text,\n  bid_id::text,\n  5\nFROM demand_blocks\n\nUNION ALL\n\nSELECT\n  cum_vol,\n  price,\n  series,\n  tech,\n  unit_id::text,\n  volume::text,\n  bid_id::text,\n  0\nFROM demand_blocks\n\nUNION ALL\n\n-- vertical demand line over the full price range of the bids, with a marker at the clearing price\nSELECT demand_volume, (SELECT least(0, min(price)) FROM (SELECT price FROM bids UNION ALL SELECT price FROM demand_bids) p), 'Demand', 'Demand', '', '', '', 0 FROM demand\nUNION ALL\nSELECT demand_volume, clearing_price, 'Demand', 'Demand', '', '', '', 8 FROM demand\nUNION ALL\nSELECT demand_volume, (SELECT max(price) FROM (SELECT price FROM bids UNION ALL SELECT price FROM demand_bids) p), 'Demand', 'Demand', '', '', '', 0 FROM demand\n\nORDER BY \"Cumulative Volume\" ASC, \"Price\" ASC",
+          "refId": "A",
           "sql": {
             "columns": [
               {
@@ -493,7 +714,18 @@
           }
         }
       ],
-      "title": "Merit Order $market at $min_time",
+      "title": "Merit Order $market at $merit_order_select",
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "Series"
+            ],
+            "keepFields": false
+          }
+        }
+      ],
       "type": "xychart"
     },
     {
@@ -514,6 +746,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 76,
             "gradientMode": "none",
@@ -530,6 +763,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -545,7 +779,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -619,13 +853,13 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "volume gas"
+              "options": "volume combined cycle gas turbine"
             },
             "properties": [
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "orange",
+                  "fixedColor": "light-orange",
                   "mode": "fixed"
                 }
               }
@@ -705,6 +939,126 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume open cycle gas turbine"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume inflex_demand"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#cfcfcf",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume exchange import"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume exchange export"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume BESS charge"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "super-light-purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume BESS discharge"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "super-light-purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume PSPP charge"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#130987",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume PSPP discharge"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#130987",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
@@ -722,15 +1076,18 @@
           ],
           "displayMode": "table",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": true,
+          "sortBy": "Mean",
+          "sortDesc": true
         },
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -756,7 +1113,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "select time, sum(volume) as \"volume\", tech FROM \n(\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_volume) AS \"volume\", unit_id, pm.technology as tech\nFROM market_orders mo\njoin power_plant_meta pm on pm.index=mo.unit_id and pm.simulation=mo.simulation\nWHERE\n\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  mo.simulation = '$simulation'\n\nGROUP BY 1, unit_id, bid_id, pm.technology\nORDER BY 1\n\n) a\ngroup by 1, tech\nORDER BY 1, tech desc",
+          "rawSql": "-- unit metadata from all *_meta tables that exist in this database (missing tables are skipped)\nWITH unit_meta AS (\n  SELECT t.unit_type, x.unit_id, x.technology\n  FROM (VALUES ('power_plant'), ('storage'), ('demand'), ('exchange')) AS t(unit_type)\n  CROSS JOIN LATERAL xmltable(\n    '/table/row'\n    PASSING query_to_xml(\n      CASE WHEN to_regclass(t.unit_type || '_meta') IS NULL\n        THEN 'SELECT NULL::text AS unit_id, NULL::text AS technology WHERE false'\n        ELSE format('SELECT \"index\"::text AS unit_id, technology::text AS technology FROM %I WHERE simulation = %L', t.unit_type || '_meta', '$simulation')\n      END, false, false, '')\n    COLUMNS unit_id text, technology text\n  ) x\n),\nseries AS (\nSELECT\n  $__timeGroupAlias(mo.start_time, $__interval),\n  SUM(mo.accepted_volume) AS \"volume\",\n  CASE\n    WHEN um.unit_type = 'power_plant' THEN um.technology\n    WHEN um.unit_type = 'storage' AND mo.accepted_volume >= 0 THEN COALESCE(um.technology, 'storage') || ' discharge'\n    WHEN um.unit_type = 'storage' AND mo.accepted_volume < 0 THEN COALESCE(um.technology, 'storage') || ' charge'\n    WHEN um.unit_type = 'demand' THEN COALESCE(um.technology, 'demand')\n    WHEN um.unit_type = 'exchange' AND mo.accepted_volume >= 0 THEN COALESCE(um.technology, 'exchange') || ' import'\n    WHEN um.unit_type = 'exchange' AND mo.accepted_volume < 0 THEN COALESCE(um.technology, 'exchange') || ' export'\n    ELSE 'unknown technology'\n  END AS tech\nFROM market_orders mo\nLEFT JOIN unit_meta um\n  ON um.unit_id = mo.unit_id\nWHERE\n  $__timeFilter(mo.start_time) AND\n  mo.market_id = '$market' AND\n  mo.simulation = '$simulation'\nGROUP BY 1, 3\n),\n-- rank technologies by variability (coefficient of variation) in the selected time range;\n-- Grafana orders series alphabetically, so the rank is prefixed to the name to stack\n-- base load at the bottom and variable technologies on top (prefix is removed by a transformation)\nranks AS (\n  SELECT\n    tech,\n    row_number() OVER (\n      ORDER BY COALESCE(stddev_pop(volume) / NULLIF(abs(avg(volume)), 0), 0), tech\n    ) AS rk\n  FROM series\n  GROUP BY tech\n)\nSELECT\n  s.time,\n  s.volume,\n  lpad(r.rk::text, 2, '0') || ' ' || s.tech AS tech\nFROM series s\nJOIN ranks r ON r.tech = s.tech\nORDER BY 1, 3",
           "refId": "A",
           "select": [
             [
@@ -844,6 +1201,15 @@
         }
       ],
       "title": "Market result by technology",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.*?)\\b\\d{2} (.*)",
+            "renamePattern": "$1$2"
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
@@ -864,6 +1230,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -880,6 +1247,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -895,7 +1263,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -924,12 +1292,13 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -955,7 +1324,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_price::float) AS \"Price\", unit_id\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id --, bid_id\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_price::float) AS \"Price\", unit_id, bid_id\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_id\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1063,6 +1432,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -1079,6 +1449,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -1094,7 +1465,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -1123,12 +1494,13 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -1294,7 +1666,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -1361,6 +1733,7 @@
         "showValue": "never",
         "stacking": "none",
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "multi",
           "sort": "none"
@@ -1369,7 +1742,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -1378,7 +1751,6 @@
           },
           "format": "table",
           "group": [],
-          "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
           "rawSql": "SELECT\n  simulation,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_cost') as \"Total cost\",\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_volume') as \"Total volume\"\nFROM kpis\nWHERE simulation = '$simulation'\ngroup by simulation",
@@ -1420,6 +1792,9 @@
             "cellOptions": {
               "type": "auto"
             },
+            "footer": {
+              "reducers": []
+            },
             "inspect": false
           },
           "mappings": [],
@@ -1428,7 +1803,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -1498,14 +1873,6 @@
       "id": 76,
       "options": {
         "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
         "showHeader": true,
         "sortBy": [
           {
@@ -1514,7 +1881,7 @@
           }
         ]
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -1524,7 +1891,6 @@
           "editorMode": "code",
           "format": "table",
           "group": [],
-          "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
           "rawSql": "SELECT\n  simulation,\n  avg(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'avg_price') as avg_price,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_cost') as total_cost,\n  sum(round(CAST(value AS numeric), 2)*1000)  FILTER (WHERE variable = 'total_volume') as total_volume\nFROM kpis\ngroup by simulation\nORDER BY simulation",
@@ -1619,13 +1985,15 @@
           "fields": "/^sum$/",
           "values": true
         },
+        "sort": "desc",
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -1641,7 +2009,6 @@
               "type": "column"
             }
           ],
-          "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
           "rawSql": "SELECT \n  NOW() as time_sec,\n  SUM(max_power),\n  technology\nFROM power_plant_meta\nWHERE \"simulation\" LIKE '$simulation'\nGROUP BY technology, simulation;\n\n\n",
@@ -1688,7 +2055,6 @@
         "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
-      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1700,14 +2066,17 @@
             "axisColorMode": "series",
             "axisLabel": "Market price €/MWh",
             "axisPlacement": "auto",
+            "fillOpacity": 50,
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
             },
+            "pointShape": "circle",
             "pointSize": {
               "fixed": 4
             },
+            "pointStrokeWidth": 1,
             "scaleDistribution": {
               "type": "linear"
             },
@@ -1719,7 +2088,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -1757,14 +2126,37 @@
           "placement": "bottom",
           "showLegend": true
         },
-        "series": [],
-        "seriesMapping": "auto",
+        "mapping": "auto",
+        "series": [
+          {
+            "frame": {
+              "matcher": {
+                "id": "byIndex",
+                "options": 0
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byType",
+                "options": "number"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byType",
+                "options": "number"
+              }
+            }
+          }
+        ],
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -1812,7 +2204,10 @@
       "type": "row"
     },
     {
-      "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 3,
         "w": 24,
@@ -1829,7 +2224,8 @@
         "content": "# Unit Specific Data\n\nFor the chosen market and the chosen unit here the dispatch is displayed.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "12.4.1",
+      "title": "",
       "type": "text"
     },
     {
@@ -1849,6 +2245,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -1868,6 +2265,7 @@
               "type": "linear"
             },
             "showPoints": "always",
+            "showValues": false,
             "spanNulls": true,
             "stacking": {
               "group": "A",
@@ -1883,7 +2281,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -1915,12 +2313,13 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -1930,7 +2329,6 @@
           "editorMode": "code",
           "format": "time_series",
           "group": [],
-          "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
           "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  avg(power) AS \"Market dispatch\",\n  concat(unit_id, ' - ', market_id) as \"unit\"\nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id in ($Gen_Units)\nGROUP BY 1, unit_id, power, market_id\nORDER BY 1",
@@ -1980,7 +2378,6 @@
           },
           "editorMode": "code",
           "format": "time_series",
-          "hide": false,
           "rawQuery": true,
           "rawSql": "SELECT\n  $__timeGroupAlias(time,$__interval),\n  avg(power) AS \"Actual dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(time) AND\n  simulation = '$simulation' AND\n  unit in ($Gen_Units)\nGROUP BY 1, unit\nORDER BY 1",
           "refId": "B",
@@ -2018,7 +2415,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -2128,6 +2525,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2144,6 +2542,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": true,
             "stacking": {
               "group": "A",
@@ -2159,7 +2558,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -2203,12 +2602,13 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -2218,10 +2618,9 @@
           "editorMode": "code",
           "format": "time_series",
           "group": [],
-          "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_price::float) AS \"Accepted price:\",\r\n  avg(price) AS \"Bid price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1\r\n",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_price::float) AS \"Accepted price:\",\r\n  avg(price) AS \"Bid price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\",\r\n  max(bid_id) AS \"bid_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1",
           "refId": "B",
           "select": [
             [
@@ -2363,7 +2762,6 @@
         "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
-      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2376,6 +2774,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2392,6 +2791,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": true,
             "stacking": {
               "group": "A",
@@ -2407,7 +2807,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -2466,12 +2866,13 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "multi",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -2583,7 +2984,6 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
-      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2595,7 +2995,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -2662,7 +3062,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -2723,7 +3123,6 @@
         "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
-      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2736,6 +3135,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2752,6 +3152,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -2767,7 +3168,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -2825,12 +3226,13 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -2916,6 +3318,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2932,6 +3335,7 @@
               "type": "linear"
             },
             "showPoints": "always",
+            "showValues": false,
             "spanNulls": true,
             "stacking": {
               "group": "A",
@@ -2947,7 +3351,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -2978,12 +3382,13 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -3043,7 +3448,6 @@
           "editorMode": "code",
           "format": "time_series",
           "group": [],
-          "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
           "rawSql": "SELECT\n  $__timeGroupAlias(time,$__interval),\n  power AS \"Actual dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(time) AND\n  simulation = '$simulation' AND\n  unit in ($Demand_Units)\nGROUP BY 1, unit, power\nORDER BY 1",
@@ -3102,7 +3506,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -3212,6 +3616,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -3228,6 +3633,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -3243,7 +3649,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -3287,12 +3693,13 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -3424,7 +3831,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -3500,7 +3907,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -3510,7 +3917,6 @@
           "editorMode": "code",
           "format": "time_series",
           "group": [],
-          "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
           "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  -energy_cashflow AS \"Cashflow\",\r\n  unit\r\nFROM unit_dispatch d\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  d.simulation = '$simulation' AND\r\n  unit in ($Demand_Units)\r\nGROUP BY 1, unit, energy_cashflow, power\r\nORDER BY 1",
@@ -3562,7 +3968,6 @@
         "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
-      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3575,6 +3980,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -3591,6 +3997,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -3606,7 +4013,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -3665,12 +4072,13 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "multi",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -3760,7 +4168,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -3796,7 +4204,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -3806,7 +4214,6 @@
           "editorMode": "code",
           "format": "table",
           "group": [],
-          "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
           "rawSql": "SELECT\n  sum(energy_cashflow)/sum(power) as \"Price per MW\",\n  unit\nFROM unit_dispatch d\nWHERE\n  $__timeFilter(time) AND\n  d.simulation = '$simulation' AND\n  unit in ($Demand_Units)\nGROUP BY unit\nORDER BY 1",
@@ -3869,7 +4276,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -3905,7 +4312,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -3915,7 +4322,6 @@
           "editorMode": "code",
           "format": "time_series",
           "group": [],
-          "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
           "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  -power*1e3 as \"Volume\",\r\n  unit\r\nFROM unit_dispatch d\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  d.simulation = '$simulation' AND\r\n  unit in ($Demand_Units)\r\nGROUP BY 1, unit, energy_cashflow, power\r\nORDER BY 1",
@@ -3979,6 +4385,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -3995,6 +4402,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -4010,7 +4418,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -4058,12 +4466,13 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "multi",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -4149,6 +4558,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -4165,6 +4575,7 @@
               "type": "linear"
             },
             "showPoints": "always",
+            "showValues": false,
             "spanNulls": true,
             "stacking": {
               "group": "A",
@@ -4180,7 +4591,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -4211,12 +4622,13 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -4276,7 +4688,6 @@
           "editorMode": "code",
           "format": "time_series",
           "group": [],
-          "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
           "rawSql": "SELECT\n  $__timeGroupAlias(time,$__interval),\n  power AS \"Actual dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(time) AND\n  simulation = '$simulation' AND\n  unit in ($Storage_Units)\nGROUP BY 1, unit, power\nORDER BY 1",
@@ -4335,7 +4746,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -4427,6 +4838,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -4443,6 +4855,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -4458,7 +4871,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -4489,12 +4902,13 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -4568,6 +4982,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -4584,6 +4999,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -4599,7 +5015,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -4643,12 +5059,13 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -4769,7 +5186,6 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
-      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4782,6 +5198,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -4798,6 +5215,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -4813,7 +5231,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -4872,12 +5290,13 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "multi",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -4989,7 +5408,6 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
-      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -5001,7 +5419,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -5068,7 +5486,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -5129,7 +5547,6 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
-      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -5142,6 +5559,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -5158,6 +5576,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -5173,7 +5592,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -5231,12 +5650,13 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "multi",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -5293,14 +5713,14 @@
       "type": "timeseries"
     }
   ],
+  "preload": false,
   "refresh": "",
-  "schemaVersion": 39,
+  "schemaVersion": 42,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": false,
           "text": "example_01c_eom_only",
           "value": "example_01c_eom_only"
         },
@@ -5310,21 +5730,18 @@
         },
         "definition": "SELECT simulation\nFROM market_meta",
         "description": "Can choose which simulation we want to show ",
-        "hide": 0,
         "includeAll": false,
-        "multi": false,
         "name": "simulation",
         "options": [],
         "query": "SELECT simulation\nFROM market_meta",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
+        "regexApplyTo": "value",
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": false,
           "text": "EOM",
           "value": "EOM"
         },
@@ -5334,26 +5751,23 @@
         },
         "definition": "SELECT \n  market_id\nFROM market_meta\nwhere simulation='$simulation'\ngroup by market_id ;",
         "description": "Choose for which market the data is displayed",
-        "hide": 0,
         "includeAll": false,
-        "multi": false,
         "name": "market",
         "options": [],
         "query": "SELECT \n  market_id\nFROM market_meta\nwhere simulation='$simulation'\ngroup by market_id ;",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
+        "regexApplyTo": "value",
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": true,
           "text": [
-            "Unit 4"
+            "Biomass"
           ],
           "value": [
-            "Unit 4"
+            "Biomass"
           ]
         },
         "datasource": {
@@ -5362,7 +5776,6 @@
         },
         "definition": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which units we want to display ",
-        "hide": 0,
         "includeAll": false,
         "multi": true,
         "name": "Gen_Units",
@@ -5370,13 +5783,12 @@
         "query": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
+        "regexApplyTo": "value",
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": true,
           "text": [
             "demand_EOM"
           ],
@@ -5390,7 +5802,6 @@
         },
         "definition": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which units we want to display ",
-        "hide": 0,
         "includeAll": false,
         "multi": true,
         "name": "Demand_Units",
@@ -5398,13 +5809,12 @@
         "query": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
+        "regexApplyTo": "value",
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": true,
           "text": [
             "Storage 1"
           ],
@@ -5418,7 +5828,6 @@
         },
         "definition": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which storage units we want to display ",
-        "hide": 0,
         "includeAll": false,
         "multi": true,
         "name": "Storage_Units",
@@ -5426,9 +5835,50 @@
         "query": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
+        "regexApplyTo": "value",
         "sort": 1,
         "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "2023-03-01 01:00:00",
+          "value": "2023-03-01 01:00:00"
+        },
+        "definition": "select distinct start_time::text from market_orders where market_id = '$market' and simulation = '$simulation' and $__timeFilter(start_time) order by 1",
+        "label": "merit order plot for",
+        "name": "merit_order_select",
+        "options": [],
+        "query": "select distinct start_time::text from market_orders where market_id = '$market' and simulation = '$simulation' and $__timeFilter(start_time) order by 1",
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "hide",
+          "value": "hide"
+        },
+        "description": "Show or hide the demand side bids (demand, storage charging, exports) in the merit order plot",
+        "includeAll": false,
+        "label": "demand curve",
+        "multi": false,
+        "name": "show_demand_curve",
+        "options": [
+          {
+            "selected": false,
+            "text": "show",
+            "value": "show"
+          },
+          {
+            "selected": true,
+            "text": "hide",
+            "value": "hide"
+          }
+        ],
+        "query": "show,hide",
+        "type": "custom"
       },
       {
         "current": {
@@ -5498,10 +5948,9 @@
     ]
   },
   "time": {
-    "from": "2019-01-01T01:11:53.495Z",
-    "to": "2019-01-31T18:05:53.940Z"
+    "from": "2019-01-12T11:21:04.921Z",
+    "to": "2019-01-16T12:57:43.188Z"
   },
-  "timeRangeUpdatedDuringEditOrView": false,
   "timepicker": {
     "refresh_intervals": [
       "5s",
