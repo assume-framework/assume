@@ -25,7 +25,6 @@ from assume.common.market_objects import (
 )
 from assume.common.utils import (
     aggregate_step_amount,
-    create_rrule,
     datetime2timestamp,
     timestamp2datetime,
 )
@@ -50,7 +49,7 @@ class UnitsOperator(Role):
         last_executed_dispatch (int): The timestamp of the last executed dispatch.
         portfolio_strategies (UnitOperatorStrategy): The portfolio strategy.
         valid_orders (defaultdict): The valid orders, per market.
-        pending_orders (defaultdict): The orders awaiting the end of their delivery period, per market.
+        pending_orders (defaultdict): The orders awaiting the end of their delivery period, per market and end_time.
         units (dict[str, BaseUnit]): The units.
         id (str): The id of the agent.
         context (Context): The context of the agent.
@@ -87,8 +86,10 @@ class UnitsOperator(Role):
 
         # valid_orders per market_id, used for the market dispatch export at clearing (before delivery)
         self.valid_orders = defaultdict(list)
-        # pending_orders per market_id awaiting the end of their delivery period to calculate reward based on actual dispatch
-        self.pending_orders = defaultdict(list)
+        # pending_orders per market_id and end_time awaiting the end of their delivery period
+        # to calculate reward based on actual dispatch. Grouping them by end_time keeps
+        # the lookup of due orders independent of the number of pending orders.
+        self.pending_orders = defaultdict(lambda: defaultdict(list))
         self.units: dict[str, BaseUnit] = {}
 
     def setup(self):
@@ -151,14 +152,34 @@ class UnitsOperator(Role):
         # execute the dispatch once per time step, independent of the markets.
         index = self.simulation_index
         if index is not None:
-            self.context.schedule_recurrent_task(
-                self.execute_dispatch,
-                create_rrule(
-                    start=index.start + index.freq,
-                    end=index.end,
-                    freq=index.freq,
-                ),
-            )
+            self.schedule_dispatch_execution(index.start + index.freq)
+
+    def schedule_dispatch_execution(self, at: datetime) -> None:
+        """
+        Schedules execute_dispatch at the given time, after which it schedules itself
+        for the next time step until the end of the simulation index.
+
+        A recurrent task is not used, as mango evaluates its rrule from the start on
+        every firing, which makes it quadratic in the number of time steps.
+
+        Args:
+            at (datetime.datetime): The time of the next execution.
+        """
+        index = self.simulation_index
+        if at > index.end:
+            return
+
+        async def execute_and_reschedule():
+            await self.execute_dispatch()
+            # if the clock jumped ahead, execute_dispatch has caught up already,
+            # so continue with the first time step after now
+            now = timestamp2datetime(self.context.current_timestamp)
+            steps = max((now - at) // index.freq, 0) + 1
+            self.schedule_dispatch_execution(at + steps * index.freq)
+
+        self.context.schedule_timestamp_task(
+            execute_and_reschedule(), datetime2timestamp(at)
+        )
 
     async def store_units(self) -> None:
         db_addr = self.context.data.get("output_agent_addr")
@@ -283,9 +304,39 @@ class UnitsOperator(Role):
         self.calculate_unit_cashflow(orderbook, marketconfig)
 
         # the reward, in contrast, depends on the dispatch that is actually realized
-        self.pending_orders[marketconfig.market_id].extend(orderbook)
+        pending = self.pending_orders[marketconfig.market_id]
+        for order in orderbook:
+            pending[order["end_time"]].append(order)
+
+        if self.last_executed_dispatch and any(
+            order["start_time"] <= timestamp2datetime(self.last_executed_dispatch)
+            for order in accepted_orders
+        ):
+            logger.warning(
+                "%s received orders of %s for time steps which were already executed",
+                self.id,
+                marketconfig.market_id,
+            )
 
         self.write_market_dispatch(marketconfig)
+
+    def is_final_clearing(self, marketconfig: MarketConfig, now: datetime) -> bool:
+        """
+        Checks whether the clearing of the given market at the given time is its last one.
+
+        Args:
+            marketconfig (MarketConfig): The market configuration.
+            now (datetime.datetime): The time of the clearing.
+
+        Returns:
+            bool: True if no further opening of the market follows.
+        """
+        # the clearing belongs to the opening one opening duration ago, and an opening
+        # after the last possible one is never scheduled by the market
+        next_opening = marketconfig.opening_hours.after(
+            now - marketconfig.opening_duration
+        )
+        return next_opening is None or next_opening > marketconfig.last_opening
 
     def handle_registration_feedback(
         self, content: RegistrationMessage, meta: MetaDict
@@ -401,16 +452,13 @@ class UnitsOperator(Role):
 
         # find all orders due for execution because their delivery period has ended
         due: dict[str, Orderbook] = {}
-        for market_id, orders in list(self.pending_orders.items()):
-            delivered = [
-                order for order in orders if order["end_time"] - freq <= execute_until
-            ]
-            if delivered:
-                due[market_id] = delivered
-                self.pending_orders[market_id] = [
-                    order
-                    for order in orders
-                    if order["end_time"] - freq > execute_until
+        for market_id, pending in self.pending_orders.items():
+            ended = sorted(
+                end_time for end_time in pending if end_time - freq <= execute_until
+            )
+            if ended:
+                due[market_id] = [
+                    order for end_time in ended for order in pending.pop(end_time)
                 ]
 
         for market_id, orders in due.items():
@@ -437,9 +485,19 @@ class UnitsOperator(Role):
         whose delivery period ended in the meantime.
         """
         now = timestamp2datetime(self.context.current_timestamp)
-        execute_until = now - self.simulation_index.freq
+        self.execute_dispatch_until(now - self.simulation_index.freq)
 
+    def execute_dispatch_until(self, execute_until: datetime) -> None:
+        """
+        Executes the dispatch of all units from the last executed time step up to and
+        including execute_until, exports it and calculates the rewards.
+
+        Args:
+            execute_until (datetime.datetime): The last time step to execute.
+        """
         last_ts = self.last_executed_dispatch
+        if datetime2timestamp(execute_until) <= last_ts:
+            return
 
         # add one second to exclude the first time stamp,
         # because it is already executed in the last step
@@ -553,12 +611,7 @@ class UnitsOperator(Role):
         """
 
         now = timestamp2datetime(self.context.current_timestamp)
-        # the clearing belongs to the opening one opening duration ago, and an opening
-        # after the last possible one is never scheduled by the market
-        next_opening = marketconfig.opening_hours.after(
-            now - marketconfig.opening_duration
-        )
-        if next_opening is not None and next_opening <= marketconfig.last_opening:
+        if not self.is_final_clearing(marketconfig, now):
             until = now
         else:
             # no export follows which could aggregate the rest, so the dispatch is final

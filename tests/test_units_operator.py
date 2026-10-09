@@ -194,6 +194,12 @@ def track_rewards(units_operator: UnitsOperator, unit_id="testdemand"):
     return rewarded
 
 
+def count_pending(units_operator: UnitsOperator, market_id="EOM") -> int:
+    return sum(
+        len(orders) for orders in units_operator.pending_orders[market_id].values()
+    )
+
+
 async def test_cashflow_is_booked_at_clearing(units_operator: UnitsOperator):
     marketconfig = units_operator.available_markets[0]
     units_operator.registered_markets[marketconfig.market_id] = marketconfig
@@ -214,7 +220,7 @@ async def test_cashflow_is_booked_at_clearing(units_operator: UnitsOperator):
     assert unit.outputs["energy_cashflow"].at[start] == -1000 * 50
     # the reward is deferred until the delivery period has been executed
     assert rewarded == []
-    assert len(units_operator.pending_orders["EOM"]) == 1
+    assert count_pending(units_operator) == 1
 
 
 async def test_reward_is_calculated_after_delivery(units_operator: UnitsOperator):
@@ -235,17 +241,51 @@ async def test_reward_is_calculated_after_delivery(units_operator: UnitsOperator
     # the time step of the product has not been executed yet
     units_operator.calculate_unit_reward(start - rd(hours=1))
     assert rewarded == []
-    assert len(units_operator.pending_orders["EOM"]) == 1
+    assert count_pending(units_operator) == 1
 
     # the product [start, start + 1h) covers the single time step `start`,
     # so it is complete once that step has been executed
     units_operator.calculate_unit_reward(start)
     assert len(rewarded) == 1
-    assert units_operator.pending_orders["EOM"] == []
+    assert count_pending(units_operator) == 0
 
     # and it is not rewarded a second time
     units_operator.calculate_unit_reward(start + rd(hours=1))
     assert len(rewarded) == 1
+
+
+async def test_products_of_one_clearing_are_rewarded_at_their_own_end(
+    units_operator: UnitsOperator,
+):
+    marketconfig = units_operator.available_markets[0]
+    units_operator.registered_markets[marketconfig.market_id] = marketconfig
+    rewarded = track_rewards(units_operator)
+
+    first = make_order()
+    second = make_order()
+    second["start_time"] = start + rd(hours=1)
+    second["end_time"] = start + rd(hours=2)
+    later = make_order()
+    later["start_time"] = start + rd(hours=1)
+    later["end_time"] = start + rd(hours=3)
+
+    units_operator.handle_market_feedback(
+        {
+            "context": "clearing",
+            "market_id": "EOM",
+            "accepted_orders": [later, second, first],
+            "rejected_orders": [],
+        },
+        {},
+    )
+
+    units_operator.calculate_unit_reward(start)
+    assert rewarded == [[first]]
+
+    # several time steps executed at once reward every product ended in between
+    units_operator.calculate_unit_reward(start + rd(hours=2))
+    assert rewarded == [[first], [second, later]]
+    assert count_pending(units_operator) == 0
 
 
 async def test_multi_step_product_is_rewarded_once_fully_executed(
@@ -276,7 +316,7 @@ async def test_multi_step_product_is_rewarded_once_fully_executed(
 
     units_operator.calculate_unit_reward(start + rd(hours=3))
     assert len(rewarded) == 1
-    assert units_operator.pending_orders["EOM"] == []
+    assert count_pending(units_operator) == 0
 
 
 async def test_rewarded_order_stays_in_market_dispatch(units_operator: UnitsOperator):
@@ -371,7 +411,7 @@ async def test_dispatch_of_the_clearing_time_step_is_not_executed_early(
 
     # executing at `start` must not touch the time step `start` yet
     await units_operator.execute_dispatch()
-    assert calls[-1][1] == start - rd(hours=1)
+    assert all(range_end < start for _, range_end in calls)
     assert rewarded == []
 
     # one time step later it is executed and the product is rewarded
@@ -414,7 +454,65 @@ async def test_last_product_is_rewarded_at_market_end(units_operator: UnitsOpera
         end - rd(hours=1)
     )
     assert len(rewarded) == 1
-    assert units_operator.pending_orders["EOM"] == []
+    assert count_pending(units_operator) == 0
+
+
+async def test_dispatch_execution_reschedules_until_index_end(
+    units_operator: UnitsOperator,
+):
+    async def execute_dispatch():
+        pass
+
+    units_operator.execute_dispatch = execute_dispatch
+    scheduled = []
+    units_operator.context.schedule_timestamp_task = lambda coroutine, timestamp: (
+        scheduled.append((timestamp, coroutine))
+    )
+
+    index = units_operator.simulation_index
+    units_operator.schedule_dispatch_execution(index.end - 2 * index.freq)
+
+    executed = []
+    while scheduled:
+        timestamp, coroutine = scheduled.pop(0)
+        executed.append(timestamp)
+        await coroutine
+
+    # once per time step up to and including the end of the index, then it stops
+    assert executed == [
+        datetime2timestamp(index.end - 2 * index.freq),
+        datetime2timestamp(index.end - index.freq),
+        datetime2timestamp(index.end),
+    ]
+
+
+async def test_dispatch_execution_skips_time_steps_the_clock_jumped_over(
+    units_operator: UnitsOperator,
+):
+    """
+    execute_dispatch catches up on every time step since its last execution, so after
+    a clock jump the next execution is the first time step after now.
+    """
+
+    async def execute_dispatch():
+        pass
+
+    units_operator.execute_dispatch = execute_dispatch
+    scheduled = []
+    units_operator.context.schedule_timestamp_task = lambda coroutine, timestamp: (
+        scheduled.append((timestamp, coroutine))
+    )
+    clock = units_operator.context.context.clock
+
+    units_operator.schedule_dispatch_execution(start + rd(hours=1))
+    clock.set_time(datetime2timestamp(start + rd(hours=5, minutes=30)))
+    _, coroutine = scheduled.pop(0)
+    await coroutine
+
+    assert [timestamp for timestamp, _ in scheduled] == [
+        datetime2timestamp(start + rd(hours=6))
+    ]
+    scheduled[0][1].close()
 
 
 async def test_get_market_dispatch(units_operator: UnitsOperator):
