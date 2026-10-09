@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+import math
 from datetime import datetime, timedelta
 from functools import lru_cache
 
@@ -40,8 +41,8 @@ class PowerPlant(SupportsMinMax):
         cold_start_cost (float, optional): The cost of a cold start, where the power plant is restarted after a prolonged downtime. Defaults to 0.
         min_operating_time (float, optional): The minimum duration that the power plant must operate once started, in hours. Defaults to 0.
         min_down_time (float, optional): The minimum downtime required after a shutdown before the power plant can be restarted, in hours. Defaults to 0.
-        downtime_hot_start (int, optional): The downtime required after a hot start before the power plant can be restarted, in hours. Defaults to 8.
-        downtime_warm_start (int, optional): The downtime required after a warm start before the power plant can be restarted, in hours. Defaults to 48.
+        downtime_hot_start (float, optional): The downtime required after a hot start before the power plant can be restarted, in hours. Defaults to 0.
+        downtime_warm_start (float, optional): The downtime required after a warm start before the power plant can be restarted, in hours. Defaults to 0.
         max_heat_extraction (float, optional): The maximum amount of heat that the power plant can extract for external use, in some suitable unit. Defaults to 0.
         location (Tuple[float, float], optional): The geographical coordinates (latitude and longitude) of the power plant's location. Defaults to (0.0, 0.0).
         node (str, optional): The identifier of the electrical bus or network node to which the power plant is connected. Defaults to "node0".
@@ -67,10 +68,10 @@ class PowerPlant(SupportsMinMax):
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
-        min_operating_time: int = 1,  # hours
-        min_down_time: int = 1,  # hours
-        downtime_hot_start: int = 0,  # hours
-        downtime_warm_start: int = 0,  # hours
+        min_operating_time: float = 1,  # hours
+        min_down_time: float = 1,  # hours
+        downtime_hot_start: float = 0,  # hours
+        downtime_warm_start: float = 0,  # hours
         max_heat_extraction: float = 0,
         location: tuple[float, float] = (0.0, 0.0),
         node: str = "node0",
@@ -144,26 +145,26 @@ class PowerPlant(SupportsMinMax):
         self.ramp_down = None if ramp_down == 0 else ramp_down
         self.ramp_up = None if ramp_up == 0 else ramp_up
 
+        # the times are given in hours, but handled in time steps of the index.
+        # Minimum times are rounded up to whole steps.
+        hours_to_steps = timedelta(hours=1) / self.index.freq
+
         if min_operating_time < 0:
             raise ValidationError(
                 message=f"{min_operating_time=} must be > 0 for unit {self.id}",
                 id=self.id,
                 field="min_operating_time",
             )
-        self.min_operating_time = min_operating_time
+        self.min_operating_time = math.ceil(min_operating_time * hours_to_steps)
         if min_down_time < 0:
             raise ValidationError(
                 message=f"{min_down_time=} must be > 0 for unit {self.id}",
                 id=self.id,
                 field="min_down_time",
             )
-        self.min_down_time = min_down_time
-        self.downtime_hot_start = downtime_hot_start / (
-            self.index.freq / timedelta(hours=1)
-        )
-        self.downtime_warm_start = downtime_warm_start / (
-            self.index.freq / timedelta(hours=1)
-        )
+        self.min_down_time = math.ceil(min_down_time * hours_to_steps)
+        self.downtime_hot_start = downtime_hot_start * hours_to_steps
+        self.downtime_warm_start = downtime_warm_start * hours_to_steps
 
         self.marginal_cost = self.calc_simple_marginal_cost()
 
