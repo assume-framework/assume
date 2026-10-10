@@ -1022,6 +1022,18 @@ class LearningConfig:
         if isinstance(self.on_policy, dict):
             self.on_policy = OnPolicyConfig(**self.on_policy)
 
+        if self.off_policy.episodes_collecting_initial_experience < 1:
+            logger.warning(
+                "episodes_collecting_initial_experience need to be at least 1 to sample from buffer, got %s. setting to 1",
+                self.off_policy.episodes_collecting_initial_experience,
+            )
+            self.off_policy.episodes_collecting_initial_experience = 1
+
+        if self.off_policy.gradient_steps <= 0:
+            raise ValueError(
+                f"gradient_steps need to be positive, got {self.off_policy.gradient_steps}"
+            )
+
 
 class LearningStrategy(BaseStrategy):
     """

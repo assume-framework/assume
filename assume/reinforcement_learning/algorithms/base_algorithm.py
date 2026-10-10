@@ -1,9 +1,11 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
 # SPDX-License-Identifier: MIT
+
 import json
 import logging
 import os
+from pathlib import Path
 
 import pandas as pd
 import torch as th
@@ -314,15 +316,14 @@ class RLAlgorithm:
             "algorithm you use."
         )
 
-    def load_obj(self, directory: str):
+    def load_obj(self, directory: Path):
         """Load a serialized object from directory.
 
         Loads a PyTorch serialized object from the specified directory path.
         The object is loaded onto the device specified by the algorithm's configuration.
 
         Args:
-            directory: Path to the directory containing the serialized object.
-                Should point to a valid .pt file.
+            directory: Path to the serialized object (.pt file).
 
         Returns:
             object: The deserialized Python object.
@@ -332,7 +333,7 @@ class RLAlgorithm:
         """
         return th.load(directory, map_location=self.device, weights_only=True)
 
-    def load_params(self, directory: str) -> None:
+    def load_params(self, directory: Path) -> None:
         """Load learning parameters from disk.
 
         Abstract method that should be implemented by subclasses to load

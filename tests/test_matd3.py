@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: MIT
 
 import json
-import os
 from copy import copy, deepcopy
 from datetime import datetime
 
@@ -91,7 +90,7 @@ def saved_n_agent_model(learning_role_n, tmp_path) -> tuple[str, dict]:
     save_dir.mkdir(parents=True, exist_ok=True)
     learning_role_n.rl_algorithm.save_params(directory=str(save_dir))
     agent = learning_role_n.rl_strats["agent_0"]
-    return str(save_dir), {
+    return save_dir, {
         "critic": agent.critics.state_dict(),
         "actor": agent.actor.state_dict(),
         "target_critic": agent.target_critics.state_dict(),
@@ -108,7 +107,7 @@ def saved_n_plus_m_agent_model(learning_role_n_plus_m, tmp_path) -> tuple[str, d
     save_dir.mkdir(parents=True, exist_ok=True)
     learning_role_n_plus_m.rl_algorithm.save_params(directory=str(save_dir))
     agent = learning_role_n_plus_m.rl_strats["agent_0"]
-    return str(save_dir), {
+    return save_dir, {
         "critic": agent.critics.state_dict(),
         "actor": agent.actor.state_dict(),
     }
@@ -207,11 +206,11 @@ def test_td3_save_params(learning_role_n, tmp_path):
 
     td3_n.save_params(directory=str(save_dir))
 
-    assert os.path.exists(save_dir / "critics" / "critic_agent_0.pt")
-    assert os.path.exists(save_dir / "critics" / "critic_agent_1.pt")
+    assert (save_dir / "critics" / "critic_agent_0.pt").exists()
+    assert (save_dir / "critics" / "critic_agent_1.pt").exists()
 
-    assert os.path.exists(save_dir / "actors" / "actor_agent_0.pt")
-    assert os.path.exists(save_dir / "actors" / "actor_agent_1.pt")
+    assert (save_dir / "actors" / "actor_agent_0.pt").exists()
+    assert (save_dir / "actors" / "actor_agent_1.pt").exists()
 
     # Verify u_id_order.json was written correctly
     order_file = save_dir / "critics" / "u_id_order.json"
@@ -406,7 +405,7 @@ def test_td3_load_corrupted_or_incomplete_critic(tmp_path, base_learning_config)
     }
     th.save(corrupted_obj, corrupted_dir / "critic_agent_0.pt")
 
-    learning.rl_algorithm.load_critic_params(directory=str(tmp_path))
+    learning.rl_algorithm.load_critic_params(directory=tmp_path)
 
     loaded_state = learning.rl_strats["agent_0"].critics.state_dict()
     assert compare_state_dicts(loaded_state, original_state)

@@ -4,7 +4,6 @@
 
 import copy
 import logging
-import os
 import shutil
 from collections import defaultdict
 from datetime import datetime
@@ -1309,8 +1308,8 @@ def run_learning(
     confirm_learning_save_path(save_path, continue_learning)
 
     # also remove tensorboard logs
-    tensorboard_path = f"tensorboard/{world.scenario_data['simulation_id']}"
-    if os.path.exists(tensorboard_path):
+    tensorboard_path = Path("tensorboard") / world.scenario_data["simulation_id"]
+    if tensorboard_path.exists():
         shutil.rmtree(tensorboard_path, ignore_errors=True)
 
     validation_interval = world.learning_role.determine_validation_interval()

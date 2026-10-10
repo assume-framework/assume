@@ -357,6 +357,8 @@ def calculate_naive_price_elastic(
                     continue
             elif bid["volume"] == 0:
                 continue
+            for field in config.additional_fields:
+                bid.setdefault(field, None)
             cleaned_orderbook.append(bid)
 
         mps = get_available_products(
