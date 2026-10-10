@@ -157,7 +157,7 @@ def _setup_for_update(learning_role) -> None:
 
 
 @pytest.mark.require_learning
-def test_mappo_discards_rollout_without_bootstrap_observation(learning_role_n):
+def test_mappo_keeps_rollout_without_bootstrap_observation(learning_role_n):
     learning_role_n.initialize_policy()
     learning_role_n.rl_algorithm.buffer = _make_rollout_buffer(
         obs_dim=learning_role_n.rl_algorithm.obs_dim,
@@ -165,10 +165,14 @@ def test_mappo_discards_rollout_without_bootstrap_observation(learning_role_n):
         n_agents=len(learning_role_n.rl_strats),
         n_steps=1,
     )
+    carried_observation = learning_role_n.rl_algorithm.buffer.observations[0].copy()
 
     learning_role_n.rl_algorithm.update_policy()
 
-    assert learning_role_n.rl_algorithm.buffer.size() == 0
+    assert learning_role_n.rl_algorithm.buffer.size() == 1
+    np.testing.assert_array_equal(
+        learning_role_n.rl_algorithm.buffer.observations[0], carried_observation
+    )
 
 
 @pytest.mark.require_learning
@@ -182,6 +186,7 @@ def test_mappo_complete_policy_update_changes_actor_and_critic(learning_role_n):
         n_agents=len(learning_role_n.rl_strats),
         n_steps=6,
     )
+    carried_observation = algorithm.buffer.observations[5].copy()
 
     actor_before = {
         unit_id: [
@@ -211,12 +216,16 @@ def test_mappo_complete_policy_update_changes_actor_and_critic(learning_role_n):
         )
     assert algorithm.n_updates == 1
     assert learning_role_n.update_steps == 1
-    assert algorithm.buffer.size() == 0
+    assert algorithm.buffer.size() == 1
+    np.testing.assert_array_equal(
+        algorithm.buffer.observations[0], carried_observation
+    )
 
 
 @pytest.mark.require_learning
 def test_mappo_clears_rollout_between_episodes(learning_role_n):
     learning_role_n.initialize_policy()
+    _setup_for_update(learning_role_n)
     learning_role_n.rl_algorithm.buffer = _make_rollout_buffer(
         obs_dim=learning_role_n.rl_algorithm.obs_dim,
         act_dim=learning_role_n.rl_algorithm.act_dim,
@@ -230,6 +239,31 @@ def test_mappo_clears_rollout_between_episodes(learning_role_n):
 
 
 @pytest.mark.require_learning
+def test_mappo_orders_units_independently_of_registration(learning_role_n):
+    items = list(learning_role_n.rl_strats.items())
+    learning_role_n.rl_strats = dict(reversed(items))
+    learning_role_n.initialize_policy()
+
+    assert learning_role_n.rl_algorithm._ordered_unit_ids() == sorted(
+        learning_role_n.rl_strats
+    )
+
+
+def test_mappo_gradient_steps_accumulate_across_updates(learning_role_n):
+    learning_role_n.initialize_policy()
+    algorithm = learning_role_n.rl_algorithm
+
+    _, first_base = algorithm.compute_gradient_step_range([{}, {}])
+    _, second_base = algorithm.compute_gradient_step_range([{}])
+
+    assert first_base == 0
+    assert second_base == 2
+    data = learning_role_n.get_inter_episodic_data()
+    algorithm.cumulative_gradient_steps = 0
+    learning_role_n.load_inter_episodic_data(data)
+    assert learning_role_n.rl_algorithm.cumulative_gradient_steps == 3
+
+
 def test_mappo_algorithm_class(learning_role_n):
     """initialize_policy creates a PPO instance as the rl_algorithm."""
     learning_role_n.initialize_policy()
@@ -450,10 +484,12 @@ def test_mappo_excludes_late_rewards_from_old_policy(learning_role_n, monkeypatc
     original_output = learn.write_rl_params_to_output
 
     def record_store(cache, device):
+        start_pos = algorithm.buffer.pos
         original_store(cache, device)
         buffer = algorithm.buffer
-        stored_hours.append(buffer.observations[: buffer.pos, 0, 0].tolist())
-        batch = buffer.sample(np.arange(buffer.pos))
+        new_rows = np.arange(start_pos, buffer.pos)
+        stored_hours.append(buffer.observations[new_rows, 0, 0].tolist())
+        batch = buffer.sample(new_rows)
         for index, strategy in enumerate(learn.rl_strats.values()):
             log_probs, _ = strategy.actor.evaluate_actions(
                 batch.observations[:, index],
@@ -462,7 +498,7 @@ def test_mappo_excludes_late_rewards_from_old_policy(learning_role_n, monkeypatc
             )
             th.testing.assert_close(
                 (log_probs - batch.old_log_probs[:, index]).exp(),
-                th.ones(buffer.pos),
+                th.ones(len(new_rows)),
                 atol=1e-5,
                 rtol=1e-5,
             )
@@ -510,7 +546,8 @@ def test_mappo_excludes_late_rewards_from_old_policy(learning_role_n, monkeypatc
     assert algorithm.n_updates == 2
     assert stored_hours == [[1.0, 2.0, 3.0], [5.0, 6.0, 7.0]]
     assert logged_hours == [[1, 2, 3], [4, 5, 6, 7]]
-    assert algorithm.buffer.pos == 0
+    assert algorithm.buffer.pos == 1
+    assert algorithm.buffer.observations[0, 0, 0] == pytest.approx(7.0)
 
 
 @pytest.mark.require_learning
@@ -675,19 +712,11 @@ def test_mappo_initialize_policy_all_dimensions_match(base_learning_config):
 
 @pytest.mark.require_learning
 def test_mappo_buffer_storage_uses_rl_strats_order(base_learning_config):
-    """Regression test for the agent-ordering bug.
+    """The rollout buffer and the policy update use the same unit order.
 
-    The on-policy buffer-storage path used to call
-    ``sorted(cache["obs"][timestamp].keys())`` to order agents, while
-    ``mappo.PPO.update_policy`` iterates ``self.rl_strats.values()``.  When
-    the unit ids do not happen to be alphabetically sorted (e.g.
-    ``pp_6, pp_7, pp_8, pp_9, pp_10``) the two orders diverge and every
-    agent is trained on a different agent's observations / actions / values,
-    silently degrading MAPPO to noise.
-
-    This test pins ``learning_role`` to use the ``rl_strats`` insertion order
-    when filling the rollout buffer, exactly like the off-policy algorithms
-    already do.
+    Both paths order agents by sorted unit id. Insertion order is not stable
+    across runs, and ``pp_10`` sorts before ``pp_6``, so the shared order has
+    to be the sorted one.
     """
     import asyncio
 
@@ -781,21 +810,25 @@ def test_mappo_buffer_storage_uses_rl_strats_order(base_learning_config):
     stored_rewards = buf.rewards[0]
     stored_log_probs = buf.log_probs[0]
 
-    for i in range(n_agents):
-        expected = float(i + 1)
+    expected_order = learn.rl_algorithm._ordered_unit_ids()
+    marker_by_unit = {
+        unit_id: float(i + 1) for i, unit_id in enumerate(insertion_order)
+    }
+    for i, unit_id in enumerate(expected_order):
+        expected = marker_by_unit[unit_id]
         assert np.allclose(stored_obs[i], expected), (
-            f"row {i} of buffer.observations should match insertion-order "
-            f"agent {insertion_order[i]} (value {expected}); got {stored_obs[i]}"
+            f"row {i} of buffer.observations should match sorted "
+            f"agent {unit_id} (value {expected}); got {stored_obs[i]}"
         )
         assert np.allclose(stored_actions[i], expected), (
-            f"row {i} of buffer.actions should match insertion-order "
-            f"agent {insertion_order[i]} (value {expected}); got {stored_actions[i]}"
+            f"row {i} of buffer.actions should match sorted "
+            f"agent {unit_id} (value {expected}); got {stored_actions[i]}"
         )
         assert np.allclose(stored_rewards[i], expected), (
-            f"row {i} of buffer.rewards should match insertion-order "
-            f"agent {insertion_order[i]} (value {expected}); got {stored_rewards[i]}"
+            f"row {i} of buffer.rewards should match sorted "
+            f"agent {unit_id} (value {expected}); got {stored_rewards[i]}"
         )
         assert np.allclose(stored_log_probs[i], -expected), (
-            f"row {i} of buffer.log_probs should match insertion-order "
-            f"agent {insertion_order[i]} (value {-expected}); got {stored_log_probs[i]}"
+            f"row {i} of buffer.log_probs should match sorted "
+            f"agent {unit_id} (value {-expected}); got {stored_log_probs[i]}"
         )

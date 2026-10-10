@@ -927,6 +927,9 @@ class LearningConfig:
             weight to long-term rewards in decision-making. Default is 0.99.
         actor_architecture (str): The architecture of the neural networks used for the actors. Options include
             "mlp" (Multi-Layer Perceptron) and "lstm" (Long Short-Term Memory). Default is "mlp".
+        critic_hidden_sizes (list[int] | None): Hidden layer widths for the centralized critic.
+            If None, the width is chosen from the number of agents. Default is None.
+        seed (int | None): Seed for rollout sampling. Replay sampling uses the global NumPy stream, which the study-case seed already sets. Copied from the study-case seed when omitted. Default is None.
 
         off_policy (OffPolicyConfig): Nested configuration for off-policy algorithms (MATD3/MADDPG) hyperparameters.
         on_policy (OnPolicyConfig): Nested configuration for on-policy algorithms (PPO/MAPPO) hyperparameters.
@@ -956,6 +959,8 @@ class LearningConfig:
     algorithm: str = "matd3"
     gamma: float = 0.99
     actor_architecture: str = "mlp"
+    critic_hidden_sizes: list[int] | None = None
+    seed: int | None = None
 
     # Nested algorithm configurations
     # Keeping the supplied keys until merging the legacy settings

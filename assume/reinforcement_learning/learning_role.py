@@ -57,8 +57,6 @@ class Learning(Role):
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
         self.learning_config = learning_config
-        self.critics = {}  # TODO: do we still use this?
-        self.target_critics = {}  # TODO: do we still use this?
 
         device = "cpu"
         if self.learning_config:
@@ -416,6 +414,10 @@ class Learning(Role):
         self.rl_algorithm.buffer = inter_episodic_data["buffer"]
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
+        if hasattr(self.rl_algorithm, "cumulative_gradient_steps"):
+            self.rl_algorithm.cumulative_gradient_steps = inter_episodic_data.get(
+                "cumulative_gradient_steps", 0
+            )
 
         # Disable initial exploration if initial experience collection is complete or not performed.
         if (
@@ -451,6 +453,9 @@ class Learning(Role):
             "avg_all_eval": self.avg_rewards,
             "buffer": buffer,
             "actors_and_critics": self.rl_algorithm.extract_policy(),
+            "cumulative_gradient_steps": getattr(
+                self.rl_algorithm, "cumulative_gradient_steps", 0
+            ),
         }
 
     def turn_off_initial_exploration(self, loaded_only=False) -> None:
@@ -753,7 +758,15 @@ class Learning(Role):
             for u_id, params in unit_params_list[gradient_step].items()
         ]
 
-        if self.db_addr:
+        try:
+            import asyncio
+
+            asyncio.get_running_loop()
+            loop_is_running = True
+        except RuntimeError:
+            loop_is_running = False
+
+        if self.db_addr and loop_is_running:
             self.context.schedule_instant_message(
                 receiver_addr=self.db_addr,
                 content={

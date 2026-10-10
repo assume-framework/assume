@@ -109,6 +109,7 @@ class PPO(ActorCriticAlgorithm):
 
         # Update counter
         self.n_updates = 0
+        self.cumulative_gradient_steps = 0
 
     # =========================================================================
     # CHECKPOINT SAVING METHODS
@@ -204,9 +205,20 @@ class PPO(ActorCriticAlgorithm):
             n_rl_units=len(self.learning_role.rl_strats),
             device=self.device,
             float_type=self.float_type,
+            seed=self.learning_config.seed,
             gamma=self.learning_config.gamma,
             gae_lambda=self.learning_config.on_policy.gae_lambda,
         )
+
+    def _ordered_unit_ids(self) -> list:
+        """Return unit ids in a stable order for centralized critic inputs."""
+        return sorted(self.learning_role.rl_strats)
+
+    def _ordered_strategies(self) -> list:
+        """Return strategies in the same order as ``_ordered_unit_ids``."""
+        return [
+            self.learning_role.rl_strats[unit_id] for unit_id in self._ordered_unit_ids()
+        ]
 
     def _centralized_values(self, obs: np.ndarray) -> np.ndarray:
         """Evaluate every agent's centralized critic on one joint observation.
@@ -216,19 +228,16 @@ class PPO(ActorCriticAlgorithm):
                 shape (n_agents, obs_dim).
 
         Returns:
-            Value estimate per agent, shape (n_agents,), in the agent order of
-            ``learning_role.rl_strats``.
+            Value estimate per agent, shape (n_agents,), in sorted unit-id order.
         """
-        strategies = list(self.learning_role.rl_strats.values())
+        strategies = self._ordered_strategies()
         values = np.zeros(len(strategies))
 
         # agent-specific slice of every agent's observation
         unique_obs_all = obs[:, self.obs_dim - self.unique_obs_dim :]
 
         with th.no_grad():
-            for i, strategy in enumerate(
-                strategies
-            ):  # TODO: does this need to be ordered by unit_id?
+            for i, strategy in enumerate(strategies):
                 other_unique = np.concatenate(
                     (unique_obs_all[:i], unique_obs_all[i + 1 :]), axis=0
                 )
@@ -252,7 +261,7 @@ class PPO(ActorCriticAlgorithm):
         version are excluded from training, their rewards are still logged by
         the learning role. This keeps the rollout under one unchanged policy.
         """
-        unit_id_order = list(self.learning_role.rl_strats.keys())
+        unit_id_order = self._ordered_unit_ids()
         self.buffer.ensure_capacity(self.buffer.pos + len(cache["obs"]))
 
         for timestamp in sorted(cache["obs"].keys()):
@@ -337,20 +346,9 @@ class PPO(ActorCriticAlgorithm):
         default — we still need a cross-episode offset, here based on
         `episodes_done` (no initial-experience subtraction needed).
         """
-        actual_gradient_steps = len(unit_params_list)
-        gradient_step_range = range(actual_gradient_steps)
-
-        # steps performed in previous training episodes
-        steps_done_in_previous_episodes = (
-            self.learning_role.episodes_done
-            * self._updates_per_episode()
-            * actual_gradient_steps
-        )
-        base_step = (
-            steps_done_in_previous_episodes
-            + self.learning_role.update_steps * actual_gradient_steps
-        )
-        return gradient_step_range, base_step
+        base_step = self.cumulative_gradient_steps
+        self.cumulative_gradient_steps += len(unit_params_list)
+        return range(len(unit_params_list)), base_step
 
     def create_actors(self) -> None:
         """Create stochastic actor networks for all agents.
@@ -411,6 +409,7 @@ class PPO(ActorCriticAlgorithm):
                 obs_dim=self.obs_dim,
                 unique_obs_dim=self.unique_obs_dim,
                 float_type=self.float_type,
+                hidden_sizes=self.learning_config.critic_hidden_sizes,
             ).to(self.device)
 
             # Create optimizer
@@ -491,7 +490,7 @@ class PPO(ActorCriticAlgorithm):
         logger.debug("Updating Policy (PPO)")
 
         # Keeping strategy order aligned with rollout-buffer column order.
-        strategies = [strategy for strategy in self.learning_role.rl_strats.values()]
+        strategies = self._ordered_strategies()
         n_rl_agents = len(strategies)
 
         # Getting the buffer, this will be a RolloutBuffer for on-policy algorithms.

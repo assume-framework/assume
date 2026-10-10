@@ -977,6 +977,8 @@ def setup_world(
 
     # handle initial learning parameters before learning_role exists
     learning_dict = config.get("learning_config", {})
+    if learning_dict is not None and "seed" not in learning_dict:
+        learning_dict["seed"] = config.get("seed")
     # those settings need to be overridden before passing to the LearningConfig
     if learning_dict:
         # make sure that continue_learning implies learning_mode

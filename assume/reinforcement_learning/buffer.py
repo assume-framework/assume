@@ -227,6 +227,7 @@ class RolloutBuffer:
         n_rl_units: int,
         device: str | th.device,
         float_type: th.dtype,
+        seed: int | None = None,
         gamma: float = 0.99,
         gae_lambda: float = 0.98,
     ):
@@ -249,6 +250,7 @@ class RolloutBuffer:
         self.device = device
         self.float_type = float_type
         self.np_float_type = np.float16 if float_type == th.float16 else np.float32
+        self.rng = np.random.default_rng(seed)
         self.gamma = gamma
         self.gae_lambda = gae_lambda
 
@@ -447,7 +449,7 @@ class RolloutBuffer:
             )
 
         buffer_size = self.pos if not self.full else self.buffer_size
-        indices = np.random.permutation(buffer_size)
+        indices = self.rng.permutation(buffer_size)
 
         if batch_size is None:
             batch_size = buffer_size

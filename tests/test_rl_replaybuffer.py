@@ -36,6 +36,22 @@ def test_replay_buffer_wraparound(batch_sizes):
 
 
 @pytest.mark.require_learning
+def test_replay_buffer_sampling_follows_global_numpy_seed():
+    def sampled_indices(seed):
+        np.random.seed(seed)
+        buffer = ReplayBuffer(8, 1, 1, 1, "cpu", th.float32)
+        values = np.arange(1, 6, dtype=np.float32).reshape(-1, 1, 1)
+        buffer.add(values, values, values)
+        return buffer.sample(3).rewards.cpu().numpy()
+
+    first = sampled_indices(11)
+    second = sampled_indices(11)
+    other = sampled_indices(22)
+    np.testing.assert_array_equal(first, second)
+    assert not np.array_equal(first, other)
+
+
+@pytest.mark.require_learning
 def test_replay_buffer_rejects_oversized_batch():
     buffer = ReplayBuffer(10, 1, 1, 1, "cpu", th.float32)
     values = np.ones((11, 1, 1), dtype=np.float32)

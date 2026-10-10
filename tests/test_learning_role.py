@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 from datetime import datetime
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -50,6 +51,8 @@ def test_learning_init():
     # test init
     learn = Learning(config["learning_config"], start=start, end=end)
     assert len(learn.rl_strats) == 0
+    assert not hasattr(learn, "critics")
+    assert not hasattr(learn, "target_critics")
 
     # we need to add learning strategies first
     learn.rl_strats["test_id"] = LearningStrategy(**config, learning_role=learn)
@@ -110,6 +113,40 @@ async def learning_role():
     learning_role.write_rl_params_to_output = MagicMock()
 
     yield learning_role, th
+
+
+@pytest.mark.require_learning
+def test_add_actions_accepts_zero_unit_id(learning_role):
+    learning_role, th = learning_role
+    action = th.tensor([0.1])
+    noise = th.tensor([0.0])
+
+    learning_role.add_actions_to_cache(0, start, action, noise)
+
+    assert learning_role.cache["actions"][start][0] == [action]
+    assert learning_role.cache["noises"][start][0] == [noise]
+
+    learning_role.add_actions_to_cache(None, start, action, noise)
+    learning_role.add_actions_to_cache("", start, action, noise)
+
+    assert None not in learning_role.cache["actions"][start]
+    assert "" not in learning_role.cache["actions"][start]
+
+
+@pytest.mark.require_learning
+def test_progress_uses_algorithm_initial_experience(learning_role):
+    learning_role, _ = learning_role
+    learning_role.initialize_policy()
+    learning_role.rl_algorithm.episodes_collecting_initial_experience = 0
+    learning_role.episodes_done = 0
+    learning_role._context = SimpleNamespace(
+        current_timestamp=learning_role.start
+        + (learning_role.end - learning_role.start) / 2
+    )
+
+    progress = learning_role.rl_algorithm.get_progress_remaining()
+
+    assert progress < 1
 
 
 @pytest.mark.require_learning

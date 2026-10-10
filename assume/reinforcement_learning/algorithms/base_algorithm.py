@@ -122,9 +122,7 @@ class RLAlgorithm:
             self.learning_role.context.current_timestamp - self.learning_role.start
         )
 
-        initial_experience_episodes = (
-            self.learning_config.off_policy.episodes_collecting_initial_experience
-        )
+        initial_experience_episodes = self.episodes_collecting_initial_experience
         learning_episodes = (
             self.learning_config.training_episodes - initial_experience_episodes
         )
@@ -835,6 +833,7 @@ class ActorCriticAlgorithm(RLAlgorithm):
                 act_dim=self.act_dim,
                 unique_obs_dim=self.unique_obs_dim,
                 float_type=self.float_type,
+                hidden_sizes=self.learning_config.critic_hidden_sizes,
             ).to(self.device)
 
             if self.uses_target_networks:
@@ -844,6 +843,7 @@ class ActorCriticAlgorithm(RLAlgorithm):
                     act_dim=self.act_dim,
                     unique_obs_dim=self.unique_obs_dim,
                     float_type=self.float_type,
+                    hidden_sizes=self.learning_config.critic_hidden_sizes,
                 ).to(self.device)
 
                 strategy.target_critics.load_state_dict(strategy.critics.state_dict())

@@ -33,6 +33,7 @@ class Critic(nn.Module):
         act_dim: int,
         float_type,
         unique_obs_dim: int,
+        hidden_sizes: list[int] | None = None,
     ):
         super().__init__()
 
@@ -43,7 +44,11 @@ class Critic(nn.Module):
         self.float_type = float_type
 
         # Dynamic Architecture Definition
-        self.hidden_sizes = self._get_architecture(n_agents)
+        self.hidden_sizes = (
+            list(hidden_sizes)
+            if hidden_sizes is not None
+            else self._get_architecture(n_agents)
+        )
 
     def _get_architecture(self, n_agents: int) -> list[int]:
         """Returns hidden layer sizes based on the number of agents."""
@@ -87,9 +92,17 @@ class CriticTD3(Critic):
     """
 
     def __init__(
-        self, n_agents: int, obs_dim: int, act_dim: int, float_type, unique_obs_dim: int
+        self,
+        n_agents: int,
+        obs_dim: int,
+        act_dim: int,
+        float_type,
+        unique_obs_dim: int,
+        hidden_sizes: list[int] | None = None,
     ):
-        super().__init__(n_agents, obs_dim, act_dim, float_type, unique_obs_dim)
+        super().__init__(
+            n_agents, obs_dim, act_dim, float_type, unique_obs_dim, hidden_sizes
+        )
 
         # First Q-network (Q1)
         self.q1_layers = self._build_q_network()
@@ -108,15 +121,12 @@ class CriticTD3(Critic):
 
         # Compute Q1
         x1 = xu
-        for layer in self.q1_layers[:-1]:  # All hidden layers
-            x1 = F.relu(layer(x1))
-        x1 = self.q1_layers[-1](x1)  # Output layer (no activation)
+        for layer in self.q1_layers:
+            x1 = layer(x1)
 
-        # Compute Q2
         x2 = xu
-        for layer in self.q2_layers[:-1]:  # All hidden layers
-            x2 = F.relu(layer(x2))
-        x2 = self.q2_layers[-1](x2)  # Output layer (no activation)
+        for layer in self.q2_layers:
+            x2 = layer(x2)
 
         return x1, x2
 
@@ -124,10 +134,8 @@ class CriticTD3(Critic):
         """Compute only Q1 (used during actor updates)."""
         x = th.cat([obs, actions], dim=1)
 
-        for layer in self.q1_layers[:-1]:  # All hidden layers
-            x = F.relu(layer(x))
-
-        x = self.q1_layers[-1](x)  # Output layer (no activation)
+        for layer in self.q1_layers:
+            x = layer(x)
 
         return x
 
@@ -150,8 +158,16 @@ class CriticDDPG(Critic):
         act_dim: int,
         float_type: th.dtype,
         unique_obs_dim: int,
+        hidden_sizes: list[int] | None = None,
     ):
-        super().__init__(n_agents, obs_dim, act_dim, float_type, unique_obs_dim)
+        super().__init__(
+            n_agents,
+            obs_dim,
+            act_dim,
+            float_type,
+            unique_obs_dim,
+            hidden_sizes,
+        )
 
         # Q-network
         self.q_layers = self._build_q_network()
@@ -164,12 +180,10 @@ class CriticDDPG(Critic):
         xu = th.cat([obs, actions], dim=1)  # Concatenate obs & actions
 
         # Compute Q
-        for layer in self.q_layers[:-1]:  # All hidden layers
-            xu = F.relu(layer(xu))
+        for layer in self.q_layers:
+            xu = layer(xu)
 
-        x = self.q_layers[-1](xu)
-
-        return x
+        return xu
 
 
 class CriticPPO(Critic):
@@ -182,13 +196,21 @@ class CriticPPO(Critic):
         unique_obs_dim: Dimension of agent-specific observations.
     """
 
-    def __init__(self, n_agents: int, obs_dim: int, float_type, unique_obs_dim: int):
+    def __init__(
+        self,
+        n_agents: int,
+        obs_dim: int,
+        float_type,
+        unique_obs_dim: int,
+        hidden_sizes: list[int] | None = None,
+    ):
         super().__init__(
             n_agents=n_agents,
             obs_dim=obs_dim,
             act_dim=0,
             float_type=float_type,
             unique_obs_dim=unique_obs_dim,
+            hidden_sizes=hidden_sizes,
         )
 
         # V-network
