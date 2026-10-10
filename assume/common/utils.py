@@ -764,7 +764,7 @@ def rename_study_case(path: str, old_key: str, new_key: str):
         yaml.safe_dump(data, file, sort_keys=False)
 
 
-def convert_to_tensors(array: np.array, copy=True, dtype=None, device=None):
+def convert_to_tensors(array: np.ndarray, copy: bool = True, dtype=None, device=None):
     """Convert a numpy array to a PyTorch tensor.
 
     Note:
@@ -774,6 +774,8 @@ def convert_to_tensors(array: np.array, copy=True, dtype=None, device=None):
         array (numpy.ndarray): The numpy array to convert.
         copy (bool, optional): Whether to copy the data or not
             (may be useful to avoid changing things by reference). Defaults to True.
+        dtype: PyTorch dtype to convert to. Defaults to None.
+        device: PyTorch device to move to. Defaults to None.
 
     Returns:
         torch.Tensor: The converted PyTorch tensor.
@@ -781,6 +783,10 @@ def convert_to_tensors(array: np.array, copy=True, dtype=None, device=None):
 
     try:
         import torch as th
+
+        if isinstance(array, th.Tensor):
+            tensor = array.to(dtype=dtype, device=device)
+            return tensor.clone() if copy else tensor
 
         if copy:
             return th.tensor(array, dtype=dtype, device=device)
