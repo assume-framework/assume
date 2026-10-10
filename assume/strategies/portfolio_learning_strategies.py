@@ -66,9 +66,11 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
     actor : torch.nn.Module
         Actor network for determining actions.
     action_noise : NormalActionNoise
-        Noise model added to actions during learning to encourage exploration. Defaults to None.
+        Noise model added to actions during learning to encourage exploration. Only set by
+        algorithms that use exploration noise.
     collect_initial_experience_mode : bool
-        Whether the agent is collecting initial experience through exploration. Defaults to True.
+        Whether the agent is collecting initial experience through exploration. Only enabled by
+        algorithms that use exploration noise. Defaults to False.
 
     Args
     ----
@@ -158,7 +160,7 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
 
         ### STEP 2: RESCALE THE AGENT INPUTS AND OUTPUTS ###
 
-        actions, noise = self.get_actions(next_observation)
+        actions, noise, extra_data = self.get_actions(next_observation)
 
         costs = min_max_scale(
             scaled_costs.cpu().numpy(),
@@ -226,12 +228,14 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
 
         if self.learning_mode:
             self.learning_role.add_actions_to_cache(
-                units_operator.id, start, actions, noise
+                units_operator.id, start, actions, noise, extra_data
             )
 
         return bids
 
-    def get_actions(self, next_observation: th.Tensor) -> tuple[th.Tensor, th.Tensor]:
+    def get_actions(
+        self, next_observation: th.Tensor
+    ) -> tuple[th.Tensor, th.Tensor, dict[str, object] | None]:
         """
         Compute actions based on the current observation.
 
@@ -245,6 +249,8 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
             A tuple containing: Actions to be taken (with or without noise). The noise component (if any), useful for diagnostics.
             The output action is a list of bid prices for flexible generation.
             Output is scaled to the range [-1, 1].
+        dict | None
+            Extra per-action data to cache, passed through unchanged from the parent implementation.
 
         Notes
         -----
@@ -254,7 +260,7 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         """
 
         # Get the base action and associated noise from the parent implementation
-        curr_action, noise = super().get_actions(next_observation)
+        curr_action, noise, extra_data = super().get_actions(next_observation)
 
         if self.learning_mode and not self.evaluation_mode:
             # Sample actions according to the forecasted residual load
@@ -265,7 +271,7 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
                     curr_action, self.actor.min_output, self.actor.max_output
                 )
 
-        return curr_action, noise
+        return curr_action, noise, extra_data
 
     def prepare_observations(self, units_operator, market_id):
         total_capacity = self.total_capacity(units_operator)

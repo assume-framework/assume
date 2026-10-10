@@ -3,8 +3,9 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+import warnings
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import InitVar, dataclass, field
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -755,6 +756,125 @@ class BaseStrategy:
         unit.forecaster.update(*args, **kwargs)
 
 
+# Algorithm category mapping
+ALGORITHM_CATEGORIES = {
+    "mappo": "on-policy",
+    "matd3": "off-policy",
+    "maddpg": "off-policy",
+}
+
+
+def is_on_policy(algorithm_name: str) -> bool:
+    """Check if algorithm is on-policy."""
+    return ALGORITHM_CATEGORIES.get(algorithm_name) == "on-policy"
+
+
+def is_off_policy(algorithm_name: str) -> bool:
+    """Check if algorithm is off-policy."""
+    return ALGORITHM_CATEGORIES.get(algorithm_name) == "off-policy"
+
+
+@dataclass
+class OffPolicyConfig:
+    """
+    Configuration for off-policy algorithms (MATD3/MADDPG) hyperparameters.
+
+    These parameters control the off-policy actor-critic algorithm behavior such as delayed policy updates,
+    target network updates, and exploration noise.
+
+    Parameters:
+        episodes_collecting_initial_experience (int): The number of episodes at the start during which random
+            actions are chosen instead of using the actor network. Default is 5.
+        gradient_steps (int): The number of gradient descent steps performed during each training update. Default is 100.
+        replay_buffer_size (int): The maximum number of transitions stored in the replay buffer. Default is 50000.
+        policy_delay (int): The frequency (in gradient steps) at which the actor policy is updated.
+            Some algorithms update the critic more frequently than the actor to stabilize training. Default is 2.
+        noise_sigma (float): The standard deviation of the Ornstein-Uhlenbeck or Gaussian noise distribution
+            used to generate exploration noise added to actions. Default is 0.1.
+        noise_scale (int): The scale factor multiplied by the noise drawn from the distribution.
+            Larger values increase exploration. Default is 1.
+        noise_dt (int): The time step parameter for the Ornstein-Uhlenbeck process, which determines how
+            quickly the noise decays over time. Used for noise scheduling. Default is 1.
+        action_noise_schedule (str | None): Which action noise decay schedule to use. Currently only "linear"
+            decay is available, which linearly decreases exploration noise over training. Default is "linear".
+        tau (float): The soft update coefficient for updating target networks. Controls how slowly target
+            networks track the main networks. Smaller values mean slower updates. Default is 0.005.
+        target_policy_noise (float): The standard deviation of noise added to target policy actions during
+            critic updates. This smoothing helps prevent overfitting to narrow policy peaks. Default is 0.2.
+        target_noise_clip (float): The maximum absolute value for clipping the target policy noise.
+            Prevents the noise from being too large. Default is 0.5.
+    """
+
+    episodes_collecting_initial_experience: int = 5
+    gradient_steps: int = 100
+    noise_dt: int = 1
+    noise_scale: int = 1
+    noise_sigma: float = 0.1
+    action_noise_schedule: str | None = None
+    policy_delay: int = 2
+    tau: float = 0.005
+    target_policy_noise: float = 0.2
+    target_noise_clip: float = 0.5
+    replay_buffer_size: int = 50000
+
+    def __post_init__(self):
+        # if we do not have initial experience collected we will get an error as no samples are available on the
+        # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
+        if self.episodes_collecting_initial_experience < 1:
+            logger.warning(
+                f"episodes_collecting_initial_experience need to be at least 1 to sample from buffer, got {self.episodes_collecting_initial_experience}. setting to 1"
+            )
+
+            self.episodes_collecting_initial_experience = 1
+
+        # check that gradient_steps is positive
+        if self.gradient_steps <= 0:
+            raise ValueError(
+                f"gradient_steps need to be positive, got {self.gradient_steps}"
+            )
+
+
+@dataclass
+class OnPolicyConfig:
+    """
+    Configuration for on-policy algorithms (PPO/MAPPO) hyperparameters.
+
+    These parameters control the PPO algorithm behavior such as clipping ranges,
+    number of optimization epochs, and loss coefficients.
+
+    Parameters:
+        clip_ratio (float): The clipping ratio for the PPO surrogate objective. Default is 0.1.
+        clip_range_vf (float | None): The clipping range for PPO value updates. Disabled by default.
+        entropy_coef (float): Coefficient for entropy term in loss. Default is 0.01.
+        gae_lambda (float): Lambda parameter for Generalized Advantage Estimation (GAE). Default is 0.95.
+        max_grad_norm (float): Maximum gradient norm for clipping. Default is 0.5.
+        vf_coef (float): Coefficient for value function term in loss. Default is 0.5.
+        n_epochs (int): Number of optimization epochs per rollout. Default is 10.
+        action_std_init (float): Initial Gaussian standard deviation before tanh squashing.
+            Remains learnable during training. Default is 1.0.
+    """
+
+    clip_ratio: float = 0.1
+    clip_range_vf: float | None = None
+    entropy_coef: float = 0.01
+    gae_lambda: float = 0.95
+    max_grad_norm: float = 0.5
+    vf_coef: float = 0.5
+    n_epochs: int = 10
+    action_std_init: float = 1.0
+
+    def __post_init__(self):
+        if not np.isfinite(self.action_std_init) or self.action_std_init <= 0:
+            raise ValueError("action_std_init must be finite and greater than zero")
+
+
+class _Unset:
+    """Distinguishing missing legacy arguments from an explicitly supplied None"""
+
+
+_UNSET = _Unset()
+
+
 @dataclass
 class LearningConfig:
     """
@@ -779,9 +899,6 @@ class LearningConfig:
 
         device (str): The device to use for PyTorch computations. Options include "cpu", "cuda", or specific
             CUDA devices like "cuda:0". Default is "cpu".
-        episodes_collecting_initial_experience (int): The number of episodes at the start during which random
-            actions are chosen instead of using the actor network. This helps populate the replay buffer with
-            diverse experiences. Default is 5.
         exploration_noise_std (float): The standard deviation of Gaussian noise added to actions during
             exploration in the environment. Higher values encourage more exploration. Default is 0.2.
         training_episodes (int): The number of training episodes, where one episode is the entire simulation
@@ -793,8 +910,6 @@ class LearningConfig:
         batch_size (int): The batch size of experiences sampled from the replay buffer for each training update.
             Larger batches provide more stable gradients but require more memory. In environments with many leanring agents we advise small batch sizes.
             Default is 128.
-        gradient_steps (int): The number of gradient descent steps performed during each training update.
-            More steps can lead to better learning but increase computation time. Default is 100.
         learning_rate (float): The learning rate (step size) for the optimizer, which controls how much the
             policy and value networks are updated during training. Default is 0.001.
         learning_rate_schedule (str | None): Which learning rate decay schedule to use. Currently only "linear"
@@ -806,33 +921,18 @@ class LearningConfig:
             early stopping. If the reward improvement is less than this threshold over early_stopping_steps,
             training is terminated early. Default is 0.05. Only available if early_stopping_steps is set.
 
-        algorithm (str): Specifies which reinforcement learning algorithm to use. Currently, only "matd3"
-            (Multi-Agent Twin Delayed Deep Deterministic Policy Gradient) is implemented. Default is "matd3".
-        replay_buffer_size (int): The maximum number of transitions stored in the replay buffer for experience replay.
-            Larger buffers allow for more diverse training samples. Default is 500000.
+        algorithm (str): Specifies which reinforcement learning algorithm to use. Options include "matd3"
+            (Multi-Agent Twin Delayed Deep Deterministic Policy Gradient), "maddpg" (Multi-Agent Deep Deterministic Policy Gradient), and "mappo" (Multi-Agent Proximal Policy Optimization). Default is "matd3".
         gamma (float): The discount factor for future rewards, ranging from 0 to 1. Higher values give more
             weight to long-term rewards in decision-making. Default is 0.99.
         actor_architecture (str): The architecture of the neural networks used for the actors. Options include
             "mlp" (Multi-Layer Perceptron) and "lstm" (Long Short-Term Memory). Default is "mlp".
-        policy_delay (int): The frequency (in gradient steps) at which the actor policy is updated.
-            TD3 updates the critic more frequently than the actor to stabilize training. Default is 2.
-        noise_sigma (float): Standard deviation of the Gaussian exploration noise added to the actor's actions.
-            The effective noise std is noise_sigma * noise_scale * noise_dt. Default is 0.1.
-        noise_scale (float): Constant factor multiplied onto the sampled noise. Larger values increase exploration.
-            Default is 1.
-        noise_dt (float): Noise multiplier that is subject to the action noise schedule. With
-            action_noise_schedule="linear" it decays linearly from noise_dt to 0 over the training episodes;
-            with None it stays constant at noise_dt.
-            Default is 1.
-        action_noise_schedule (str | None): Which action noise decay schedule to use. Currently only "linear"
-            is available, which linearly decreases noise_dt (and with it the exploration noise) to 0 over training.
-            Default is None (constant exploration noise).
-        tau (float): The soft update coefficient for updating target networks. Controls how slowly target
-            networks track the main networks. Smaller values mean slower updates. Default is 0.005.
-        target_policy_noise (float): The standard deviation of noise added to target policy actions during
-            critic updates. This smoothing helps prevent overfitting to narrow policy peaks. Default is 0.2.
-        target_noise_clip (float): The maximum absolute value for clipping the target policy noise.
-            Prevents the noise from being too large. Default is 0.5.
+        critic_hidden_sizes (list[int] | None): Hidden layer widths for the centralized critic.
+            If None, the width is chosen from the number of agents. Default is None.
+        seed (int | None): Seed for rollout sampling. Replay sampling uses the global NumPy stream, which the study-case seed already sets. Copied from the study-case seed when omitted. Default is None.
+
+        off_policy (OffPolicyConfig): Nested configuration for off-policy algorithms (MATD3/MADDPG) hyperparameters.
+        on_policy (OnPolicyConfig): Nested configuration for on-policy algorithms (PPO/MAPPO) hyperparameters.
 
     """
 
@@ -846,45 +946,97 @@ class LearningConfig:
     max_bid_price: float | None = 100.0
 
     device: str = "cpu"
-    episodes_collecting_initial_experience: int = 5
     exploration_noise_std: float = 0.2
     training_episodes: int = 100
     validation_episodes_interval: int = 5
     train_freq: str = "24h"
     batch_size: int = 128
-    gradient_steps: int = 100
     learning_rate: float = 0.001
     learning_rate_schedule: str | None = None
     early_stopping_steps: int | None = None
     early_stopping_threshold: float = 0.05
 
     algorithm: str = "matd3"
-    replay_buffer_size: int = 50000
     gamma: float = 0.99
     actor_architecture: str = "mlp"
-    policy_delay: int = 2
-    noise_sigma: float = 0.1
-    noise_scale: int = 1
-    noise_dt: int = 1
-    action_noise_schedule: str | None = None
-    tau: float = 0.005
-    target_policy_noise: float = 0.2
-    target_noise_clip: float = 0.5
+    critic_hidden_sizes: list[int] | None = None
+    seed: int | None = None
 
-    def __post_init__(self):
-        # if we do not have initial experience collected we will get an error as no samples are available on the
-        # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
-        if self.episodes_collecting_initial_experience < 1:
-            logger.warning(
-                f"episodes_collecting_initial_experience need to be at least 1 to sample from buffer, got {self.episodes_collecting_initial_experience}. setting to 1"
+    # Nested algorithm configurations
+    # Keeping the supplied keys until merging the legacy settings
+    off_policy: OffPolicyConfig | dict = field(default_factory=dict)
+    on_policy: OnPolicyConfig = field(default_factory=OnPolicyConfig)
+
+    # Accepting legacy settings during initialization without storing them twice
+    episodes_collecting_initial_experience: InitVar[int | _Unset] = _UNSET
+    gradient_steps: InitVar[int | _Unset] = _UNSET
+    noise_sigma: InitVar[float | _Unset] = _UNSET
+    noise_scale: InitVar[int | _Unset] = _UNSET
+    noise_dt: InitVar[int | _Unset] = _UNSET
+    action_noise_schedule: InitVar[str | None | _Unset] = _UNSET
+    tau: InitVar[float | _Unset] = _UNSET
+    policy_delay: InitVar[int | _Unset] = _UNSET
+    target_policy_noise: InitVar[float | _Unset] = _UNSET
+    target_noise_clip: InitVar[float | _Unset] = _UNSET
+    replay_buffer_size: InitVar[int | _Unset] = _UNSET
+
+    def __post_init__(
+        self,
+        episodes_collecting_initial_experience,
+        gradient_steps,
+        noise_sigma,
+        noise_scale,
+        noise_dt,
+        action_noise_schedule,
+        tau,
+        policy_delay,
+        target_policy_noise,
+        target_noise_clip,
+        replay_buffer_size,
+    ):
+        """Migrating legacy settings and preparing nested configs with their defaults"""
+        legacy_values = {
+            "episodes_collecting_initial_experience": episodes_collecting_initial_experience,
+            "gradient_steps": gradient_steps,
+            "noise_sigma": noise_sigma,
+            "noise_scale": noise_scale,
+            "noise_dt": noise_dt,
+            "action_noise_schedule": action_noise_schedule,
+            "tau": tau,
+            "policy_delay": policy_delay,
+            "target_policy_noise": target_policy_noise,
+            "target_noise_clip": target_noise_clip,
+            "replay_buffer_size": replay_buffer_size,
+        }
+        legacy_values = {
+            key: value for key, value in legacy_values.items() if value is not _UNSET
+        }
+        if legacy_values:
+            warnings.warn(
+                f"The following learning_config fields must now be placed under 'off_policy': {', '.join(sorted(legacy_values))}. Top-level support is deprecated.",
+                DeprecationWarning,
+                stacklevel=3,
             )
 
-            self.episodes_collecting_initial_experience = 1
+        if isinstance(self.off_policy, dict):
+            # Merging before creating the config so legacy values are also validated
+            self.off_policy = OffPolicyConfig(**(legacy_values | self.off_policy))
+        elif not isinstance(self.off_policy, OffPolicyConfig):
+            raise TypeError("off_policy must be a dict or OffPolicyConfig instance")
+        # Keeping all values from an existing OffPolicyConfig over legacy settings
+        if isinstance(self.on_policy, dict):
+            self.on_policy = OnPolicyConfig(**self.on_policy)
 
-        # check that gradient_steps is positive
-        if self.gradient_steps <= 0:
+        if self.off_policy.episodes_collecting_initial_experience < 1:
+            logger.warning(
+                "episodes_collecting_initial_experience need to be at least 1 to sample from buffer, got %s. setting to 1",
+                self.off_policy.episodes_collecting_initial_experience,
+            )
+            self.off_policy.episodes_collecting_initial_experience = 1
+
+        if self.off_policy.gradient_steps <= 0:
             raise ValueError(
-                f"gradient_steps need to be positive, got {self.gradient_steps}"
+                f"gradient_steps need to be positive, got {self.off_policy.gradient_steps}"
             )
 
 
@@ -927,6 +1079,7 @@ class LearningStrategy(BaseStrategy):
         # access to the learning_role that orchestrates learning
         self.learning_role = learning_role
         self.learning_config = learning_role.learning_config
+        self.algorithm = self.learning_config.algorithm
 
         self.foresight = foresight
         self.act_dim = act_dim
