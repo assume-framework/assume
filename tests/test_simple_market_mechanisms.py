@@ -108,9 +108,10 @@ def test_market_pay_as_clear():
 
     """
     Create Orderbook with constant order volumes and prices:
-        - dem1: volume = -1000, price = 3000
-        - gen1: volume = 1000, price = 100
-        - gen2: volume = 900, price = 50
+        - dem1: volume = -400, price = 3000
+        - dem2: volume = -100, price = 3000
+        - gen1: volume = 300, price = 100
+        - gen2: volume = 200, price = 50
     """
     orderbook = extend_orderbook(products, -400, 3000)
     orderbook = extend_orderbook(products, -100, 3000, orderbook)
@@ -175,9 +176,10 @@ def test_market_pay_as_clears_single_demand_more_generation():
 
     """
     Create Orderbook with constant order volumes and prices:
-        - dem1: volume = -1000, price = 3000
-        - gen1: volume = 1000, price = 100
-        - gen2: volume = 900, price = 50
+        - dem1: volume = -400, price = 3000
+        - gen1: volume = 300, price = 100
+        - gen2: volume = 200, price = 50
+        - gen3: volume = 230, price = 60
     """
     orderbook = extend_orderbook(products, -400, 3000)
     orderbook = extend_orderbook(products, 300, 100, orderbook)
