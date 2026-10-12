@@ -9,7 +9,11 @@ from dateutil import rrule as rr
 
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
-from assume.markets.clearing_algorithms import PayAsClearRole, PayAsBidRole, clearing_mechanisms
+from assume.markets.clearing_algorithms import (
+    PayAsBidRole,
+    PayAsClearRole,
+    clearing_mechanisms,
+)
 
 from .utils import create_orderbook, extend_orderbook
 
@@ -197,6 +201,7 @@ def test_market_pay_as_clears_single_demand_more_generation():
     assert meta[0]["price"] == 60
     assert accepted[0]["volume"] == -400
     assert accepted[0]["accepted_volume"] == -400
+
 
 def test_market_pay_as_bid_supply_scarcity():
     next_opening = simple_dayahead_auction_config.opening_hours.after(
