@@ -130,7 +130,7 @@ def test_market_pay_as_clear():
         assert bid["volume"] == bid["accepted_volume"]
 
 
-def test_market_pay_as_clears_single_demand():
+def test_market_pay_as_clears_single_demand_is_price_setting():
     next_opening = simple_dayahead_auction_config.opening_hours.after(
         datetime(2005, 6, 1)
     )
@@ -141,9 +141,11 @@ def test_market_pay_as_clears_single_demand():
 
     """
     Create Orderbook with constant order volumes and prices:
-        - dem1: volume = -1000, price = 3000
-        - gen1: volume = 1000, price = 100
-        - gen2: volume = 900, price = 50
+        - dem1: volume = -700, price = 3000
+        - gen1: volume = 300, price = 100
+        - gen2: volume = 200, price = 50
+    Supply cannot serve demand and therefore the last accepted demand order sets the price.
+    The accepted volume of the last accepted demand order is reduced to match the supply volume.
     """
     orderbook = extend_orderbook(products, -700, 3000)
     orderbook = extend_orderbook(products, 300, 100, orderbook)
@@ -157,7 +159,7 @@ def test_market_pay_as_clears_single_demand():
     assert len(rejected) == 0
     assert meta[0]["supply_volume"] == 500
     assert meta[0]["demand_volume"] == 500
-    assert meta[0]["price"] == 100
+    assert meta[0]["price"] == 3000
     assert accepted[0]["volume"] == -700
     assert accepted[0]["accepted_volume"] == -500
 
