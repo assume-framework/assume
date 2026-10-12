@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 # "" means no CSV files will be stored
 csv_path = ""
 
-os.makedirs("./examples/local_db", exist_ok=True)
+#os.makedirs("./examples/local_db", exist_ok=True)
 
 scenario = {
     "simple": {"scenario": "simple", "study_case": "base_case"},
@@ -83,7 +83,7 @@ if __name__ == "__main__":
 
     data_format = "timescale"  # "local_db" or "timescale"
 
-    example = "simple_with_storage_10demand-steps_cc_24h"  # "simple", "simple_complex", "simple_with_storage", "simple_with_storage_complex", "stylized"
+    example = "simple"  # "simple", "simple_complex", "simple_with_storage", "simple_with_storage_complex", "stylized"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
