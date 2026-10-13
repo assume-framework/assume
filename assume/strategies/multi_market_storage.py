@@ -68,6 +68,10 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
             Defaults to 0.1.
         solver_name (str, optional): The name of the solver to use. Defaults
             to the first available of appsi_highs, gurobi, glpk, cbc, cplex.
+        capacity_price_fallback (str | float, optional): Price for capacity
+            markets without a dedicated price forecast. Either the market id
+            of another market (uses its forecast) or a flat price. Defaults
+            to 0.
         **kwargs: Additional keyword arguments, including the bidding
             parameters of the world.
     """
@@ -78,6 +82,10 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
         self.foresight = parse_duration(kwargs.get("foresight", "24h"))
         self.price_epsilon = float(kwargs.get("price_epsilon", 0.1))
         self.solver_name = kwargs.get("solver_name", None)
+        # fallback price for capacity markets without a price forecast:
+        # a market id (str) to use the forecast of that market, or a flat
+        # price (number). Defaults to zero.
+        self.capacity_price_fallback = kwargs.get("capacity_price_fallback", 0.0)
 
         # discovered markets - filled on first calculate_bids call
         self.markets: dict[str, MarketInfo] | None = None
@@ -115,9 +123,11 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
         """
         Returns the price forecast of a market for the given time range.
 
-        Falls back to the EOM price forecast for energy-type markets if no
-        dedicated forecast exists. Capacity markets without a forecast are
-        priced at zero.
+        Energy-type markets fall back to the EOM price forecast if no
+        dedicated forecast exists. Capacity markets without a dedicated
+        forecast use the `capacity_price_fallback`: either the price forecast
+        of another market (given as market id) or a flat price (given as
+        number). Defaults to zero.
 
         Args:
             unit (SupportsMinMaxCharge): The storage unit.
@@ -135,7 +145,13 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
             # energy-type markets fall back to the EOM price forecast
             price_series = unit.forecaster.price.get("EOM")
         if price_series is None:
-            # capacity markets without forecast are priced at zero
+            # capacity markets use the configured fallback
+            fallback = self.capacity_price_fallback
+            if isinstance(fallback, str):
+                price_series = unit.forecaster.price.get(fallback)
+            elif fallback:
+                return np.full(1, float(fallback))
+        if price_series is None:
             return np.zeros(1)
 
         # the end of the range is exclusive, the last index step is included
