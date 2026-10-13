@@ -1,0 +1,10 @@
+name,technology,bidding_EOM,bidding_CRM_pos,bidding_CRM_neg,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,unit_operator
+Wind Onshore,wind_onshore,powerplant_energy_naive,,,renewable,0.0,2500.0,0.0,1.0,0.0,vre_operator
+Wind Offshore,wind_offshore,powerplant_energy_naive,,,renewable,0.0,400.0,0.0,1.0,0.0,vre_operator
+Solar,solar,powerplant_energy_naive,,,renewable,0.0,2500.0,0.0,1.0,0.0,vre_operator
+Hydro,hydro,powerplant_energy_naive,,,renewable,0.0,250.0,0.0,1.0,0.0,vre_operator
+Biomass,biomass,powerplant_energy_naive,,,biomass,0.0,400.0,0.0,1.0,0.0,vre_operator
+Unit 1,nuclear,powerplant_energy_heuristic_block,powerplant_capacity_heuristic_balancing_pos,powerplant_capacity_heuristic_balancing_neg,uranium,0.0,1000.0,200.0,0.3,10.3,Operator 1
+Unit 2,lignite,powerplant_energy_heuristic_linked,powerplant_capacity_heuristic_balancing_pos,powerplant_capacity_heuristic_balancing_neg,lignite,0.4,1000.0,200.0,0.5,1.65,Operator 2
+Unit 3,hard coal,powerplant_energy_heuristic_flexable,powerplant_capacity_heuristic_balancing_pos,powerplant_capacity_heuristic_balancing_neg,hard coal,0.3,1000.0,200.0,0.4,1.3,Operator 3
+Unit 4,combined cycle gas turbine,powerplant_energy_heuristic_flexable,powerplant_capacity_heuristic_balancing_pos,powerplant_capacity_heuristic_balancing_neg,natural gas,0.2,1000.0,200.0,0.6,3.5,Operator 4

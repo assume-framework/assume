@@ -175,6 +175,13 @@ industry_capacity_heuristic_balancing_neg    CRM_neg             A negative capa
 industry_capacity_heuristic_balancing_pos    CRM_pos             A positive capacity strategy of a Industry DSM unit. The bid volume is the optimal power requirement of the optimization.
 powerplant_energy_optimization_dmas          EOM                 Power plant strategy using forecast optimization and avoided cost calculation used for smart bids coming from the DMAS methodology
 storage_energy_optimization_dmas             EOM                 Storage strategy using forecasts and avoided cost calculation used for smart bids coming from the DMAS methodology
+storage_multi_market_optimization            all                 Generic multi-market strategy for Storage units. Discovers all markets of the world where the unit is
+                                                                 eligible at simulation start and optimizes the storage operation over a user-defined foresight window
+                                                                 across all of them at once. The objective maximizes the expected profit over all markets using the price
+                                                                 forecasts of the unit; constraints are the SoC dynamics and limits, the charge/discharge power limits,
+                                                                 the coupling between the markets (sum of all commitments per delivery period respects the power limits)
+                                                                 and balancing energy bids bounded by the balancing capacity commitments. Bids into a market are extracted
+                                                                 from the shared optimization plan whenever the market opens. Requires a solver (HiGHS by default).
 ===========================================  ==================  ============
 
 Optimization method API references:
@@ -183,6 +190,7 @@ Optimization method API references:
 - :py:meth:`assume.strategies.naive_strategies.DsmCapacityHeuristicBalancingStrategy`
 - :py:meth:`assume.strategies.dmas_powerplant.EnergyOptimizationDmasStrategy`
 - :py:meth:`assume.strategies.dmas_storage.StorageEnergyOptimizationDmasStrategy`
+- :py:meth:`assume.strategies.multi_market_storage.MultiMarketStorageStrategy`
 
 Learning
 --------
