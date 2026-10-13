@@ -83,6 +83,27 @@ def price_profile(periods: int = 48) -> np.ndarray:
     return prices
 
 
+def apply_plan(storage: Storage, strategy: MultiMarketStorageStrategy, until: datetime):
+    """
+    Simulates the market clearing the plan's bids up to `until` (exclusive),
+    as the unit's set_dispatch_plan would: the energy flows are written to
+    the unit outputs and the SoC is updated accordingly.
+    """
+    soc = storage.outputs["soc"].at[storage.index[0]] * storage.capacity
+    for (_, start, _), entry in sorted(strategy._cache_solution.items()):
+        if start >= until:
+            continue
+        net = entry.get("sell", 0) - entry.get("buy", 0)
+        storage.outputs["energy"].at[start] = net
+        if net > 0:
+            soc -= net / storage.efficiency_discharge
+        else:
+            soc += -net * storage.efficiency_charge
+        next_t = start + storage.index.freq
+        if next_t in storage.index:
+            storage.outputs["soc"].at[next_t] = soc / storage.capacity
+
+
 @pytest.fixture
 def eom_storage():
     index = pd.date_range("2022-01-01", periods=48, freq="h")
@@ -133,7 +154,8 @@ def test_soc_constraints_respected(eom_storage):
             soc -= net / storage.efficiency_discharge
         else:
             soc += -net * storage.efficiency_charge
-        assert 0 <= soc <= storage.capacity
+        # small numerical tolerance for the LP solution
+        assert -1e-6 <= soc <= storage.capacity + 1e-6
 
 
 def test_power_limit_respected(eom_storage):
@@ -159,7 +181,7 @@ def test_caching(eom_storage):
     strategy.calculate_bids(
         storage, mc, product_tuples=[(datetime(2022, 1, 1, 1), datetime(2022, 1, 1, 2), None)]
     )
-    fingerprint = strategy._cache_fingerprint
+    plan_time = strategy._plan_time
 
     # a second market opening at the same decision time reuses the plan
     mc2 = make_market_config("EOM_2")
@@ -167,7 +189,7 @@ def test_caching(eom_storage):
     strategy.calculate_bids(
         storage, mc2, product_tuples=[(datetime(2022, 1, 1, 1), datetime(2022, 1, 1, 2), None)]
     )
-    assert strategy._cache_fingerprint == fingerprint
+    assert strategy._plan_time == plan_time
 
 
 def test_multi_market_coupling():
@@ -273,3 +295,131 @@ def test_infeasible_horizon_returns_no_bids():
         product_tuples=[(datetime(2022, 1, 2, 1), datetime(2022, 1, 2, 2), None)],
     )
     assert bids == []
+
+
+@pytest.fixture
+def rolling_storage():
+    index = pd.date_range("2022-01-01", periods=48, freq="h")
+    strategy = MultiMarketStorageStrategy(foresight="24h", overlap="12h")
+    storage = make_storage({"EOM": price_profile()}, index, {"EOM": strategy})
+    storage.available_markets = [make_market_config("EOM")]
+    return storage, strategy
+
+
+def test_rolling_horizon_plan_reuse(rolling_storage):
+    """Within the overlap period, the plan is reused instead of re-optimized."""
+    storage, strategy = rolling_storage
+    mc = storage.available_markets[0]
+
+    # first opening at 00:00 optimizes over the 24h foresight
+    strategy.calculate_bids(
+        storage, mc, product_tuples=[(datetime(2022, 1, 1, 1), datetime(2022, 1, 1, 2), None)]
+    )
+    assert strategy._plan_time == datetime(2022, 1, 1)
+    assert strategy._plan_valid_until == datetime(2022, 1, 1, 12)
+    solution = strategy._cache_solution
+
+    # the market clears the plan's bids for the first hours
+    apply_plan(storage, strategy, until=datetime(2022, 1, 1, 7))
+
+    # an opening 6h later is within the overlap: the plan is reused
+    strategy.calculate_bids(
+        storage, mc, product_tuples=[(datetime(2022, 1, 1, 7), datetime(2022, 1, 1, 8), None)]
+    )
+    assert strategy._cache_solution is solution
+    assert strategy._plan_time == datetime(2022, 1, 1)
+
+    # an opening 12h later is beyond the overlap: re-optimization
+    apply_plan(storage, strategy, until=datetime(2022, 1, 1, 13))
+    strategy.calculate_bids(
+        storage, mc, product_tuples=[(datetime(2022, 1, 1, 13), datetime(2022, 1, 1, 14), None)]
+    )
+    assert strategy._cache_solution is not solution
+    assert strategy._plan_time == datetime(2022, 1, 1, 12)
+    assert strategy._plan_valid_until == datetime(2022, 1, 2)
+
+
+def test_rolling_horizon_energy_value(rolling_storage):
+    """
+    Energy at the end of the used window keeps its value.
+
+    The peak price is in hour 18, beyond the 12h overlap. Without a terminal
+    condition, the storage must not dump its energy within the first 12h -
+    the optimization sees the peak in the later hours of the foresight
+    window and keeps the energy for it.
+    """
+    storage, strategy = rolling_storage
+    mc = storage.available_markets[0]
+
+    # opening at 00:00: bids are only taken for the first 12 hours
+    strategy.calculate_bids(
+        storage, mc, product_tuples=[(datetime(2022, 1, 1, 1), datetime(2022, 1, 1, 2), None)]
+    )
+
+    # net energy flow within the used window (hours 1-12, cheap at 20 EUR)
+    solution = strategy._cache_solution
+    net = sum(
+        entry.get("sell", 0) - entry.get("buy", 0)
+        for (_, start, _), entry in solution.items()
+        if start < datetime(2022, 1, 1, 12)
+    )
+    # the storage charges (or does nothing) - it does not dump its energy
+    assert net <= 0
+
+    # the plan still contains the discharge for the peak beyond the overlap
+    peak_net = sum(
+        entry.get("sell", 0) - entry.get("buy", 0)
+        for (_, start, _), entry in solution.items()
+        if start.hour == 18
+    )
+    assert peak_net > 0
+
+
+def test_terminal_condition_option():
+    """With terminal_condition=True, the plan ends with at least the current SoC."""
+    index = pd.date_range("2022-01-01", periods=48, freq="h")
+    strategy = MultiMarketStorageStrategy(foresight="24h", terminal_condition=True)
+    storage = make_storage({"EOM": price_profile()}, index, {"EOM": strategy})
+    storage.available_markets = [make_market_config("EOM")]
+    mc = storage.available_markets[0]
+
+    strategy.calculate_bids(
+        storage, mc, product_tuples=[(datetime(2022, 1, 1, 1), datetime(2022, 1, 1, 2), None)]
+    )
+
+    # the planned SoC at the end of the horizon is not below the current SoC
+    planned_soc = strategy._plan_soc
+    current_soc = storage.initial_soc * storage.capacity
+    horizon_end = max(times for times in planned_soc)
+    assert planned_soc[horizon_end] >= current_soc - 1e-6
+
+
+def test_reoptimization_on_soc_deviation(rolling_storage):
+    """A deviation of the actual SoC from the plan triggers re-optimization."""
+    storage, strategy = rolling_storage
+    mc = storage.available_markets[0]
+
+    strategy.calculate_bids(
+        storage, mc, product_tuples=[(datetime(2022, 1, 1, 1), datetime(2022, 1, 1, 2), None)]
+    )
+    solution = strategy._cache_solution
+
+    # the market clears the plan's bids for the first hours
+    apply_plan(storage, strategy, until=datetime(2022, 1, 1, 7))
+
+    # an opening within the overlap reuses the plan
+    strategy.calculate_bids(
+        storage, mc, product_tuples=[(datetime(2022, 1, 1, 7), datetime(2022, 1, 1, 8), None)]
+    )
+    assert strategy._cache_solution is solution
+
+    # now the actual SoC deviates from the planned trajectory (e.g. because
+    # the market clamped the accepted volume)
+    decision_time = datetime(2022, 1, 1, 6)  # the opening time of the market
+    planned_soc = strategy._plan_soc[decision_time]
+    storage.outputs["soc"].at[decision_time] = planned_soc / storage.capacity + 0.1
+
+    strategy.calculate_bids(
+        storage, mc, product_tuples=[(datetime(2022, 1, 1, 7), datetime(2022, 1, 1, 8), None)]
+    )
+    assert strategy._cache_solution is not solution

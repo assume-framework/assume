@@ -177,11 +177,16 @@ powerplant_energy_optimization_dmas          EOM                 Power plant str
 storage_energy_optimization_dmas             EOM                 Storage strategy using forecasts and avoided cost calculation used for smart bids coming from the DMAS methodology
 storage_multi_market_optimization            all                 Generic multi-market strategy for Storage units. Discovers all markets of the world where the unit is
                                                                  eligible at simulation start and optimizes the storage operation over a user-defined foresight window
-                                                                 across all of them at once. The objective maximizes the expected profit over all markets using the price
-                                                                 forecasts of the unit; constraints are the SoC dynamics and limits, the charge/discharge power limits,
-                                                                 the coupling between the markets (sum of all commitments per delivery period respects the power limits)
-                                                                 and balancing energy bids bounded by the balancing capacity commitments. Bids into a market are extracted
-                                                                 from the shared optimization plan whenever the market opens. Requires a solver (HiGHS by default).
+                                                                 across all of them at once. The optimization follows a rolling horizon: the plan is optimized over
+                                                                 the foresight window but only used for a configurable overlap period (by default until the next
+                                                                 market opening) before it is re-optimized over the shifted window - as the optimization sees beyond
+                                                                 the end of the used plan, stored energy keeps its value for the planned future dispatch. The
+                                                                 objective maximizes the expected profit over all markets using the price forecasts of the unit;
+                                                                 constraints are the SoC dynamics and limits, the charge/discharge power limits, the coupling between
+                                                                 the markets (sum of all commitments per delivery period respects the power limits) and balancing
+                                                                 energy bids bounded by the balancing capacity commitments. An optional terminal condition can require
+                                                                 the plan to end with at least the currently stored energy. Bids into a market are extracted from the
+                                                                 shared optimization plan whenever the market opens. Requires a solver (HiGHS by default).
 ===========================================  ==================  ============
 
 Optimization method API references:

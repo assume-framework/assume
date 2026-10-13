@@ -50,20 +50,39 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
       direction.
 
     Commitments from already cleared markets are read from the unit outputs
-    and enter the optimization as fixed parameters. The solution is cached
-    per decision time, so that multiple markets opening at the same time
-    reuse one optimization and each market only receives its own slice of
-    the shared plan.
+    and enter the optimization as fixed parameters. The optimization follows
+    a rolling horizon: the plan is optimized over the foresight window, but
+    only used for a shorter overlap period (by default until the next market
+    opening). Afterwards, the storage is re-optimized over a shifted foresight
+    window. As the optimization sees beyond the end of the used plan, the
+    stored energy keeps its value for the planned future dispatch instead of
+    being dumped at the end of the used window. Multiple markets opening at
+    the same time reuse one optimization and each market only receives its
+    own slice of the shared plan.
 
     Attributes:
-        foresight (datetime.timedelta): The user-defined foresight window for
-            the optimization.
+        foresight (datetime.timedelta): The optimization horizon: how far
+            ahead the storage operation is optimized.
+        overlap (datetime.timedelta): How long the optimization plan is used
+            before it is re-optimized (rolling horizon). Defaults to zero,
+            i.e. re-optimization at every market opening.
+        terminal_condition (bool): Whether the optimization must end the
+            horizon with at least the energy currently stored. Defaults to
+            False.
         price_epsilon (float): The price margin added/subtracted from the
             price forecast when setting bid prices.
 
     Args:
         foresight (str, optional): The foresight window (e.g. "24h").
             Defaults to "24h".
+        overlap (str, optional): How long the optimization plan is used
+            before re-optimizing (e.g. "12h": optimize over 24h foresight,
+            use the plan for 12h, then re-optimize over the shifted window).
+            Defaults to re-optimizing at every market opening.
+        terminal_condition (bool, optional): If True, the optimization must
+            not end the horizon with less energy than the storage currently
+            holds (prevents net energy withdrawal over the horizon).
+            Defaults to False.
         price_epsilon (float, optional): Price margin for bid prices.
             Defaults to 0.1.
         solver_name (str, optional): The name of the solver to use. Defaults
@@ -80,6 +99,10 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
         super().__init__(*args, **kwargs)
 
         self.foresight = parse_duration(kwargs.get("foresight", "24h"))
+        # rolling horizon: how long the plan is used before re-optimizing.
+        # Zero means re-optimization at every market opening.
+        self.overlap = parse_duration(kwargs.get("overlap", "0h"))
+        self.terminal_condition = bool(kwargs.get("terminal_condition", False))
         self.price_epsilon = float(kwargs.get("price_epsilon", 0.1))
         self.solver_name = kwargs.get("solver_name", None)
         # fallback price for capacity markets without a price forecast:
@@ -91,10 +114,14 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
         self.markets: dict[str, MarketInfo] | None = None
         # solver instance - created lazily to fail late if no solver exists
         self.opt = None
-        # cached optimization result: fingerprint of the last optimization
-        # and the solution mapping (market_id, start, end) -> bid quantities
-        self._cache_fingerprint: tuple | None = None
+        # cached optimization result: solution mapping
+        # (market_id, start, end) -> bid quantities
         self._cache_solution: dict[tuple, dict[str, float]] = {}
+        # rolling horizon: decision time of the last optimization, the time
+        # until which its plan is used, and the planned SoC trajectory
+        self._plan_time: datetime | None = None
+        self._plan_valid_until: datetime | None = None
+        self._plan_soc: dict[datetime, float] = {}
 
     def _discover_markets(self, unit: SupportsMinMaxCharge) -> None:
         """
@@ -205,6 +232,41 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
             fixed_charge_energy,
         )
 
+    def _needs_reoptimization(
+        self,
+        unit: SupportsMinMaxCharge,
+        decision_time: datetime,
+    ) -> bool:
+        """
+        Returns True if the cached plan is outdated and must be re-optimized.
+
+        This is the case when the actual SoC deviates from the planned
+        trajectory - e.g. because bids were rejected or only partially
+        accepted, or because activations changed the dispatch. The planned
+        trajectory already accounts for the plan's own bids, so clearing
+        them as planned does not trigger a re-optimization. Deviations of
+        capacity commitments (which do not flow energy) only make the plan
+        conservative, never infeasible, and are handled at the next
+        re-optimization.
+
+        Args:
+            unit (SupportsMinMaxCharge): The storage unit.
+            decision_time (datetime.datetime): The current decision time.
+
+        Returns:
+            bool: True if the plan must be re-optimized.
+        """
+        if not self._plan_soc:
+            return True
+
+        # if the actual SoC deviates from the planned one, the plan's future
+        # volumes may no longer be feasible
+        planned_soc = self._plan_soc.get(decision_time)
+        if planned_soc is None:
+            return True
+        actual_soc = unit.outputs["soc"].at[decision_time] * unit.capacity
+        return not np.isclose(actual_soc, planned_soc, atol=1e-6)
+
     def _optimize(
         self,
         unit: SupportsMinMaxCharge,
@@ -298,7 +360,7 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
             sell_indices,
             buy_indices,
             energy_sell,
-            with_terminal=True,
+            with_terminal=self.terminal_condition,
         )
 
         # objective: maximize the expected profit over all markets
@@ -320,7 +382,7 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
         model.obj = pyo.Objective(expr=pyo.quicksum(obj_terms), sense=pyo.maximize)
 
         solution = self._solve(model, windows, sell_indices, buy_indices)
-        if solution is None:
+        if solution is None and self.terminal_condition:
             # retry without the terminal condition (e.g. at the end of the
             # simulation when the horizon is truncated)
             model.constraints.deactivate()
@@ -348,8 +410,17 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
                 unit.id,
                 decision_time,
             )
+            self._plan_soc = {}
             return {}
 
+        # store the planned SoC trajectory (start-of-step values, matching
+        # the convention of the unit's soc output) to detect deviations of
+        # the actual SoC from the plan (e.g. after rejected or clamped bids)
+        planned_soc = unit.outputs["soc"].at[decision_time] * unit.capacity
+        self._plan_soc = {}
+        for i in range(n):
+            self._plan_soc[times[i]] = planned_soc
+            planned_soc = float(pyo.value(model.soc[i]))
         return solution
 
     def _build_constraints(
@@ -477,8 +548,8 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
                     )
                     constraints.add(model.buy[i] <= reserved)
 
-        # terminal condition: do not end the horizon with less energy than
-        # now (prevents myopic dumping of the stored energy)
+        # terminal condition (optional): do not end the horizon with less
+        # energy than now (prevents myopic dumping of the stored energy)
         if with_terminal and n > 0:
             constraints.add(
                 model.soc[n - 1]
@@ -525,8 +596,10 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
         Calculates the bids for the given products of the given market.
 
         On the first call, the markets of the world are discovered. The
-        optimization is run once per decision time and cached; each market
-        opening only extracts its own bids from the shared plan.
+        optimization follows a rolling horizon: the plan is optimized over
+        the foresight window and reused until the overlap period has passed
+        (by default until the next market opening). Each market opening only
+        extracts its own bids from the shared plan.
 
         Args:
             unit (SupportsMinMaxCharge): The storage unit.
@@ -556,25 +629,22 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
         )
         decision_time = min(product[0] for product in product_tuples) - first_delivery
 
-        # fingerprint to detect whether a re-optimization is needed: the
-        # decision time and the cleared commitments of the unit
-        freq = unit.index.freq
-        horizon_end = min(decision_time + self.foresight, unit.index[-1] + freq)
-        n = int((horizon_end - decision_time) / freq)
-        if n <= 0:
-            return []
-        times = [decision_time + freq * i for i in range(n)]
-        fingerprint = (
-            decision_time,
-            tuple(
-                float(np.sum(unit.outputs[product_type].loc[times[0] : times[-1]]))
-                for product_type in ("energy", "capacity_pos", "capacity_neg")
-            ),
-        )
-
-        if fingerprint != self._cache_fingerprint:
+        # rolling horizon: re-optimize when the current plan is expired
+        # (the overlap period has passed) or when the actual SoC deviated
+        # from the planned trajectory. Markets opening at the same decision
+        # time share one optimization.
+        if (
+            self._plan_time is None
+            # a later decision time beyond the plan validity re-optimizes
+            # (with overlap = 0h, every later opening re-optimizes, while
+            # markets opening at the same time share one optimization)
+            or (decision_time > self._plan_time and decision_time >= self._plan_valid_until)
+            or self._needs_reoptimization(unit, decision_time)
+        ):
             self._cache_solution = self._optimize(unit, decision_time)
-            self._cache_fingerprint = fingerprint
+            # the plan is used until the overlap period has passed
+            self._plan_time = decision_time
+            self._plan_valid_until = decision_time + self.overlap
 
         bids = []
         for product in product_tuples:
