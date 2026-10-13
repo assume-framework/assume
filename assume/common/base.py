@@ -58,6 +58,9 @@ class BaseUnit:
         self.node = node
         self.location = location
 
+        # all markets available in the world - set by the world when the unit is created
+        self.available_markets: list[MarketConfig] = []
+
         self.outputs = defaultdict(lambda: FastSeries(value=0.0, index=self.index))
         # series does not like to convert from tensor to float otherwise
 

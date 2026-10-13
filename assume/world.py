@@ -521,12 +521,15 @@ class World:
         unit_params["bidding_strategies"] = bidding_strategies
 
         # create unit within the unit operator its associated with
-        return unit_class(
+        unit = unit_class(
             id=id,
             unit_operator=unit_operator_id,
             forecaster=forecaster,
             **unit_params,
         )
+        # provide all markets of the world to the unit - needed by multi-market strategies
+        unit.available_markets = list(self.markets.values())
+        return unit
 
     def _prepare_bidding_strategies(self, unit_params, unit_id):
         """
