@@ -34,12 +34,18 @@ class MarketInfo:
             of the market. Gate closure is opening time + opening_duration.
         deliveries (list[tuple[datetime, datetime]]): The chronological
             delivery windows of the products traded at this market.
+        gate_closures (dict[tuple[datetime, datetime], datetime]): Maps each
+            delivery window (start, end) to the gate closure (i.e. the end of
+            the opening window) after which its bid is fixed.
     """
 
     market_config: MarketConfig
     product_type: str
     openings: list[datetime] = field(default_factory=list)
     deliveries: list[tuple[datetime, datetime]] = field(default_factory=list)
+    gate_closures: dict[tuple[datetime, datetime], datetime] = field(
+        default_factory=dict
+    )
 
     @property
     def market_id(self) -> str:
@@ -154,6 +160,18 @@ def discover_markets(
             product_type=market_config.product_type,
             openings=openings,
             deliveries=deliveries,
+            gate_closures={
+                (period_start, period_end): opening + market_config.opening_duration
+                for opening in openings
+                for period_start, period_end in (
+                    (
+                        opening + product.first_delivery + product.duration * i,
+                        opening + product.first_delivery + product.duration * (i + 1),
+                    )
+                    for product in market_config.market_products
+                    for i in range(product.count)
+                )
+            },
         )
 
     # sort markets by their first gate closure so that the strategy
