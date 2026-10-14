@@ -124,7 +124,15 @@ def test_single_market_arbitrage(eom_storage):
     )
     assert len(bids) == 1
     assert bids[0]["volume"] < 0  # charging
-    assert bids[0]["price"] == pytest.approx(20.1)  # price + epsilon
+    # the buy bid price follows the symmetric convention: the marginal
+    # storage value (dual of the SoC balance, here 20/eta_charge) scaled by
+    # sqrt(round-trip efficiency), widened by the deadband (price tick
+    # defaults to 0 here)
+    marginal_value = 20.0 / storage.efficiency_charge
+    expected = marginal_value * np.sqrt(
+        storage.efficiency_charge * storage.efficiency_discharge
+    )
+    assert bids[0]["price"] == pytest.approx(expected)
 
     # check the plan: discharge in the expensive hours
     solution = strategy._cache_solution
@@ -279,6 +287,90 @@ def test_price_limits_applied(eom_storage):
     )
     for bid in bids:
         assert 0 <= bid["price"] <= 30
+
+
+def test_bid_prices_from_marginal_value():
+    """
+    Bid prices follow the symmetric convention from the marginal storage
+    value (SoC balance duals) with additional costs and deadband.
+    """
+    index = pd.date_range("2022-01-01", periods=48, freq="h")
+    strategy = MultiMarketStorageStrategy(foresight="24h", deadband=0.5)
+    storage = make_storage(
+        {"EOM": price_profile()},
+        index,
+        {"EOM": strategy},
+        additional_cost_charge=1.0,
+        additional_cost_discharge=2.0,
+    )
+    storage.available_markets = [make_market_config("EOM")]
+    mc = storage.available_markets[0]
+
+    bids = strategy.calculate_bids(
+        storage, mc, product_tuples=[(datetime(2022, 1, 1, 1), datetime(2022, 1, 1, 2), None)]
+    )
+    # charging bid: value * sqrt(efficiency) - additional_cost_charge - deadband
+    # with the costs in the objective, the marginal value at a charging hour
+    # is (price + additional_cost_charge) / efficiency_charge
+    value = (20.0 + 1.0) / storage.efficiency_charge
+    eta = storage.efficiency_charge * storage.efficiency_discharge
+    expected = value * np.sqrt(eta) - 1.0 - 0.5
+    assert bids[0]["price"] == pytest.approx(expected)
+    assert bids[0]["volume"] < 0
+
+    # discharging bid: value / sqrt(efficiency) + additional_cost_discharge
+    # + deadband; with the costs in the objective, the marginal value at a
+    # discharging hour is efficiency_discharge * (price - additional_cost)
+    bids = strategy.calculate_bids(
+        storage, mc, product_tuples=[(datetime(2022, 1, 1, 12), datetime(2022, 1, 1, 13), None)]
+    )
+    assert bids[0]["volume"] > 0
+    value = storage.efficiency_discharge * (100.0 - 2.0)
+    expected = value / np.sqrt(eta) + 2.0 + 0.5
+    assert bids[0]["price"] == pytest.approx(expected)
+
+
+def test_deadband_defaults_to_price_tick():
+    """Without a configured deadband, the price tick of the market is used."""
+    index = pd.date_range("2022-01-01", periods=48, freq="h")
+    strategy = MultiMarketStorageStrategy(foresight="24h")
+    storage = make_storage({"EOM": price_profile()}, index, {"EOM": strategy})
+    mc = make_market_config("EOM", price_tick=0.1)
+    storage.available_markets = [mc]
+
+    strategy.calculate_bids(
+        storage, mc, product_tuples=[(datetime(2022, 1, 1, 1), datetime(2022, 1, 1, 2), None)]
+    )
+    # the charging bid is widened by the price tick
+    value = 20.0 / storage.efficiency_charge
+    eta = storage.efficiency_charge * storage.efficiency_discharge
+    expected = value * np.sqrt(eta) - 0.1
+    assert strategy._cache_solution[("EOM", datetime(2022, 1, 1, 1), datetime(2022, 1, 1, 2))][
+        "buy"
+    ] > 0
+    bids = strategy.calculate_bids(
+        storage, mc, product_tuples=[(datetime(2022, 1, 1, 1), datetime(2022, 1, 1, 2), None)]
+    )
+    assert bids[0]["price"] == pytest.approx(expected)
+
+
+def test_degradation_cost():
+    """The degradation cost enters the objective and the sell bid prices."""
+    index = pd.date_range("2022-01-01", periods=48, freq="h")
+    strategy = MultiMarketStorageStrategy(foresight="24h", degradation_cost=3.0)
+    storage = make_storage({"EOM": price_profile()}, index, {"EOM": strategy})
+    storage.available_markets = [make_market_config("EOM")]
+    mc = storage.available_markets[0]
+
+    bids = strategy.calculate_bids(
+        storage, mc, product_tuples=[(datetime(2022, 1, 1, 12), datetime(2022, 1, 1, 13), None)]
+    )
+    assert bids[0]["volume"] > 0
+    # the marginal value in the peak hours is eta_discharge * (price - deg)
+    value = storage.efficiency_discharge * (100.0 - 3.0)
+    eta = storage.efficiency_charge * storage.efficiency_discharge
+    expected = value / np.sqrt(eta) + 3.0
+    assert bids[0]["price"] == pytest.approx(expected)
 
 
 def test_infeasible_horizon_returns_no_bids():

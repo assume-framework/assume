@@ -184,9 +184,12 @@ storage_multi_market_optimization            all                 Generic multi-m
                                                                  objective maximizes the expected profit over all markets using the price forecasts of the unit;
                                                                  constraints are the SoC dynamics and limits, the charge/discharge power limits, the coupling between
                                                                  the markets (sum of all commitments per delivery period respects the power limits) and balancing
-                                                                 energy bids bounded by the balancing capacity commitments. An optional terminal condition can require
-                                                                 the plan to end with at least the currently stored energy. Bids into a market are extracted from the
-                                                                 shared optimization plan whenever the market opens. Requires a solver (HiGHS by default).
+                                                                 energy bids bounded by the balancing capacity commitments. Bid prices are derived from the marginal
+                                                                 storage value (the duals of the SoC balance) with the round-trip efficiency spread, the additional
+                                                                 costs of the unit, an optional degradation cost and a deadband (by default the price tick of the
+                                                                 market). An optional terminal condition can require the plan to end with at least the currently
+                                                                 stored energy. Bids into a market are extracted from the shared optimization plan whenever the
+                                                                 market opens. Requires a solver (HiGHS by default).
 ===========================================  ==================  ============
 
 Optimization method API references:

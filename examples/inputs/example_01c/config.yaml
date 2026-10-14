@@ -102,7 +102,7 @@ eom_and_crm_multi_market:
 
   bidding_strategy_params:
     foresight: 24h
-    price_epsilon: 0.1
+    deadband: null
     capacity_price_fallback: EOM
 
   markets_config:

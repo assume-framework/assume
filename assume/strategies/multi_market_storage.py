@@ -60,6 +60,19 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
     the same time reuse one optimization and each market only receives its
     own slice of the shared plan.
 
+    The bid prices are derived from the marginal storage value: the dual
+    (shadow price) of the state-of-charge balance of the solved optimization.
+    As the optimization already contains the price forecasts, the dual
+    reflects the expected future dispatch opportunities of the stored energy
+    (in EUR/MWh stored). Following the symmetric convention, the buy and sell
+    bid prices are anchored symmetrically around this value with a spread of
+    the round-trip efficiency: buy price = value * sqrt(efficiency), sell
+    price = value / sqrt(efficiency). The additional costs of the unit (for
+    charging respectively discharging) and the degradation cost enter the
+    optimization objective and widen the bid prices accordingly. A deadband
+    (by default the price tick of the respective market) widens the bid-ask
+    band further, so that small price movements do not trigger trades.
+
     Attributes:
         foresight (datetime.timedelta): The optimization horizon: how far
             ahead the storage operation is optimized.
@@ -69,8 +82,11 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
         terminal_condition (bool): Whether the optimization must end the
             horizon with at least the energy currently stored. Defaults to
             False.
-        price_epsilon (float): The price margin added/subtracted from the
-            price forecast when setting bid prices.
+        deadband (float): The symmetric widening of the bid-ask band. If
+            None, the price tick of the respective market is used (0 if the
+            market has no price tick).
+        degradation_cost (float): Degradation cost per MWh discharged
+            (grid-side). Defaults to 0.
 
     Args:
         foresight (str, optional): The foresight window (e.g. "24h").
@@ -83,8 +99,10 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
             not end the horizon with less energy than the storage currently
             holds (prevents net energy withdrawal over the horizon).
             Defaults to False.
-        price_epsilon (float, optional): Price margin for bid prices.
-            Defaults to 0.1.
+        deadband (float, optional): Symmetric widening of the bid-ask band.
+            Defaults to the price tick of the respective market.
+        degradation_cost (float, optional): Degradation cost per MWh
+            discharged (grid-side). Defaults to 0.
         solver_name (str, optional): The name of the solver to use. Defaults
             to the first available of appsi_highs, gurobi, glpk, cbc, cplex.
         capacity_price_fallback (str | float, optional): Price for capacity
@@ -103,7 +121,11 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
         # Zero means re-optimization at every market opening.
         self.overlap = parse_duration(kwargs.get("overlap", "0h"))
         self.terminal_condition = bool(kwargs.get("terminal_condition", False))
-        self.price_epsilon = float(kwargs.get("price_epsilon", 0.1))
+        # symmetric widening of the bid-ask band; None means the price tick
+        # of the respective market is used (0 if the market has none)
+        self.deadband = kwargs.get("deadband", None)
+        # degradation cost per MWh discharged (grid-side)
+        self.degradation_cost = float(kwargs.get("degradation_cost", 0.0))
         self.solver_name = kwargs.get("solver_name", None)
         # fallback price for capacity markets without a price forecast:
         # a market id (str) to use the forecast of that market, or a flat
@@ -122,6 +144,8 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
         self._plan_time: datetime | None = None
         self._plan_valid_until: datetime | None = None
         self._plan_soc: dict[datetime, float] = {}
+        # marginal storage value per time step (duals of the SoC balance)
+        self._marginal_value: dict[datetime, float] = {}
 
     def _discover_markets(self, unit: SupportsMinMaxCharge) -> None:
         """
@@ -345,6 +369,9 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
             domain=pyo.NonNegativeReals,
             bounds=(unit.min_soc * unit.capacity, unit.max_soc * unit.capacity),
         )
+        # to extract the duals of the SoC constraints (marginal storage
+        # value) from the solved optimization
+        model.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT)
 
         model.constraints = self._build_constraints(
             model,
@@ -363,7 +390,8 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
             with_terminal=self.terminal_condition,
         )
 
-        # objective: maximize the expected profit over all markets
+        # objective: maximize the expected profit over all markets, minus
+        # the additional costs of the unit and the degradation cost
         obj_terms = []
         for i, (info, w_start, w_end) in enumerate(windows):
             covered_end = min(w_end, horizon_end)
@@ -377,8 +405,12 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
                 # positive reserve is paid to the unit
                 obj_terms.append(price * hours * model.sell[i])
             else:
-                # energy sells earn the price, energy buys pay it
-                obj_terms.append(price * hours * (model.sell[i] - model.buy[i]))
+                # energy sells earn the price minus the additional costs of
+                # discharging and the degradation, energy buys pay the price
+                # plus the additional costs of charging
+                sell_price = price - unit.additional_cost_discharge - self.degradation_cost
+                buy_price = price + unit.additional_cost_charge
+                obj_terms.append(hours * (sell_price * model.sell[i] - buy_price * model.buy[i]))
         model.obj = pyo.Objective(expr=pyo.quicksum(obj_terms), sense=pyo.maximize)
 
         solution = self._solve(model, windows, sell_indices, buy_indices)
@@ -411,16 +443,21 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
                 decision_time,
             )
             self._plan_soc = {}
+            self._marginal_value = {}
             return {}
 
         # store the planned SoC trajectory (start-of-step values, matching
-        # the convention of the unit's soc output) to detect deviations of
-        # the actual SoC from the plan (e.g. after rejected or clamped bids)
+        # the convention of the unit's soc output) and the marginal storage
+        # value (the duals of the SoC balance constraints) to derive the bid
+        # prices; both detect deviations of the actual SoC from the plan
+        # (e.g. after rejected or clamped bids)
         planned_soc = unit.outputs["soc"].at[decision_time] * unit.capacity
         self._plan_soc = {}
+        self._marginal_value = {}
         for i in range(n):
             self._plan_soc[times[i]] = planned_soc
             planned_soc = float(pyo.value(model.soc[i]))
+            self._marginal_value[times[i]] = float(model.dual[model.soc_constraints[i]])
         return solution
 
     def _build_constraints(
@@ -466,6 +503,9 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
         n = len(times)
         constraints = pyo.ConstraintList()
         constraints.construct()
+        # the SoC balance constraints, to extract their duals (marginal
+        # storage value) from the solved optimization
+        soc_constraints = []
 
         # windows covering each time step
         covering = [[] for _ in range(n)]
@@ -478,7 +518,10 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
             return i in covering[t]
 
         # SoC dynamics: energy flows of energy-type markets and the fixed
-        # energy flows of cleared markets change the state of charge
+        # energy flows of cleared markets change the state of charge.
+        # The constraints are collected to extract their duals (the marginal
+        # storage value) from the solved optimization.
+        model.soc_constraints = []
         soc_prev = unit.outputs["soc"].at[decision_time] * unit.capacity
         for t in range(n):
             charge_flow = 0.0
@@ -491,7 +534,9 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
                 (charge_flow + fixed_ch_e[t]) * unit.efficiency_charge
                 - (discharge_flow + fixed_dis_e[t]) / unit.efficiency_discharge
             ) * dt_h
-            constraints.add(model.soc[t] == soc_prev + soc_delta)
+            soc_constraints.append(
+                constraints.add(model.soc[t] == soc_prev + soc_delta)
+            )
             soc_prev = model.soc[t]
 
         # power limits: the sum of all commitments delivering in a period plus
@@ -556,6 +601,7 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
                 >= unit.outputs["soc"].at[decision_time] * unit.capacity
             )
 
+        model.soc_constraints = soc_constraints
         return constraints
 
     def _solve(
@@ -584,6 +630,69 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
                 entry["buy"] = float(pyo.value(model.buy[i]))
             solution[(info.market_id, w_start, w_end)] = entry
         return solution
+
+    def _bid_price(
+        self,
+        unit: SupportsMinMaxCharge,
+        market_config: MarketConfig,
+        start: datetime,
+        end: datetime,
+        discharge: bool,
+    ) -> float:
+        """
+        Calculates the bid price from the marginal storage value.
+
+        The marginal storage value is the mean of the SoC balance duals over
+        the delivery window (EUR/MWh stored). Following the symmetric
+        convention, the buy and sell prices are anchored symmetrically
+        around this value with a spread of the round-trip efficiency:
+
+        - sell (discharge) price: value / sqrt(efficiency) plus the
+          additional costs of discharging and the degradation cost
+        - buy (charge) price: value * sqrt(efficiency) minus the additional
+          costs of charging
+
+        A deadband (by default the price tick of the market) widens the
+        band symmetrically, so that small price movements do not trigger
+        trades.
+
+        Args:
+            unit (SupportsMinMaxCharge): The storage unit.
+            market_config (MarketConfig): The market to bid on.
+            start (datetime.datetime): The start of the delivery window.
+            end (datetime.datetime): The end of the delivery window.
+            discharge (bool): Whether the bid is a sell (True) or buy
+                (False) bid.
+
+        Returns:
+            float: The bid price.
+        """
+        freq = unit.index.freq
+        values = [
+            self._marginal_value[t]
+            for t in self._marginal_value
+            if start <= t < end
+        ]
+        value = float(np.mean(values)) if values else 0.0
+
+        efficiency = unit.efficiency_charge * unit.efficiency_discharge
+        if discharge:
+            bid_price = value / np.sqrt(efficiency)
+            bid_price += unit.additional_cost_discharge + self.degradation_cost
+        else:
+            bid_price = value * np.sqrt(efficiency)
+            bid_price -= unit.additional_cost_charge
+
+        # deadband: widen the band symmetrically, default is the price tick
+        deadband = self.deadband
+        if deadband is None:
+            deadband = market_config.price_tick or 0.0
+        if discharge:
+            bid_price += deadband
+        else:
+            bid_price -= deadband
+
+        return float(bid_price)
 
     def calculate_bids(
         self,
@@ -658,9 +767,6 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
             if entry is None:
                 continue
 
-            prices = self._get_price_forecast(unit, market_info, start, end)
-            price = float(np.mean(prices)) if len(prices) else 0.0
-
             # net out sell and buy volumes: the LP is indifferent between
             # simultaneous buy and sell at the same price (circular flow
             # through the storage loses energy but does not change profit),
@@ -669,26 +775,10 @@ class MultiMarketStorageStrategy(MinMaxChargeStrategy):
             buy = entry.get("buy", 0.0)
             net = sell - buy
 
-            if net > 1e-9:
-                if market_info.product_type in ("energy", "heat"):
-                    bid_price = price - self.price_epsilon
-                else:
-                    bid_price = price
-                bids.append(
-                    {
-                        "start_time": start,
-                        "end_time": end,
-                        "only_hours": only_hours,
-                        "price": bid_price,
-                        "volume": net,
-                        "node": unit.node,
-                    }
+            if net > 1e-9 or net < -1e-9:
+                bid_price = self._bid_price(
+                    unit, market_config, start, end, discharge=net > 0
                 )
-            elif net < -1e-9:
-                if market_info.product_type in ("energy", "heat"):
-                    bid_price = price + self.price_epsilon
-                else:
-                    bid_price = price
                 bids.append(
                     {
                         "start_time": start,
