@@ -16,7 +16,7 @@ import yaml
 from tqdm import tqdm
 
 from assume.common.exceptions import AssumeException
-from assume.common.fast_pandas import FastIndex
+from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecaster import (
     BuildingForecaster,
     CementForecaster,
@@ -703,13 +703,18 @@ def load_config_and_create_forecaster(
     shared_unit_index = FastIndex(
         start=index[0], end=index[-1], freq=pd.infer_freq(index)
     )
+    # convert fuel prices once so all forecasters share the same arrays instead of copying them
+    fuel_prices = {
+        fuel: FastSeries(index=shared_unit_index, value=fuel_prices_df[fuel])
+        for fuel in fuel_prices_df.columns
+    }
     unit_forecasts: dict[str, UnitForecaster] = {}
     if powerplant_units is not None:
         for id, plant in powerplant_units.iterrows():
             unit_forecasts[id] = PowerplantForecaster(
                 index=shared_unit_index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),
-                fuel_prices=fuel_prices_df,
+                fuel_prices=fuel_prices,
                 forecast_algorithms=get_unit_forecast_algorithms(
                     forecast_algorithms, plant
                 ),
@@ -785,7 +790,7 @@ def load_config_and_create_forecaster(
                             id, pd.Series(1.0, index, name=id)
                         ),
                         forecast_algorithms=unit_forecast_algorithms,
-                        fuel_prices=fuel_prices_df,
+                        fuel_prices=fuel_prices,
                         load_profile=building_load_profile,
                         ev_load_profile=building_ev_profile,
                         heat_demand=building_heat_demand,
@@ -810,7 +815,7 @@ def load_config_and_create_forecaster(
                         market_prices=unit.get("market_prices"),
                         forecast_algorithms=unit_forecast_algorithms,
                         forecast_registries=None,
-                        fuel_prices=fuel_prices_df,
+                        fuel_prices=fuel_prices,
                         normalized_load_profile=normalized_profile,
                         steel_demand=steel_demand,
                     )
@@ -826,7 +831,7 @@ def load_config_and_create_forecaster(
                         market_prices=unit.get("market_prices"),
                         forecast_algorithms=unit_forecast_algorithms,
                         forecast_registries=None,
-                        fuel_prices=fuel_prices_df,
+                        fuel_prices=fuel_prices,
                         normalized_load_profile=get_unit_forecast_column(
                             forecasts_df, id, "normalized_load_profile"
                         ),
@@ -868,7 +873,7 @@ def load_config_and_create_forecaster(
                         ),
                         forecast_algorithms=unit_forecast_algorithms,
                         demand=unit["demand"],
-                        fuel_prices=fuel_prices_df,
+                        fuel_prices=fuel_prices,
                         electricity_price_flex=0,  # TODO
                         thermal_storage_schedule=0,  # TODO
                         thermal_demand=0,  # TODO
