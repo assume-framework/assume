@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
+import math
 from datetime import datetime, timedelta
 from functools import lru_cache
 
@@ -238,10 +239,24 @@ class FastIndex:
         remainder = delta_seconds % self.freq_seconds
 
         if round_up and remainder > 0:
-            # if there is a large remainder, we need to add to return the value of the next date as begin
-            delta_seconds += self.freq_seconds
+            # an off-grid date maps to the next step at or after it
+            return math.ceil(delta_seconds / self.freq_seconds)
 
         return round(delta_seconds / self.freq_seconds)
+
+    def align_up(self, date: datetime) -> datetime:
+        """
+        Rounds ``date`` up to the first step of the index at or after it.
+
+        The result may lie beyond the end of the index.
+
+        Parameters:
+            date (datetime.datetime): The datetime to align.
+
+        Returns:
+            datetime.datetime: The first step at or after ``date``.
+        """
+        return self.start + self._get_idx_from_date(date) * self.freq
 
     @staticmethod
     def _convert_to_datetime(value: datetime | str) -> datetime:

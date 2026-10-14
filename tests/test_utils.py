@@ -971,6 +971,22 @@ def test_sum_line_capacities_fallback_and_reverse():
     assert result.at["Link_B2_B3_fallback", "cap_reverse"] == 20.0
 
 
+def test_fast_index_rounds_off_grid_dates_up():
+    start = datetime(2024, 1, 1)
+    index = FastIndex(start, start + timedelta(hours=10), freq="1h")
+
+    # a date 40 or 20 minutes past the step must land on the next step, not two steps later
+    for minutes in (20, 40):
+        date = start + timedelta(hours=2, minutes=minutes)
+        assert index._get_idx_from_date(date) == 3
+        assert index.align_up(date) == start + timedelta(hours=3)
+
+    on_grid = start + timedelta(hours=2)
+    assert index.align_up(on_grid) == on_grid
+    # beyond the end the alignment still returns the next step
+    assert index.align_up(index.end + timedelta(minutes=10)) == index.end + index.freq
+
+
 if __name__ == "__main__":
     test_convert_rrule()
     test_available_products()

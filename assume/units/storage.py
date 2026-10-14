@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+import math
 from datetime import datetime, timedelta
 from functools import lru_cache
 
@@ -278,8 +279,8 @@ class Storage(SupportsMinMaxCharge):
         """
         Executes the current dispatch of the unit based on the provided timestamps.
 
-        The dispatch is only executed, if it is in the constraints given by the unit.
-        Returns the volume of the unit within the given time range.
+        The committed plan in ``outputs["energy"]`` is clipped to what the unit
+        can run at, and the SOC is derived from the result.
 
         Args:
             start (datetime.datetime): The start time of the dispatch.
@@ -288,54 +289,46 @@ class Storage(SupportsMinMaxCharge):
         Returns:
             np.ndarray: The volume of the unit within the given time range.
         """
-        start = max(start, self.index[0])
-        time_delta = self.index.freq / timedelta(hours=1)
+        last = self.index[-1]
+        start = min(self.index.align_up(max(start, self.index[0])), last)
 
+        # the SOC has to be valid at `start`, everything after it is replaced
+        self.ensure_soc(start)
+        self._soc_valid_until = start
+
+        last_executed = None
+        clipped = []
         for t in self.index[start:end]:
-            current_power = self.outputs["energy"].at[t]
-
-            # adjust power to constraints of the unit
-            if current_power > self.max_power_discharge:
-                current_power = self.max_power_discharge
-            elif current_power < self.max_power_charge:
-                current_power = self.max_power_charge
-            elif (
-                self.min_power_discharge > current_power > self.min_power_charge
-                and current_power != 0
-            ):
-                current_power = 0
-
-            # calculate the change in state of charge
-            delta_soc = 0
+            last_executed = t
             soc = self.outputs["soc"].at[t]
+            planned = self.outputs["energy"].at[t]
+            current_power = self.feasible_power(planned, soc)
 
-            # discharging
-            if current_power > 0:
-                max_soc_discharge = self.calculate_soc_max_discharge(soc)
+            if not math.isclose(current_power, planned, abs_tol=1e-6):
+                clipped.append((t, planned, current_power))
 
-                if current_power > max_soc_discharge:
-                    current_power = max_soc_discharge
-
-                delta_soc = (
-                    -current_power * time_delta / self.efficiency_discharge
-                ) / self.capacity
-
-            # charging
-            elif current_power < 0:
-                max_soc_charge = self.calculate_soc_max_charge(soc)
-
-                if current_power < max_soc_charge:
-                    current_power = max_soc_charge
-
-                delta_soc = (
-                    -current_power * time_delta * self.efficiency_charge
-                ) / self.capacity
-
-            # update the values of the state of charge and the energy
-            next_freq = t + self.index.freq
-            if next_freq in self.index:
-                self.outputs["soc"].at[next_freq] = soc + delta_soc
             self.outputs["energy"].at[t] = current_power
+            if t != last:
+                self.outputs["soc"].at[t + self.index.freq] = soc + self.delta_soc(
+                    current_power
+                )
+
+        if clipped:
+            first_t, first_planned, first_power = clipped[0]
+            logger.warning(
+                "Unit %s: dispatch not feasible at %d time step(s) between %s and %s, "
+                "e.g. at %s planned %s but running at %s",
+                self.id,
+                len(clipped),
+                start,
+                end,
+                first_t,
+                first_planned,
+                first_power,
+            )
+
+        if last_executed is not None:
+            self._soc_valid_until = min(last_executed + self.index.freq, last)
 
         return self.outputs["energy"].loc[start:end]
 
@@ -427,7 +420,7 @@ class Storage(SupportsMinMaxCharge):
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
 
-        base_load = self.outputs["energy"].loc[start:end_excl]
+        base_load = self.get_feasible_energy(start, end_excl)
         capacity_pos = self.outputs["capacity_pos"].loc[start:end_excl]
         capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
 
@@ -444,7 +437,7 @@ class Storage(SupportsMinMaxCharge):
 
         # restrict charging according to max_soc
         if soc is None:
-            soc = self.outputs["soc"].at[start]
+            soc = self.get_soc(start)
         max_soc_charge = self.calculate_soc_max_charge(soc)
         max_power_charge = max_power_charge.clip(min=max_soc_charge)
 
@@ -469,7 +462,7 @@ class Storage(SupportsMinMaxCharge):
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
 
-        base_load = self.outputs["energy"].loc[start:end_excl]
+        base_load = self.get_feasible_energy(start, end_excl)
         capacity_pos = self.outputs["capacity_pos"].loc[start:end_excl]
         capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
 
@@ -490,7 +483,7 @@ class Storage(SupportsMinMaxCharge):
 
         # restrict according to min_soc
         if soc is None:
-            soc = self.outputs["soc"].at[start]
+            soc = self.get_soc(start)
         max_soc_discharge = self.calculate_soc_max_discharge(soc)
         max_power_discharge = max_power_discharge.clip(max=max_soc_discharge)
 

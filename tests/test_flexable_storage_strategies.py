@@ -232,3 +232,52 @@ if __name__ == "__main__":
     import pytest
 
     pytest.main(["-s", __file__])
+
+
+def test_flexable_eom_storage_bids_on_top_of_an_infeasible_plan(mock_market_config):
+    """
+    A later energy market bids on hours an earlier one already committed. The
+    SoC estimate of the strategy has to build on what the unit can actually run
+    at there - 20 MWh are stored, so a committed 100 MW discharge only delivers
+    20 MW - rather than on the plan, which would drive it far below empty.
+    """
+    index = pd.date_range("2022-01-01", periods=8, freq="h")
+    prices = pd.Series([50, 50, 80, 80, 80, 80, 80, 80], index=index)
+    strategy = StorageEnergyHeuristicFlexableStrategy(eom_foresight="4h")
+    storage = Storage(
+        id="Test_Storage",
+        unit_operator="TestOperator",
+        technology="TestTechnology",
+        bidding_strategies={"EOM": strategy},
+        forecaster=UnitForecaster(index, availability=1, market_prices={"EOM": prices}),
+        max_power_charge=-100,
+        max_power_discharge=100,
+        capacity=100,
+        efficiency_charge=1,
+        efficiency_discharge=1,
+        initial_soc=0.2,
+    )
+    storage.set_dispatch_plan(
+        mock_market_config,
+        [
+            {
+                "start_time": index[1],
+                "end_time": index[2],
+                "only_hours": None,
+                "accepted_volume": 100,
+                "accepted_price": 80,
+            }
+        ],
+    )
+    assert storage.get_feasible_energy(index[1], index[1])[0] == 20
+
+    product_tuples = [(index[i], index[i + 1], None) for i in (1, 2, 3)]
+    bids = strategy.calculate_bids(storage, mock_market_config, product_tuples)
+
+    # empty after t1, the unit can charge 80 MW on top of its 20 MW discharge,
+    # discharge them again at t2 and then charge fully at t3
+    assert [(bid["start_time"], bid["volume"]) for bid in bids] == [
+        (index[1], pytest.approx(-80)),
+        (index[2], pytest.approx(80)),
+        (index[3], pytest.approx(-100)),
+    ]
