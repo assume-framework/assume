@@ -109,7 +109,7 @@ def load_entsoe(
     api_key = api_key or os.getenv("ENTSOE_API_KEY") or os.getenv("ENTSOE")
     if not api_key:
         raise AssumeException(
-            "ENTSO-E API key missing. Set ENTSOE_API_KEY or pass api_key."
+            "ENTSO-E API key missing. Set ENTSOE_API_KEY or pass api_key in the function call 'load_entsoe()'."
         )
 
     entsoe = EntsoeInterface(api_key=api_key)
