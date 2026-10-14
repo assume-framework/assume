@@ -9,7 +9,11 @@ from dateutil import rrule as rr
 
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
-from assume.markets.clearing_algorithms import PayAsClearRole, clearing_mechanisms
+from assume.markets.clearing_algorithms import (
+    PayAsBidRole,
+    PayAsClearRole,
+    clearing_mechanisms,
+)
 
 from .utils import create_orderbook, extend_orderbook
 
@@ -108,9 +112,10 @@ def test_market_pay_as_clear():
 
     """
     Create Orderbook with constant order volumes and prices:
-        - dem1: volume = -1000, price = 3000
-        - gen1: volume = 1000, price = 100
-        - gen2: volume = 900, price = 50
+        - dem1: volume = -400, price = 3000
+        - dem2: volume = -100, price = 3000
+        - gen1: volume = 300, price = 100
+        - gen2: volume = 200, price = 50
     """
     orderbook = extend_orderbook(products, -400, 3000)
     orderbook = extend_orderbook(products, -100, 3000, orderbook)
@@ -130,7 +135,7 @@ def test_market_pay_as_clear():
         assert bid["volume"] == bid["accepted_volume"]
 
 
-def test_market_pay_as_clears_single_demand():
+def test_market_pay_as_clears_single_demand_is_price_setting():
     next_opening = simple_dayahead_auction_config.opening_hours.after(
         datetime(2005, 6, 1)
     )
@@ -141,9 +146,11 @@ def test_market_pay_as_clears_single_demand():
 
     """
     Create Orderbook with constant order volumes and prices:
-        - dem1: volume = -1000, price = 3000
-        - gen1: volume = 1000, price = 100
-        - gen2: volume = 900, price = 50
+        - dem1: volume = -700, price = 3000
+        - gen1: volume = 300, price = 100
+        - gen2: volume = 200, price = 50
+    Supply cannot serve demand and therefore the last accepted demand order sets the price.
+    The accepted volume of the last accepted demand order is reduced to match the supply volume.
     """
     orderbook = extend_orderbook(products, -700, 3000)
     orderbook = extend_orderbook(products, 300, 100, orderbook)
@@ -157,7 +164,7 @@ def test_market_pay_as_clears_single_demand():
     assert len(rejected) == 0
     assert meta[0]["supply_volume"] == 500
     assert meta[0]["demand_volume"] == 500
-    assert meta[0]["price"] == 100
+    assert meta[0]["price"] == 3000
     assert accepted[0]["volume"] == -700
     assert accepted[0]["accepted_volume"] == -500
 
@@ -173,9 +180,10 @@ def test_market_pay_as_clears_single_demand_more_generation():
 
     """
     Create Orderbook with constant order volumes and prices:
-        - dem1: volume = -1000, price = 3000
-        - gen1: volume = 1000, price = 100
-        - gen2: volume = 900, price = 50
+        - dem1: volume = -400, price = 3000
+        - gen1: volume = 300, price = 100
+        - gen2: volume = 200, price = 50
+        - gen3: volume = 230, price = 60
     """
     orderbook = extend_orderbook(products, -400, 3000)
     orderbook = extend_orderbook(products, 300, 100, orderbook)
@@ -193,3 +201,43 @@ def test_market_pay_as_clears_single_demand_more_generation():
     assert meta[0]["price"] == 60
     assert accepted[0]["volume"] == -400
     assert accepted[0]["accepted_volume"] == -400
+
+
+def test_market_pay_as_bid_supply_scarcity():
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
+    products = get_available_products(
+        simple_dayahead_auction_config.market_products, next_opening
+    )
+    assert len(products) == 1
+
+    """
+    Create Orderbook with constant order volumes and prices:
+        - dem1: volume = -400, price = 3000
+        - gen1: volume = 100, price = 100
+        - gen2: volume = 200, price = 50
+    """
+    orderbook = extend_orderbook(products, -400, 3000)
+    orderbook = extend_orderbook(products, 100, 100, orderbook)
+    orderbook = extend_orderbook(products, 200, 50, orderbook)
+
+    pay_as_bid_auction_config = copy.copy(simple_dayahead_auction_config)
+    pay_as_bid_auction_config.market_mechanism = "pay_as_bid"
+    mr = PayAsBidRole(pay_as_bid_auction_config)
+    accepted, rejected, meta, flows = mr.clear(orderbook, products)
+    assert meta[0]["demand_volume"] > 0
+    assert meta[0]["price"] > 0
+    assert len(accepted) == 3
+    assert len(rejected) == 0
+    assert meta[0]["supply_volume"] == 300
+    assert meta[0]["demand_volume"] == 300
+    assert accepted[0]["volume"] == -400
+    assert accepted[0]["accepted_volume"] == -300
+    assert accepted[0]["price"] == 3000
+    assert accepted[1]["volume"] == 200
+    assert accepted[1]["accepted_volume"] == 200
+    assert accepted[1]["price"] == 50
+    assert accepted[2]["volume"] == 100
+    assert accepted[2]["accepted_volume"] == 100
+    assert accepted[2]["price"] == 100
