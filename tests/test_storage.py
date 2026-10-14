@@ -577,3 +577,79 @@ def test_initialising_invalid_storages():
 if __name__ == "__main__":
     # run pytest and enable prints
     pytest.main(["-s", __file__])
+
+
+def _order(unit, start, hour, volume):
+    return {
+        "start_time": start + timedelta(hours=hour),
+        "end_time": start + timedelta(hours=hour + 1),
+        "accepted_volume": volume,
+        "accepted_price": 50,
+        "unit_id": unit.id,
+    }
+
+
+def _three_day_storage() -> Storage:
+    index = pd.date_range("2022-01-01", periods=72, freq="h")
+    forecaster = UnitForecaster(
+        index, market_prices={"EOM": [20] * 6 + [80] * 18 + [20] * 48}
+    )
+    return Storage(
+        id="Storage",
+        unit_operator="TestOperator",
+        technology="pumped_hydro_storage",
+        bidding_strategies={"EOM": StorageEnergyHeuristicFlexableStrategy()},
+        forecaster=forecaster,
+        max_power_charge=-100,
+        max_power_discharge=100,
+        capacity=200,
+        efficiency_charge=1,
+        efficiency_discharge=1,
+        initial_soc=0.5,
+    )
+
+
+def test_soc_after_the_last_order_of_a_day(mock_market_config):
+    """
+    A storage only has orders in the time steps in which it can charge or discharge. The state
+    of charge of the next day must follow from the dispatch, not from the initial value.
+    """
+    unit = _three_day_storage()
+    start = datetime(2022, 1, 1)
+    # the storage is filled in the first hour of the first day, there are no later orders
+    unit.set_dispatch_plan(mock_market_config, [_order(unit, start, 0, -100)])
+    assert unit.outputs["soc"].at[start + timedelta(hours=1)] == pytest.approx(1.0)
+    assert unit.soc_known_until() == start + timedelta(hours=1)
+
+    next_day = start + timedelta(days=1)
+    products = [
+        (next_day + timedelta(hours=h), next_day + timedelta(hours=h + 1), None)
+        for h in range(24)
+    ]
+    bids = unit.calculate_bids(mock_market_config, products)
+    assert unit.outputs["soc"].at[next_day] == pytest.approx(1.0)
+    assert unit.soc_known_until() == next_day
+    # the full storage first sells energy on the next day, with the initial state of charge
+    # of 0.5 it would buy energy
+    assert bids[0]["volume"] > 0
+
+
+def test_soc_before_the_first_order_of_a_day(mock_market_config):
+    unit = _three_day_storage()
+    start = datetime(2022, 1, 1)
+    unit.set_dispatch_plan(mock_market_config, [_order(unit, start, 0, -100)])
+    # the only order of the next day is in its sixth hour
+    unit.set_dispatch_plan(mock_market_config, [_order(unit, start, 29, 100)])
+    assert unit.outputs["soc"].at[start + timedelta(hours=29)] == pytest.approx(1.0)
+    assert unit.outputs["soc"].at[start + timedelta(hours=30)] == pytest.approx(0.5)
+    assert unit.outputs["energy"].at[start + timedelta(hours=29)] == pytest.approx(100)
+
+
+def test_soc_without_any_order(mock_market_config):
+    # a storage without accepted or rejected orders keeps its state of charge
+    unit = _three_day_storage()
+    start = datetime(2022, 1, 1)
+    unit.set_dispatch_plan(mock_market_config, [_order(unit, start, 0, 50)])
+    products = [(start + timedelta(hours=60), start + timedelta(hours=61), None)]
+    unit.calculate_bids(mock_market_config, products)
+    assert unit.outputs["soc"].at[start + timedelta(hours=60)] == pytest.approx(0.25)
