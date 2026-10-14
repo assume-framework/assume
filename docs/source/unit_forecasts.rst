@@ -150,6 +150,9 @@ Price forecast algorithms:
    * - Naive (default)
      - ``price_naive_forecast``
      - Merit-order dispatch against demand (excl. storages and DSM units) for all timesteps. Automatically uses elastic or inelastic clearing depending on demand unit types. Columns in ``forecast_df`` take precedence over calculated values.
+   * - Zonal merit order
+     - ``price_zonal_merit_order``
+     - One merit order per price zone (see :ref:`zonal_price_forecast`), each unit gets the forecast of its zone. Requires the preprocess algorithm ``price_unit_zone``.
    * - Keep
      - ``price_keep_given``
      - Keeps the forecast series provided at instantiation unchanged.
@@ -230,6 +233,9 @@ These are used by the ``preprocess`` method. Their key uses the ``preprocess_`` 
    * - ``price_default``
      - price
      - No-op (returns None). This is the default.
+   * - ``price_unit_zone``
+     - price
+     - Determines the price zone of the unit in every market and takes a given zone forecast (``price_{market_id}_{zone}``) from ``forecast_df``. Used by ``price_zonal_merit_order``.
    * - ``residual_load_default``
      - residual_load
      - No-op (returns None). This is the default.
@@ -271,6 +277,37 @@ These are used by the ``update`` method. Their key uses the ``update_`` prefix
    * - ``renewable_utilisation_default``
      - renewable_utilisation
      - No-op (keeps current forecast unchanged). This is the default.
+
+.. _zonal_price_forecast:
+
+Zonal price forecast
+====================
+
+In simulations with several price zones or nodes the naive price forecast stacks all units of all
+zones in one merit order, so all units get the same price forecast. The zonal merit order forecast
+calculates one price per zone instead and provides each unit with the forecast of its zone:
+
+.. code-block:: yaml
+
+    forecast_algorithms:
+        price: price_zonal_merit_order
+        preprocess_price: price_unit_zone
+
+- **Zones** are taken from the grid data of the market (``grid_data`` in the ``param_dict``): with a
+  ``zones_identifier`` the buses are grouped into zones (zonal clearing), otherwise every bus is its
+  own zone (nodal clearing). Without grid data the market has a single zone.
+- **Supply** of a zone are the power plants (marginal cost and available power) and the imports of
+  the exchange units, **demand** are the demand units (bid price and demand) and the exports of the
+  exchange units. The price is set by the marginal supply bid, or by the marginal demand bid if it is
+  only partially served (price-sensitive demand or scarcity).
+- **Not considered** are flows between the zones, storages, DSM units and elastic demand units.
+- The prices of all zones are calculated once and shared by all units.
+- Forecasters without a unit, e.g. of :class:`~assume.common.forecaster.UnitsOperatorForecaster`,
+  use the naive price forecast of the whole market.
+- A forecast of a zone can be given in ``forecast_df`` as column ``price_{market_id}_{zone}``
+  (e.g. ``price_EOM_DE_LU``). A column ``price_{market_id}`` is used for all zones.
+- Saved forecasts (``save_forecasts``) contain one column per market and zone, e.g.
+  ``price_zonal_merit_order_EOM_DE_LU``.
 
 ***********************************
 Other Ways to Provide Forecasts
