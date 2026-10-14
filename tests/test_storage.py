@@ -54,6 +54,12 @@ def test_init_function(storage_unit):
     assert storage_unit.initial_soc == 0.5
 
 
+def test_as_dict(storage_unit):
+    unit_dict = storage_unit.as_dict()
+    assert unit_dict["efficiency_charge"] == 0.9
+    assert unit_dict["efficiency_discharge"] == 0.95
+
+
 def test_reset_function(storage_unit):
     # check if total_power_output is reset
     assert (

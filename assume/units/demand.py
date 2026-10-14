@@ -185,3 +185,13 @@ class Demand(SupportsMinMax):
         )
 
         return unit_dict
+
+    def calculate_costs(self, start: datetime, end: datetime) -> None:
+        """
+        Demand units do not have generation costs, so this is a no-op.
+        It is included for compatibility with the base unit interface.
+
+        Args:
+            start (datetime.datetime): The start time for the calculation.
+            end (datetime.datetime): The end time for the calculation.
+        """

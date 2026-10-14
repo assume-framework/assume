@@ -110,24 +110,26 @@ def test_calculate_bids(base_unit, mock_market_config):
     # mock calculate_marginal_cost
     base_unit.calculate_marginal_cost = lambda *x: 10
     base_unit.set_dispatch_plan(mock_market_config, orderbook)
-    base_unit.calculate_generation_cost(index[0], index[1], "energy")
-    base_unit.calculate_cashflow_and_reward(mock_market_config, orderbook)
+    base_unit.calculate_costs(index[0], index[1])
+    base_unit.calculate_cashflow(mock_market_config.product_type, orderbook)
+    base_unit.calculate_reward(mock_market_config, orderbook)
 
     # we apply the dispatch plan of 10 MW
     assert base_unit.outputs["energy"][start] == 10
-    assert base_unit.outputs["energy_generation_costs"][start] == 10 * 10
+    assert base_unit.outputs["generation_costs"][start] == 10 * 10
     # we received more, as accepted_price is higher
     assert base_unit.outputs["energy_cashflow"][start] == 10 * 11
 
     # we somehow sold an additional 10 MW
     base_unit.set_dispatch_plan(mock_market_config, orderbook)
-    base_unit.calculate_generation_cost(index[0], index[1], "energy")
-    base_unit.calculate_cashflow_and_reward(mock_market_config, orderbook)
+    base_unit.calculate_costs(index[0], index[1])
+    base_unit.calculate_cashflow(mock_market_config.product_type, orderbook)
+    base_unit.calculate_reward(mock_market_config, orderbook)
 
     # the final output should be 10+10
     assert base_unit.outputs["energy"][start] == 20
     # the marginal cost for this volume should be twice as much too
-    assert base_unit.outputs["energy_generation_costs"][start] == 200
+    assert base_unit.outputs["generation_costs"][start] == 200
     assert base_unit.outputs["energy_cashflow"][start] == 20 * 11
 
 
@@ -158,26 +160,28 @@ def test_calculate_multi_bids(base_unit, mock_market_config):
     # mock calculate_marginal_cost
     base_unit.calculate_marginal_cost = lambda *x: 10
     base_unit.set_dispatch_plan(mock_market_config, orderbook)
-    base_unit.calculate_generation_cost(index[0], index[1], "energy")
-    base_unit.calculate_cashflow_and_reward(mock_market_config, orderbook)
+    base_unit.calculate_costs(index[0], index[1])
+    base_unit.calculate_cashflow(mock_market_config.product_type, orderbook)
+    base_unit.calculate_reward(mock_market_config, orderbook)
 
     assert base_unit.outputs["energy"][index[0]] == 10
-    assert base_unit.outputs["energy_generation_costs"][index[0]] == 100
+    assert base_unit.outputs["generation_costs"][index[0]] == 100
     assert base_unit.outputs["energy_cashflow"][index[0]] == 110
     assert base_unit.outputs["energy"][index[1]] == 10
-    assert base_unit.outputs["energy_generation_costs"][index[1]] == 100
+    assert base_unit.outputs["generation_costs"][index[1]] == 100
     assert base_unit.outputs["energy_cashflow"][index[1]] == 110
 
     base_unit.set_dispatch_plan(mock_market_config, orderbook)
-    base_unit.calculate_generation_cost(index[0], index[1], "energy")
-    base_unit.calculate_cashflow_and_reward(mock_market_config, orderbook)
+    base_unit.calculate_costs(index[0], index[1])
+    base_unit.calculate_cashflow(mock_market_config.product_type, orderbook)
+    base_unit.calculate_reward(mock_market_config, orderbook)
 
     # should be correctly applied for the sum, even if different hours are applied
     assert base_unit.outputs["energy"][index[0]] == 20
-    assert base_unit.outputs["energy_generation_costs"][index[0]] == 200
+    assert base_unit.outputs["generation_costs"][index[0]] == 200
     assert base_unit.outputs["energy_cashflow"][index[0]] == 220
     assert base_unit.outputs["energy"][index[1]] == 20
-    assert base_unit.outputs["energy_generation_costs"][index[1]] == 200
+    assert base_unit.outputs["generation_costs"][index[1]] == 200
     assert base_unit.outputs["energy_cashflow"][index[1]] == 220
 
     # in base_unit - this should not do anything but get return the energy dispatch
@@ -245,3 +249,22 @@ def test_clear_empty_bids(base_unit, mock_market_config):
 
 if __name__ == "__main__":
     pytest.main(["-s", __file__])
+
+
+def test_update_avg_op_time(base_unit):
+    index = base_unit.index
+    base_unit.outputs["energy"].loc[index[0] : index[3]] = [10, 0, 10, 10]
+
+    # the first execution may start before the index
+    base_unit.update_avg_op_time(index[0] - index.freq, index[0])
+    assert base_unit.total_op_time == 1
+    assert base_unit.avg_op_time == 1
+
+    base_unit.update_avg_op_time(index[1], index[1])
+    assert base_unit.total_op_time == 1
+    assert base_unit.avg_op_time == 1 / 2
+
+    # executing several time steps at once counts each of them
+    base_unit.update_avg_op_time(index[2], index[3])
+    assert base_unit.total_op_time == 3
+    assert base_unit.avg_op_time == 3 / 4
