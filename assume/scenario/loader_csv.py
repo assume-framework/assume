@@ -974,100 +974,60 @@ def load_config_and_create_forecaster(
                         },
                     )
                 if type == "sector_coupled_system":
-                    system_type = str(
-                        unit.get("system_type", "heat")
-                    ).strip().lower()
+                    system_type = str(unit.get("system_type", "heat")).strip().lower()
+                    carrier_demands = {}
+                    extra_profiles = {}
 
                     if system_type == "heat":
-                        heat_demand = get_unit_forecast_column(
-                            forecasts_df,
-                            id,
-                            "heat",
-                        )
+                        heat_demand = get_unit_forecast_column(forecasts_df, id, "heat")
                         if heat_demand is None:
-                            heat_demand = get_unit_forecast_column(
-                                forecasts_df,
-                                id,
-                                "heat_demand",
-                            )
-
+                            heat_demand = get_unit_forecast_column(forecasts_df, id, "heat_demand")
                         if heat_demand is None:
                             raise ValueError(
-                                f"No heat-demand forecast found for "
-                                f"SectorCoupledSystem '{id}'. Expected "
-                                f"'{id}_heat' or '{id}_heat_demand' "
-                                "in forecasts_df.csv."
+                                f"No heat-demand forecast found for " f"SectorCoupledSystem '{id}'. Expected "
+                                f"'{id}_heat' or '{id}_heat_demand' " "in forecasts_df.csv."
                             )
-
-                        unit_forecasts[id] = SectorCoupledForecaster(
-                            index=shared_unit_index,
-                            availability=availability.get(
-                                id,
-                                pd.Series(1.0, index, name=id),
-                            ),
-                            forecast_algorithms=unit_forecast_algorithms,
-                            fuel_prices=fuel_prices_df,
-                            heat_demand=heat_demand,
-                        )
+                        carrier_demands["heat"] = heat_demand
 
                     elif system_type == "hydrogen":
-                        hydrogen_demand = get_unit_forecast_column(
-                            forecasts_df,
-                            id,
-                            "hydrogen_demand",
-                        )
+                        hydrogen_demand = get_unit_forecast_column(forecasts_df, id, "hydrogen_demand")
                         if hydrogen_demand is None:
-                            hydrogen_demand = get_unit_forecast_column(
-                                forecasts_df,
-                                id,
-                                "hydrogen",
-                            )
+                            hydrogen_demand = get_unit_forecast_column(forecasts_df, id, "hydrogen")
 
-                        # Backward-compatible fallback for scenarios that
-                        # specify a constant per-step H2 demand in the unit CSV.
+                        # Backward-compatible fallback for scenarios that specify
+                        # a constant per-step hydrogen demand in the unit CSV.
                         if hydrogen_demand is None:
                             raw_demand = unit.get("demand", 0.0)
                             try:
                                 raw_demand = float(raw_demand)
                             except (TypeError, ValueError):
                                 raw_demand = 0.0
-
                             hydrogen_demand = pd.Series(
-                                raw_demand,
-                                index=index,
-                                name=f"{id}_hydrogen_demand",
+                                raw_demand, index=index, name=f"{id}_hydrogen_demand"
                             )
+                        carrier_demands["hydrogen"] = hydrogen_demand
 
-                        seasonal_storage_schedule = (
-                            get_unit_forecast_column(
-                                forecasts_df,
-                                id,
-                                "seasonal_storage_schedule",
-                            )
+                        seasonal_storage_schedule = get_unit_forecast_column(
+                            forecasts_df, id, "seasonal_storage_schedule"
                         )
                         if seasonal_storage_schedule is None:
                             seasonal_storage_schedule = 0
-
-                        unit_forecasts[id] = HydrogenForecaster(
-                            index=shared_unit_index,
-                            availability=availability.get(
-                                id,
-                                pd.Series(1.0, index, name=id),
-                            ),
-                            forecast_algorithms=unit_forecast_algorithms,
-                            hydrogen_demand=hydrogen_demand,
-                            seasonal_storage_schedule=(
-                                seasonal_storage_schedule
-                            ),
-                        )
+                        extra_profiles["seasonal_storage_schedule"] = seasonal_storage_schedule
 
                     else:
                         raise ValueError(
-                            f"Unsupported system_type '{system_type}' "
-                            f"for SectorCoupledSystem '{id}'. "
-                            "Currently supported presets are 'heat' "
-                            "and 'hydrogen'."
+                            f"Unsupported system_type '{system_type}' " f"for SectorCoupledSystem '{id}'. "
+                            "Currently supported presets are 'heat' " "and 'hydrogen'."
                         )
+
+                    unit_forecasts[id] = SectorCoupledForecaster(
+                        index=shared_unit_index,
+                        availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                        forecast_algorithms=unit_forecast_algorithms,
+                        fuel_prices=fuel_prices_df,
+                        carrier_demands=carrier_demands,
+                        **extra_profiles,
+                    )
 
                 if type == "hydrogen_plant":
                     unit_forecasts[id] = HydrogenForecaster(
@@ -1314,17 +1274,18 @@ def setup_world(
         world_bidding_strategies=world.bidding_strategies,
     )
 
-    if dsm_units is not None:
+    if dsm_units:
         for unit_type, units_df in dsm_units.items():
-            dsm_units = read_units(
+            dsm_units_by_operator = read_units(
                 units_df=units_df,
                 unit_type=unit_type,
                 forecaster=unit_forecasts,
                 world_bidding_strategies=world.bidding_strategies,
                 learning_mode=learning_mode,
             )
-        for op, op_units in dsm_units.items():
-            units[op].extend(op_units)
+
+            for op, op_units in dsm_units_by_operator.items():
+                units[op].extend(op_units)
 
     for op, op_units in powerplant_units.items():
         units[op].extend(op_units)
