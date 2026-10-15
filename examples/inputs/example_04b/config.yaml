@@ -7,7 +7,6 @@ base:
   end_date: 2023-01-04 00:00
   time_step: 1h
   save_frequency_hours: 24
-  heat_system: true
   markets_config:
     EOM:
       start_date: 2023-01-01 00:00
@@ -90,7 +89,6 @@ zonal_case:
   end_date: 2023-01-06 00:00
   time_step: 1h
   save_frequency_hours: 24
-  heat_system: true
   markets_config:
     DAM:
       operator: EOM_operator
