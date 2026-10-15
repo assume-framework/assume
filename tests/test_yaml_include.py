@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 """
 Regression tests for :mod:`assume.scenario.yaml_include`, the in-house

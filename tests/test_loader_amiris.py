@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 from assume.scenario.loader_amiris import (
     get_send_receive_msgs_per_id,

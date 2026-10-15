@@ -3,11 +3,10 @@
 
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import argparse
 import logging
-import os
 import sys
 import warnings
 from pathlib import Path
@@ -134,7 +133,7 @@ def cli(args=None):
     from assume.scenario.loader_csv import load_scenario_folder, run_learning
 
     try:
-        os.makedirs("./examples/local_db", exist_ok=True)
+        Path("./examples/local_db").mkdir(parents=True, exist_ok=True)
 
         if args.parallel:
             distributed_role = True

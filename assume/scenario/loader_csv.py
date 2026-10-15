@@ -1,10 +1,9 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import copy
 import logging
-import os
 import shutil
 from collections import defaultdict
 from datetime import datetime
@@ -1175,3 +1174,514 @@ def setup_world(
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
     exchange_units = scenario_data["exchange_units"]
+    dsm_units = scenario_data["dsm_units"]
+    unit_forecasts = scenario_data["unit_forecasts"]
+    forecasts_df = scenario_data["forecasts_df"]
+    units_operator_forecast_data = scenario_data["units_operator_forecast_data"]
+
+    # save every thousand steps by default to free up memory
+    save_frequency_hours = config.get("save_frequency_hours", 48)
+    # if save_frequency_hours is set to 0, disable saving
+    save_frequency_hours = None if save_frequency_hours == 0 else save_frequency_hours
+    # check that save_frequency_hours is either None or an integer and raise an error if not with a hint for the user
+    if save_frequency_hours is not None and (
+        not isinstance(save_frequency_hours, int) or save_frequency_hours <= 0
+    ):
+        raise ValueError(
+            f"save_frequency_hours argument in the config file must be either null or a positive integer. "
+            f"Current value: {save_frequency_hours}."
+        )
+
+    # Disable save frequency if CSV export is enabled
+    if world.export_csv_path and save_frequency_hours is not None:
+        save_frequency_hours = None
+        logger.info(
+            "save_frequency_hours is disabled due to CSV export being enabled. "
+            "Data will be stored in the CSV files at the end of the simulation."
+        )
+
+        # If PostgreSQL database is in use, warn the user about end-of-simulation saving
+        if world.db_uri is not None and "postgresql" in world.db_uri:
+            logger.warning(
+                "Data will be stored in the PostgreSQL database only at the end of the simulation due to CSV export being enabled. "
+                "Disable CSV export to save data at regular intervals (export_csv_path = '')."
+            )
+
+    bidding_params = config.get("bidding_strategy_params", {})
+
+    if config.get("learning_mode"):
+        raise ValueError(
+            "The 'learning_mode' parameter in the top-level of the config.yaml has been moved to 'learning_config'. "
+            "Please adjust your config file accordingly."
+        )
+
+    # handle initial learning parameters before learning_role exists
+    learning_dict = config.get("learning_config", {})
+    # those settings need to be overridden before passing to the LearningConfig
+    if learning_dict:
+        # make sure that continue_learning implies learning_mode
+        if learning_dict.get("continue_learning"):
+            learning_dict["learning_mode"] = True
+        # determined by learning loop in run_learning()
+        learning_dict["evaluation_mode"] = evaluation_mode
+
+        if terminate_learning:
+            learning_dict["learning_mode"] = False
+            learning_dict["evaluation_mode"] = False
+
+        # default path for saving trained policies is set here because
+        # a) depends on the simulation_id
+        # b) it is set relative to inputs_path in replace_paths() below
+        if not learning_dict.get("trained_policies_save_path"):
+            learning_dict["trained_policies_save_path"] = (
+                f"learned_strategies/{simulation_id}"
+            )
+
+    # learning mode always needed for reading units below
+    learning_mode = learning_dict.get("learning_mode", False)
+
+    # all paths should be relative to the inputs_path
+    config = replace_paths(config, scenario_data["path"])
+
+    world.reset()
+
+    world.setup(
+        start=start,
+        end=end,
+        save_frequency_hours=save_frequency_hours,
+        simulation_id=simulation_id,
+        learning_dict=learning_dict,
+        episode=episode,
+        eval_episode=eval_episode,
+        bidding_params=bidding_params,
+        index=scenario_data["index"],
+    )
+
+    # get the market config from the config file and add the markets
+    logger.info("Adding markets")
+    for market_id, market_params in config["markets_config"].items():
+        market_config = make_market_config(
+            id=market_id,
+            market_params=market_params,
+            world_start=start,
+            world_end=end,
+        )
+        if "network_path" in market_config.param_dict.keys():
+            grid_data = read_grid(market_config.param_dict["network_path"])
+            market_config.param_dict["grid_data"] = grid_data
+
+        operator_id = str(market_params["operator"])
+        if operator_id not in world.market_operators:
+            world.add_market_operator(id=operator_id)
+
+        world.add_market(
+            market_operator_id=operator_id,
+            market_config=market_config,
+        )
+
+    # create list of units from dataframes before adding actual operators
+    logger.info("Read units from dataframe")
+
+    units = defaultdict(list)
+    powerplant_units = read_units(
+        units_df=powerplant_units,
+        unit_type="power_plant",
+        forecaster=unit_forecasts,
+        world_bidding_strategies=world.bidding_strategies,
+        learning_mode=learning_mode,
+    )
+
+    storage_units = read_units(
+        units_df=storage_units,
+        unit_type="storage",
+        forecaster=unit_forecasts,
+        world_bidding_strategies=world.bidding_strategies,
+        learning_mode=learning_mode,
+    )
+
+    demand_units = read_units(
+        units_df=demand_units,
+        unit_type="demand",
+        forecaster=unit_forecasts,
+        world_bidding_strategies=world.bidding_strategies,
+        learning_mode=learning_mode,
+    )
+
+    exchange_units = read_units(
+        units_df=exchange_units,
+        unit_type="exchange",
+        forecaster=unit_forecasts,
+        world_bidding_strategies=world.bidding_strategies,
+    )
+
+    if dsm_units is not None:
+        for unit_type, units_df in dsm_units.items():
+            dsm_units = read_units(
+                units_df=units_df,
+                unit_type=unit_type,
+                forecaster=unit_forecasts,
+                world_bidding_strategies=world.bidding_strategies,
+                learning_mode=learning_mode,
+            )
+        for op, op_units in dsm_units.items():
+            units[op].extend(op_units)
+
+    for op, op_units in powerplant_units.items():
+        units[op].extend(op_units)
+    for op, op_units in storage_units.items():
+        units[op].extend(op_units)
+    for op, op_units in demand_units.items():
+        units[op].extend(op_units)
+    for op, op_units in exchange_units.items():
+        units[op].extend(op_units)
+
+    config_forecast_algorithms = units_operator_forecast_data["forecast_algorithms"]
+    operator_forecast_algorithms: dict[str, dict] = {}
+    if unit_operators is not None:
+        logger.info("Create unit_operators for portfolio strategies")
+        unit_operators_strategies = unit_operators.to_dict("index")
+        # remove starting "bidding_" string from market names
+        for operator in unit_operators_strategies.keys():
+            raw_params = unit_operators_strategies[operator]
+            operator_forecast_algorithms[operator] = get_unit_forecast_algorithms(
+                config_forecast_algorithms, raw_params
+            )
+            unit_operators_strategies[operator] = bidding_strategies_from_param_dict(
+                raw_params
+            )
+    else:
+        unit_operators_strategies = {}
+
+    operator_forecasts = {
+        op: UnitsOperatorForecaster(
+            index=units_operator_forecast_data["shared_unit_index"],
+            forecast_algorithms=operator_forecast_algorithms.get(
+                op, config_forecast_algorithms
+            ),
+        )
+        for op in set(units.keys())
+    }
+
+    # if distributed_role is true - there is a manager available
+    # and we can add each units_operator as a separate process
+    if world.distributed_role is True:
+        logger.info("Adding unit operators and units - with subprocesses")
+        for op, op_units in units.items():
+            strategies = unit_operators_strategies.get(op, {})
+            world.add_units_with_operator_subprocess(
+                op, op_units, strategies, forecaster=operator_forecasts.get(op)
+            )
+    else:
+        logger.info("Adding unit operators and units")
+        for company_name in set(units.keys()):
+            strategies = unit_operators_strategies.get(company_name, {})
+            world.add_unit_operator(
+                id=str(company_name),
+                strategies=strategies,
+                forecaster=operator_forecasts.get(company_name),
+            )
+
+        # add the units to corresponding unit operators
+        for op, op_units in units.items():
+            for unit in op_units:
+                world.add_unit(**unit)
+
+    # When use_forecasts_df is False, the loaded forecasts_df does not
+    # supersede algorithmic forecast calculation.
+    use_forecasts_df = config.get("use_forecasts_df", True)
+    world.init_forecasts(forecasts_df if use_forecasts_df else None)
+
+    if config.get("save_forecasts", False):
+        forecast_save_file = Path(scenario_data["path"]) / config.get(
+            "forecast_save_file",
+            "saved_forecasts.csv",
+        )
+        save_unique_forecasts(world.units.values(), forecast_save_file)
+
+    if (
+        world.learning_mode
+        and world.learning_role is not None
+        and len(world.learning_role.rl_strats) == 0
+    ):
+        raise ValueError("No RL units/strategies were provided!")
+
+
+def load_scenario_folder(
+    world: World,
+    inputs_path: str,
+    scenario: str,
+    study_case: str,
+):
+    """
+    Load a scenario from a given path.
+
+    This function loads a scenario within a specified study case from a given path, setting up the world environment for simulation and learning.
+
+    Args:
+        world (World): An instance of the World class representing the simulation environment.
+        inputs_path (str): The path to the folder containing input files necessary for the scenario.
+        scenario (str): The name of the scenario to be loaded.
+        study_case (str): The specific study case within the scenario to be loaded.
+
+    Raises:
+        ValueError: If the specified scenario or study case is not found in the provided inputs.
+
+    Note:
+        - The function sets up the world environment based on the provided inputs and configuration files.
+        - The function utilizes the specified inputs to configure the simulation environment, including market parameters, unit operators, and forecasting data.
+        - After calling this function, the world environment is prepared for further simulation and analysis.
+
+    """
+
+    world.scenario_data = load_config_and_create_forecaster(
+        inputs_path, scenario, study_case
+    )
+
+    setup_world(world=world)
+
+
+def load_custom_units(
+    world: World,
+    inputs_path: str,
+    scenario: str,
+    file_name: str,
+    forecast_file_name: str,
+    unit_type: str,
+) -> None:
+    """
+    Load custom units from a given path.
+
+    This function loads custom units of a specified type from a given path within a scenario, adding them to the world environment for simulation.
+
+    Args:
+        world (World): An instance of the World class representing the simulation environment.
+        inputs_path (str): The path to the folder containing input files necessary for the custom units.
+        scenario (str): The name of the scenario from which the custom units are to be loaded.
+        file_name (str): The name of the file containing the custom units.
+        unit_type (str): The type of the custom units to be loaded.
+
+    Example:
+        >>> load_custom_units(
+            world=world,
+            inputs_path="/path/to/inputs",
+            scenario="scenario_name",
+            file_name="custom_units.csv",
+            unit_type="custom_type"
+        )
+
+    Note:
+        - The function loads custom units from the specified file within the given scenario and adds them to the world environment for simulation.
+        - If the specified custom units file is not found, a warning is logged.
+        - Each unique unit operator in the custom units is added to the world's unit operators.
+        - The custom units are added to the world environment based on their type for use in simulations.
+    """
+    path = f"{inputs_path}/{scenario}"
+
+    custom_units = load_file(
+        path=path,
+        config={},
+        file_name=file_name,
+    )
+
+    if custom_units is None:
+        logger.warning(f"No {file_name} units were provided!")
+
+    forecasts = load_file(
+        path=path,
+        config={},
+        file_name=forecast_file_name,
+    )
+    if forecasts is None:
+        logger.warning(f"No {forecast_file_name} forecasts were provided!")
+
+    operators = custom_units.unit_operator.unique()
+    for operator in operators:
+        if operator not in world.unit_operators:
+            world.add_unit_operator(id=str(operator))
+
+    kwargs = {}
+    for k, v in forecasts.items():
+        kwargs[k] = v
+    forecaster = CustomUnitForecaster(forecasts.index, **kwargs)
+    add_units(
+        units_df=custom_units,
+        unit_type=unit_type,
+        world=world,
+        forecaster=forecaster,
+    )
+
+
+def run_learning(
+    world: World,
+    verbose: bool = False,
+) -> None:
+    """
+    Train Deep Reinforcement Learning (DRL) agents to act in a simulated market environment.
+
+    This function runs multiple episodes of simulation to train DRL agents, performs evaluation, and saves the best runs. It maintains the buffer and learned agents in memory to avoid resetting them with each new run.
+
+    Args:
+        world (World): An instance of the World class representing the simulation environment.
+        verbose (bool, optional): A flag indicating whether to enable verbose logging. Defaults to False.
+
+    Note:
+        - The function uses a ReplayBuffer to store experiences for training the DRL agents.
+        - It iterates through training episodes, updating the agents and evaluating their performance at regular intervals.
+        - Initial exploration is active at the beginning and is disabled after a certain number of episodes to improve the performance of DRL algorithms.
+        - Upon completion of training, the function performs an evaluation run using the last policy learned during training.
+        - The best policies are chosen based on the average reward obtained during the evaluation runs, and they are saved for future use.
+    """
+    from assume.reinforcement_learning.buffer import ReplayBuffer
+
+    if not verbose:
+        logger.setLevel(logging.WARNING)
+
+    # remove csv path so that nothing is written while learning
+    temp_csv_path = world.export_csv_path
+    world.export_csv_path = ""
+
+    # initialize policies already here to set the obs_dim and act_dim in the learning role
+    world.learning_role.rl_algorithm.initialize_policy()
+
+    # check if we already stored policies for this simulation
+    save_path = world.learning_role.learning_config.trained_policies_save_path
+    continue_learning = world.learning_role.learning_config.continue_learning
+    confirm_learning_save_path(save_path, continue_learning)
+
+    # also remove tensorboard logs
+    tensorboard_path = Path("tensorboard") / world.scenario_data["simulation_id"]
+    if tensorboard_path.exists():
+        shutil.rmtree(tensorboard_path, ignore_errors=True)
+
+    # -----------------------------------------
+    # Information that needs to be stored across episodes, aka one simulation run
+    inter_episodic_data = {
+        "buffer": ReplayBuffer(
+            buffer_size=world.learning_role.learning_config.replay_buffer_size,
+            obs_dim=world.learning_role.rl_algorithm.obs_dim,
+            act_dim=world.learning_role.rl_algorithm.act_dim,
+            n_rl_units=len(world.learning_role.rl_strats),
+            device=world.learning_role.device,
+            float_type=world.learning_role.float_type,
+        ),
+        "actors_and_critics": None,
+        "max_eval": defaultdict(lambda: -1e9),
+        "all_eval": defaultdict(list),
+        "avg_all_eval": [],
+        "episodes_done": 0,
+        "eval_episodes_done": 0,
+    }
+
+    world.learning_role.load_inter_episodic_data(inter_episodic_data)
+
+    validation_interval = world.learning_role.determine_validation_interval()
+
+    # sync train frequency with simulation horizon once at the beginning of training and overwrite scenario data
+    world.scenario_data["config"]["learning_config"]["train_freq"] = (
+        world.learning_role.sync_train_freq_with_simulation_horizon()
+    )
+
+    eval_episode = 1
+
+    for episode in tqdm(
+        range(1, world.learning_role.learning_config.training_episodes + 1),
+        desc="Training Episodes",
+    ):
+        # -----------------------------------------
+        # Give the newly initialized learning role the needed information across episodes
+        if episode != 1:
+            setup_world(
+                world=world,
+                episode=episode,
+            )
+            world.learning_role.load_inter_episodic_data(inter_episodic_data)
+
+        world.run()
+
+        world.learning_role.tensor_board_logger.update_tensorboard()
+
+        # -----------------------------------------
+        # Store updated information across episodes
+        inter_episodic_data = world.learning_role.get_inter_episodic_data()
+        inter_episodic_data["episodes_done"] = episode
+
+        # evaluation run:
+        if (
+            episode % validation_interval == 0
+            and episode
+            >= world.learning_role.learning_config.episodes_collecting_initial_experience
+            + validation_interval
+        ):
+            world.reset()
+
+            # load evaluation run
+            setup_world(
+                world=world,
+                evaluation_mode=True,
+                episode=episode,
+                eval_episode=eval_episode,
+            )
+
+            world.learning_role.load_inter_episodic_data(inter_episodic_data)
+
+            world.run()
+
+            world.learning_role.tensor_board_logger.update_tensorboard()
+
+            if not world.db_uri:
+                raise AssumeException("No learning rewards as no database was given")
+
+            total_rewards = world.output_role.get_sum_reward(episode=eval_episode)
+
+            if len(total_rewards) == 0:
+                raise AssumeException("No rewards were collected during evaluation run")
+
+            avg_reward = np.mean(total_rewards)
+
+            # check reward improvement in evaluation run
+            # and store best run in eval folder
+            terminate = world.learning_role.compare_and_save_policies(
+                {"avg_reward": avg_reward}
+            )
+
+            inter_episodic_data["eval_episodes_done"] = eval_episode
+
+            # if we have not improved in the last x evaluations, we stop loop
+            if terminate:
+                break
+
+            eval_episode += 1
+
+        world.reset()
+
+        # save the policies after each episode in case the simulation is stopped or crashes
+        if (
+            episode
+            >= world.learning_role.learning_config.episodes_collecting_initial_experience
+            + validation_interval
+        ):
+            world.learning_role.rl_algorithm.save_params(
+                directory=f"{world.learning_role.learning_config.trained_policies_save_path}/last_policies"
+            )
+
+    # container shutdown implicitly with new initialisation
+    logger.info("################")
+    logger.info("Training finished, Start evaluation run")
+    world.export_csv_path = temp_csv_path
+
+    world.reset()
+
+    # latest policies for final simulation run
+    world.scenario_data["config"]["learning_config"]["trained_policies_load_path"] = (
+        f"{world.learning_role.learning_config.trained_policies_save_path}/last_policies"
+    )
+
+    # load scenario for evaluation
+    setup_world(
+        world=world,
+        terminate_learning=True,
+    )
+
+
+if __name__ == "__main__":
+    data = read_grid(Path("examples/inputs/example_01d"))
