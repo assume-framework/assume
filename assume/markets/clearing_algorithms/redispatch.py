@@ -11,6 +11,7 @@ import pypsa
 from assume.common.grid_utils import (
     add_redispatch_generators,
     add_redispatch_loads,
+    add_redispatch_flexible_loads,
     calculate_network_meta,
     get_supported_solver_linopy,
     read_pypsa_grid,
@@ -70,6 +71,13 @@ class RedispatchMarketRole(MarketRole):
             loads=self.grid_data["loads"],
         )
 
+        self.flexible_loads = self.grid_data.get("flexible_loads",pd.DataFrame(columns=["node", "p_nom"]))
+        if not self.flexible_loads.empty:
+            add_redispatch_flexible_loads(
+                network=self.network,
+                flexible_loads=self.flexible_loads,
+            )
+
         self.solver_name = get_supported_solver_linopy(
             marketconfig.param_dict.get("solver_name", "highs")
         )
@@ -114,6 +122,18 @@ class RedispatchMarketRole(MarketRole):
         orderbook_df["accepted_volume"] = 0.0
         orderbook_df["accepted_price"] = 0.0
 
+        if "parent_unit_id" in orderbook_df.columns:
+            component_mask = (
+                orderbook_df["parent_unit_id"].notna()
+                & orderbook_df["parent_unit_id"].ne(orderbook_df["unit_id"])
+                & orderbook_df["parent_unit_id"].isin(self.flexible_loads.index)
+            )
+
+            if component_mask.any():
+                raise NotImplementedError(
+                    "Component-level redispatch clearing is not supported yet."
+                )
+
         # Now you can pivot the DataFrame
         volume_pivot = orderbook_df.pivot(
             index="start_time", columns="unit_id", values="volume"
@@ -147,10 +167,12 @@ class RedispatchMarketRole(MarketRole):
         # Generators and loads from the grid data
         generator_names = self.grid_data["generators"].index
         load_names = self.grid_data["loads"].index
+        flexible_load_names = self.flexible_loads.index
 
         gen_cols = p_set.columns.intersection(generator_names)
         load_cols = p_set.columns.intersection(load_names)
-
+        flex_cols = p_set.columns.intersection(flexible_load_names)
+        
         # 1. Fixed generator dispatch
         gen_p_set = p_set[gen_cols].copy()
 
@@ -167,7 +189,9 @@ class RedispatchMarketRole(MarketRole):
 
         # 2. Fixed demand/load profile
         # PyPSA p_set values to positive values since the sign of the p_set values is usually positive
-        load_p_set = p_set[load_cols].copy().abs()
+        # Here the cleared capacity of flexible loads is also added with the normal loads 
+        load_cols_all = load_cols.union(flex_cols)
+        load_p_set = p_set[load_cols_all].copy().abs()
 
         redispatch_network.loads_t.p_set = load_p_set.reindex(
             index=redispatch_network.snapshots,
@@ -176,22 +200,28 @@ class RedispatchMarketRole(MarketRole):
         )
 
         # 3. Redispatch flexibility only for power plants
+
+        # All redispatch-capable units
+        redisp_cols = gen_cols.union(flex_cols)
+        redisp_p_nom = pd.Series({u: redispatch_network.generators.at[f"{u}_up", "p_nom"] for u in redisp_cols})
+
         # Upward redispatch capacity:
-        # Possible maximum upwards generation : availability * max_power - market_cleared_capacity (no incorporation of ramping constraints yet)
+        # Possible maximum upwards generation : availability * max_power - market_cleared_capacity
+        # no incorporation of ramping constraints yet
         p_max_pu_up = (
-            (max_power_pivot[gen_cols] - gen_p_set)
-            .div(p_nom.where(p_nom != 0, np.inf))
-            .clip(lower=0, upper=1)
+            (max_power_pivot[redisp_cols] - p_set[redisp_cols])
+            .div(redisp_p_nom, axis="columns")
+            .clip(lower=0.0, upper=1.0)
         )
 
         # Downward redispatch capacity:
         # Possible maximum downward generation : market_cleared_capacity - min_power (no incorporation of ramping constraints yet)
         p_max_pu_down = (
-            (gen_p_set - min_power_pivot[gen_cols])
-            .div(p_nom.where(p_nom != 0, np.inf))
-            .clip(lower=0, upper=1)
+            (p_set[redisp_cols] - min_power_pivot[redisp_cols])
+            .div(redisp_p_nom, axis="columns")
+            .clip(lower=0.0, upper=1.0)
         )
-        costs = price_pivot[gen_cols]
+        costs = price_pivot[redisp_cols]
 
         redispatch_network.generators_t.p_max_pu.update(p_max_pu_up.add_suffix("_up"))
 
