@@ -12,6 +12,7 @@ from assume.scenario.loader_csv import (
     load_config_and_create_forecaster,
     setup_world,
 )
+from assume.scenario.loader_csv import build_flexible_loads
 from assume.world import World
 
 
@@ -194,6 +195,81 @@ def test_forecast_interface__save_forecasts():
         saved_forecasts["residual_load_naive_forecast_EOM"]
         == expected_load["load_forecast"]
     ).all()
+
+
+def test_build_flexible_loads_collects_all_dsm_types():
+    """
+    build_flexible_loads() must be technology-agnostic: industrial,
+    residential and sector-coupled DSM units use the same grid interface.
+    """
+    dsm_units = {
+        "steel_plant": pd.DataFrame(
+            {
+                "node": ["N"],
+                "electrical_p_nom": [25.0],
+            },
+            index=["steel_1"],
+        ),
+        "building": pd.DataFrame(
+            {
+                "node": ["E"],
+                "electrical_p_nom": [5.0],
+            },
+            index=["building_1"],
+        ),
+        "sector_coupled_system": pd.DataFrame(
+            {
+                "node": ["S"],
+                "electrical_p_nom": [8.0],
+            },
+            index=["hs_south"],
+        ),
+    }
+
+    flexible_loads = build_flexible_loads(dsm_units)
+
+    assert set(flexible_loads.index) == {
+        "steel_1",
+        "building_1",
+        "hs_south",
+    }
+
+    assert flexible_loads.at["steel_1", "node"] == "N"
+    assert flexible_loads.at["steel_1", "p_nom"] == pytest.approx(25.0)
+
+    assert flexible_loads.at["building_1", "node"] == "E"
+    assert flexible_loads.at["building_1", "p_nom"] == pytest.approx(5.0)
+
+    assert flexible_loads.at["hs_south", "node"] == "S"
+    assert flexible_loads.at["hs_south", "p_nom"] == pytest.approx(8.0)
+
+
+def test_build_flexible_loads_excludes_non_electrical_dsm_units():
+    """
+    A DSM parent with no direct electrical grid capacity must not create
+    a redispatch flexible-load asset.
+    """
+    dsm_units = {
+        "sector_coupled_system": pd.DataFrame(
+            {
+                "node": ["N", "S"],
+                "electrical_p_nom": [8.0, 0.0],
+            },
+            index=["heat_with_hp", "thermal_only"],
+        ),
+    }
+
+    flexible_loads = build_flexible_loads(dsm_units)
+
+    assert "heat_with_hp" in flexible_loads.index
+    assert "thermal_only" not in flexible_loads.index
+
+
+def test_build_flexible_loads_handles_empty_dsm_input():
+    flexible_loads = build_flexible_loads({})
+
+    assert flexible_loads.empty
+    assert {"node", "p_nom"}.issubset(flexible_loads.columns)
 
 
 if __name__ == "__main__":

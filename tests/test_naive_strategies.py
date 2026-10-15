@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
-
+from types import SimpleNamespace
 from assume.common.forecaster import UnitForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
@@ -17,7 +17,9 @@ from assume.strategies import (
     EnergyNaiveProfileStrategy,
     EnergyNaiveStrategy,
 )
-from assume.strategies.naive_strategies import EnergyNaiveRedispatchStrategy
+from assume.strategies.naive_strategies import (
+    EnergyNaiveRedispatchStrategy, SectorCoupledEnergyNaiveStrategy
+)
 from tests.conftest import MockMinMaxUnit
 
 start = datetime(2023, 7, 1)
@@ -242,6 +244,48 @@ def test_naive_redispatch_strategy(
     assert [bids[i]["price"] for i in range(len(bids))] == pytest.approx(
         [3] * len(bids)
     )  # should bid at marginal cost, which are set to 3 in MockMinMaxUnit
+
+
+def test_sector_coupled_energy_strategy_creates_aggregate_demand_bid(
+    sector_coupled_market_config,
+    validation_product,
+    unit_id,
+    node,
+    power_requirement,
+    expected_volume,
+):
+    def get_eom_market_positions(_start):
+        return [
+            {
+                "unit_id": unit_id,
+                "parent_unit_id": unit_id,
+                "component_type": "aggregate",
+                "node": node,
+                "volume": -power_requirement,
+            }
+        ]
+
+    unit = SimpleNamespace(
+        prepare_market_state=lambda: None,
+        get_eom_market_positions=get_eom_market_positions,
+    )
+
+    strategy = SectorCoupledEnergyNaiveStrategy()
+    bids = strategy.calculate_bids(
+        unit,
+        sector_coupled_market_config,
+        validation_product,
+    )
+
+    assert len(bids) == 1
+
+    bid = bids[0]
+    assert bid["unit_id"] == unit_id
+    assert bid["parent_unit_id"] == unit_id
+    assert bid["component_type"] == "aggregate"
+    assert bid["node"] == node
+    assert bid["volume"] == pytest.approx(expected_volume, abs=1e-5)
+    assert bid["price"] == pytest.approx(3000.0, abs=1e-5)
 
 
 if __name__ == "__main__":
