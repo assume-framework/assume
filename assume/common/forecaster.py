@@ -906,35 +906,116 @@ class CementForecaster(DsmUnitForecaster):
 
         initializing_unit.setup_model()
 
-class HeatSystemForecaster(DsmUnitForecaster):
+class SectorCoupledForecaster(DsmUnitForecaster):
     """
-    Forecaster for heat system units.
+    Generic forecaster for SectorCoupledSystem units.
 
-    Provides the forecasts required by a HeatSystem:
-    - heat demand
-    - electricity price
-    - fuel prices
-    - DSM congestion and renewable-utilisation signals
+    The forecaster provides the common DSM forecasts inherited from
+    DsmUnitForecaster together with arbitrary carrier-demand profiles,
+    fuel prices and optional sector-specific profiles.
 
-    The electricity price is inherited from DsmUnitForecaster and is
-    derived from the EOM price forecast.
+    Attributes
+    ----------
+    carrier_demands : dict[str, FastSeries]
+        Demand timeseries indexed by carrier name.
+
+    fuel_prices : dict[str, FastSeries]
+        Fuel-price timeseries, e.g. natural gas or hydrogen.
+
+    electricity_price_flex : FastSeries
+        Optional electricity-price signal used for flexibility
+        optimisation. If not explicitly supplied, the normal
+        electricity-price forecast is used.
+
+    congestion_signal
+        Inherited DSM congestion forecast.
+
+    renewable_utilisation_signal
+        Inherited DSM renewable-utilisation forecast.
+
+    electricity_price
+        Inherited electricity-price forecast.
     """
 
     def __init__(
         self,
         index: ForecastIndex,
+        carrier_demands: dict[str, ForecastSeries] | None = None,
         fuel_prices: dict[str, ForecastSeries] | None = None,
-        heat_demand: ForecastSeries = 0,
         electricity_price_flex: ForecastSeries | None = None,
         availability: ForecastSeries = 1,
-        forecast_algorithms: dict[str, str] = {},
-        forecast_registries: dict[str, dict] = None,
-        market_prices: dict[str, ForecastSeries] = None,
-        residual_load: dict[str, ForecastSeries] = None,
+        forecast_algorithms: dict[str, str] | None = None,
+        forecast_registries: dict[str, dict] | None = None,
+        market_prices: dict[str, ForecastSeries] | None = None,
+        residual_load: dict[str, ForecastSeries] | None = None,
         congestion_signal: ForecastSeries = 0.0,
         renewable_utilisation_signal: ForecastSeries = 0.0,
-        electricity_price: ForecastSeries = None,
+        electricity_price: ForecastSeries | None = None,
+        **kwargs,
     ):
+        """
+        Initialize a SectorCoupledForecaster.
+
+        Parameters
+        ----------
+        index : ForecastIndex
+            Time index used by the unit.
+
+        carrier_demands : dict[str, ForecastSeries], optional
+            Demand timeseries keyed by energy carrier, e.g.::
+
+                {
+                    "heat": heat_demand,
+                    "hydrogen": hydrogen_demand,
+                }
+
+            Each entry is additionally exposed as
+            ``<carrier>_demand``.
+
+        fuel_prices : dict[str, ForecastSeries], optional
+            Fuel-price timeseries keyed by fuel name, e.g.::
+
+                {
+                    "natural gas": gas_price,
+                    "hydrogen": hydrogen_price,
+                }
+
+        electricity_price_flex : ForecastSeries, optional
+            Alternative electricity-price signal used for flexibility
+            optimisation. If omitted, ``electricity_price`` is used.
+
+        availability : ForecastSeries
+            Availability profile of the parent system.
+
+        forecast_algorithms : dict[str, str], optional
+            Forecast algorithms inherited from DsmUnitForecaster.
+
+        forecast_registries : dict[str, dict], optional
+            Forecast algorithm registries.
+
+        market_prices : dict[str, ForecastSeries], optional
+            Market-price forecasts.
+
+        residual_load : dict[str, ForecastSeries], optional
+            Residual-load forecasts.
+
+        congestion_signal : ForecastSeries
+            Congestion forecast.
+
+        renewable_utilisation_signal : ForecastSeries
+            Renewable-utilisation forecast.
+
+        electricity_price : ForecastSeries, optional
+            Explicit electricity-price profile.
+
+        **kwargs
+            Arbitrary additional sector-coupling profiles. Pandas
+            Series are converted automatically to FastSeries.
+        """
+
+        if forecast_algorithms is None:
+            forecast_algorithms = {}
+
         super().__init__(
             index=index,
             availability=availability,
@@ -947,52 +1028,150 @@ class HeatSystemForecaster(DsmUnitForecaster):
             electricity_price=electricity_price,
         )
 
-        if fuel_prices is None:
-            fuel_prices = {}
+        # Carrier demands
+        self.carrier_demands: dict[str, FastSeries] = {}
 
-        self.fuel_prices = self._dict_to_series(fuel_prices)
-        self.heat_demand = self._to_series(heat_demand)
+        for carrier, demand in (carrier_demands or {}).items():
+            if demand is None:
+                continue
 
+            carrier = str(carrier).strip()
+
+            if not carrier:
+                raise ValueError(
+                    "Carrier names in carrier_demands must not be empty."
+                )
+
+            demand_series = self._to_series(demand)
+
+            self.carrier_demands[carrier] = demand_series
+
+            # Convenience attribute required by SectorCoupledSystem.
+            setattr(
+                self,
+                f"{carrier}_demand",
+                demand_series,
+            )
+        # Fuel prices
+        self.fuel_prices: dict[str, FastSeries] = self._dict_to_series(
+            fuel_prices or {}
+        )
+
+        # Optional electricity price used specifically for flexibility
         self._electricity_price_flex = (
             self._to_series(electricity_price_flex)
             if electricity_price_flex is not None
             else None
         )
 
+        # Additional sector-specific profiles
+        # Examples: thermal_storage_schedule, hydrogen_storage_schedule, component availability profiles etc.
+        for key, value in kwargs.items():
+            if isinstance(value, pd.Series):
+                value = self._to_series(value)
+
+            setattr(self, key, value)
+
+    # Carrier-demand interface
+    def get_demand(
+        self,
+        carrier: str,
+        default: ForecastSeries | None = None,
+    ) -> FastSeries:
+        """
+        Return the demand forecast of a carrier.
+
+        Parameters
+        ----------
+        carrier : str
+            Carrier name, e.g. ``"heat"`` or ``"hydrogen"``.
+
+        default : ForecastSeries, optional
+            Value returned when no demand for the carrier exists.
+            If omitted, a zero-valued series is returned.
+
+        Returns
+        -------
+        FastSeries
+            Demand profile of the requested carrier.
+        """
+
+        if carrier in self.carrier_demands:
+            return self.carrier_demands[carrier]
+
+        if default is None:
+            default = 0.0
+
+        return self._to_series(default)
+
+    # Fuel-price interface
+    def get_price(self, fuel: str) -> FastSeries:
+        """
+        Return the forecasted price of a fuel.
+
+        A zero-valued series is returned if the requested fuel does
+        not exist.
+
+        Parameters
+        ----------
+        fuel : str
+            Fuel name, e.g. ``"natural gas"`` or ``"hydrogen"``.
+
+        Returns
+        -------
+        FastSeries
+            Fuel-price timeseries.
+        """
+
+        if fuel not in self.fuel_prices:
+            return self._to_series(0.0)
+
+        return self.fuel_prices[fuel]
+
+    # Flexibility electricity price
     @property
     def electricity_price_flex(self) -> FastSeries:
         """
-        Alternative electricity-price signal used for flexibility
-        optimisation.
+        Electricity-price signal used for flexibility optimisation.
 
-        If no separate flexibility price is provided, use the normal
-        electricity-price forecast.
+        If no dedicated flexibility-price forecast was supplied,
+        use the normal electricity-price forecast.
         """
+
         if self._electricity_price_flex is None:
             return self.electricity_price
 
         return self._electricity_price_flex
 
     @electricity_price_flex.setter
-    def electricity_price_flex(self, value: ForecastSeries) -> None:
+    def electricity_price_flex(
+        self,
+        value: ForecastSeries | None,
+    ) -> None:
         self._electricity_price_flex = (
             self._to_series(value)
             if value is not None
             else None
         )
 
-    def get_price(self, fuel: str) -> FastSeries:
+    # Generic forecast access
+    def __getitem__(self, key: str):
         """
-        Return the forecasted price for a fuel.
-
-        Returns a zero-valued series if the requested fuel is not
-        available.
+        Allow dictionary-style access to arbitrary forecasts.
+        Examples
+            forecaster["heat_demand"]
+            forecaster["hydrogen_demand"]
+            forecaster["seasonal_storage_schedule"]
         """
-        if fuel not in self.fuel_prices:
-            return self._to_series(0)
+        try:
+            return getattr(self, key)
+        except AttributeError as exc:
+            raise KeyError(
+                f"Forecast '{key}' not found in "
+                "SectorCoupledForecaster."
+            ) from exc
 
-        return self.fuel_prices[fuel]
-
+    # ASSUME forecast initialization
     def initialize(
         self,
         units: list[BaseUnit],
@@ -1000,6 +1179,10 @@ class HeatSystemForecaster(DsmUnitForecaster):
         forecast_df: ForecastSeries = None,
         initializing_unit: BaseUnit = None,
     ):
+        """
+        Initialize market and DSM forecasts and set up the physical SectorCoupledSystem model
+        """
+
         super().initialize(
             units,
             market_configs,
@@ -1007,11 +1190,20 @@ class HeatSystemForecaster(DsmUnitForecaster):
             initializing_unit,
         )
 
-        initializing_unit.congestion_signal = self.congestion_signal
+        if initializing_unit is None:
+            return
+
+        # Standard DSM signals used by the flexibility framework
+        initializing_unit.congestion_signal = (
+            self.congestion_signal
+        )
+
         initializing_unit.renewable_utilisation_signal = (
             self.renewable_utilisation_signal
         )
 
+        # The unit receives all carrier-specific forecasts through this
+        # forecaster before its Pyomo model is constructed
         initializing_unit.setup_model()
 
 class SteamgenerationForecaster(DsmUnitForecaster):
