@@ -129,42 +129,14 @@ def add_redispatch_flexible_loads(
 ) -> None:
     """
     Add flexible electrical consumers to the redispatch network.
-
     Each flexible consumer is represented by:
 
-    1. A fixed PyPSA Load containing the DA/reference consumption.
-       The actual p_set is assigned later in redispatch.py.
-
-    2. An ``_up`` Generator:
-       reduction of electricity consumption,
-       electrically equivalent to positive injection.
-
-    3. A ``_down`` Generator with sign=-1:
-       increase of electricity consumption,
-       electrically equivalent to negative injection.
-
-    Parameters
-    ----------
-    network : pypsa.Network
-        Redispatch network.
-
-    flexible_loads : pd.DataFrame
-        DataFrame indexed by market-facing unit_id.
-
-        Required columns:
-            node
-            p_nom
     """
-
     if flexible_loads.empty:
         return
 
     required_columns = {"node", "p_nom"}
-
-    missing_columns = (
-        required_columns
-        - set(flexible_loads.columns)
-    )
+    missing_columns = (required_columns- set(flexible_loads.columns))
 
     if missing_columns:
         raise ValueError(
@@ -189,23 +161,14 @@ def add_redispatch_flexible_loads(
             "Flexible redispatch loads require p_nom > 0. "
             f"Invalid units: {invalid}"
         )
-
-    # ----------------------------------------------------------
-    # Time-dependent zero profiles used during network creation.
-    # redispatch.py overwrites them for every market clearing.
-    # ----------------------------------------------------------
     zeros = pd.DataFrame(
         0.0,
         index=network.snapshots,
         columns=flexible_loads.index,
     )
 
-    # ----------------------------------------------------------
     # 1. Physical electricity consumption
-    # ----------------------------------------------------------
-    missing_loads = flexible_loads.index.difference(
-        network.loads.index
-    )
+    missing_loads = flexible_loads.index.difference(network.loads.index)
 
     if len(missing_loads) > 0:
         network.add(
@@ -217,19 +180,10 @@ def add_redispatch_flexible_loads(
             p_set=zeros[missing_loads],
         )
 
-    # ----------------------------------------------------------
     # 2. Upward redispatch
-    #
-    # Reducing consumption is electrically equivalent
-    # to positive generation.
-    # ----------------------------------------------------------
-    up_names = pd.Index(
-        [f"{unit_id}_up" for unit_id in flexible_loads.index]
-    )
-
-    existing_up = pd.Index(
-        network.generators.index
-    ).intersection(up_names)
+    # Reducing consumption is electrically equivalent to positive generation.
+    up_names = pd.Index([f"{unit_id}_up" for unit_id in flexible_loads.index])
+    existing_up = pd.Index(network.generators.index).intersection(up_names)
 
     if len(existing_up) > 0:
         raise ValueError(
@@ -249,19 +203,10 @@ def add_redispatch_flexible_loads(
         sign=1,
     )
 
-    # ----------------------------------------------------------
     # 3. Downward redispatch
-    #
-    # Increasing consumption is electrically equivalent
-    # to negative generation.
-    # ----------------------------------------------------------
-    down_names = pd.Index(
-        [f"{unit_id}_down" for unit_id in flexible_loads.index]
-    )
-
-    existing_down = pd.Index(
-        network.generators.index
-    ).intersection(down_names)
+    # Increasing consumption is electrically equivalent to negative generation.
+    down_names = pd.Index([f"{unit_id}_down" for unit_id in flexible_loads.index])
+    existing_down = pd.Index(network.generators.index).intersection(down_names)
 
     if len(existing_down) > 0:
         raise ValueError(
