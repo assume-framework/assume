@@ -204,10 +204,10 @@ def load_dsm_units(path: str, config: dict, file_name: str) -> dict:
     # Define columns that are common across different technologies within the same plant
     common_columns = [
         "unit_operator", "objective", "demand", "cost_tolerance", "unit_type", "node",
-        "flexibility_measure", "is_prosumer", "congestion_threshold", "peak_load_cap",
-        "load_profile_deviation", "system_type", "market_representation",
+        "electrical_p_nom","flexibility_measure", "is_prosumer", "congestion_threshold", 
+        "peak_load_cap", "load_profile_deviation", "system_type", "market_representation",
         "enforce_terminal_soc", "primary_carrier",
-    ]  # fmt: skip
+    ]
     # Filter the common columns to only include those that exist in the DataFrame
     common_columns = [col for col in common_columns if col in dsm_units.columns]
 
@@ -315,46 +315,47 @@ def build_flexible_loads(dsm_units: dict[str, pd.DataFrame]) -> pd.DataFrame:
     Build the static grid-facing representation of DSM units
     that may participate in redispatch as flexible consumers.
 
-    Returns one row per physical DSM parent.
+    Returns one row per physical DSM parent with:
+        node
+        p_nom
+        unit_type
     """
-    records = []
+    frames = []
+
+    if not dsm_units:
+        return pd.DataFrame(columns=["node", "p_nom", "unit_type"])
 
     for unit_type, units_df in dsm_units.items():
         if units_df is None or units_df.empty:
             continue
 
-        for unit_id, unit in units_df.iterrows():
-            node = unit.get("node")
-            if node is None or pd.isna(node):
-                continue
+        # No direct electrical grid capacity defined -> not a flexible load
+        if "electrical_p_nom" not in units_df.columns:
+            continue
 
-            components = unit.get("components", {})
-            p_nom = 0.0
+        flexible = units_df[["node", "electrical_p_nom"]].copy()
+        flexible["electrical_p_nom"] = pd.to_numeric(
+            flexible["electrical_p_nom"], errors="coerce"
+        ).fillna(0.0)
 
-            for component_name, component in components.items():
-                # Components with direct electrical consumption
-                max_power = component.get("max_power", 0.0)
-                try:
-                    max_power = abs(float(max_power))
-                except (TypeError, ValueError):
-                    max_power = 0.0
+        # Electrical capacity is a positive physical capacity
+        flexible["electrical_p_nom"] = flexible["electrical_p_nom"].abs()
 
-                # We still need a robust way of identifying
-                # which component types consume electricity.
-                if component_name in {"heat_pump", "electrolyser", "electric_boiler"}:
-                    p_nom += max_power
+        # Remove units without a valid grid node or electrical capacity
+        flexible = flexible[
+            flexible["node"].notna() & (flexible["electrical_p_nom"] > 0.0)
+        ]
+        if flexible.empty:
+            continue
 
-            if p_nom <= 0:
-                continue
+        flexible.rename(columns={"electrical_p_nom": "p_nom"}, inplace=True)
+        flexible["unit_type"] = unit_type
+        frames.append(flexible)
 
-            records.append(
-                {"unit_id": unit_id, "node": node, "p_nom": p_nom, "unit_type": unit_type}
-            )
-
-    if not records:
+    if not frames:
         return pd.DataFrame(columns=["node", "p_nom", "unit_type"])
 
-    return pd.DataFrame(records).set_index("unit_id")
+    return pd.concat(frames)
 
 
 def replace_paths(config: dict, inputs_path: str):

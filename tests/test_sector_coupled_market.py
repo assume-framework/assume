@@ -96,16 +96,6 @@ def _accepted_by_unit(accepted_orders):
     return {order["unit_id"]: order for order in accepted_orders}
 
 
-@pytest.mark.parametrize(
-    "unit_id,node,power_requirement,expected_volume",
-    [
-        ("hs_north", "north", 2.0, -2.0),
-        ("hs_east", "east", 3.0, -3.0),
-        ("hs_west", "west", 4.0, -4.0),
-    ],
-)
-
-
 def test_market_without_sector_coupled_system_clears_at_wind_price(
     sector_coupled_market_config,
     validation_product,
