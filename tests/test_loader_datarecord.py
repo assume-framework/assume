@@ -102,24 +102,36 @@ def test_loader_datarecord_setup():
         study_case="unit_case",
     )
 
-    assert "gen_gas" in world.units
-    assert "load_city" in world.units
-    assert "batt_1" in world.units
-    assert "powerplant_operator" in world.unit_operators
-    assert "demand_operator" in world.unit_operators
-    assert "storage_operator" in world.unit_operators
+    assert "gen_gas" in world.units, "generator gen_gas must be registered in world"
+    assert "load_city" in world.units, "load_city must be registered in world"
+    assert "batt_1" in world.units, "storage batt_1 must be registered in world"
+    assert "powerplant_operator" in world.unit_operators, (
+        "powerplant_operator must be registered"
+    )
+    assert "demand_operator" in world.unit_operators, (
+        "demand_operator must be registered"
+    )
+    assert "storage_operator" in world.unit_operators, (
+        "storage_operator must be registered"
+    )
 
     gen_unit = world.units["gen_gas"]
-    assert gen_unit.max_power == 250.0
-    assert gen_unit.fuel_type == "gas"
+    assert gen_unit.max_power == 250.0, "generator max_power must match p_nom"
+    assert gen_unit.fuel_type == "gas", "generator fuel_type must match carrier"
 
     load_unit = world.units["load_city"]
-    assert load_unit.node == "bus_north"
+    assert load_unit.node == "bus_north", "load node must match bus"
 
     storage_unit = world.units["batt_1"]
-    assert storage_unit.max_power_charge == -50.0
-    assert storage_unit.max_power_discharge == 50.0
-    assert storage_unit.capacity == 200.0
+    assert storage_unit.max_power_charge == -50.0, (
+        "storage max_power_charge must be negative"
+    )
+    assert storage_unit.max_power_discharge == 50.0, (
+        "storage max_power_discharge must match p_nom"
+    )
+    assert storage_unit.capacity == 200.0, (
+        "storage capacity must match p_nom * max_hours"
+    )
 
 
 def test_loader_datarecord_simulation_run():
@@ -172,5 +184,7 @@ def test_loader_datarecord_simulation_run():
     world.run()
 
     gen = world.units["gen_solar"]
-    assert "energy" in gen.outputs
-    assert gen.outputs["energy"].at[pd.Timestamp("2026-01-01 01:00:00")] == 50.0
+    assert "energy" in gen.outputs, "unit outputs must record dispatched energy"
+    assert gen.outputs["energy"].at[pd.Timestamp("2026-01-01 01:00:00")] == 50.0, (
+        "dispatched energy at step 1 must be 50.0 MW"
+    )

@@ -34,23 +34,28 @@ def _extract_connection_map(record: Any) -> dict[str, str]:
     return {}
 
 
+def _build_attribute_map(record: Any, attr_name: str) -> dict[str, pd.Series]:
+    """Map entity names to their time series for `attr_name` in one pass."""
+    frame = record.attributes.get(attr_name)
+    if frame is None:
+        return {}
+    df = frame.collect().to_pandas()
+    if "entity" not in df.columns or "value" not in df.columns:
+        return {}
+    time_col = "snapshot" if "snapshot" in df.columns else "timestep"
+    if time_col not in df.columns:
+        return {}
+    return {
+        str(entity): sub.set_index(time_col)["value"]
+        for entity, sub in df.groupby("entity")
+    }
+
+
 def _extract_attribute_series(
     record: Any, attr_name: str, entity_name: str
 ) -> pd.Series | None:
     """Extract a time series for a given attribute and entity."""
-    frame = record.attributes.get(attr_name)
-    if frame is None:
-        return None
-    df = frame.collect().to_pandas()
-    if "entity" not in df.columns or "value" not in df.columns:
-        return None
-    time_col = "snapshot" if "snapshot" in df.columns else "timestep"
-    if time_col not in df.columns:
-        return None
-    subset = df[df["entity"] == entity_name]
-    if subset.empty:
-        return None
-    return subset.set_index(time_col)["value"]
+    return _build_attribute_map(record, attr_name).get(entity_name)
 
 
 def load_datarecord(
@@ -150,6 +155,9 @@ def load_datarecord(
         strategies = bidding_strategies
 
     connections = _extract_connection_map(record)
+    p_max_map = _build_attribute_map(record, "p_max_pu")
+    mc_map = _build_attribute_map(record, "marginal_cost")
+    p_set_map = _build_attribute_map(record, "p_set")
 
     # Generators / Power Plants
     gen_type = "power_plant" if "power_plant" in record.entity_types else "Generator"
@@ -172,9 +180,9 @@ def load_datarecord(
             min_up = int(gen.get("min_up_time", gen.get("min_operating_time", 1)))
             min_down = int(gen.get("min_down_time", 1))
 
-            av_series = _extract_attribute_series(record, "p_max_pu", name)
+            av_series = p_max_map.get(name)
             availability = av_series if av_series is not None else 1.0
-            mc_series = _extract_attribute_series(record, "marginal_cost", name)
+            mc_series = mc_map.get(name)
             mc_value = float(gen.get("marginal_cost", 50.0))
             fuel_prices = (
                 {carrier: mc_series} if mc_series is not None else {carrier: mc_value}
@@ -212,7 +220,7 @@ def load_datarecord(
         for _, load in loads_df.iterrows():
             name = str(load.get("entity", load.name))
             node = connections.get(name, str(load.get("bus", "node_0")))
-            load_series = _extract_attribute_series(record, "p_set", name)
+            load_series = p_set_map.get(name)
             if load_series is None:
                 continue
             abs_max = float(abs(load_series).max())
