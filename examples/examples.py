@@ -108,7 +108,7 @@ available_examples = {
     # redispatch example
     "redisp_3_nodes": {"scenario": "example_04a", "study_case": "base"},
     # heat system example
-    "heat_system_3_nodes": {"scenario": "example_04b", "study_case": "base"},
+    "sector_coupled_3_nodes": {"scenario": "example_04b", "study_case": "base"},
 }
 
 
@@ -125,7 +125,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small_with_vre_and_storage"
+    example = "heat_system_with_storage_3_nodes"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
