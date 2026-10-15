@@ -100,13 +100,9 @@ class UnitsOperatorDirectStrategy(UnitOperatorStrategy):
             for i, order in enumerate(product_bids):
                 order["agent_addr"] = units_operator.context.addr
                 if market_config.volume_tick:
-                    order["volume"] = round(
-                        order["volume"] / market_config.volume_tick
-                    )
+                    order["volume"] = round(order["volume"] / market_config.volume_tick)
                 if market_config.price_tick:
-                    order["price"] = round(
-                        order["price"] / market_config.price_tick
-                    )
+                    order["price"] = round(order["price"] / market_config.price_tick)
                 market_unit_id = order.get("unit_id", unit_id)
                 order.setdefault("parent_unit_id", unit_id)
                 if "bid_id" not in order or order["bid_id"] is None:
