@@ -55,9 +55,9 @@ def _extract_attribute_series(
 
 def load_datarecord(
     world: World,
-    scenario: str,
-    study_case: str,
     record: Any,
+    scenario: str = "datarecord_scenario",
+    study_case: str = "base",
     marketdesign: list[MarketConfig] | None = None,
     bidding_strategies: dict[str, dict[str, Any]] | None = None,
     save_frequency_hours: int = 4,
@@ -68,12 +68,12 @@ def load_datarecord(
     ----------
     world : World
         The ASSUME World instance to configure.
-    scenario : str
-        Name of the scenario.
-    study_case : str
-        Name of the study case.
     record : RecordLike
         The resolved datarecord.
+    scenario : str, default "datarecord_scenario"
+        Name of the scenario.
+    study_case : str, default "base"
+        Name of the study case.
     marketdesign : list of MarketConfig, optional
         Market configurations to attach to the market operator.
     bidding_strategies : dict, optional
@@ -81,6 +81,14 @@ def load_datarecord(
     save_frequency_hours : int, default 4
         Output persistence interval in hours.
     """
+    if isinstance(record, str) and not hasattr(record, "dims"):
+        scenario_str = record
+        study_case_str = str(scenario)
+        actual_record = study_case
+        scenario = scenario_str
+        study_case = study_case_str
+        record = actual_record
+
     time_frame = record.dims.get("snapshot") or record.dims.get("timestep")
     if time_frame is None:
         msg = "record must declare a 'snapshot' or 'timestep' dimension for ASSUME"
@@ -130,7 +138,9 @@ def load_datarecord(
             mc.market_id: "powerplant_energy_naive" for mc in marketdesign
         }
         default_demand = {mc.market_id: "demand_energy_naive" for mc in marketdesign}
-        default_storage = {mc.market_id: "storage_energy_naive" for mc in marketdesign}
+        default_storage = {
+            mc.market_id: "storage_energy_heuristic_flexable" for mc in marketdesign
+        }
         strategies = {
             "power_plant": defaultdict(lambda: default_powerplant),
             "demand": defaultdict(lambda: default_demand),
@@ -237,15 +247,15 @@ def load_datarecord(
             )
             max_hours = float(storage.get("max_hours", 4.0))
             capacity = float(storage.get("capacity", p_nom * max_hours))
+            charge_power = float(storage.get("max_power_charge", p_nom))
+            discharge_power = float(storage.get("max_power_discharge", p_nom))
             world.add_unit(
                 name,
                 "storage",
                 "storage_operator",
                 {
-                    "max_power_charge": float(storage.get("max_power_charge", p_nom)),
-                    "max_power_discharge": float(
-                        storage.get("max_power_discharge", p_nom)
-                    ),
+                    "max_power_charge": -abs(charge_power),
+                    "max_power_discharge": abs(discharge_power),
                     "efficiency_charge": float(
                         storage.get(
                             "efficiency_store", storage.get("efficiency_charge", 0.9)

@@ -44,10 +44,23 @@ def test_loader_datarecord_setup():
         }
     )
 
+    storage_df = pd.DataFrame(
+        {
+            "entity": ["batt_1"],
+            "p_nom": [50.0],
+            "max_hours": [4.0],
+            "carrier": ["battery"],
+            "bus": ["bus_north"],
+            "state_of_charge_initial": [0.5],
+            "efficiency_store": [0.95],
+            "efficiency_dispatch": [0.95],
+        }
+    )
+
     conn_df = pd.DataFrame(
         {
-            "entity": ["gen_gas", "load_city"],
-            "bus": ["bus_north", "bus_north"],
+            "entity": ["gen_gas", "load_city", "batt_1"],
+            "bus": ["bus_north", "bus_north", "bus_north"],
         }
     )
 
@@ -72,6 +85,7 @@ def test_loader_datarecord_setup():
         entity_types={
             "power_plant": nw.from_native(gen_df).lazy(),
             "demand": nw.from_native(demand_df).lazy(),
+            "storage": nw.from_native(storage_df).lazy(),
         },
         groups={"connection": nw.from_native(conn_df).lazy()},
         attributes={
@@ -83,15 +97,17 @@ def test_loader_datarecord_setup():
     world = World()
     load_datarecord(
         world=world,
+        record=record,
         scenario="datarecord_test",
         study_case="unit_case",
-        record=record,
     )
 
     assert "gen_gas" in world.units
     assert "load_city" in world.units
+    assert "batt_1" in world.units
     assert "powerplant_operator" in world.unit_operators
     assert "demand_operator" in world.unit_operators
+    assert "storage_operator" in world.unit_operators
 
     gen_unit = world.units["gen_gas"]
     assert gen_unit.max_power == 250.0
@@ -99,3 +115,62 @@ def test_loader_datarecord_setup():
 
     load_unit = world.units["load_city"]
     assert load_unit.node == "bus_north"
+
+    storage_unit = world.units["batt_1"]
+    assert storage_unit.max_power_charge == -50.0
+    assert storage_unit.max_power_discharge == 50.0
+    assert storage_unit.capacity == 200.0
+
+
+def test_loader_datarecord_simulation_run():
+    """`load_datarecord` constructs a valid world capable of executing simulation steps."""
+    time_index = pd.date_range("2026-01-01", periods=3, freq="h")
+    time_df = pd.DataFrame({"snapshot": time_index})
+
+    gen_df = pd.DataFrame(
+        {
+            "entity": ["gen_solar"],
+            "p_nom": [100.0],
+            "carrier": ["solar"],
+            "marginal_cost": [10.0],
+            "bus": ["node_0"],
+        }
+    )
+    demand_df = pd.DataFrame(
+        {
+            "entity": ["load_main"],
+            "price": [500.0],
+            "bus": ["node_0"],
+        }
+    )
+    conn_df = pd.DataFrame(
+        {
+            "entity": ["gen_solar", "load_main"],
+            "bus": ["node_0", "node_0"],
+        }
+    )
+    p_set_df = pd.DataFrame(
+        {
+            "entity": ["load_main"] * 3,
+            "snapshot": time_index,
+            "value": [-40.0, -50.0, -45.0],
+        }
+    )
+
+    record = DummyRecord(
+        dims={"snapshot": nw.from_native(time_df).lazy()},
+        entity_types={
+            "power_plant": nw.from_native(gen_df).lazy(),
+            "demand": nw.from_native(demand_df).lazy(),
+        },
+        groups={"connection": nw.from_native(conn_df).lazy()},
+        attributes={"p_set": nw.from_native(p_set_df).lazy()},
+    )
+
+    world = World(database_uri=None, export_csv_path=None)
+    load_datarecord(world, record)
+    world.run()
+
+    gen = world.units["gen_solar"]
+    assert "energy" in gen.outputs
+    assert gen.outputs["energy"].at[pd.Timestamp("2026-01-01 01:00:00")] == 50.0
