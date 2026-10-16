@@ -1053,8 +1053,11 @@ class SectorCoupledForecaster(DsmUnitForecaster):
                 demand_series,
             )
         # Fuel prices
+        if fuel_prices is None:
+            fuel_prices = {}
+
         self.fuel_prices: dict[str, FastSeries] = self._dict_to_series(
-            fuel_prices or {}
+            fuel_prices
         )
 
         # Optional electricity price used specifically for flexibility
