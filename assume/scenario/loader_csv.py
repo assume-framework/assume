@@ -204,7 +204,7 @@ def load_dsm_units(path: str, config: dict, file_name: str) -> dict:
     # Define columns that are common across different technologies within the same plant
     common_columns = [
         "unit_operator", "objective", "demand", "cost_tolerance", "unit_type", "node",
-        "electrical_p_nom","flexibility_measure", "is_prosumer", "congestion_threshold", 
+        "flexibility_measure", "is_prosumer", "congestion_threshold", 
         "peak_load_cap", "load_profile_deviation", "system_type", "market_representation",
         "enforce_terminal_soc", "primary_carrier",
     ]
@@ -315,13 +315,15 @@ def build_flexible_loads(dsm_units: dict[str, pd.DataFrame]) -> pd.DataFrame:
     Build the static grid-facing representation of DSM units
     that may participate in redispatch as flexible consumers.
 
+    The nominal electrical capacity of each parent unit is derived
+    from its directly electricity-consuming components.
+
     Returns one row per physical DSM parent with:
         node
         p_nom
         unit_type
     """
     frames = []
-
     if not dsm_units:
         return pd.DataFrame(columns=["node", "p_nom", "unit_type"])
 
@@ -329,26 +331,43 @@ def build_flexible_loads(dsm_units: dict[str, pd.DataFrame]) -> pd.DataFrame:
         if units_df is None or units_df.empty:
             continue
 
-        # No direct electrical grid capacity defined -> not a flexible load
-        if "electrical_p_nom" not in units_df.columns:
-            continue
+        flexible = units_df[["node"]].copy()
+        flexible["p_nom"] = 0.0
 
-        flexible = units_df[["node", "electrical_p_nom"]].copy()
-        flexible["electrical_p_nom"] = pd.to_numeric(
-            flexible["electrical_p_nom"], errors="coerce"
-        ).fillna(0.0)
+        for unit_id, unit in units_df.iterrows():
+            components = unit.get("components", {})
+            if not isinstance(components, dict):
+                continue
 
-        # Electrical capacity is a positive physical capacity
-        flexible["electrical_p_nom"] = flexible["electrical_p_nom"].abs()
+            p_nom_elec = 0.0
+            for technology, component in components.items():
+                technology = str(technology).strip().lower()
+                try:
+                    max_power = abs(float(component.get("max_power", 0.0)))
+                except (TypeError, ValueError):
+                    max_power = 0.0
+                if max_power <= 0.0:
+                    continue
 
-        # Remove units without a valid grid node or electrical capacity
-        flexible = flexible[
-            flexible["node"].notna() & (flexible["electrical_p_nom"] > 0.0)
-        ]
+                # max_power represents electrical input capacity.
+                if technology.startswith("heat_pump"):
+                    p_nom_elec += max_power
+
+                elif technology.startswith("electrolyser"):
+                    p_nom_elec += max_power
+
+                elif technology.startswith("boiler"):
+                    fuel_type = str(component.get("fuel_type", "")).strip().lower()
+                    if "electric" in technology or fuel_type == "electricity":
+                        p_nom_elec += max_power
+
+            flexible.loc[unit_id, "p_nom"] = p_nom_elec
+
+        # Keep only valid flexible electrical consumers
+        flexible = flexible[flexible["node"].notna() & (flexible["p_nom"] > 0.0)]
         if flexible.empty:
             continue
 
-        flexible.rename(columns={"electrical_p_nom": "p_nom"}, inplace=True)
         flexible["unit_type"] = unit_type
         frames.append(flexible)
 
@@ -632,21 +651,28 @@ def save_unique_forecasts(units, save_path: Path) -> None:
 
 
 def load_config_and_create_forecaster(
-    inputs_path: str,
-    scenario: str,
-    study_case: str,
+    inputs_path: str, scenario: str, study_case: str
 ) -> dict[str, object]:
     """
-    Load the configuration and files for a given scenario and study case. This function
-    allows us to load the files and config only once when running multiple iterations of the same scenario.
+    Load the configuration and input data for a scenario and study case.
+
+    The configuration and unit data are loaded once and returned together with
+    the time index and forecaster-related inputs. Demand-side units from
+    industrial, residential, and sector-coupled systems are collected in a
+    common DSM unit registry.
 
     Args:
-        inputs_path (str): The path to the folder containing input files necessary for the scenario.
-        scenario (str): The name of the scenario to be loaded.
-        study_case (str): The specific study case within the scenario to be loaded.
+        inputs_path (str):
+            Path to the directory containing the scenario input folders.
+        scenario (str):
+            Name of the scenario to load.
+        study_case (str):
+            Study case within the scenario configuration.
 
     Returns:
-        dict[str, object]:: A dictionary containing the configuration and loaded files for the scenario and study case.
+        dict[str, object]:
+            Scenario configuration, unit data, DSM units, time index, and
+            related inputs required to set up the simulation.
     """
 
     path = f"{inputs_path}/{scenario}"
@@ -655,17 +681,20 @@ def load_config_and_create_forecaster(
 
     with open(f"{path}/config.yaml") as f:
         config = yaml.safe_load(f)
+
     if not study_case:
         study_case = list(config.keys())[0]
+
     config = config[study_case]
     logger.info(f"Loaded config from: {path}/config.yaml")
-    logger.info(f"heat_system config value: {config.get('heat_system', 'MISSING')!r}")
+
     learning_config = config.get("learning_config", {})
     learning_mode = learning_config.get("learning_mode", False) or learning_config.get(
         "continue_learning", False
     )
 
-    # Set seed, or disable with `seed: null` in config
+    # Set the random seed. Use `seed: null` in the configuration
+    # to disable deterministic seeding.
     set_random_seed(seed=config.get("seed", 42), learning_mode=learning_mode)
 
     simulation_id = config.get("simulation_id", f"{scenario}_{study_case}")
@@ -675,12 +704,9 @@ def load_config_and_create_forecaster(
     start = pd.Timestamp(config["start_date"])
     end = pd.Timestamp(config["end_date"])
 
-    index = pd.date_range(
-        start=start,
-        end=end,
-        freq=config["time_step"],
-    )
+    index = pd.date_range(start=start, end=end, freq=config["time_step"])
 
+    # Load conventional market and grid-connected units.
     unit_operators = load_file(path=path, config=config, file_name="unit_operators")
     powerplant_units = load_file(path=path, config=config, file_name="powerplant_units")
     storage_units = load_file(path=path, config=config, file_name="storage_units")
@@ -690,87 +716,61 @@ def load_config_and_create_forecaster(
     if powerplant_units is None or demand_units is None:
         raise ValueError("No power plant or no demand units were provided!")
 
+    # Demand is represented with the ASSUME load sign convention:
+    # both minimum and maximum power must have the same sign and
+    # are stored as negative values.
     if ((demand_units["min_power"] < 0) & (demand_units["max_power"] > 0)).any() or (
         (demand_units["min_power"] > 0) & (demand_units["max_power"] < 0)
     ).any():
         raise ValueError(
             "min_power and max_power must both be either negative or positive"
         )
+
     demand_units["min_power"] = -abs(demand_units["min_power"])
     demand_units["max_power"] = -abs(demand_units["max_power"])
 
     if storage_units is not None:
+        # Charging is represented as negative electrical power.
         if "max_power_charge" in storage_units.columns:
             storage_units["max_power_charge"] = -abs(storage_units["max_power_charge"])
+
         if "min_power_charge" in storage_units.columns:
             storage_units["min_power_charge"] = -abs(storage_units["min_power_charge"])
+
         if "capacity" not in storage_units.columns:
             raise ValueError("No capacity column provided for storage units!")
 
-    # Initialize an empty dictionary to combine the DSM units
+    # ------------------------------------------------------------------
+    # Demand-side and sector-coupled units
+    # ------------------------------------------------------------------
+    #
+    # All supported demand-side unit families are collected in the same
+    # dictionary. The dictionary is keyed by ASSUME unit type and is later
+    # used by the common unit-creation pathway.
     dsm_units = {}
+
+    # Load the existing industrial and residential DSM unit families.
     for unit_type in ["industrial_dsm_units", "residential_dsm_units"]:
         units = load_dsm_units(path=path, config=config, file_name=unit_type)
+
         if units is not None:
             dsm_units.update(units)
-    """
-    # Load heat system units only if enabled in config
-    if config.get("heat_system", False):
-        logger.info("Loading heat_system_units.csv")
-        units = load_dsm_units(path=path,config=config,file_name="heat_system_units",)
-        if units is None:
-            raise ValueError("heat_system is enabled in config but heat_system_units.csv was not found.")
-        dsm_units.update(units)
-    """
-    # Generic sector-coupled systems
-    units = load_dsm_units(
-        path=path,
-        config=config,
-        file_name="sector_coupled_units",
-    )
+
+    # Load generic sector-coupled systems.
+
+    # A sector-coupled parent may contain several interacting technologies
+    # and carrier balances, for example heat pumps, boilers, electrolysers,
+    # or storage technologies. 
+    units = load_dsm_units(path=path, config=config, file_name="sector_coupled_units")
 
     if units is None:
         logger.info(
-            "No sector-coupled systems found. "
-            "sector_coupled_units.csv is not present."
+            "No sector-coupled systems found. sector_coupled_units.csv is not present."
         )
     else:
         dsm_units.update(units)
 
-        logger.info(
-            "Loaded sector-coupled systems: %s",
-            list(units.keys()),
-        )
-
-    # Load heat system units only if enabled in config
-    logger.info(
-        f"Checking HeatSystem: heat_system={config.get('heat_system', False)!r}"
-    )
-
-    if config.get("heat_system", False):
-        logger.info("HeatSystem enabled - loading heat_system_units.csv")
-
-        units = load_dsm_units(
-            path=path,
-            config=config,
-            file_name="heat_system_units",
-        )
-
-        logger.info(
-            f"Result from load_dsm_units for HeatSystem: "
-            f"{list(units.keys()) if units is not None else None}"
-        )
-
-        if units is None:
-            raise ValueError(
-                "heat_system is enabled in config but "
-                "heat_system_units.csv was not found."
-            )
-
-        dsm_units.update(units)
-
-        logger.info(f"DSM unit types after HeatSystem loading: {list(dsm_units.keys())}")
-
+        logger.info("Sector-coupled system successfully loaded")
 
     forecasts_df = load_file(
         path=path, config=config, file_name="forecasts_df", index=index
@@ -1229,6 +1229,7 @@ def setup_world(
         )
         if "network_path" in market_config.param_dict.keys():
             grid_data = read_grid(market_config.param_dict["network_path"])
+            grid_data["flexible_loads"] = build_flexible_loads(dsm_units)
             market_config.param_dict["grid_data"] = grid_data
 
         operator_id = str(market_params["operator"])
