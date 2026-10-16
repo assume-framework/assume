@@ -155,10 +155,18 @@ def test_loader_datarecord_simulation_run():
             "bus": ["node_0"],
         }
     )
+    storage_df = pd.DataFrame(
+        {
+            "entity": ["batt_1"],
+            "p_nom": [50.0],
+            "max_hours": [4.0],
+            "bus": ["node_0"],
+        }
+    )
     conn_df = pd.DataFrame(
         {
-            "entity": ["gen_solar", "load_main"],
-            "bus": ["node_0", "node_0"],
+            "entity": ["gen_solar", "load_main", "batt_1"],
+            "bus": ["node_0", "node_0", "node_0"],
         }
     )
     p_set_df = pd.DataFrame(
@@ -174,6 +182,7 @@ def test_loader_datarecord_simulation_run():
         entity_types={
             "power_plant": nw.from_native(gen_df).lazy(),
             "demand": nw.from_native(demand_df).lazy(),
+            "storage": nw.from_native(storage_df).lazy(),
         },
         groups={"connection": nw.from_native(conn_df).lazy()},
         attributes={"p_set": nw.from_native(p_set_df).lazy()},
@@ -188,3 +197,6 @@ def test_loader_datarecord_simulation_run():
     assert gen.outputs["energy"].at[pd.Timestamp("2026-01-01 01:00:00")] == 50.0, (
         "dispatched energy at step 1 must be 50.0 MW"
     )
+    batt = world.units["batt_1"]
+    assert "energy" in batt.outputs, "storage unit outputs must record energy"
+    assert "soc" in batt.outputs, "storage unit outputs must record soc"
