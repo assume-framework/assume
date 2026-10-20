@@ -25,6 +25,7 @@ from assume.reinforcement_learning.algorithms.mappo import PPO
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.learning_utils import (
     linear_schedule_func,
+    resolve_device,
 )
 from assume.reinforcement_learning.tensorboard_logger import TensorBoardLogger
 
@@ -58,15 +59,7 @@ class Learning(Role):
         self.rl_strats: dict[int, LearningStrategy] = {}
         self.learning_config = learning_config
 
-        device = "cpu"
-        if self.learning_config:
-            if "cuda" in self.learning_config.device and th.cuda.is_available():
-                device = self.learning_config.device
-            elif (
-                "mps" in self.learning_config.device and th.backends.mps.is_available()
-            ):
-                device = self.learning_config.device
-        self.device = th.device(device)
+        self.device = resolve_device(self.learning_config.device or "cpu")
 
         # future: add option to choose between float16 and float32
         # float_type = learning_config.float_type
