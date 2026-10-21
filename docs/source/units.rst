@@ -18,5 +18,14 @@ The primary unit types in this context include:
 
 Each unit type has specific characteristics that affect how the power system operates, and understanding these is key to modeling and optimizing grid performance.
 
+State of Charge of Storage Units
+================================
+
+The state of charge (SoC) of a storage unit is the fraction of its capacity at the *beginning* of a time step; the dispatch of that step is reflected in the SoC of the next one.
+This also holds for ``initial_soc`` and the ``soc`` output.
+As the SoC is calculated when it is read, bidding strategies use :meth:`~assume.common.base.SupportsMinMaxCharge.get_soc` instead of ``unit.outputs["soc"]``,
+and :meth:`~assume.common.base.SupportsMinMaxCharge.get_feasible_energy` for the energy the storage can deliver, as ``unit.outputs["energy"]`` holds the committed volume until delivery.
+In the DSM storage components (:class:`~assume.units.dst_components.GenericStorage`), ``soc[t]`` is the SoC at the *end* of ``t``.
+
 
 .. include:: demand_side_agent.rst

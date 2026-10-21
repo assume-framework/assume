@@ -779,7 +779,8 @@ class SupportsMinMaxCharge(BaseUnit):
 
     def get_soc(self, t: datetime) -> float:
         """
-        Returns the state of charge at ``t``, propagating it there if needed.
+        Returns the state of charge at the beginning of ``t`` before committing to a dispatch,
+        propagating it there if needed.
 
         Prefer this over ``outputs["soc"]``, which is only up to date until
         the last propagation.

@@ -33,7 +33,7 @@ class Storage(SupportsMinMaxCharge):
         capacity (float): The capacity of the storage unit in MWh.
         max_soc (float): The maximum state of charge of the storage unit as a fraction (typically 1).
         min_soc (float): The minimum state of charge of the storage unit as a fraction (typically 0).
-        initial_soc (float): The initial state of charge of the storage unit as a fraction (between 0 and 1).
+        initial_soc (float): The state of charge at the beginning of the first time step as a fraction (between 0 and 1).
         efficiency_charge (float): The efficiency of the storage unit while charging.
         efficiency_discharge (float): The efficiency of the storage unit while discharging.
         additional_cost_charge (float, optional): Additional costs associated with power consumption, in EUR/MWh. Defaults to 0.
