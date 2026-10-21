@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import StringIO
 from unittest.mock import MagicMock, patch
 
@@ -477,6 +477,7 @@ def test_flatten_columns_collapses_duplicates():
 def test_get_country_demand_handles_series_and_single_column(tmp_path, hourly_index):
     start = datetime(2024, 1, 1)
     end = datetime(2024, 1, 2, 23, 0)
+    timestep = timedelta(hours=1)
     load = pd.Series(range(48), index=hourly_index, dtype=float, name="Actual Load")
 
     responses = (
@@ -490,7 +491,7 @@ def test_get_country_demand_handles_series_and_single_column(tmp_path, hourly_in
         iface.cache_dir = tmp_path / f"cache_{i}"
         iface.client.query_load.return_value = response
         if i < 2:
-            demand = iface.get_country_demand(start, end, "DE")
+            demand = iface.get_country_demand(start, end, "DE", timestep)
             assert isinstance(demand, pd.Series)
             assert len(demand) == 48
             assert demand.iloc[0] == 0.0
@@ -503,6 +504,7 @@ def test_get_country_demand_handles_series_and_single_column(tmp_path, hourly_in
 def test_generation_cache_single_column_stays_dataframe(tmp_path, hourly_index):
     start = datetime(2024, 1, 1)
     end = datetime(2024, 1, 2, 23, 0)
+    timestep = timedelta(hours=1)
     iface = EntsoeInterface.__new__(EntsoeInterface)
     iface.cache_dir = tmp_path
     cache_path = iface._cache_path("DE", start, end, "generation")
@@ -511,7 +513,7 @@ def test_generation_cache_single_column_stays_dataframe(tmp_path, hourly_index):
         cache_path
     )
 
-    generation = iface.get_country_generation(start, end, "DE", use_cache=True)
+    generation = iface.get_country_generation(start, end, "DE", timestep, use_cache=True)
     assert isinstance(generation, pd.DataFrame)
     assert list(generation.columns) == ["Solar"]
     assert len(generation) == 48
@@ -794,7 +796,8 @@ def test_demand_is_utc_across_spring_dst(tmp_path):
     )
     iface.client.query_load.return_value = pd.Series(1.0, index=local)
     start, end = datetime(2024, 3, 30, 11), datetime(2024, 4, 1, 10)
-    demand = iface.get_country_demand(start, end, "DE", use_cache=False)
+    timestep = timedelta(hours=1)
+    demand = iface.get_country_demand(start, end, "DE", timestep, use_cache=False)
     assert demand.index.is_unique
     assert (
         demand.index.freq is not None
@@ -812,7 +815,8 @@ def test_single_row_caches_stay_series(tmp_path):
     pd.Series([5.0], index=pd.to_datetime(["2024-01-01"])).rename_axis("t").to_csv(
         demand_path
     )
-    demand = iface.get_country_demand(start, end, "DE", use_cache=True)
+    timestep = timedelta(hours=1)
+    demand = iface.get_country_demand(start, end, "DE", timestep, use_cache=True)
     assert isinstance(demand, pd.Series)
     assert len(demand) == 1
 
