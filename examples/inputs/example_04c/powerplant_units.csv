@@ -1,0 +1,6 @@
+name,technology,bidding_EOM,bidding_redispatch,bidding_nodal,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,node,unit_operator
+powerplant_north,wind turbine,powerplant_energy_naive,powerplant_energy_naive_redispatch,powerplant_energy_naive,renewable,0,60,0,1,20,north,Operator 1
+powerplant_east_cheap,steam turbine,powerplant_energy_naive,powerplant_energy_naive_redispatch,powerplant_energy_naive,hard coal,0,60,0,1,10,east,Operator 1
+powerplant_east_expensive,steam turbine,powerplant_energy_naive,powerplant_energy_naive_redispatch,powerplant_energy_naive,natural gas,0,20,0,1,15,east,Operator 1
+powerplant_west_cheap,steam turbine,powerplant_energy_naive,powerplant_energy_naive_redispatch,powerplant_energy_naive,natural gas,0,80,0,1,10,west,Operator 1
+powerplant_west_expensive,steam turbine,powerplant_energy_naive,powerplant_energy_naive_redispatch,powerplant_energy_naive,natural gas,0,20,0,1,15,west,Operator 1
