@@ -77,6 +77,7 @@ Upcoming Release
   - **Fix loss of the last ``train_freq`` window during learning**: Tasks scheduled at exactly the simulation end were started by the run loop but never awaited, because tasks registered with ``src="no_wait"`` are excluded from mango's termination detection. The run loop now drains all remaining tasks before shutting the container down.
   - **Fix nodal clearing for units without a bid**: Generators, loads and storage units present in the grid data but without a bid in a snapshot kept the default availability they were added to the network with, and a unit bidding in only some snapshots passed NaN availability to the optimization. Such units now have zero availability in the snapshots without a bid.
   - **Fix OEDS queries after the open-mastr migration**: Postcodes with a leading zero (eastern Germany) were excluded, PV units without EEG payments were dropped, appended date filters produced invalid SQL, tracked PV units got a tilt of 180°, the battery of east-west PV+battery units was counted twice, and planned units were counted as built capacity.
+  - **Fix non-deterministic results with equal-price bids**: The orderbook order no longer depends on ``PYTHONHASHSEED`` or on process timing in ``--parallel`` mode, so ties between equal-price bids are resolved reproducibly. (#861)
 
 0.6.0 - (18th March 2026)
 =========================

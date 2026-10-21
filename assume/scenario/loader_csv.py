@@ -1124,7 +1124,7 @@ def setup_world(
                 op, config_forecast_algorithms
             ),
         )
-        for op in set(units.keys())
+        for op in units.keys()
     }
 
     # if distributed_role is true - there is a manager available
@@ -1138,7 +1138,7 @@ def setup_world(
             )
     else:
         logger.info("Adding unit operators and units")
-        for company_name in set(units.keys()):
+        for company_name in units.keys():
             strategies = unit_operators_strategies.get(company_name, {})
             world.add_unit_operator(
                 id=str(company_name),
