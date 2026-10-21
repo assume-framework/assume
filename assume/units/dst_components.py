@@ -1015,6 +1015,134 @@ class Electrolyser:
         return model_block
 
 
+class FuelCell:
+    """
+    A generic hydrogen fuel-cell component that converts hydrogen into electricity.
+
+    The component uses hydrogen as its input carrier and produces electrical power.
+    ``max_power`` and ``min_power`` refer to electrical output in MW_el. Hydrogen
+    input is represented in energy-equivalent MW_H2 and linked through the electrical
+    efficiency.
+
+    Args:
+        max_power (float): Maximum electrical output of the fuel cell [MW_el].
+        efficiency (float): Electrical conversion efficiency, i.e. power_out / hydrogen_in.
+        time_steps (list[int]): Optimisation time steps.
+        min_power (float, optional): Minimum electrical output while operating [MW_el].
+            Defaults to 0.0.
+        ramp_up (float, optional): Maximum increase in electrical output per time step.
+            Defaults to ``max_power``.
+        ramp_down (float, optional): Maximum decrease in electrical output per time step.
+            Defaults to ``max_power``.
+        min_operating_steps (int, optional): Minimum number of consecutive operating
+            steps after start-up. Defaults to 0.
+        min_down_steps (int, optional): Minimum number of consecutive off steps after
+            shutdown. Defaults to 0.
+        initial_operational_status (int, optional): Initial on/off status. Defaults to 1.
+        variable_cost (float, optional): Additional variable operating cost per MWh_el
+            generated. Defaults to 0.0. This should represent only incremental fuel-cell
+            O&M or other non-hydrogen costs; the energy cost of internally produced
+            hydrogen is already accounted for upstream by the electrolyser.
+    """
+
+    def __init__(
+        self,
+        max_power: float,
+        efficiency: float,
+        time_steps: list[int],
+        min_power: float = 0.0,
+        ramp_up: float | None = None,
+        ramp_down: float | None = None,
+        min_operating_steps: int = 0,
+        min_down_steps: int = 0,
+        initial_operational_status: int = 1,
+        variable_cost: float = 0.0,
+        **kwargs,
+    ):
+        super().__init__()
+
+        if max_power < 0:
+            raise ValueError("FuelCell max_power must be non-negative.")
+        if min_power < 0:
+            raise ValueError("FuelCell min_power must be non-negative.")
+        if min_power > max_power:
+            raise ValueError("FuelCell min_power cannot exceed max_power.")
+        if not 0 < efficiency <= 1:
+            raise ValueError("FuelCell efficiency must be in the interval (0, 1].")
+
+        self.max_power = max_power
+        self.min_power = min_power
+        self.efficiency = efficiency
+        self.time_steps = time_steps
+        self.ramp_up = max_power if ramp_up is None else ramp_up
+        self.ramp_down = max_power if ramp_down is None else ramp_down
+        self.min_operating_steps = int(min_operating_steps)
+        self.min_down_steps = int(min_down_steps)
+        self.initial_operational_status = initial_operational_status
+        self.variable_cost = variable_cost
+        self.kwargs = kwargs
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+        """Add the fuel-cell equations and operating constraints to ``model_block``."""
+
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.min_power = pyo.Param(initialize=self.min_power)
+        model_block.efficiency = pyo.Param(initialize=self.efficiency)
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
+        model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
+        model_block.initial_operational_status = pyo.Param(
+            initialize=self.initial_operational_status
+        )
+        model_block.variable_cost = pyo.Param(initialize=self.variable_cost)
+
+        # ``power_out`` is electrical generation exported by the fuel cell.
+        # ``hydrogen_in`` is the corresponding hydrogen-energy input.
+        model_block.power_out = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, model_block.max_power),
+        )
+        model_block.hydrogen_in = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+        model_block.operating_cost = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+
+        @model_block.Constraint(self.time_steps)
+        def conversion_efficiency_constraint(b, t):
+            return b.power_out[t] == b.hydrogen_in[t] * b.efficiency
+
+        @model_block.Constraint(self.time_steps)
+        def operating_cost_constraint_rule(b, t):
+            return b.operating_cost[t] == b.power_out[t] * b.variable_cost
+
+        add_ramping_constraints(
+            model_block=model_block,
+            time_steps=self.time_steps,
+            ramped=model_block.power_out,
+        )
+
+        if (
+            self.min_operating_steps > 1
+            or self.min_down_steps > 1
+            or self.min_power > 0
+        ):
+            add_min_up_down_time_constraints(
+                model_block=model_block,
+                time_steps=self.time_steps,
+                quantity="power_out",
+                min_quantity="min_power",
+                max_quantity="max_power",
+            )
+
+        return model_block
+
+
 class DRIPlant:
     """
     A class to represent a DRI (Direct Reduced Iron) plant in an energy system model.
@@ -2746,6 +2874,7 @@ class Kiln(ThermalProcessStage):
 # Mapping of component type identifiers to their respective classes
 demand_side_technologies: dict = {
     "electrolyser": Electrolyser,
+    "fuel_cell": FuelCell,
     "hydrogen_buffer_storage": HydrogenBufferStorage,
     "hydrogen_seasonal_storage": SeasonalHydrogenStorage,
     "dri_plant": DRIPlant,
