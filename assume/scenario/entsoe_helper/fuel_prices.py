@@ -221,7 +221,7 @@ class InstratFuelPrices:
         coal_data = self._download(COAL_URL, query_start, end)
         if not coal_data.empty:
             pln_eur = self._pln_to_eur(coal_data.index)
-            steam_coal_eur_per_gj = coal_data["pscmi1_pln_per_gj"] * pln_eur
+            steam_coal_eur_per_gj = coal_data["PSCMI1 PLN per GJ"] * pln_eur
             # EUR/GJ -> EUR/MWh thermal (1 GJ = 277.8 kWh)
             series = _sanitize_daily_prices(
                 steam_coal_eur_per_gj / GJ_TO_KWH * 1e3,
