@@ -634,6 +634,17 @@ class MarketRole(MarketMechanism, Role):
             )
             return
 
+        # the arrival order of orders depends on the process timing
+        # sort the orders deterministically, as the order is used for tie-breaking between equal-price bids
+        self.all_orders.sort(
+            key=lambda order: (
+                order["start_time"],
+                order["end_time"],
+                str(order["agent_addr"]),
+                str(order.get("bid_id")),
+            )
+        )
+
         try:
             (accepted_orderbook, rejected_orderbook, market_meta, flows) = self.clear(
                 self.all_orders, market_products
