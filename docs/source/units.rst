@@ -20,3 +20,5 @@ Each unit type has specific characteristics that affect how the power system ope
 
 
 .. include:: demand_side_agent.rst
+
+.. include:: sector_coupling.rst
