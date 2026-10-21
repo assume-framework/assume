@@ -47,6 +47,7 @@ def load_entsoe(
     countries: list[str],
     marketdesign: list[MarketConfig],
     bidding_strategies: dict[str, dict[str, str]],
+    timestep: timedelta =timedelta(hours=1),
     api_key: str | None = None,
     fuel_price_ranges: dict[str, tuple[float, float]] | None = None,
     block_sizes_mw: dict[str, float] | None = None,
@@ -72,6 +73,7 @@ def load_entsoe(
         countries (list[str]): ISO country codes, e.g. ``["DE", "FR"]``
         marketdesign (list[MarketConfig]): market design for the simulation
         bidding_strategies (dict): bidding strategies per fuel or technology key
+        timestep (timedelta): simulation time step (e.g. 15 min or 1 h)
         api_key (str, optional): ENTSO-E API key
         fuel_price_ranges (dict, optional): block spread in €/MWh per fuel
         block_sizes_mw (dict, optional): block size in MW per technology
@@ -100,9 +102,11 @@ def load_entsoe(
         )
     if not countries:
         countries = ["DE"]
+    if not timestep:
+        timestep = timedelta(hours=1)
 
     countries = [country.upper() for country in countries]
-    index = pd.date_range(start=start, end=end, freq="h")
+    index = pd.date_range(start=start, end=end, freq=timestep)
     simulation_id = f"{scenario}_{study_case}"
     logger.info(f"loading ENTSO-E scenario {simulation_id} with {countries}")
 
@@ -140,11 +144,11 @@ def load_entsoe(
 
     for country in countries:
         logger.info(f"loading ENTSO-E data for {country}")
-        demand = entsoe.get_country_demand(start, end, country, use_cache=use_cache)
+        demand = entsoe.get_country_demand(start, end, country, timestep, use_cache=use_cache)
         # fill gaps in the load series so every simulation hour has a value
         demand = demand.reindex(index).ffill().bfill()
         generation = entsoe.get_country_generation(
-            start, end, country, use_cache=use_cache
+            start, end, country, timestep, use_cache=use_cache
         )
         capacity = entsoe.get_installed_capacity(
             start, end, country, use_cache=use_cache
@@ -476,14 +480,15 @@ if __name__ == "__main__":
     study_case = f"{'_'.join(countries)}_{year}"
 
     start = datetime(year, 1, 1)
-    end = datetime(year + 1, 1, 1) - timedelta(hours=1)
+    timestep = timedelta(hours=1) # e.g. timedelta(minutes=15) or timedelta(hours=1)
+    end = datetime(year + 1, 1, 1) - timestep
     marketdesign = [
         MarketConfig(
             "EOM",
-            rr.rrule(rr.HOURLY, interval=24, dtstart=start, until=end),
-            timedelta(hours=1),
+            rr.rrule(rr.HOURLY, interval=1, dtstart=start, until=end),
+            timestep,
             "pay_as_clear",
-            [MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))],
+            [MarketProduct(timestep, 24, timestep)],
             additional_fields=["block_id", "link", "exclusive_id"],
             maximum_bid_volume=1e6,
             maximum_bid_price=3000,
@@ -519,5 +524,6 @@ if __name__ == "__main__":
         countries,
         marketdesign,
         bidding_strategies,
+        timestep,
     )
     world.run()
