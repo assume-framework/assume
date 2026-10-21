@@ -8,6 +8,10 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 from pandas.api.types import is_datetime64_any_dtype
+from pandas.tseries.frequencies import to_offset
+
+# tolerance for floating point errors when mapping dates onto the index grid
+_ALIGNMENT_EPSILON_SECONDS = 1e-6
 
 try:
     import torch as th
@@ -110,13 +114,14 @@ class FastIndex:
             return self._date_list[item]
 
         elif isinstance(item, slice):
+            # datetime bounds are clipped to the index range like in pandas
             start_idx = (
-                self._get_idx_from_date(item.start)
+                max(0, self._get_idx_from_date(item.start))
                 if isinstance(item.start, datetime)
                 else item.start or 0
             )
             stop_idx = (
-                self._get_idx_from_date(item.stop, round_up=False) + 1
+                max(0, self._get_idx_from_date(item.stop, round_up=False) + 1)
                 if isinstance(item.stop, datetime)
                 else item.stop or len(self._date_list)
             )
@@ -148,11 +153,32 @@ class FastIndex:
         """
         if self.start > date or self.end < date:
             return False
-        try:
-            self._get_idx_from_date(date)
-            return True
-        except ValueError:
-            return False
+        return self._is_aligned(date)
+
+    def _is_aligned(self, date: datetime) -> bool:
+        """Check whether a datetime lies exactly on the index grid."""
+        delta_seconds = (date - self.start).total_seconds()
+        remainder = delta_seconds % self.freq_seconds
+        return (
+            remainder <= _ALIGNMENT_EPSILON_SECONDS
+            or self.freq_seconds - remainder <= _ALIGNMENT_EPSILON_SECONDS
+        )
+
+    def get_position(self, date: datetime) -> int:
+        """
+        Get the position of a single datetime in the index.
+
+        Unaligned datetimes map to the next date on the index grid.
+
+        Raises:
+            KeyError: If the datetime lies outside the index range.
+        """
+        idx = self._get_idx_from_date(date)
+        if idx < 0 or idx >= self._count:
+            raise KeyError(
+                f"{date} is outside of the index range {self.start} - {self.end}"
+            )
+        return idx
 
     def __len__(self) -> int:
         """Return the number of datetime points in the index."""
@@ -200,8 +226,8 @@ class FastIndex:
             total_dates = np.arange(self._count) * self._freq_seconds
             self._date_list = [self._start + timedelta(seconds=s) for s in total_dates]
 
-        start_idx = self._get_idx_from_date(start or self.start)
-        end_idx = self._get_idx_from_date(end or self.end, round_up=False) + 1
+        start_idx = max(0, self._get_idx_from_date(start or self.start))
+        end_idx = max(0, self._get_idx_from_date(end or self.end, round_up=False) + 1)
         return self._date_list[start_idx:end_idx]
 
     def as_datetimeindex(self) -> pd.DatetimeIndex:
@@ -221,27 +247,31 @@ class FastIndex:
         """
         Convert a datetime to its corresponding index in the range.
 
+        The result is not bounds-checked and can lie outside of the index range.
+
         Parameters:
             date (datetime.datetime): The datetime to convert.
+            round_up (bool): For dates between two index dates, return the next date (True)
+                or the previous date (False).
 
         Returns:
             int: The index of the datetime in the index range.
 
         Raises:
             KeyError: If the input `date` is None.
-            ValueError: If the `date` is not aligned with the frequency within tolerance.
         """
         if date is None:
             raise KeyError("Date cannot be None. Please provide a valid datetime.")
 
         delta_seconds = (date - self.start).total_seconds()
-        remainder = delta_seconds % self.freq_seconds
+        idx, remainder = divmod(delta_seconds, self.freq_seconds)
+        idx = int(idx)
 
-        if round_up and remainder > 0:
-            # if there is a large remainder, we need to add to return the value of the next date as begin
-            delta_seconds += self.freq_seconds
-
-        return round(delta_seconds / self.freq_seconds)
+        if remainder <= _ALIGNMENT_EPSILON_SECONDS:
+            return idx
+        if self.freq_seconds - remainder <= _ALIGNMENT_EPSILON_SECONDS:
+            return idx + 1
+        return idx + 1 if round_up else idx
 
     @staticmethod
     def _convert_to_datetime(value: datetime | str) -> datetime:
@@ -261,14 +291,24 @@ class FastIndex:
 
         Raises:
             TypeError: If the input type is not supported.
-            ValueError: If the string format is invalid.
+            ValueError: If the string format is invalid or not a fixed frequency (e.g. monthly).
         """
         if isinstance(freq, timedelta):
             return freq
         if isinstance(freq, str):
+            # parse pandas offset aliases first, as pd.to_timedelta reads e.g. "MS" as milliseconds
             try:
-                if freq.isalpha():
-                    freq = f"1{freq}"
+                offset = to_offset(freq)
+            except ValueError:
+                offset = None
+            if offset is not None:
+                try:
+                    return pd.Timedelta(offset.nanos, unit="ns")
+                except ValueError as e:
+                    raise ValueError(
+                        f"Invalid frequency string: {freq}. Only fixed frequencies are supported. Error: {e}"
+                    )
+            try:
                 return pd.to_timedelta(freq)
             except ValueError as e:
                 raise ValueError(f"Invalid frequency string: {freq}. Error: {e}")
@@ -315,11 +355,14 @@ class FastSeries:
             value = value[self.start : self.end]
 
         count = len(self.index)  # Use index length directly
-        self._data = (
-            np.full(count, value, dtype=np.float64)
-            if isinstance(value, int | float)
-            else np.array(value, dtype=np.float64)
-        )
+        data = np.array(value, dtype=np.float64)
+        if data.ndim == 0:
+            data = np.full(count, data, dtype=np.float64)
+        elif data.shape != (count,):
+            raise ValueError(
+                f"Length of values ({len(data)}) does not match length of index ({count})."
+            )
+        self._data = data
 
     @property
     def index(self) -> FastIndex:
@@ -369,7 +412,7 @@ class FastSeries:
         Parameters:
             value (np.ndarray): The new data array.
         """
-        if value.shape[0] != len(self.index):
+        if np.ndim(value) == 0 or len(value) != len(self.index):
             raise ValueError("Data length must match index length.")
         self._data = value
 
@@ -425,7 +468,7 @@ class FastSeries:
 
     def fillna(self, value):
         result = self.copy()
-        result.data = np.nan_to_num(self.data, value)
+        result.data = np.where(np.isnan(self.data), value, self.data)
         return result
 
     def ones_like(self):
@@ -451,18 +494,7 @@ class FastSeries:
             ValueError: If dates are not aligned within tolerance.
         """
         if isinstance(item, slice):
-            # Handle slicing with datetime start/stop
-            start_idx = (
-                self.index._get_idx_from_date(item.start)
-                if item.start is not None
-                else 0
-            )
-            stop_idx = (
-                self.index._get_idx_from_date(item.stop, round_up=False) + 1
-                if item.stop is not None
-                else len(self.data)
-            )
-            return self.data[start_idx:stop_idx]
+            return self.data[self._data_slice(item)]
 
         elif isinstance(
             item, (list | pd.Index | pd.DatetimeIndex | np.ndarray | pd.Series)
@@ -479,16 +511,18 @@ class FastSeries:
                 raise ValueError(
                     "One or more dates are not aligned with the index frequency."
                 )
+            if np.any((indices < 0) | (indices >= len(self.data))):
+                raise KeyError("One or more dates are outside of the index range.")
             return self.data[indices]
 
         elif isinstance(item, str):
             # Handle string input
             date = pd.to_datetime(item).to_pydatetime()
-            return self.data[self.index._get_idx_from_date(date)]
+            return self.data[self.index.get_position(date)]
 
         elif isinstance(item, datetime):
             # Handle datetime input
-            return self.data[self.index._get_idx_from_date(item)]
+            return self.data[self.index.get_position(item)]
 
         else:
             raise TypeError(
@@ -514,32 +548,15 @@ class FastSeries:
             ValueError: If lengths of indices and values do not match or dates are not aligned within tolerance.
         """
         if isinstance(item, slice):
-            # Handle slicing
-            start_idx = (
-                self.index._get_idx_from_date(item.start)
-                if isinstance(item.start, datetime)
-                else (
-                    len(self.data) + item.start
-                    if item.start is not None and item.start < 0
-                    else 0
-                )
-            )
-            stop_idx = (
-                self.index._get_idx_from_date(item.stop, round_up=False) + 1
-                if isinstance(item.stop, datetime)
-                else (
-                    len(self.data) + item.stop
-                    if item.stop is not None and item.stop < 0
-                    else len(self.data)
-                )
-            )
+            data_slice = self._data_slice(item)
 
             # Assign values to the slice
-            if np.isscalar(value) or len(self.data[start_idx:stop_idx]) == len(value):
-                self.data[start_idx:stop_idx] = value
+            slice_length = len(self.data[data_slice])
+            if np.isscalar(value) or slice_length == len(value):
+                self.data[data_slice] = value
             else:
                 raise ValueError(
-                    f"Length of values ({len(value)}) does not match slice length ({stop_idx - start_idx})."
+                    f"Length of values ({len(value)}) does not match slice length ({slice_length})."
                 )
 
         elif isinstance(
@@ -550,19 +567,20 @@ class FastSeries:
                 and item[0] == self.index.start
                 and item[-1] == self.index.end
             ):
-                self.data = np.array(value)
+                # assign in place to keep the float dtype and broadcast scalars
+                self.data[:] = value
             else:
                 if isinstance(value, pd.Series):
                     for idx, i in enumerate(item):
-                        start = self.index._get_idx_from_date(i)
+                        start = self.index.get_position(i)
                         self.data[start] = value.iloc[idx]
                 elif isinstance(value, list | np.ndarray):
                     for idx, i in enumerate(item):
-                        start = self.index._get_idx_from_date(i)
+                        start = self.index.get_position(i)
                         self.data[start] = value[idx]
                 else:
                     for i in item:
-                        start = self.index._get_idx_from_date(i)
+                        start = self.index.get_position(i)
                         self.data[start] = value
 
         elif isinstance(item, datetime | str):
@@ -570,7 +588,7 @@ class FastSeries:
             date = (
                 pd.to_datetime(item).to_pydatetime() if isinstance(item, str) else item
             )
-            idx = self.index._get_idx_from_date(date)
+            idx = self.index.get_position(date)
             self.data[idx] = value
 
         else:
@@ -578,6 +596,36 @@ class FastSeries:
                 f"Unsupported index type: {type(item)}. Must be datetime, slice, list, "
                 "pandas Index, NumPy array, pandas Series, or string."
             )
+
+    def _data_slice(self, item: slice) -> slice:
+        """
+        Convert a slice on the series into a slice on the data array.
+
+        Datetime bounds are inclusive and clipped to the index range, like label-based
+        slicing in pandas. Integer bounds are positional, like python slicing.
+
+        Raises:
+            TypeError: If the bounds are neither datetimes nor integers, or are mixed.
+        """
+        bounds = [bound for bound in (item.start, item.stop) if bound is not None]
+        if all(isinstance(bound, datetime) for bound in bounds):
+            start_idx = (
+                max(0, self.index._get_idx_from_date(item.start))
+                if item.start is not None
+                else 0
+            )
+            stop_idx = (
+                max(0, self.index._get_idx_from_date(item.stop, round_up=False) + 1)
+                if item.stop is not None
+                else len(self.data)
+            )
+            return slice(start_idx, stop_idx, item.step)
+        if all(isinstance(bound, int | np.integer) for bound in bounds):
+            return item
+        raise TypeError(
+            "FastSeries slices must use datetime or integer bounds, got "
+            f"{type(item.start)} and {type(item.stop)}."
+        )
 
     def __add__(self, other: int | float | np.ndarray):
         return self._arithmetic_operation(other, "add")
@@ -1030,7 +1078,7 @@ class FastSeries:
             TypeError: If the `other` type is unsupported.
         """
         result = self.copy()
-        if isinstance(other, int | float | np.ndarray):
+        if isinstance(other, int | float | np.number | np.ndarray):
             result.data = getattr(self.data, f"__{op}__")(other)
         elif isinstance(other, FastSeries):
             if self._index_aligned_with(other):
@@ -1296,7 +1344,7 @@ class TensorFastSeries(FastSeries):
             for i, idx in enumerate(range(start_idx, stop_idx, step)):
                 self._data[idx] = value[i].clone()
         elif isinstance(item, datetime):
-            idx = self.index._get_idx_from_date(item)
+            idx = self.index.get_position(item)
             self._data[idx] = value.clone()
         else:
             raise TypeError(
@@ -1325,7 +1373,7 @@ class TensorFastSeries(FastSeries):
             step = item.step or 1
             return [self._data[i] for i in range(start_idx, stop_idx, step)]
         elif isinstance(item, datetime):
-            idx = self.index._get_idx_from_date(item)
+            idx = self.index.get_position(item)
             return self._data[idx]
         else:
             raise TypeError(
