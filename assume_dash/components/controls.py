@@ -15,10 +15,18 @@ DATES = "global-dates"
 
 INTERVALS = {
     "raw": "Raw",
-    "1h": "Hourly mean",
-    "4h": "4-hourly mean",
-    "1D": "Daily mean",
-    "7D": "Weekly mean",
+    "1h": "Hourly",
+    "4h": "4-hourly",
+    "1D": "Daily",
+    "7D": "Weekly",
+}
+
+# accepted bids: volumes add up within an interval, prices are averaged
+BID_AGGREGATION = {
+    "accepted_volume": "sum",
+    "volume": "sum",
+    "accepted_price": "mean",
+    "price": "mean",
 }
 
 
@@ -102,13 +110,27 @@ def filter_time(df: pd.DataFrame, column: str, view: View) -> pd.DataFrame:
     return df[mask].sort_values(column, kind="stable")
 
 
+def aggregate_bids(
+    orders: pd.DataFrame, column: str, view: View, by: str = "unit_id"
+) -> pd.DataFrame:
+    """Per-unit bid series: raw values, or summed volumes / mean prices per interval."""
+    return aggregate(
+        orders,
+        "start_time",
+        [by],
+        [column],
+        view.interval,
+        how={column: BID_AGGREGATION[column]},
+    )
+
+
 def aggregate(
     df: pd.DataFrame,
     time_col: str,
     by: list[str],
     values: list[str],
     interval: str,
-    how: str = "mean",
+    how: str | dict[str, str] = "mean",
 ) -> pd.DataFrame:
     """Aggregate ``values`` per ``by`` group and time bucket (replaces ``$__interval``)."""
     if df.empty:

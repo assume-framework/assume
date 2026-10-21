@@ -13,6 +13,7 @@ from assume_dash.components.controls import (
     SIMULATION,
     View,
     aggregate,
+    aggregate_bids,
     filter_time,
     view_inputs,
 )
@@ -131,24 +132,25 @@ class MarketTab(Tab):
                 "Market result by technology",
                 "MW",
             )
+            suffix = "" if view.interval == "raw" else " (volume summed, price mean)"
             price = style_figure(
                 px.line(
-                    orders.sort_values("start_time"),
+                    aggregate_bids(orders, "accepted_price", view),
                     x="start_time",
                     y="accepted_price",
                     color="unit_id",
                 ),
-                "Accepted bid price",
+                "Accepted bid price" + suffix,
                 "EUR/MWh",
             )
             volume = style_figure(
                 px.line(
-                    orders.sort_values("start_time"),
+                    aggregate_bids(orders, "accepted_volume", view),
                     x="start_time",
                     y="accepted_volume",
                     color="unit_id",
                 ),
-                "Accepted bid volume",
+                "Accepted bid volume" + suffix,
                 "MW",
             )
             return tech_fig, price, volume

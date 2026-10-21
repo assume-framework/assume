@@ -21,6 +21,7 @@ from assume_dash.components.controls import (
     SIMULATION,
     View,
     aggregate,
+    aggregate_bids,
     filter_time,
     view_inputs,
 )
@@ -354,7 +355,12 @@ class DsmTab(Tab):
                 ("Accepted price", "EUR/MWh", "accepted_price"),
                 ("Accepted volume", "MW", "accepted_volume"),
             ):
-                fig = px.line(og, x="start_time", y=column, color="unit_id")
+                fig = px.line(
+                    aggregate_bids(og, column, view),
+                    x="start_time",
+                    y=column,
+                    color="unit_id",
+                )
                 figs.append(
                     graph_figure(
                         style_figure(fig, f"{title} - {market_id}", unit_label)

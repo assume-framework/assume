@@ -13,6 +13,7 @@ from assume_dash.components.controls import (
     SIMULATION,
     View,
     aggregate,
+    aggregate_bids,
     filter_time,
     view_inputs,
 )
@@ -197,9 +198,7 @@ class UnitsTab(Tab):
                     ("Bid volume", "MW", "volume"),
                     ("Accepted volume", "MW", "accepted_volume"),
                 ):
-                    agg = aggregate(
-                        og, "start_time", ["unit_id"], [column], view.interval
-                    )
+                    agg = aggregate_bids(og, column, view)
                     fig = px.line(agg, x="start_time", y=column, color="unit_id")
                     figs.append(
                         graph_figure(
