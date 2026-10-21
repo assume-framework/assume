@@ -47,7 +47,7 @@ def load_entsoe(
     countries: list[str],
     marketdesign: list[MarketConfig],
     bidding_strategies: dict[str, dict[str, str]],
-    timestep: timedelta =timedelta(hours=1),
+    timestep: timedelta = timedelta(hours=1),
     api_key: str | None = None,
     fuel_price_ranges: dict[str, tuple[float, float]] | None = None,
     block_sizes_mw: dict[str, float] | None = None,
@@ -144,7 +144,9 @@ def load_entsoe(
 
     for country in countries:
         logger.info(f"loading ENTSO-E data for {country}")
-        demand = entsoe.get_country_demand(start, end, country, timestep, use_cache=use_cache)
+        demand = entsoe.get_country_demand(
+            start, end, country, timestep, use_cache=use_cache
+        )
         # fill gaps in the load series so every simulation hour has a value
         demand = demand.reindex(index).ffill().bfill()
         generation = entsoe.get_country_generation(
@@ -480,7 +482,7 @@ if __name__ == "__main__":
     study_case = f"{'_'.join(countries)}_{year}"
 
     start = datetime(year, 1, 1)
-    timestep = timedelta(hours=1) # e.g. timedelta(minutes=15) or timedelta(hours=1)
+    timestep = timedelta(hours=1)  # e.g. timedelta(minutes=15) or timedelta(hours=1)
     end = datetime(year + 1, 1, 1) - timestep
     marketdesign = [
         MarketConfig(

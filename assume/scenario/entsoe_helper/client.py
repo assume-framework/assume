@@ -160,7 +160,7 @@ class EntsoeInterface:
         # write to cache before resampling
         if use_cache:
             self._write_cache(cache_path, load_series)
-        
+
         # resample to the simulation step
         demand = load_series.resample(timestep).mean()
         demand = self._ensure_unique_index(self._to_naive_index(demand))
@@ -203,7 +203,7 @@ class EntsoeInterface:
         # cache before resampling
         if use_cache:
             self._write_cache(cache_path, generation)
-        
+
         generation = generation.resample(timestep).mean()
         generation = self._ensure_unique_index(self._to_naive_index(generation))
         return self._slice_to_period(generation, start, end)
