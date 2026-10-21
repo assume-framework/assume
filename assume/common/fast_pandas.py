@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: MIT
 
-import math
 from datetime import datetime, timedelta
 from functools import lru_cache
 
@@ -239,8 +238,8 @@ class FastIndex:
         remainder = delta_seconds % self.freq_seconds
 
         if round_up and remainder > 0:
-            # an off-grid date maps to the next step at or after it
-            return math.ceil(delta_seconds / self.freq_seconds)
+            # if there is a large remainder, we need to add to return the value of the next date as begin
+            delta_seconds += self.freq_seconds
 
         return round(delta_seconds / self.freq_seconds)
 
