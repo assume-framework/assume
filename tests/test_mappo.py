@@ -217,9 +217,7 @@ def test_mappo_complete_policy_update_changes_actor_and_critic(learning_role_n):
     assert algorithm.n_updates == 1
     assert learning_role_n.update_steps == 1
     assert algorithm.buffer.size() == 1
-    np.testing.assert_array_equal(
-        algorithm.buffer.observations[0], carried_observation
-    )
+    np.testing.assert_array_equal(algorithm.buffer.observations[0], carried_observation)
 
 
 @pytest.mark.require_learning

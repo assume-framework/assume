@@ -217,7 +217,8 @@ class PPO(ActorCriticAlgorithm):
     def _ordered_strategies(self) -> list:
         """Return strategies in the same order as ``_ordered_unit_ids``."""
         return [
-            self.learning_role.rl_strats[unit_id] for unit_id in self._ordered_unit_ids()
+            self.learning_role.rl_strats[unit_id]
+            for unit_id in self._ordered_unit_ids()
         ]
 
     def _centralized_values(self, obs: np.ndarray) -> np.ndarray:
