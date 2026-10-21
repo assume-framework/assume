@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 from assume.common.mango_serializer import mango_codec_factory
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook

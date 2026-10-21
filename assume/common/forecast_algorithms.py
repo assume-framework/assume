@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 from __future__ import annotations
 
 import logging
@@ -357,6 +357,8 @@ def calculate_naive_price_elastic(
                     continue
             elif bid["volume"] == 0:
                 continue
+            for field in config.additional_fields:
+                bid.setdefault(field, None)
             cleaned_orderbook.append(bid)
 
         mps = get_available_products(

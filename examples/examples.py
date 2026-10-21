@@ -1,10 +1,10 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 # %%
 import logging
-import os
+from pathlib import Path
 
 from assume import World
 from assume.scenario.loader_csv import load_scenario_folder, run_learning
@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 # "" means no CSV files will be stored
 csv_path = ""
 
-os.makedirs("./examples/local_db", exist_ok=True)
+Path("./examples/local_db").mkdir(parents=True, exist_ok=True)
 
 available_examples = {
     # small examples for easier understanding of different features and configurations
