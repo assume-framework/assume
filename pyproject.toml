@@ -53,7 +53,7 @@ learning = [
     "setuptools <82" # https://github.com/tensorflow/tensorboard/issues/7003
 ]
 network = [
-    "pypsa",
+    "pypsa >=1.4.0",
 ]
 oeds = [
     "demandlib >=0.1.9",
