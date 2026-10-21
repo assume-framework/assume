@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -124,6 +124,7 @@ class EntsoeInterface:
         start: datetime,
         end: datetime,
         country: str,
+        timestep: timedelta,
         use_cache: bool = True,
     ) -> pd.Series:
         country = country.upper()
@@ -131,6 +132,7 @@ class EntsoeInterface:
         if use_cache:
             cached = self._read_cache(cache_path)
             if cached is not None:
+                cached = cached.resample(timestep).mean()
                 return self._slice_to_period(
                     self._ensure_unique_index(self._to_naive_index(cached)),
                     start,
@@ -154,11 +156,14 @@ class EntsoeInterface:
                 f"Unexpected ENTSO-E load format for {country}: "
                 f"columns={list(load.columns)}"
             )
-        # resample to the hourly simulation step
-        demand = load_series.resample("h").mean()
-        demand = self._ensure_unique_index(self._to_naive_index(demand))
+
+        # write to cache before resampling
         if use_cache:
-            self._write_cache(cache_path, demand)
+            self._write_cache(cache_path, load_series)
+        
+        # resample to the simulation step
+        demand = load_series.resample(timestep).mean()
+        demand = self._ensure_unique_index(self._to_naive_index(demand))
         return self._slice_to_period(demand, start, end)
 
     def get_country_generation(
@@ -166,6 +171,7 @@ class EntsoeInterface:
         start: datetime,
         end: datetime,
         country: str,
+        timestep: timedelta,
         use_cache: bool = True,
     ) -> pd.DataFrame:
         country = country.upper()
@@ -177,6 +183,7 @@ class EntsoeInterface:
             if cached is not None:
                 if isinstance(cached, pd.Series):
                     cached = cached.to_frame()
+                cached = cached.resample(timestep).mean()
                 return self._slice_to_period(
                     self._ensure_unique_index(self._to_naive_index(cached)),
                     start,
@@ -192,10 +199,13 @@ class EntsoeInterface:
         if isinstance(generation, pd.Series):
             generation = generation.to_frame()
         generation = _flatten_columns(generation)
-        generation = generation.resample("h").mean()
-        generation = self._ensure_unique_index(self._to_naive_index(generation))
+
+        # cache before resampling
         if use_cache:
             self._write_cache(cache_path, generation)
+        
+        generation = generation.resample(timestep).mean()
+        generation = self._ensure_unique_index(self._to_naive_index(generation))
         return self._slice_to_period(generation, start, end)
 
     def get_installed_capacity(
