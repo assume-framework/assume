@@ -101,6 +101,7 @@ Changelog = "https://assume.readthedocs.io/en/latest/release_notes.html"
 
 [project.scripts]
 assume = "assume_cli.cli:cli"
+assume-dash = "assume_dash.__main__:main"
 
 [tool.setuptools.packages.find]
 include = ["assume*", "assume_cli*"]

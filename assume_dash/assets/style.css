@@ -1,0 +1,589 @@
+/*
+ * SPDX-FileCopyrightText: ASSUME Developers
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+/*
+ * Dashboard theme. Dash serves everything in this folder automatically.
+ *
+ * Configure the look by overriding the custom properties below, either
+ *   - with a CSS file passed to `python -m assume_dash --css my.css`, or
+ *   - by editing this file.
+ * Example (my.css):  :root { --accent: var(--mint); --radius: 0; }
+ * The dark palette is applied with `--theme dark` or the switch in the header.
+ */
+
+:root {
+  /* brand palette */
+  --coral: #ee6063;
+  --yellow: #e2dc6d;
+  --mint: #84c69b;
+  --blue: #82cdd7;
+
+  --accent: var(--coral);
+  --accent-contrast: #ffffff;
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-alt: #f3f4f4;
+  --text: #333333;
+  --text-muted: #777777;
+  --border: #e2e4e4;
+  --shadow: 0 1px 3px rgba(51, 51, 51, 0.12);
+  --radius: 8px;
+  --gap: 1rem;
+  --font: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-size: 15px;
+  --max-width: 1500px;
+}
+
+:root[data-theme="dark"] {
+  --accent: var(--coral);
+  --accent-contrast: #ffffff;
+  --bg: #262626;
+  --surface: #333333;
+  --surface-alt: #3d3d3d;
+  --text: #f4f4f4;
+  --text-muted: #b5b5b5;
+  --border: #4d4d4d;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* ---- base ---------------------------------------------------------------- */
+html {
+  color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--font-size);
+  line-height: 1.45;
+}
+
+.app {
+  display: flex;
+  align-items: flex-start;
+  min-height: 100vh;
+}
+
+.main {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: var(--max-width);
+  padding: 0 1.5rem 3rem;
+}
+
+h1,
+h3 {
+  margin: 0;
+  font-weight: 600;
+}
+
+h3 {
+  margin: 1.8rem 0 0.6rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 2px solid var(--accent);
+  font-size: 1.1rem;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* ---- header and global controls ----------------------------------------- */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 -1.5rem;
+  padding: 1rem 1.5rem;
+  background: var(--surface);
+  color: var(--text);
+  border-bottom: 4px solid var(--accent);
+  box-shadow: var(--shadow);
+}
+
+.header h1 {
+  font-size: 1.6rem;
+  letter-spacing: 0.02em;
+}
+
+.header h1 span {
+  color: var(--accent);
+  font-weight: 400;
+}
+
+.theme-switch label,
+.theme-switch label * {
+  color: var(--text) !important;
+}
+
+.theme-switch label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0 1rem;
+  color: var(--text);
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.9rem;
+}
+
+.controls {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: flex-end;
+  margin: var(--gap) 0;
+  padding: 0.9rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* ---- sidebar navigation -------------------------------------------------- */
+.sidebar {
+  position: sticky;
+  top: 0;
+  flex: 0 0 var(--sidebar-width, 15rem);
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  box-sizing: border-box;
+  height: 100vh;
+  padding: 1.4rem 1rem;
+  overflow-y: auto;
+  background: var(--surface);
+  border-right: 4px solid var(--accent);
+  box-shadow: var(--shadow);
+}
+
+.sidebar h1 {
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+}
+
+.sidebar h1 span {
+  display: block;
+  color: var(--accent);
+  font-weight: 400;
+}
+
+.nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1 1 auto;
+}
+
+.nav-list label {
+  display: block;
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid transparent;
+  border-left: 4px solid transparent;
+  border-radius: 8px;
+  color: var(--text) !important;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+
+.nav-list label * {
+  color: inherit !important;
+}
+
+.nav-list input,
+.nav-list .dash-options-list-option-wrapper {
+  display: none !important;
+}
+
+.nav-list label:hover {
+  background: var(--highlight);
+  border-color: var(--accent);
+}
+
+.nav-list label.selected {
+  background: var(--highlight-strong);
+  border-color: var(--accent);
+}
+
+.sidebar .theme-switch {
+  display: flex;
+  justify-content: space-between;
+}
+
+.sidebar .theme-switch label {
+  margin: 0;
+}
+
+@media (max-width: 800px) {
+  .app {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    flex-basis: auto;
+    width: 100%;
+  }
+
+  .nav-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
+.control {
+  flex: 1 1 12rem;
+}
+
+.control-wide {
+  flex: 2 1 18rem;
+}
+
+/* ---- tabs ---------------------------------------------------------------- */
+.tab-bar {
+  margin-bottom: var(--gap);
+}
+
+.tab-bar .tab {
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  border-color: var(--border);
+  font-weight: 600;
+}
+
+.tab-bar .tab--selected,
+.tab-bar .tab--selected:hover {
+  background: var(--surface);
+  color: var(--text);
+  border-top: 3px solid var(--accent) !important;
+}
+
+input[type="radio"],
+input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+/* ---- cards: every graph and table sits on a surface --------------------- */
+.card,
+.dash-graph {
+  margin-bottom: var(--gap);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.stat-card {
+  min-width: 10rem;
+  padding: 0.7rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.stat-card .label {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.stat-card .value {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap);
+}
+
+.row > * {
+  flex: 1 1 28rem;
+  min-width: 0;
+}
+
+.stat-row {
+  margin: var(--gap) 0;
+}
+
+.stat-row > * {
+  flex: 0 0 auto;
+}
+
+/* ---- plotly: follow the theme instead of the figure template ----------- */
+.dash-options-list-option,
+.dash-options-list-option * ,
+.dash-radioitems-inline,
+.dash-radioitems-inline *,
+.dash-dropdown-value,
+.dash-datepicker-input {
+  color: var(--text) !important;
+}
+
+.ag-theme-alpine {
+  --ag-background-color: var(--surface);
+  --ag-foreground-color: var(--text);
+  --ag-header-background-color: var(--surface-alt);
+  --ag-border-color: var(--border);
+  --ag-odd-row-background-color: var(--surface);
+}
+
+.ag-theme-alpine,
+.ag-theme-alpine .ag-body-horizontal-scroll,
+.ag-theme-alpine .ag-body-horizontal-scroll-viewport,
+.ag-theme-alpine .ag-center-cols-viewport,
+.ag-theme-alpine .ag-overlay {
+  background: var(--surface) !important;
+}
+.dash-dropdown svg,
+.dash-datepicker-input-wrapper svg,
+.dash-datepicker svg {
+  color: var(--text) !important;
+}
+
+.dash-dropdown-trigger-icon,
+.dash-datepicker-caret-icon {
+  fill: var(--text) !important;
+}
+.js-plotly-plot .plotly .main-svg {
+  background: transparent !important;
+}
+
+.js-plotly-plot .plotly .bg {
+  fill: transparent !important;
+}
+
+.js-plotly-plot .plotly text {
+  fill: var(--text) !important;
+}
+
+.js-plotly-plot .plotly .gridlayer path,
+.js-plotly-plot .plotly .zerolinelayer path {
+  stroke: var(--border) !important;
+}
+
+/* ---- dash inputs and tables --------------------------------------------- */
+.Select-control,
+.Select-menu-outer,
+.DateInput_input,
+.DateRangePickerInput,
+.dash-dropdown,
+.dash-dropdown-content,
+.dash-datepicker-input-wrapper,
+.dash-datepicker-input,
+.dash-datepicker-content,
+input[type="text"] {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+  border-radius: var(--radius) !important;
+}
+
+.Select-value-label,
+.Select-placeholder,
+.dash-dropdown-value,
+.dash-datepicker-input,
+.DateInput_input {
+  color: var(--text) !important;
+}
+
+.ag-theme-alpine {
+  --ag-background-color: var(--surface);
+  --ag-header-background-color: var(--surface-alt);
+  --ag-foreground-color: var(--text);
+  --ag-border-color: var(--border);
+  --ag-odd-row-background-color: var(--surface);
+  --ag-row-hover-color: var(--surface-alt);
+  --ag-font-family: var(--font);
+  border-radius: var(--radius);
+}
+
+/* ---- selectable elements: visible hover, focus and selected states ------ */
+:root {
+  --highlight: color-mix(in srgb, var(--accent) 14%, transparent);
+  --highlight-strong: color-mix(in srgb, var(--accent) 28%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.dash-dropdown,
+.dash-datepicker-input-wrapper,
+.tab,
+.dash-options-list-option,
+.ag-header-cell,
+.ag-row,
+.js-plotly-plot .legendtoggle {
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s, box-shadow 0.12s,
+    color 0.12s;
+}
+
+.dash-dropdown:hover,
+.dash-datepicker-input-wrapper:hover {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.dash-dropdown:focus-within,
+.dash-dropdown[aria-expanded="true"],
+.dash-datepicker-input-wrapper:focus-within {
+  border-color: var(--accent) !important;
+  box-shadow: var(--focus-ring) !important;
+}
+
+.tab-bar .tab:hover {
+  background: var(--highlight);
+  color: var(--text);
+  border-top: 3px solid var(--accent) !important;
+}
+
+.tab-bar .tab--selected {
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+
+.dash-options-list-option:hover {
+  background: var(--highlight) !important;
+}
+
+.dash-options-list-option.selected {
+  background: var(--highlight-strong) !important;
+  font-weight: 600;
+}
+
+.dash-radioitems-inline {
+  padding: 0.25rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+
+.dash-radioitems-inline:hover {
+  background: var(--highlight);
+  border-color: var(--accent);
+}
+
+.dash-radioitems-inline.selected {
+  background: var(--highlight-strong);
+  border-color: var(--accent);
+}
+
+.floating-select {
+  position: sticky;
+  top: var(--controls-height, 12rem);
+  z-index: 40;
+  margin: 0.5rem 0 1rem;
+  padding: 0.6rem 1rem;
+  background: var(--surface, var(--bg, #fff));
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.floating-select .chip-list {
+  max-height: 4.6rem;
+  gap: 0.25rem;
+}
+
+.floating-select .chip-list label {
+  padding: 0.1rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.floating-select label {
+  margin-bottom: 0.1rem;
+}
+
+.floating-select .row {
+  gap: 0.4rem;
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  max-height: 11rem;
+  overflow-y: auto;
+  padding: 0.2rem;
+}
+
+.chip-list [class*="checklist-inline"],
+.chip-list label {
+  cursor: pointer;
+  padding: 0.25rem 0.8rem;
+  border: 1px solid var(--border, #ccc);
+  border-radius: 999px;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.chip-list [class*="checklist-inline"]:hover,
+.chip-list label:hover {
+  background: var(--highlight);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--highlight-strong);
+}
+
+.chip-list [class*="checklist-inline"].selected,
+.chip-list label.selected {
+  background: var(--highlight-strong) !important;
+  border-color: var(--accent);
+  color: var(--text) !important;
+  font-weight: 600;
+}
+
+.chip-list label {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.chip-list label,
+.chip-list label * {
+  color: var(--text) !important;
+}
+
+.ag-theme-alpine {
+  --ag-row-hover-color: var(--highlight);
+  --ag-selected-row-background-color: var(--highlight-strong);
+  --ag-header-cell-hover-background-color: var(--highlight);
+}
+
+.js-plotly-plot .legend .traces:hover {
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 3px var(--accent));
+}
+
+.card:hover,
+.dash-graph:hover {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

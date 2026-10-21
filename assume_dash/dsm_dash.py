@@ -45,8 +45,8 @@ def load_data() -> dict[str, pd.DataFrame]:
             "unit": ["steel_plant_1", "steel_plant_2", "data_center_1"],
             "unit_type": "demand",
             "technology": ["steel_plant", "steel_plant", "data_center"],
-            "max_power_MW": [100, 60, 30],
-            "min_power_MW": [20, 10, 5],
+            "max_power": [100, 60, 30],
+            "min_power": [20, 10, 5],
             "ramp_up_MW_h": [40, 25, 30],
             "ramp_down_MW_h": [40, 25, 30],
             "min_operating_time_h": [4, 4, 0],
@@ -60,12 +60,12 @@ def load_data() -> dict[str, pd.DataFrame]:
     rows = []
     for _, u in units.iterrows():
         power = np.clip(
-            _hourly_pattern(u.max_power_MW * 0.6, u.max_power_MW * 0.25),
-            u.min_power_MW,
-            u.max_power_MW,
+            _hourly_pattern(u.max_power * 0.6, u.max_power * 0.25),
+            u.min_power,
+            u.max_power,
         )
         price = _hourly_pattern(60, 25)
-        baseline = np.full(len(TIME), u.max_power_MW * 0.65)
+        baseline = np.full(len(TIME), u.max_power * 0.65)
         flex = baseline - power
         rows.append(
             pd.DataFrame(
@@ -76,11 +76,11 @@ def load_data() -> dict[str, pd.DataFrame]:
                     "baseline_MW": baseline,
                     "flex_MW": flex,
                     "price": price,
-                    "grid_import_MW": power * 0.8 + 0.05 * u.max_power_MW,
+                    "grid_import_MW": power * 0.8 + 0.05 * u.max_power,
                     "grid_export_MW": np.clip(-flex, 0, None) * 0.2,
                     "grid_limit_MW": u.grid_connection_MW,
-                    "regime": np.where(power > u.max_power_MW * 0.6, "high", "low"),
-                    "on": (power > u.min_power_MW * 1.05).astype(int),
+                    "regime": np.where(power > u.max_power * 0.6, "high", "low"),
+                    "on": (power > u.min_power * 1.05).astype(int),
                 }
             )
         )
@@ -184,7 +184,7 @@ def build_overview_tab():
                 figure=px.bar(
                     u,
                     x="unit",
-                    y=["min_power_MW", "max_power_MW", "grid_connection_MW"],
+                    y=["min_power", "max_power", "grid_connection_MW"],
                     barmode="group",
                     title="Installed capacities",
                 )
@@ -238,7 +238,7 @@ def build_operations_tab():
 )
 def update_ops(units):
     d = _sel(DATA["ops"], units)
-    cap = DATA["units"].set_index("unit")["max_power_MW"]
+    cap = DATA["units"].set_index("unit")["max_power"]
     profile = px.line(d, x="time", y="power_MW", color="unit", title="Operating profile")
     dispatch = px.area(
         d, x="time", y="power_MW", color="unit", title="Dispatch (stacked)"
