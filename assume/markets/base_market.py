@@ -634,8 +634,8 @@ class MarketRole(MarketMechanism, Role):
             )
             return
 
-        # the arrival order of orders depends on the process timing
-        # sort the orders deterministically, as the order is used for tie-breaking between equal-price bids
+        # the arrival order of orders depends on the process timing, sort the orders deterministically
+        # the tie-breaking rule itself should be defined by the clearing mechanism
         self.all_orders.sort(
             key=lambda order: (
                 order["start_time"],

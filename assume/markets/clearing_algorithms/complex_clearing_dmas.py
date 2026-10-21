@@ -61,6 +61,9 @@ class ComplexDmasClearingRole(MarketRole):
         Returns:
             tuple[Orderbook, Orderbook, list[dict]]: accepted orderbook, rejected orderbook and clearing meta data
         """
+        # tie-breaking rule: deterministic order of orderbook; reproducible but always favours the same bids.
+        # implement other rule here if desired
+
         # assumes same duration for all given products
         start = market_products[0][0]
         duration = market_products[0][1] - start
