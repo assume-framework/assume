@@ -513,7 +513,9 @@ def test_generation_cache_single_column_stays_dataframe(tmp_path, hourly_index):
         cache_path
     )
 
-    generation = iface.get_country_generation(start, end, "DE", timestep, use_cache=True)
+    generation = iface.get_country_generation(
+        start, end, "DE", timestep, use_cache=True
+    )
     assert isinstance(generation, pd.DataFrame)
     assert list(generation.columns) == ["Solar"]
     assert len(generation) == 48
