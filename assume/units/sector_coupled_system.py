@@ -15,7 +15,7 @@ The first implementation contains presets for:
     - heat systems:
         heat_pump + boiler + thermal_storage
     - hydrogen systems:
-        electrolyser + hydrogen_seasonal_storage
+        electrolyser + hydrogen_seasonal_storage + fuel cell
 
 Additional sectors can be added by supplying ``carrier_balances`` instead of
 creating another parent-unit class.
@@ -101,15 +101,24 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
             "balances": {
                 "hydrogen": {
                     "demand_attr": "hydrogen_demand",
-                    # Preserve the existing HydrogenPlant behaviour.
-                    "sense": "ge",
+                    "sense": "eq",
                     "required_prefixes": ["electrolyser"],
                     "allowed_prefixes": [
                         "electrolyser",
                         "hydrogen_seasonal_storage",
+                        "fuel_cell",
                     ],
                     "producers": [
-                        {"prefix": "electrolyser", "variable": "hydrogen_out"}
+                        {
+                            "prefix": "electrolyser",
+                            "variable": "hydrogen_out",
+                        }
+                    ],
+                    "consumers": [
+                        {
+                            "prefix": "fuel_cell",
+                            "variable": "hydrogen_in",
+                        }
                     ],
                     "storages": [
                         {
@@ -123,6 +132,26 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
             },
         },
     }
+
+    def _component_power_expr(self, m, t):
+        """
+        Net electrical exchange of the sector-coupled system.
+
+        Positive = electricity consumption
+        Negative = electricity generation/export
+        """
+        expr = 0
+
+        for name in m.dsm_blocks:
+            block = m.dsm_blocks[name]
+
+            if hasattr(block, "power_in"):
+                expr += block.power_in[t]
+
+            if hasattr(block, "power_out"):
+                expr -= block.power_out[t]
+
+        return expr
 
     def __init__(
         self,
@@ -226,9 +255,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
             self.components
         )
 
-    # ------------------------------------------------------------------
     # Configuration helpers
-    # ------------------------------------------------------------------
     @staticmethod
     def _matches_prefix(component_name: str, prefix: str) -> bool:
         return component_name == prefix or component_name.startswith(
@@ -321,9 +348,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                     return storage
         return None
 
-    # ------------------------------------------------------------------
     # Pyomo physical model
-    # ------------------------------------------------------------------
     def define_parameters(self):
         self.model.electricity_price = pyo.Param(
             self.model.time_steps,
@@ -393,7 +418,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
     def define_variables(self):
         self.model.total_power_input = pyo.Var(
             self.model.time_steps,
-            within=pyo.NonNegativeReals,
+            within=pyo.Reals,
         )
         self.model.variable_cost = pyo.Var(
             self.model.time_steps,
@@ -424,6 +449,21 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                         f"required by carrier '{carrier}'."
                     )
                 expr += getattr(block, variable)[t]
+
+
+        for consumer in spec.get("consumers", []):
+            for name in self._names_matching_prefix(consumer["prefix"]):
+                block = m.dsm_blocks[name]
+                variable = consumer["variable"]
+
+                if not hasattr(block, variable):
+                    raise AttributeError(
+                        f"Component '{name}' does not expose '{variable}' "
+                        f"required by carrier '{carrier}'."
+                    )
+
+                expr -= getattr(block, variable)[t]
+
 
         for storage in spec.get("storages", []):
             for name in self._names_matching_prefix(storage["prefix"]):
@@ -637,7 +677,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         instance = self.model.create_instance()
         instance = self.switch_to_opt(instance)
 
-        results = self.solver.solve(instance, options={})
+        results = self.solver.solve(instance, options={}, tee=False)
 
         if not (
             results.solver.status == SolverStatus.ok
@@ -727,7 +767,13 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                     if t >= target_t:
                         break
                     try:
-                        variable[t].fix(float(series.iloc[t]))
+                        value = float(series.iloc[t])
+                        lb, ub = variable[t].lb, variable[t].ub
+                        if lb is not None:
+                            value = max(value, lb)
+                        if ub is not None:
+                            value = min(value, ub)
+                        variable[t].fix(value)
                     except (
                         KeyError,
                         ValueError,
@@ -820,7 +866,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
             sense=objective_sense,
         )
 
-        results = self.solver.solve(instance, options={})
+        results = self.solver.solve(instance, options={}, tee=False)
 
         if not (
             results.solver.status == SolverStatus.ok
@@ -890,9 +936,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
 
         return float(min_consumption), float(max_consumption)
 
-    # ------------------------------------------------------------------
     # Market positions
-    # ------------------------------------------------------------------
     def get_component_eom_positions(
         self,
         start,
@@ -1242,9 +1286,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
 
         return records
 
-    # ------------------------------------------------------------------
     # Public market interface used by generic strategies
-    # ------------------------------------------------------------------
     def get_eom_market_positions(
         self,
         start,
