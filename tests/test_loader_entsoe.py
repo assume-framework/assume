@@ -498,7 +498,7 @@ def test_get_country_demand_handles_series_and_single_column(tmp_path, hourly_in
             assert demand.iloc[47] == 47.0
         else:
             with pytest.raises(AssumeException, match="Unexpected ENTSO-E load format"):
-                iface.get_country_demand(start, end, "DE")
+                iface.get_country_demand(start, end, "DE", timestep)
 
 
 def test_generation_cache_single_column_stays_dataframe(tmp_path, hourly_index):
