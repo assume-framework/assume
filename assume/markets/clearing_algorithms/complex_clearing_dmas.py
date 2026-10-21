@@ -61,6 +61,9 @@ class ComplexDmasClearingRole(MarketRole):
         Returns:
             tuple[Orderbook, Orderbook, list[dict]]: accepted orderbook, rejected orderbook and clearing meta data
         """
+        # tie-breaking rule: deterministic order of orderbook; reproducible but always favours the same bids.
+        # implement other rule here if desired
+
         # assumes same duration for all given products
         start = market_products[0][0]
         duration = market_products[0][1] - start
@@ -143,7 +146,8 @@ class ComplexDmasClearingRole(MarketRole):
             if parent_id == -1:
                 start_block.append((block, agent))
 
-        start_block = set(start_block)
+        # use dict.fromkeys instead of set to keep a deterministic order
+        start_block = list(dict.fromkeys(start_block))
 
         # optimize
         model.clear()
@@ -151,9 +155,11 @@ class ComplexDmasClearingRole(MarketRole):
         t1 = time.time()
         # Step 1 initialize binary variables for hourly ask block per agent and id
         model.use_hourly_ask = Var(
-            set(
-                (block, hour, agent)
-                for block, hour, agent in orders["single_ask"].keys()
+            list(
+                dict.fromkeys(
+                    (block, hour, agent)
+                    for block, hour, agent in orders["single_ask"].keys()
+                )
             ),
             within=Reals,
             bounds=(0, 1),
@@ -162,11 +168,11 @@ class ComplexDmasClearingRole(MarketRole):
         model_vars["single_ask"] = model.use_hourly_ask
         # Step 3 initialize binary variables for ask order in block per agent
         model.use_linked_order = Var(
-            set(
-                [
+            list(
+                dict.fromkeys(
                     (block, hour, agent)
                     for block, hour, agent in orders["linked_ask"].keys()
-                ]
+                )
             ),
             within=Reals,
             bounds=(0, 1),
@@ -177,7 +183,11 @@ class ComplexDmasClearingRole(MarketRole):
 
         # Step 4 initialize binary variables for exclusive block and agent
         model.use_exclusive_block = Var(
-            set([(block, agent) for block, _, agent in orders["exclusive_ask"].keys()]),
+            list(
+                dict.fromkeys(
+                    (block, agent) for block, _, agent in orders["exclusive_ask"].keys()
+                )
+            ),
             within=Binary,
         )
         model_vars["exclusive_ask"] = model.use_exclusive_block
@@ -230,7 +240,9 @@ class ComplexDmasClearingRole(MarketRole):
         # ------------------------------------------------
         # Step 7 set constraint: only one scheduling can be used
         model.one_exclusive_block = ConstraintList()
-        for data in set([(agent,) for _, _, agent in orders["exclusive_ask"].keys()]):
+        for data in dict.fromkeys(
+            (agent,) for _, _, agent in orders["exclusive_ask"].keys()
+        ):
             agent = data
             model.one_exclusive_block.add(
                 1 >= quicksum(model.use_exclusive_block[:, agent])
