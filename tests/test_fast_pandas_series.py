@@ -80,7 +80,7 @@ def test_constructor_rejects_wrong_length_values(index):
         FastSeries(index, [1.0, 2.0, 3.0])
 
 
-def test_constructor_rejects_mismatched_pandas_series(index):
+def test_constructor_mismatched_pandas_series_keeps_index_length(index):
     """A 15-minute pandas Series on an hourly index should raise or produce length 6."""
     quarter_hourly = pd.Series(1.0, index=pd.date_range(t0, periods=24, freq="15min"))
     try:

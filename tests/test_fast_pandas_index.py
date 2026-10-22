@@ -38,30 +38,30 @@ def test_loc_slice_stop_before_index_start_is_empty(series):
     assert result.size == 0
 
 
-def test_contains_ignores_frequency_alignment(series):
+def test_contains_rejects_unaligned_timestamp(series):
     """A timestamp not aligned to the index frequency should not be reported as contained."""
     assert (t0 + timedelta(minutes=30)) not in series.index
 
 
 @pytest.mark.parametrize("minutes", [30, 40])
-def test_at_unaligned_is_not_rounded_badly(series, minutes):
-    """An unaligned scalar lookup should raise KeyError/ValueError or return the 01:00 value (1.0)."""
+def test_at_unaligned_rounds_up_to_next_step(series, minutes):
+    """An unaligned scalar lookup at 00:30 or 00:40 should return the 01:00 value (1.0)."""
     assert series.at[t0 + timedelta(minutes=minutes)] == 1.0
 
 
-def test_loc_slice_start_round_up_matches_pandas(series):
+def test_loc_slice_unaligned_start_rounds_up(series):
     """A slice starting at 00:40 should start at 01:00 and give [1, 2, 3, 4, 5] like pandas."""
     result = np.asarray(series.loc[t0 + timedelta(minutes=40) :])
     np.testing.assert_array_equal(result, np.array([1.0, 2.0, 3.0, 4.0, 5.0]))
 
 
-def test_get_date_list_round_up_start_is_next_hour(series):
+def test_get_date_list_unaligned_start_rounds_up(series):
     """get_date_list from 00:40 should begin at 01:00, the next grid point."""
     first = series.index.get_date_list(t0 + timedelta(minutes=40))[0]
     assert first == t0 + H
 
 
-def test_loc_slice_stop_round_down_matches_pandas(series):
+def test_loc_slice_unaligned_stop_rounds_down(series):
     """A slice stopping at 00:40 should end at 00:00 and give [0] (floor, not round)."""
     result = np.asarray(series.loc[: t0 + timedelta(minutes=40)])
     np.testing.assert_array_equal(result, np.array([0.0]))
