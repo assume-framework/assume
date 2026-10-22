@@ -4,7 +4,7 @@
 
 import calendar
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -526,7 +526,7 @@ def test_broken_timestamps():
     assert true_unix_epoch_start + offset == unix_epoch_start
     # however, we want to have everything in UTC
     # so we need this approach to get a datetime
-    assert unix_start == datetime.fromtimestamp(0, tz=timezone.utc).replace(tzinfo=None)
+    assert unix_start == datetime.fromtimestamp(0, tz=UTC).replace(tzinfo=None)
     # and for the utc timestamp
     assert 0 == calendar.timegm(unix_start.utctimetuple())
 
