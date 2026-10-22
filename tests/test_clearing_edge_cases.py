@@ -10,12 +10,11 @@ from dateutil import rrule as rr
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
 from assume.markets.clearing_algorithms import (
-    PayAsBidRole,
-    PayAsClearRole,
     ComplexClearingRole,
+    PayAsClearRole,
 )
 
-from .utils import create_orderbook, extend_orderbook
+from .utils import extend_orderbook
 
 simple_dayahead_auction_config = MarketConfig(
     market_id="simple_dayahead_auction",
@@ -50,6 +49,7 @@ complex_dayahead_auction_config = MarketConfig(
     price_unit="€/MW",
     market_mechanism="complex_clearing",
 )
+
 
 def test_supply_and_demand_curves_horizontal_overlap():
     next_opening = simple_dayahead_auction_config.opening_hours.after(
@@ -107,6 +107,7 @@ def test_supply_and_demand_curves_horizontal_overlap():
     assert accepted[0]["accepted_volume"] == -60
     assert accepted[1]["accepted_volume"] == -40
 
+
 def test_supply_and_demand_curves_full_horizontal_overlap():
     next_opening = simple_dayahead_auction_config.opening_hours.after(
         datetime(2005, 6, 1)
@@ -159,6 +160,7 @@ def test_supply_and_demand_curves_full_horizontal_overlap():
     assert meta[0]["demand_volume"] == 700
     assert meta[0]["price"] == 200
 
+
 def test_supply_and_demand_curves_vertical_overlap():
     next_opening = simple_dayahead_auction_config.opening_hours.after(
         datetime(2005, 6, 1)
@@ -184,7 +186,7 @@ def test_supply_and_demand_curves_vertical_overlap():
     orderbook = extend_orderbook(products, 100, 12, orderbook)
 
     orderbook_copy = copy.deepcopy(orderbook)
-    
+
     mr_simple_pac = PayAsClearRole(simple_dayahead_auction_config)
     mr_complex_pac = ComplexClearingRole(complex_dayahead_auction_config)
 
@@ -195,7 +197,9 @@ def test_supply_and_demand_curves_vertical_overlap():
     assert len(rejected) == 2
     assert meta[0]["supply_volume"] == 100
     assert meta[0]["demand_volume"] == 100
-    assert meta[0]["price"] == 8 # this should be 8, and is ensured by the supply_scarcity flag in SimpleClearing (would be 20 otherwise)
+    assert (
+        meta[0]["price"] == 8
+    )  # this should be 8, and is ensured by the supply_scarcity flag in SimpleClearing (would be 20 otherwise)
     assert accepted[0]["volume"] == -100
     assert accepted[0]["accepted_volume"] == -100
 
@@ -206,9 +210,10 @@ def test_supply_and_demand_curves_vertical_overlap():
     assert len(rejected) == 2
     assert meta[0]["supply_volume"] == 100
     assert meta[0]["demand_volume"] == 100
-    assert meta[0]["price"] == 10 # next demand bid sets price
+    assert meta[0]["price"] == 10  # next demand bid sets price
     assert accepted[0]["volume"] == -100
     assert accepted[0]["accepted_volume"] == -100
+
 
 def test_supply_and_demand_curves_full_vertical_overlap():
     next_opening = simple_dayahead_auction_config.opening_hours.after(
@@ -248,7 +253,9 @@ def test_supply_and_demand_curves_full_vertical_overlap():
     assert len(rejected) == 2
     assert meta[0]["supply_volume"] == 800
     assert meta[0]["demand_volume"] == 800
-    assert meta[0]["price"] == 10 # this should be 10, and is ensured by the supply_scarcity flag in SimpleClearing (would be 20 otherwise)
+    assert (
+        meta[0]["price"] == 10
+    )  # this should be 10, and is ensured by the supply_scarcity flag in SimpleClearing (would be 20 otherwise)
     assert accepted[0]["volume"] == -700
     assert accepted[0]["accepted_volume"] == -700
     assert accepted[1]["volume"] == -100
@@ -266,6 +273,7 @@ def test_supply_and_demand_curves_full_vertical_overlap():
     assert accepted[0]["accepted_volume"] == -700
     assert accepted[1]["volume"] == -100
     assert accepted[1]["accepted_volume"] == -100
+
 
 def test_supply_and_demand_curves_no_overlap_demand_scarcity():
     next_opening = simple_dayahead_auction_config.opening_hours.after(
@@ -315,6 +323,7 @@ def test_supply_and_demand_curves_no_overlap_demand_scarcity():
     assert meta[0]["supply_volume"] == 150
     assert meta[0]["demand_volume"] == 150
     assert meta[0]["price"] == 10
+
 
 def test_supply_and_demand_curves_no_overlap_supply_scarcity():
     next_opening = simple_dayahead_auction_config.opening_hours.after(
