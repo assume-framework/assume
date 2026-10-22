@@ -71,14 +71,11 @@ def test_loc_slice_stop_round_down_matches_pandas(series):
     np.testing.assert_array_equal(result, np.array([0.0]))
 
 
-def test_monthly_freq_ms_is_parsed_as_months():
-    """freq='MS' should give month starts (2024-02-01 at index 1), or raise ValueError if unsupported."""
-    # always use periods= here: with end= the millisecond parsing allocates ~40 GB
-    try:
-        ix = FastIndex(start=t0, periods=3, freq="MS")
-    except ValueError:
-        return
-    assert ix[1] == datetime(2024, 2, 1)
+@pytest.mark.parametrize("freq", ["m", "W", "M", "MS", "ME"])
+def test_index_rejects_calendar_frequencies(freq):
+    """Calendar frequencies have no fixed step and should raise ValueError."""
+    with pytest.raises(ValueError):
+        FastIndex(start=t0, periods=3, freq=freq)
 
 
 def test_slicing_fastseries_even():
@@ -128,10 +125,18 @@ def test_index_requires_end_or_periods():
 
 @pytest.mark.parametrize(
     "freq, expected",
-    [("1h", H), ("h", H), ("15min", timedelta(minutes=15)), (H, H)],
+    [
+        ("1h", H),
+        ("h", H),
+        ("15min", timedelta(minutes=15)),
+        ("min", timedelta(minutes=1)),
+        ("D", 24 * H),
+        ("24h", 24 * H),
+        (H, H),
+    ],
 )
 def test_index_parses_frequency(freq, expected):
-    """String and timedelta frequencies should be parsed to a timedelta."""
+    """Timedeltas and fixed offset aliases should be parsed to a timedelta."""
     assert FastIndex(start=t0, periods=2, freq=freq).freq == expected
 
 

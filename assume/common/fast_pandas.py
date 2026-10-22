@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from pandas.api.types import is_datetime64_any_dtype
 from pandas.tseries.frequencies import to_offset
+from pandas.tseries.offsets import Day, Tick
 
 # tolerance for floating point errors when mapping dates onto the index grid
 _ALIGNMENT_EPSILON_SECONDS = 1e-6
@@ -41,8 +42,9 @@ class FastIndex:
         Parameters:
             start (datetime | str): The start datetime or its string representation.
             end (datetime | str, optional): The end datetime or its string representation. Defaults to None.
-            freq (timedelta | str, optional): The frequency of the index. Can be a timedelta or pandas-style string.
-                                               Defaults to timedelta(hours=1).
+            freq (timedelta | str, optional): The fixed step of the index, as timedelta or pandas offset alias
+                (e.g. "15min", "h" or "D"). Calendar frequencies such as "W" or "MS" are not supported.
+                Defaults to timedelta(hours=1).
             periods (int, optional): Number of periods in the index. Either `end` or `periods` must be provided.
         """
         self._start = self._convert_to_datetime(start)
@@ -284,7 +286,7 @@ class FastIndex:
         Parse a frequency input into a timedelta.
 
         Parameters:
-            freq (timedelta | str): Frequency in timedelta or pandas-style string format.
+            freq (timedelta | str): Frequency as timedelta or fixed pandas offset alias (e.g. "15min", "h", "D").
 
         Returns:
             timedelta: The parsed frequency.
@@ -296,22 +298,16 @@ class FastIndex:
         if isinstance(freq, timedelta):
             return freq
         if isinstance(freq, str):
-            # parse pandas offset aliases first, as pd.to_timedelta reads e.g. "MS" as milliseconds
             try:
                 offset = to_offset(freq)
-            except ValueError:
-                offset = None
-            if offset is not None:
-                try:
-                    return pd.Timedelta(offset.nanos, unit="ns")
-                except ValueError as e:
-                    raise ValueError(
-                        f"Invalid frequency string: {freq}. Only fixed frequencies are supported. Error: {e}"
-                    )
-            try:
-                return pd.to_timedelta(freq)
             except ValueError as e:
                 raise ValueError(f"Invalid frequency string: {freq}. Error: {e}")
+            # Day is no Tick in pandas>=3, but has a fixed length for naive datetimes
+            if not isinstance(offset, Tick | Day):
+                raise ValueError(
+                    f"Frequency {freq} is not fixed, use e.g. '15min', 'h' or 'D'."
+                )
+            return pd.Timedelta(offset.nanos, unit="ns")
         raise TypeError("Frequency must be a string or timedelta")
 
     @staticmethod
