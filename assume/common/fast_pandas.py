@@ -62,7 +62,6 @@ class FastIndex:
             total_seconds = (self._end - self._start).total_seconds()
             self._count = int(np.floor(total_seconds / self._freq_seconds)) + 1
 
-        self._tolerance_seconds = 1
         self._date_list = None  # Lazy-loaded
 
     @property
@@ -84,11 +83,6 @@ class FastIndex:
     def freq_seconds(self) -> float:
         """Get the frequency of the index in total seconds."""
         return self._freq_seconds
-
-    @property
-    def tolerance_seconds(self) -> int:
-        """Get the tolerance in seconds for date alignment."""
-        return self._tolerance_seconds
 
     def __getitem__(self, item: int | slice):
         """
@@ -503,7 +497,10 @@ class FastSeries:
             indices = (delta_seconds / self.index.freq_seconds).round().astype(int)
             remainders = delta_seconds % self.index.freq_seconds
 
-            if not np.all(remainders <= self.index.tolerance_seconds):
+            if not np.all(
+                (remainders <= _ALIGNMENT_EPSILON_SECONDS)
+                | (self.index.freq_seconds - remainders <= _ALIGNMENT_EPSILON_SECONDS)
+            ):
                 raise ValueError(
                     "One or more dates are not aligned with the index frequency."
                 )

@@ -46,11 +46,7 @@ def test_contains_ignores_frequency_alignment(series):
 @pytest.mark.parametrize("minutes", [30, 40])
 def test_at_unaligned_is_not_rounded_badly(series, minutes):
     """An unaligned scalar lookup should raise KeyError/ValueError or return the 01:00 value (1.0)."""
-    try:
-        result = series.at[t0 + timedelta(minutes=minutes)]
-    except (KeyError, ValueError):
-        return
-    assert result == 1.0
+    assert series.at[t0 + timedelta(minutes=minutes)] == 1.0
 
 
 def test_loc_slice_start_round_up_matches_pandas(series):
