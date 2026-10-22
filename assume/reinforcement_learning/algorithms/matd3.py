@@ -4,7 +4,7 @@
 
 import json
 import logging
-import os
+from pathlib import Path
 
 import torch as th
 from torch.nn import functional as F
@@ -46,10 +46,11 @@ class TD3(RLAlgorithm):
         Args:
             directory (str): The base directory for saving the parameters.
         """
-        self.save_critic_params(directory=f"{directory}/critics")
-        self.save_actor_params(directory=f"{directory}/actors")
+        directory = Path(directory)
+        self.save_critic_params(directory=directory / "critics")
+        self.save_actor_params(directory=directory / "actors")
 
-    def save_critic_params(self, directory):
+    def save_critic_params(self, directory: Path) -> None:
         """
         Save the parameters of critic networks.
 
@@ -58,26 +59,25 @@ class TD3(RLAlgorithm):
         associated with each learning strategy.
 
         Args:
-            directory (str): The base directory for saving the parameters.
+            directory (Path): The base directory for saving the parameters.
         """
-        os.makedirs(directory, exist_ok=True)
+        directory.mkdir(parents=True, exist_ok=True)
         for u_id, strategy in self.learning_role.rl_strats.items():
             obj = {
                 "critic": strategy.critics.state_dict(),
                 "critic_target": strategy.target_critics.state_dict(),
                 "critic_optimizer": strategy.critics.optimizer.state_dict(),
             }
-            path = f"{directory}/critic_{u_id}.pt"
-            th.save(obj, path)
+            th.save(obj, directory / f"critic_{u_id}.pt")
 
         # record the exact order of u_ids and save it with critics to ensure that the same order is used when loading the parameters
         u_id_list = [str(u) for u in self.learning_role.rl_strats.keys()]
         mapping = {"u_id_order": u_id_list}
-        map_path = os.path.join(directory, "u_id_order.json")
-        with open(map_path, "w") as f:
+        map_path = directory / "u_id_order.json"
+        with map_path.open("w") as f:
             json.dump(mapping, f, indent=2)
 
-    def save_actor_params(self, directory):
+    def save_actor_params(self, directory: Path) -> None:
         """
         Save the parameters of actor networks.
 
@@ -86,19 +86,18 @@ class TD3(RLAlgorithm):
         associated with each learning strategy.
 
         Args:
-            directory (str): The base directory for saving the parameters.
+            directory (Path): The base directory for saving the parameters.
         """
-        os.makedirs(directory, exist_ok=True)
+        directory.mkdir(parents=True, exist_ok=True)
         for u_id, strategy in self.learning_role.rl_strats.items():
             obj = {
                 "actor": strategy.actor.state_dict(),
                 "actor_target": strategy.actor_target.state_dict(),
                 "actor_optimizer": strategy.actor.optimizer.state_dict(),
             }
-            path = f"{directory}/actor_{u_id}.pt"
-            th.save(obj, path)
+            th.save(obj, directory / f"actor_{u_id}.pt")
 
-    def load_params(self, directory: str) -> None:
+    def load_params(self, directory: Path) -> None:
         """
         Load the parameters of both actor and critic networks.
 
@@ -106,30 +105,30 @@ class TD3(RLAlgorithm):
         directory. It uses the `load_critic_params` and `load_actor_params` methods to load the respective parameters.
 
         Args:
-            directory (str): The directory from which the parameters should be loaded.
+            directory (Path): The directory from which the parameters should be loaded.
         """
         self.load_critic_params(directory)
         self.load_actor_params(directory)
 
-    def load_critic_params(self, directory: str) -> None:
+    def load_critic_params(self, directory: Path) -> None:
         """
         Load critic, target_critic, and optimizer states for each agent strategy.
         If agent count differs between saved and current model, performs weight transfer for both networks.
         Args:
-            directory (str): The directory from which the parameters should be loaded.
+            directory (Path): The directory from which the parameters should be loaded.
         """
         logger.info("Loading critic parameters...")
 
-        if not os.path.exists(directory):
+        if not directory.exists():
             logger.warning(
                 "Specified directory does not exist. Using randomly initialized critics."
             )
             return
 
-        map_path = os.path.join(directory, "critics", "u_id_order.json")
-        if os.path.exists(map_path):
+        map_path = directory / "critics" / "u_id_order.json"
+        if map_path.exists():
             # read the saved order of u_ids from critics save directory
-            with open(map_path) as f:
+            with map_path.open() as f:
                 loaded_id_order = json.load(f).get("u_id_order", [])
         else:
             logger.warning("No u_id_order.json: assuming same order as current.")
@@ -146,8 +145,8 @@ class TD3(RLAlgorithm):
             )
 
         for u_id, strategy in self.learning_role.rl_strats.items():
-            critic_path = os.path.join(directory, "critics", f"critic_{u_id}.pt")
-            if not os.path.exists(critic_path):
+            critic_path = directory / "critics" / f"critic_{u_id}.pt"
+            if not critic_path.exists():
                 logger.warning(f"No saved critic for {u_id}; skipping.")
                 continue
 
@@ -194,7 +193,7 @@ class TD3(RLAlgorithm):
             except Exception as e:
                 logger.warning(f"Failed to load critic for {u_id}: {e}")
 
-    def load_actor_params(self, directory: str) -> None:
+    def load_actor_params(self, directory: Path) -> None:
         """
         Load the parameters of actor networks from a specified directory.
 
@@ -203,10 +202,10 @@ class TD3(RLAlgorithm):
         with the learning role, loads the respective parameters, and updates the actor and target actor networks accordingly.
 
         Args:
-            directory (str): The directory from which the parameters should be loaded.
+            directory (Path): The directory from which the parameters should be loaded.
         """
         logger.info("Loading actor parameters...")
-        if not os.path.exists(directory):
+        if not directory.exists():
             logger.warning(
                 "Specified directory for loading the actors does not exist! Starting with randomly initialized values!"
             )
@@ -215,7 +214,7 @@ class TD3(RLAlgorithm):
         for u_id, strategy in self.learning_role.rl_strats.items():
             try:
                 actor_params = self.load_obj(
-                    directory=f"{directory}/actors/actor_{str(u_id)}.pt"
+                    directory=directory / "actors" / f"actor_{u_id}.pt"
                 )
                 strategy.actor.load_state_dict(actor_params["actor"])
                 strategy.actor_target.load_state_dict(actor_params["actor_target"])
