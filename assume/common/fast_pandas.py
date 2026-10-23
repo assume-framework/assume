@@ -164,11 +164,15 @@ class FastIndex:
         """
         Get the position of a single datetime in the index.
 
-        Unaligned datetimes map to the next date on the index grid.
+        Like label-based lookups in pandas, the datetime has to match an index date exactly.
 
         Raises:
-            KeyError: If the datetime lies outside the index range.
+            KeyError: If the datetime lies outside the index range or is not aligned with the frequency.
         """
+        if not self._is_aligned(date):
+            raise KeyError(
+                f"{date} is not aligned with the index frequency {self.freq}"
+            )
         idx = self._get_idx_from_date(date)
         if idx < 0 or idx >= self._count:
             raise KeyError(
@@ -481,7 +485,7 @@ class FastSeries:
 
         Raises:
             TypeError: If the index type is unsupported.
-            ValueError: If dates are not aligned within tolerance.
+            KeyError: If dates are outside of the index range or not aligned with the frequency.
         """
         if isinstance(item, slice):
             return self.data[self._data_slice(item)]
@@ -501,7 +505,7 @@ class FastSeries:
                 (remainders <= _ALIGNMENT_EPSILON_SECONDS)
                 | (self.index.freq_seconds - remainders <= _ALIGNMENT_EPSILON_SECONDS)
             ):
-                raise ValueError(
+                raise KeyError(
                     "One or more dates are not aligned with the index frequency."
                 )
             if np.any((indices < 0) | (indices >= len(self.data))):
@@ -538,7 +542,8 @@ class FastSeries:
 
         Raises:
             TypeError: If the index type is unsupported.
-            ValueError: If lengths of indices and values do not match or dates are not aligned within tolerance.
+            ValueError: If lengths of indices and values do not match.
+            KeyError: If dates are outside of the index range or not aligned with the frequency.
         """
         if isinstance(item, slice):
             data_slice = self._data_slice(item)

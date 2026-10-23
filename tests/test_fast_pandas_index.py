@@ -43,10 +43,20 @@ def test_contains_rejects_unaligned_timestamp(series):
     assert (t0 + timedelta(minutes=30)) not in series.index
 
 
-@pytest.mark.parametrize("minutes", [30, 40])
-def test_at_unaligned_rounds_up_to_next_step(series, minutes):
-    """An unaligned scalar lookup at 00:30 or 00:40 should return the 01:00 value (1.0)."""
-    assert series.at[t0 + timedelta(minutes=minutes)] == 1.0
+def test_unaligned_raises_key_error(series):
+    """An unaligned scalar lookup at 00:30 should raise KeyError like pandas."""
+    unaligned = t0 + timedelta(minutes=30)
+    with pytest.raises(KeyError):
+        _ = series.at[unaligned]
+    with pytest.raises(KeyError):
+        _ = series.loc[[t0, unaligned]]
+    with pytest.raises(KeyError):
+        _ = series[[unaligned]]
+
+    original_value = series.at[t0 + H]
+    with pytest.raises(KeyError):
+        series.at[t0 + timedelta(minutes=30)] = 9.0
+    assert series.at[t0 + H] == original_value
 
 
 def test_loc_slice_unaligned_start_rounds_up(series):
