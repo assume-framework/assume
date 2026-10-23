@@ -37,6 +37,13 @@ Custom Units (CSV import)     ``CustomUnitForecaster``                  *(arbitr
 ============================= ========================================= ===========================================
 
 .. note::
+   Forecast series passed to a forecaster as :class:`~assume.common.fast_pandas.FastSeries` are used as-is,
+   while any other type (``pd.Series``, list, scalar) is copied into a new array per forecaster.
+   For data that is identical for many units, such as fuel prices, create the ``FastSeries`` once and pass the
+   same objects to every forecaster to avoid one copy per unit. The CSV loader does this for ``fuel_prices``.
+   Shared series must not be modified in place, as the change would affect all units.
+
+.. note::
    Unit operators can also own a forecaster, :class:`~assume.common.forecaster.UnitsOperatorForecaster`,
    giving the operator its own ``price`` and ``residual_load`` forecasts (see :doc:`unit_operator`).
    It reuses the same lifecycle, algorithms, and registries described below; its algorithms can be set per

@@ -532,6 +532,7 @@ class ComplexClearingRole(MarketRole):
         if len(orderbook) == 0:
             return [], [], []
 
+        # tie-breaking rule: deterministic sort order; reproducible but always favours the same bids.
         orderbook.sort(key=itemgetter("start_time", "end_time", "only_hours"))
 
         # create a list of all orders linked as child to a bid
