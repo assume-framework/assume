@@ -739,7 +739,13 @@ def load_config_and_create_forecaster(
                 ),
             )
     if exchange_units is not None:
+        # collect units without price timeseries to log them once instead of per unit
+        missing_price_series = []
         for id, exchange in exchange_units.iterrows():
+            price_import = exchanges_df.get(f"{id}_price_import")
+            price_export = exchanges_df.get(f"{id}_price_export")
+            if price_import is None or price_export is None:
+                missing_price_series.append(id)
             unit_forecasts[id] = ExchangeForecaster(
                 index=shared_unit_index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),
@@ -748,6 +754,13 @@ def load_config_and_create_forecaster(
                 ),
                 volume_export=exchanges_df[f"{id}_export"],
                 volume_import=exchanges_df[f"{id}_import"],
+                price_import=price_import,
+                price_export=price_export,
+            )
+        if missing_price_series:
+            logger.warning(
+                f"!! No (complete) exchange price timeseries in exchanges_df for {missing_price_series} !! "
+                "Falling back to the scalar price_import/price_export of the units. Make sure this is what you actually want."
             )
     if dsm_units is not None:
         for type, dsm in dsm_units.items():
