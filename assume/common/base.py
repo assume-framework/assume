@@ -627,23 +627,28 @@ class SupportsMinMaxCharge(BaseUnit):
             power_charge = min(power_charge, minimum_required - current_power, 0)
         return power_charge
 
-    def set_dispatch_plan(
-        self, marketconfig: MarketConfig, orderbook: Orderbook
-    ) -> None:
-        """Updates the SOC for storage units."""
-        super().set_dispatch_plan(marketconfig, orderbook)
+    def soc_known_until(self) -> datetime:
+        """
+        Time until which the state of charge in ``outputs["soc"]`` follows from the dispatch plan.
+        Later values are not calculated yet, they still hold the initial state of charge.
+        """
+        return getattr(self, "_soc_known_until", None) or self.index[0]
 
-        if not orderbook:
+    def update_soc(self, start: datetime, end: datetime) -> None:
+        """
+        Calculates the state of charge after every time step from ``start`` to ``end`` (both
+        inclusive) from the state of charge at ``start`` and the dispatch plan.
+        Power which does not fit to the state of charge is reduced in the dispatch plan.
+
+        Args:
+            start (datetime.datetime): The first time step.
+            end (datetime.datetime): The last time step.
+        """
+        if end < start:
             return
-
-        # also update the SOC when setting the dispatch plan
-        start = min(order["start_time"] for order in orderbook)
-        end = max(order["end_time"] for order in orderbook)
-        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-        end_excl = end - self.index.freq
         time_delta = self.index.freq / timedelta(hours=1)
 
-        for t in self.index[start:end_excl]:
+        for t in self.index[start:end]:
             next_t = t + self.index.freq
             # continue if it is the last time step
             if next_t not in self.index:
@@ -679,6 +684,55 @@ class SupportsMinMaxCharge(BaseUnit):
             # update the values of the state of charge and the energy
             self.outputs["soc"].at[next_t] = soc + delta_soc
             self.outputs["energy"].at[t] = current_power
+
+        self._soc_known_until = max(
+            self.soc_known_until(), min(end + self.index.freq, self.index[-1])
+        )
+
+    def set_dispatch_plan(
+        self, marketconfig: MarketConfig, orderbook: Orderbook
+    ) -> None:
+        """Updates the SOC for storage units."""
+        super().set_dispatch_plan(marketconfig, orderbook)
+
+        if not orderbook:
+            return
+
+        # also update the SOC when setting the dispatch plan
+        start = min(order["start_time"] for order in orderbook)
+        end = max(order["end_time"] for order in orderbook)
+        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
+        end_excl = end - self.index.freq
+        # the orders of a unit do not cover every time step (no bid without available power):
+        # the state of charge is also calculated for the steps without orders before the first
+        # order, and again for later steps which were already calculated with the old plan
+        known = self.soc_known_until()
+        self.update_soc(min(start, known), max(end_excl, known - self.index.freq))
+
+    def calculate_bids(
+        self,
+        market_config: MarketConfig,
+        product_tuples: list[tuple],
+    ) -> Orderbook:
+        """
+        Calculates the bids for the next time step.
+
+        The bidding strategies read the state of charge at the start of the first product. It is
+        calculated here for the time steps since the last order of the unit: the dispatch plan
+        only updates the state of charge until the last time step with an order.
+
+        Args:
+            market_config (MarketConfig): The market configuration.
+            product_tuples (list[tuple]): The product tuples.
+
+        Returns:
+            Orderbook: The bids.
+        """
+        if product_tuples:
+            start = min(product[0] for product in product_tuples)
+            if self.index[0] < start <= self.index[-1]:
+                self.update_soc(self.soc_known_until(), start - self.index.freq)
+        return super().calculate_bids(market_config, product_tuples)
 
 
 class BaseStrategy:
