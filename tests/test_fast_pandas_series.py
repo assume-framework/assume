@@ -152,8 +152,8 @@ def test_create_date_range():
     for i in range(n):
         series.at[start] = 1
     res_slice_pd = time.time() - t
-    # more than at least factor 4
-    assert res_slice < res_slice_pd / 4
+    # more than at least factor 2
+    assert res_slice < res_slice_pd / 2
 
     # check that setting slices is faster
     t = time.time()

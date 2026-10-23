@@ -10,7 +10,6 @@ from assume.common.fast_pandas.indexers import (
     FastSeriesLocIndexer,
 )
 from assume.common.fast_pandas.series import FastSeries
-from assume.common.fast_pandas.tensor_series import TensorFastSeries
 
 __all__ = [
     "FastIndex",
@@ -19,5 +18,4 @@ __all__ = [
     "FastSeriesIatIndexer",
     "FastSeriesILocIndexer",
     "FastSeriesLocIndexer",
-    "TensorFastSeries",
 ]
