@@ -60,6 +60,7 @@ Upcoming Release
     - Datetime slices include both ends, move bounds between two steps inward to the next step on the grid, and are clipped to the index range.
     - Frequencies without a fixed length, such as ``"MS"`` or ``"W"``, raise ``ValueError``. Use fixed frequencies such as ``"15min"``, ``"h"`` or ``"D"``.
     - Creating a ``FastSeries`` with values whose length does not match the index raises ``ValueError``.
+  - **Removed unused TensorFastSeries class** which has become deprecated after a learning refactoring (#648)
 
 **Bug Fixes:**
   - **Fix critic loading skipping only the inner key loop**: In ``TD3.load_critic_params`` the ``continue`` for a checkpoint with missing keys only skipped the inner key loop, so the incomplete critic was still loaded and failed with a ``KeyError``. The agent is now skipped as a whole, with one warning listing all missing keys.
