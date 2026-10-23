@@ -78,6 +78,7 @@ Upcoming Release
   - **Fix nodal clearing for units without a bid**: Generators, loads and storage units present in the grid data but without a bid in a snapshot kept the default availability they were added to the network with, and a unit bidding in only some snapshots passed NaN availability to the optimization. Such units now have zero availability in the snapshots without a bid.
   - **Fix OEDS queries after the open-mastr migration**: Postcodes with a leading zero (eastern Germany) were excluded, PV units without EEG payments were dropped, appended date filters produced invalid SQL, tracked PV units got a tilt of 180°, the battery of east-west PV+battery units was counted twice, and planned units were counted as built capacity.
   - **Fix non-deterministic results with equal-price bids**: The orderbook order no longer depends on ``PYTHONHASHSEED`` or on process timing in ``--parallel`` mode, so ties between equal-price bids are resolved reproducibly. (#861)
+  - **Fix stale storage SoC when bids are filtered out** (#562, #837, #884): Time steps without orders - e.g. after ``remove_empty_bids`` - no longer leave the initial SoC in place. Storages now propagate their SoC on demand from what they can actually run at, so read it through ``get_soc`` and the deliverable dispatch through ``get_feasible_energy``; ``outputs['energy']`` keeps the committed plan until delivery.
 
 0.6.0 - (18th March 2026)
 =========================
