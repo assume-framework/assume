@@ -374,7 +374,7 @@ class ExchangeEnergyNaiveStrategy(MinMaxStrategy):
                     "start_time": start,
                     "end_time": product[1],
                     "only_hours": product[2],
-                    "price": unit.price_import,
+                    "price": unit.price_import.at[start],
                     "volume": unit.volume_import.at[start],
                     "node": unit.node,
                 }
@@ -386,7 +386,7 @@ class ExchangeEnergyNaiveStrategy(MinMaxStrategy):
                     "start_time": start,
                     "end_time": product[1],
                     "only_hours": product[2],
-                    "price": unit.price_export,
+                    "price": unit.price_export.at[start],
                     "volume": unit.volume_export.at[start],
                     "node": unit.node,
                 }
