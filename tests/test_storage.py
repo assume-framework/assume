@@ -79,6 +79,14 @@ def test_reset_function(storage_unit):
 
 
 def test_calculate_operational_window(mock_market_config, storage_unit):
+    """Verify charge and discharge limits before and after market commitments.
+
+    The storage initially has a charge range of 0 to -100 and a discharge
+    range of 0 to 100. After a 10-unit energy commitment and reservations of
+    -50 negative capacity and 30 positive capacity, the remaining operational
+    windows for potential additional bids are
+    -40 to -60 for charging and 40 to 60 for discharging.
+    """
     start = datetime(2022, 1, 1, 0)
     end = datetime(2022, 1, 1, 1)
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
@@ -110,14 +118,14 @@ def test_calculate_operational_window(mock_market_config, storage_unit):
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end
     )
-    assert min_power_charge[0] == -40
-    assert max_power_charge[0] == -60
+    assert min_power_charge[0] == -40 # -100 + 60 = -40 
+    assert max_power_charge[0] == -60 # -100 + 40 = -60
 
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
     )
-    assert min_power_discharge[0] == 40
-    assert max_power_discharge[0] == 60
+    assert min_power_discharge[0] == 40 # 0 - (10 + -50) = 40
+    assert max_power_discharge[0] == 60 # 100 - (10 + 30) = 60
 
     start = start + timedelta(hours=1)
 
