@@ -574,19 +574,15 @@ class FastSeries:
     def copy(self, deep: bool = False):
         """
         Create a copy of the FastSeries.
+        The index is shared, as it is immutable.
 
         Parameters:
-            deep (bool, optional): If True, perform a deep copy of the data array. Defaults to False.
+            deep (bool, optional): Only kept for compatibility with pandas, has no effect.
 
         Returns:
             FastSeries: A new FastSeries instance with copied data and metadata.
         """
-        copied_data = self._data.copy() if deep else self._data.view()
-        return FastSeries(
-            index=self.index,
-            value=copied_data,
-            name=self.name,
-        )
+        return FastSeries(index=self.index, value=self._data, name=self.name)
 
     def window(
         self, center: int | datetime, length: int, direction: str = "forward"
