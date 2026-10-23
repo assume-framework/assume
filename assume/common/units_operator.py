@@ -11,6 +11,7 @@ from operator import itemgetter
 from mango import Role, create_acl, sender_addr
 from mango.messages.message import Performatives
 
+from assume.common.fast_pandas import FastIndex
 from assume.common.forecaster import UnitsOperatorForecaster
 from assume.common.market_objects import (
     ClearingMessage,
@@ -24,6 +25,7 @@ from assume.common.market_objects import (
 )
 from assume.common.utils import (
     aggregate_step_amount,
+    datetime2timestamp,
     timestamp2datetime,
 )
 from assume.strategies import (
@@ -43,9 +45,11 @@ class UnitsOperator(Role):
     Attributes:
         available_markets (list[MarketConfig]): The available markets.
         registered_markets (dict[str, MarketConfig]): The registered markets.
-        last_sent_dispatch (int): The last sent dispatch.
+        last_sent_market_dispatch (dict[str, int]): The time until which the market dispatch was sent, per market.
+        last_executed_dispatch (int): The timestamp of the last executed dispatch.
         portfolio_strategies (UnitOperatorStrategy): The portfolio strategy.
-        valid_orders (defaultdict): The valid orders.
+        valid_orders (defaultdict): The valid orders, per market.
+        pending_orders (defaultdict): The orders awaiting the end of their delivery period, per market and end_time.
         units (dict[str, BaseUnit]): The units.
         id (str): The id of the agent.
         context (Context): The context of the agent.
@@ -67,7 +71,10 @@ class UnitsOperator(Role):
 
         self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
-        self.last_sent_dispatch = defaultdict(lambda: 0)
+
+        self.last_sent_market_dispatch = defaultdict(lambda: 0)
+        self.last_executed_dispatch = 0
+
         self.forecaster = forecaster
 
         self.portfolio_strategies = portfolio_strategies
@@ -77,8 +84,12 @@ class UnitsOperator(Role):
                     UnitsOperatorDirectStrategy()
                 )
 
-        # valid_orders per product_type
+        # valid_orders per market_id, used for the market dispatch export at clearing (before delivery)
         self.valid_orders = defaultdict(list)
+        # pending_orders per market_id and end_time awaiting the end of their delivery period
+        # to calculate reward based on actual dispatch. Grouping them by end_time keeps
+        # the lookup of due orders independent of the number of pending orders.
+        self.pending_orders = defaultdict(lambda: defaultdict(list))
         self.units: dict[str, BaseUnit] = {}
 
     def setup(self):
@@ -107,6 +118,21 @@ class UnitsOperator(Role):
             lambda content, meta: content.get("context") == "data_request",
         )
 
+    @property
+    def simulation_index(self) -> FastIndex | None:
+        """
+        The shared simulation index, taken from the operator forecaster if one is
+        given and from any of the managed units otherwise.
+
+        Returns:
+            FastIndex | None: The simulation index, or None if the operator has no units.
+        """
+        if self.forecaster is not None:
+            return self.forecaster.index
+        if self.units:
+            return next(iter(self.units.values())).index
+        return None
+
     def on_ready(self):
         super().on_ready()
         self.id = self.context.aid
@@ -121,6 +147,38 @@ class UnitsOperator(Role):
         self.context.schedule_timestamp_task(
             self.store_units(),
             1,  # register after time was updated for the first time
+        )
+
+        # execute the dispatch once per time step, independent of the markets.
+        index = self.simulation_index
+        if index is not None:
+            self.schedule_dispatch_execution(index.start + index.freq)
+
+    def schedule_dispatch_execution(self, at: datetime) -> None:
+        """
+        Schedules execute_dispatch at the given time, after which it schedules itself
+        for the next time step until the end of the simulation index.
+
+        A recurrent task is not used, as mango evaluates its rrule from the start on
+        every firing, which makes it quadratic in the number of time steps.
+
+        Args:
+            at (datetime.datetime): The time of the next execution.
+        """
+        index = self.simulation_index
+        if at > index.end:
+            return
+
+        async def execute_and_reschedule():
+            await self.execute_dispatch()
+            # if the clock jumped ahead, execute_dispatch has caught up already,
+            # so continue with the first time step after now
+            now = timestamp2datetime(self.context.current_timestamp)
+            steps = max((now - at) // index.freq, 0) + 1
+            self.schedule_dispatch_execution(at + steps * index.freq)
+
+        self.context.schedule_timestamp_task(
+            execute_and_reschedule(), datetime2timestamp(at)
         )
 
     async def store_units(self) -> None:
@@ -239,13 +297,46 @@ class UnitsOperator(Role):
             order["market_id"] = content["market_id"]
 
         marketconfig = self.registered_markets[content["market_id"]]
-        self.valid_orders[marketconfig.product_type].extend(orderbook)
+        self.valid_orders[marketconfig.market_id].extend(orderbook)
         self.set_unit_dispatch(orderbook, marketconfig)
-        self.write_actual_dispatch(marketconfig.product_type)
 
-        # now once we have the market results and the dispatch has been set
-        # we can calculate the cashflow and reward for the units
-        self.calculate_unit_cashflow_and_reward(orderbook, marketconfig)
+        # the cashflow is fully determined by the clearing result and can be booked now
+        self.calculate_unit_cashflow(orderbook, marketconfig)
+
+        # the reward, in contrast, depends on the dispatch that is actually realized
+        pending = self.pending_orders[marketconfig.market_id]
+        for order in orderbook:
+            pending[order["end_time"]].append(order)
+
+        if self.last_executed_dispatch and any(
+            order["start_time"] <= timestamp2datetime(self.last_executed_dispatch)
+            for order in accepted_orders
+        ):
+            logger.warning(
+                "%s received orders of %s for time steps which were already executed",
+                self.id,
+                marketconfig.market_id,
+            )
+
+        self.write_market_dispatch(marketconfig)
+
+    def is_final_clearing(self, marketconfig: MarketConfig, now: datetime) -> bool:
+        """
+        Checks whether the clearing of the given market at the given time is its last one.
+
+        Args:
+            marketconfig (MarketConfig): The market configuration.
+            now (datetime.datetime): The time of the clearing.
+
+        Returns:
+            bool: True if no further opening of the market follows.
+        """
+        # the clearing belongs to the opening one opening duration ago, and an opening
+        # after the last possible one is never scheduled by the market
+        next_opening = marketconfig.opening_hours.after(
+            now - marketconfig.opening_duration
+        )
+        return next_opening is None or next_opening > marketconfig.last_opening
 
     def handle_registration_feedback(
         self, content: RegistrationMessage, meta: MetaDict
@@ -326,11 +417,14 @@ class UnitsOperator(Role):
                 orderbook=orderbook,
             )
 
-    def calculate_unit_cashflow_and_reward(
+    def calculate_unit_cashflow(
         self, orderbook: Orderbook, marketconfig: MarketConfig
     ) -> None:
         """
-        Feeds the current market result back to the units.
+        Books the cashflow of the given market result in the units.
+
+        The cashflow follows directly from the accepted prices and volumes and is
+        therefore known as soon as the market is cleared.
 
         Args:
             orderbook (Orderbook): The orderbook of the market.
@@ -338,55 +432,119 @@ class UnitsOperator(Role):
         """
         orderbook.sort(key=itemgetter("unit_id"))
         for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
-            unit_orders = list(orders)
-            self.units[unit_id].calculate_cashflow_and_reward(
-                marketconfig=marketconfig,
-                orderbook=unit_orders,
+            self.units[unit_id].calculate_cashflow(
+                product_type=marketconfig.product_type,
+                orderbook=list(orders),
             )
 
-        # Calculate reward for the portfolio strategy
-        self.portfolio_strategies.get(marketconfig.market_id).calculate_reward(
-            units_operator=self,
-            marketconfig=marketconfig,
-            orderbook=orderbook,
-        )
-
-    def get_actual_dispatch(
-        self, product_type: str, last: datetime
-    ) -> tuple[list[tuple[datetime, float, str, str]], list[dict]]:
+    def calculate_unit_reward(self, execute_until: datetime) -> None:
         """
-        Retrieves the actual dispatch since the last dispatch and commits it in the unit.
-        We calculate the series of the actual market results dataframe with accepted bids.
-        And the unit_dispatch for all units taken care of in the UnitsOperator.
+        Calculates the reward of all orders whose delivery period has ended.
+
+        This is called from execute_dispatch, so the reward is based on the dispatch
+        that was actually realized, including the contribution of all markets that
+        cleared for the respective delivery period.
 
         Args:
-            product_type (str): The product type for which this is done
-            last (datetime.datetime): the last date until which the dispatch was already sent
+            execute_until (datetime.datetime): The last time step which will be executed.
+        """
+        freq = self.simulation_index.freq
 
-        Returns:
-            tuple[list[tuple[datetime, float, str, str]], list[dict]]: market_dispatch and unit_dispatch dataframes
+        # find all orders due for execution because their delivery period has ended
+        due: dict[str, Orderbook] = {}
+        for market_id, pending in self.pending_orders.items():
+            ended = sorted(
+                end_time for end_time in pending if end_time - freq <= execute_until
+            )
+            if ended:
+                due[market_id] = [
+                    order for end_time in ended for order in pending.pop(end_time)
+                ]
+
+        for market_id, orders in due.items():
+            marketconfig = self.registered_markets[market_id]
+
+            orders.sort(key=itemgetter("unit_id"))
+            for unit_id, unit_orders in groupby(orders, itemgetter("unit_id")):
+                self.units[unit_id].calculate_reward(
+                    marketconfig=marketconfig,
+                    orderbook=list(unit_orders),
+                )
+
+            # Calculate reward for the portfolio strategy
+            self.portfolio_strategies.get(market_id).calculate_reward(
+                units_operator=self,
+                marketconfig=marketconfig,
+                orderbook=orders,
+            )
+
+    async def execute_dispatch(self) -> None:
+        """
+        Executes the dispatch of all units for the time steps which have passed since
+        the last execution, exports it and calculates the reward of every product
+        whose delivery period ended in the meantime.
         """
         now = timestamp2datetime(self.context.current_timestamp)
-        # add one second to exclude the first time stamp, because it is already executed in the last step
-        start = timestamp2datetime(last + 1)
+        self.execute_dispatch_until(now - self.simulation_index.freq)
 
-        market_dispatch = aggregate_step_amount(
-            orderbook=self.valid_orders[product_type],
-            begin=timestamp2datetime(last),
-            end=now,
-            groupby=["market_id", "unit_id"],
+    def execute_dispatch_until(self, execute_until: datetime) -> None:
+        """
+        Executes the dispatch of all units from the last executed time step up to and
+        including execute_until, exports it and calculates the rewards.
+
+        Args:
+            execute_until (datetime.datetime): The last time step to execute.
+        """
+        last_ts = self.last_executed_dispatch
+        if datetime2timestamp(execute_until) <= last_ts:
+            return
+
+        # add one second to exclude the first time stamp,
+        # because it is already executed in the last step
+        actual_dispatch = self.get_actual_dispatch(
+            timestamp2datetime(last_ts + 1), execute_until
         )
+        self.write_actual_dispatch(actual_dispatch)
 
+        # now that the dispatch is realized, the reward of every product whose
+        # delivery period has been executed can be calculated
+        self.calculate_unit_reward(execute_until)
+        self.last_executed_dispatch = datetime2timestamp(execute_until)
+
+    def get_actual_dispatch(self, start: datetime, end: datetime) -> list[dict]:
+        """
+        Retrieves the actual dispatch of all units in the given time range and commits
+        it in the unit. This checks the feasibility of the planned dispatch and adjusts
+        it to the closest feasible one if needed, so it has to happen once the time
+        range has passed and all markets for it have cleared.
+
+        The actual dispatch is the volume a unit really dispatched across all of the
+        markets it participated in, which is why this is independent of the product
+        type and can only be determined after the delivery period.
+
+        Args:
+            start (datetime.datetime): The start of the range to execute.
+            end (datetime.datetime): The end of the range to execute, inclusive.
+
+        Returns:
+            list[dict]: the unit_dispatch dataframes
+        """
         unit_dispatch = []
+        market_ids = {m.market_id for m in self.available_markets}
         for unit_id, unit in self.units.items():
-            current_dispatch = unit.execute_current_dispatch(start, now)
-            end = now
+            # skip unit if it does not participate in any of the markets
+            if not (market_ids & unit.bidding_strategies.keys()):
+                continue
+
+            current_dispatch = unit.execute_current_dispatch(start, end)
             dispatch = {"power": current_dispatch}
-            unit.calculate_generation_cost(start, now, "energy")
+            unit.calculate_costs(start, end)
+            unit.update_avg_op_time(start, end)
             valid_outputs = [
                 "soc",
                 "cashflow",
                 "generation_costs",
+                "starting_costs",
                 "total_costs",
                 "heat",
             ]
@@ -399,29 +557,83 @@ class UnitsOperator(Role):
             dispatch["unit"] = unit_id
             unit_dispatch.append(dispatch)
 
-        return market_dispatch, unit_dispatch
+        return unit_dispatch
 
-    def write_actual_dispatch(self, product_type: str) -> None:
+    def get_market_dispatch(
+        self, market_id: str, last: datetime, until: datetime
+    ) -> list[tuple[datetime, float, str, str]]:
         """
-        Sends the actual aggregated dispatch curve to the output agent.
+        Aggregates the accepted orders of the given market into the dispatch per unit.
 
         Args:
-            product_type (str): The type of the product.
+            market_id (str): The market for which this is done.
+            last (datetime.datetime): The last date until which the dispatch was already sent.
+            until (datetime.datetime): The date up to which the dispatch is
+                aggregated, exclusive.
+
+        Returns:
+            list[tuple[datetime, float, str, str]]: the market_dispatch dataframe
+        """
+        return aggregate_step_amount(
+            orderbook=self.valid_orders[market_id],
+            begin=last,
+            end=until,
+            groupby=["market_id", "unit_id"],
+        )
+
+    def write_actual_dispatch(self, actual_dispatch: list[dict]) -> None:
+        """
+        Sends the actual dispatch of the units to the output agent.
+
+        Args:
+            actual_dispatch (list[dict]): The unit dispatch dataframes.
+
+        """
+        db_addr = self.context.data.get("output_agent_addr")
+        if db_addr and actual_dispatch:
+            self.context.schedule_instant_message(
+                receiver_addr=db_addr,
+                content={
+                    "context": "write_results",
+                    "type": "unit_dispatch",
+                    "data": actual_dispatch,
+                },
+            )
+
+    def write_market_dispatch(self, marketconfig: MarketConfig) -> None:
+        """
+        Sends the aggregated market dispatch curve of the given market to the output agent.
+        This has to be called at a clearing of the given market, as the dispatch which is
+        final by now is derived from the opening this clearing belongs to.
+
+        Args:
+            marketconfig (MarketConfig): The market configuration.
         """
 
-        last = self.last_sent_dispatch[product_type]
-        if self.context.current_timestamp == last:
-            # stop if we exported at this time already
-            return
-        self.last_sent_dispatch[product_type] = self.context.current_timestamp
-
-        market_dispatch, unit_dispatch = self.get_actual_dispatch(product_type, last)
-
         now = timestamp2datetime(self.context.current_timestamp)
-        self.valid_orders[product_type] = list(
+        if not self.is_final_clearing(marketconfig, now):
+            until = now
+        else:
+            # no export follows which could aggregate the rest, so the dispatch is final
+            # until the market end. The closing delta there lies beyond the simulation
+            # and is excluded by the aggregation.
+            until = marketconfig.market_end
+
+        market_id = marketconfig.market_id
+        last = timestamp2datetime(self.last_sent_market_dispatch[market_id])
+        if until <= last:
+            # stop if nothing became final since the last export
+            return
+        self.last_sent_market_dispatch[market_id] = datetime2timestamp(until)
+
+        market_dispatch = self.get_market_dispatch(market_id, last, until)
+
+        # orders have to be kept until their closing delta has been aggregated,
+        # which only happens in the export following their end_time
+        self.valid_orders[market_id] = list(
             filter(
-                lambda x: x["end_time"] > now,
-                self.valid_orders[product_type],
+                lambda x: x["end_time"] > until,
+                self.valid_orders[market_id],
             )
         )
 
@@ -435,15 +647,6 @@ class UnitsOperator(Role):
                     "data": market_dispatch,
                 },
             )
-            if unit_dispatch:
-                self.context.schedule_instant_message(
-                    receiver_addr=db_addr,
-                    content={
-                        "context": "write_results",
-                        "type": "unit_dispatch",
-                        "data": unit_dispatch,
-                    },
-                )
 
     async def submit_bids(self, opening: OpeningMessage, meta: MetaDict) -> None:
         """

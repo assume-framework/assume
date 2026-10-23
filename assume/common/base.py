@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+import math
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -156,21 +157,21 @@ class BaseUnit:
                 accepted_price
             )
 
-    def calculate_cashflow_and_reward(
+    def calculate_reward(
         self,
         marketconfig: MarketConfig,
         orderbook: Orderbook,
     ) -> None:
         """
-        Calculates the cashflow and the reward for the given unit.
+        Calculates the reward for the given unit.
+
+        This is called once the delivery period of the orders has been executed,
+        so that the reward can be based on the actual dispatch of the unit.
 
         Args:
             marketconfig (MarketConfig): The market configuration.
             orderbook (Orderbook): The orderbook.
         """
-
-        product_type = marketconfig.product_type
-        self.calculate_cashflow(product_type, orderbook)
 
         self.bidding_strategies[marketconfig.market_id].calculate_reward(
             unit=self,
@@ -178,33 +179,70 @@ class BaseUnit:
             orderbook=orderbook,
         )
 
-    def calculate_generation_cost(
-        self, start: datetime, end: datetime, product_type: str
-    ) -> None:
+    def calculate_costs(self, start: datetime, end: datetime) -> None:
         """
-        Calculates the generation cost for a specific product type within the given time range,
-        but only if the end is the last index in the time series.
+        Calculates the generation, start-up and total costs of the unit within the given time range.
+
+        The costs are derived from the energy dispatch of the unit and written to the
+        ``generation_costs``, ``starting_costs`` and ``total_costs`` outputs.
 
         Args:
             start (datetime.datetime): The start time for the calculation.
             end (datetime.datetime): The end time for the calculation.
-            product_type (str): The type of product for which the generation cost is to be calculated.
         """
 
         if start not in self.index:
             start = self.index[0]
 
         # Adjusted code for accessing product data and mapping over the index
-        product_data = self.outputs[product_type].loc[start:end]
+        product_data = self.outputs["energy"].loc[start:end]
 
         marginal_costs = [
             self.calculate_marginal_cost(t, product_data[idx])
             for idx, t in enumerate(self.index[start:end])
         ]
         generation_costs = np.abs(marginal_costs * product_data)
-        self.outputs[f"{product_type}_generation_costs"].loc[start:end] = (
-            generation_costs
+        self.outputs["generation_costs"].loc[start:end] = generation_costs
+
+        starting_costs = np.zeros(len(self.index[start:end]))
+        for idx, t in enumerate(self.index[start:end]):
+            op_time = self.get_operation_time(t)
+
+            if self.outputs["energy"].loc[t] != 0 and op_time < 0:
+                starting_costs[idx] = self.get_starting_costs(op_time)
+
+        self.outputs["starting_costs"].loc[start:end] = starting_costs
+
+        # future work:
+        # balancing_costs = balancing_price * abs(sum(accepted_volumes across all products and markets) - product_data)
+        # self.outputs[f"balancing_costs"].loc[start:end] = (
+        #   balancing_costs
+        # )
+
+        self.outputs["total_costs"].loc[start:end] = (
+            generation_costs + starting_costs  # future work: + balancing_costs
         )
+
+    def update_avg_op_time(self, start: datetime, end: datetime) -> None:
+        """
+        Updates the average operation time from the dispatch which was just executed.
+
+        It needs to be called once per unit and time step after the dispatch has been
+        executed, so that the average operation time is based on the actual dispatch and
+        avoids double-counting in case of multiple market dispatches.
+
+        Args:
+            start (datetime.datetime): The start of the executed range.
+            end (datetime.datetime): The end of the executed range, inclusive.
+        """
+        start = max(start, self.index[0])
+
+        # Increment total operation time for operating periods in the executed range
+        self.total_op_time += (self.outputs["energy"].loc[start:end] > 0).sum()
+
+        # Update the average operation time
+        total_periods = len(self.index[:end])  # Total periods up to and including 'end'
+        self.avg_op_time = self.total_op_time / total_periods
 
     def execute_current_dispatch(
         self,
@@ -302,6 +340,18 @@ class BaseUnit:
         """
         return 0
 
+    def get_operation_time(self, start: datetime) -> int:
+        """
+        Returns the time the unit is operating (positive) or shut down (negative).
+
+        Args:
+            start (datetime.datetime): The start time.
+
+        Returns:
+            int: The operation time as a positive integer if operating, or negative if shut down.
+        """
+        return 0
+
 
 class SupportsMinMax(BaseUnit):
     """
@@ -315,8 +365,13 @@ class SupportsMinMax(BaseUnit):
     ramp_up: float = None
     efficiency: float
     emission_factor: float
-    min_operating_time: int = 0
-    min_down_time: int = 0
+    min_operating_time: float = 0  # time steps
+    min_down_time: float = 0  # time steps
+    downtime_hot_start: float = 0  # time steps
+    downtime_warm_start: float = 0  # time steps
+    hot_start_cost: float = 0
+    warm_start_cost: float = 0
+    cold_start_cost: float = 0
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -392,9 +447,34 @@ class SupportsMinMax(BaseUnit):
             )
         return power
 
+    def get_max_lookback_op_time(self) -> int:
+        """
+        Returns the number of time steps the operation time looks back.
+
+        The window covers the longest of the minimum operating time, the minimum down
+        time and the hot and warm start thresholds, plus one step for the thresholds. This
+        way a downtime longer than the warm start threshold can be told apart from a
+        warm start and is charged as a cold start.
+
+        Returns:
+            int: The lookback window in time steps.
+        """
+        return math.ceil(
+            max(
+                self.min_operating_time,
+                self.min_down_time,
+                self.downtime_hot_start + 1,
+                self.downtime_warm_start + 1,
+                1,
+            )
+        )
+
     def get_operation_time(self, start: datetime) -> int:
         """
-        Returns the time the unit is operating (positive) or shut down (negative).
+        Returns the time in time steps the unit is operating (positive) or shut down (negative).
+
+        The operation time is limited by the lookback window of
+        :meth:`get_max_lookback_op_time`.
 
         Args:
             start (datetime.datetime): The start time.
@@ -402,13 +482,12 @@ class SupportsMinMax(BaseUnit):
         Returns:
             int: The operation time as a positive integer if operating, or negative if shut down.
         """
-        # Set the time window based on max of min operating/down time
-        max_time = max(self.min_operating_time, self.min_down_time, 1)
+        max_time = self.get_max_lookback_op_time()
         begin = max(start - self.index.freq * max_time, self.index[0])
         end = start - self.index.freq
 
         if start <= self.index[0]:
-            # before start of index
+            # all units are assumed to be running at the start of the simulation
             return max_time
 
         # Check energy output in the defined time window, reversed for most recent state

@@ -604,8 +604,8 @@ class Storage(SupportsMinMaxCharge):
                 "max_power_discharge": self.max_power_discharge,
                 "min_power_charge": self.min_power_charge,
                 "min_power_discharge": self.min_power_discharge,
-                "efficiency_charge": self.efficiency_discharge,
-                "efficiency_discharge": self.efficiency_charge,
+                "efficiency_charge": self.efficiency_charge,
+                "efficiency_discharge": self.efficiency_discharge,
                 "unit_type": "storage",
             }
         )

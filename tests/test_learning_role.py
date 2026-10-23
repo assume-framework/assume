@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
+import asyncio
 from datetime import datetime
 from unittest.mock import MagicMock
 
@@ -398,3 +399,99 @@ def test_compare_and_save_policies_early_stopping_still_records_other_metrics():
         c.kwargs["directory"] for c in learn.rl_algorithm.save_params.call_args_list
     ]
     assert saved_dirs[-1] == "saved/last_policies"
+
+
+@pytest.mark.require_learning
+async def test_atomic_swap_carries_over_partially_rewarded_timestep(learning_role):
+    """
+    Rewards are calculated per units operator, so a timestep can be rewarded for some
+    units but not yet for others. Such a timestep must be carried over together with
+    the rewards it already has instead of being processed incompletely.
+    """
+    learning_role, th = learning_role
+    learning_role.rl_strats["unit_2"] = learning_role.rl_strats["unit_1"]
+
+    ts1, ts2 = 1000, 2000
+
+    for unit_id in ("unit_1", "unit_2"):
+        for ts in (ts1, ts2):
+            learning_role.add_observation_to_cache(unit_id, ts, th.tensor([1.0, 1.1]))
+            learning_role.add_actions_to_cache(
+                unit_id, ts, th.tensor([0.1]), th.tensor([0.01])
+            )
+        learning_role.add_reward_to_cache(unit_id, ts1, 10.0, regret=0.0, profit=10.0)
+
+    # ts2 is only rewarded for unit_1 so far
+    learning_role.add_reward_to_cache("unit_1", ts2, 20.0, regret=0.0, profit=20.0)
+
+    await learning_role.store_to_buffer_and_update()
+
+    processed = learning_role.write_rl_params_to_output.call_args.args[0]
+    assert list(processed["obs"]) == [ts1]
+
+    assert ts2 in learning_role.all_obs, "ts2 should be carried over"
+    assert list(learning_role.all_rewards[ts2]) == ["unit_1"], (
+        "the reward ts2 already has should be carried over as well"
+    )
+
+    # once the reward of unit_2 arrives, ts2 is complete and processed
+    learning_role.add_reward_to_cache("unit_2", ts2, 20.0, regret=0.0, profit=20.0)
+    learning_role.add_observation_to_cache("unit_1", 3000, th.tensor([1.0, 1.1]))
+    await learning_role.store_to_buffer_and_update()
+
+    processed = learning_role.write_rl_params_to_output.call_args.args[0]
+    assert list(processed["obs"]) == [ts2]
+    assert set(processed["rewards"][ts2]) == {"unit_1", "unit_2"}
+
+
+@pytest.mark.require_learning
+async def test_store_to_buffer_without_complete_timestep(learning_role):
+    """
+    Rewards are calculated after delivery, so a day-ahead market whose products are
+    delivered after the first update leaves no complete timestep to process.
+    """
+    learning_role, th = learning_role
+    learning_role.learning_config.evaluation_mode = False
+
+    for ts in (1000, 2000):
+        learning_role.add_observation_to_cache("unit_1", ts, th.tensor([1.0, 1.1]))
+        learning_role.add_actions_to_cache(
+            "unit_1", ts, th.tensor([0.1]), th.tensor([0.01])
+        )
+
+    await learning_role.store_to_buffer_and_update()
+
+    learning_role.write_rl_params_to_output.assert_not_called()
+    assert set(learning_role.all_obs) == {1000, 2000}
+    assert set(learning_role.all_actions) == {1000, 2000}
+
+
+@pytest.mark.require_learning
+async def test_store_to_buffer_includes_rewards_of_tasks_scheduled_for_the_same_time(
+    learning_role,
+):
+    """
+    The units operators calculate the rewards of the previous timestep in a task which
+    is scheduled for the same time as the update. The update has to let such a task
+    run first, otherwise the last timestep of an episode would never be processed.
+    """
+    learning_role, th = learning_role
+    ts = 1000
+    learning_role.add_observation_to_cache("unit_1", ts, th.tensor([1.0, 1.1]))
+    learning_role.add_actions_to_cache(
+        "unit_1", ts, th.tensor([0.1]), th.tensor([0.01])
+    )
+
+    # the observation of the next timestep is needed to process this one
+    learning_role.add_observation_to_cache("unit_1", 2000, th.tensor([1.0, 1.1]))
+
+    async def calculate_reward():
+        learning_role.add_reward_to_cache("unit_1", ts, 10.0, regret=0.0, profit=10.0)
+
+    reward_task = asyncio.create_task(calculate_reward())
+    await learning_role.store_to_buffer_and_update()
+    await reward_task
+
+    processed = learning_role.write_rl_params_to_output.call_args.args[0]
+    assert list(processed["obs"]) == [ts]
+    assert ts not in learning_role.all_obs

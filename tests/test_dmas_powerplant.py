@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 from dateutil import rrule as rr
 
+from assume.common.exceptions import ValidationError
 from assume.common.fast_pandas import FastIndex
 from assume.common.forecaster import PowerplantForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
@@ -245,3 +246,37 @@ def test_dmas_prevent_start_end(power_plant_day):
 
 if __name__ == "__main__":
     pytest.main(["-s", __file__])
+
+
+def test_dmas_requires_hourly_resolution():
+    index = FastIndex("2022-01-01", periods=8, freq="15min")
+    ff = PowerplantForecaster(
+        index=index,
+        availability=1,
+        fuel_prices={"lignite": 10, "co2": 10},
+        market_prices={"EOM": 50},
+    )
+    unit = PowerPlant(
+        id="test_pp",
+        unit_operator="test_operator",
+        technology="hard coal",
+        bidding_strategies={"EOM": EnergyOptimizationDmasStrategy()},
+        max_power=1000,
+        min_power=200,
+        efficiency=0.5,
+        additional_cost=10,
+        fuel_type="lignite",
+        emission_factor=0.5,
+        forecaster=ff,
+    )
+    strategy = EnergyOptimizationDmasStrategy()
+
+    with pytest.raises(ValidationError, match="hourly resolution"):
+        strategy.build_model(
+            unit=unit,
+            start=index[0],
+            hour_count=2,
+            emission_prices=[10, 10],
+            fuel_prices=[10, 10],
+            power_prices=[50, 50],
+        )

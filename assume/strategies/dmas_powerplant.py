@@ -26,6 +26,7 @@ from pyomo.opt import (
 )
 
 from assume.common.base import MinMaxStrategy, SupportsMinMax
+from assume.common.exceptions import ValidationError
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_supported_solver_pyomo
 
@@ -90,7 +91,16 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
 
         Returns:
             np.ndarray: Cashflow.
+
+        Raises:
+            ValidationError: If the index of the unit is not hourly.
         """
+        if unit.index.freq != timedelta(hours=1):
+            raise ValidationError(
+                message=f"The DMAS strategy for unit {unit.id} is only applicable with hourly resolution.",
+                id=unit.id,
+                field="index",
+            )
         runtime = runtime or unit.get_operation_time(start)
         p0 = p0 or unit.get_output_before(start)
         self.model.clear()
