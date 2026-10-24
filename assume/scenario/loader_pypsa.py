@@ -218,8 +218,8 @@ if __name__ == "__main__":
             market_mechanism,
             [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
             additional_fields=["node", "max_power", "min_power", "bid_type"],
-            maximum_bid_volume=1e9,
-            maximum_bid_price=1e9,
+            maximum_bid_volume=1e6,
+            maximum_bid_price=3000,
             param_dict={"log_flows": True},
         )
     ]
@@ -237,8 +237,8 @@ if __name__ == "__main__":
                 "pay_as_clear",
                 [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1.5))],
                 additional_fields=["node", "max_power", "min_power"],
-                maximum_bid_volume=1e9,
-                maximum_bid_price=1e9,
+                maximum_bid_volume=1e6,
+                maximum_bid_price=3000,
             )
         )
     default_strategies = {
