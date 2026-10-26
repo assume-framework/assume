@@ -163,6 +163,11 @@ def test_soc_constraint(storage_unit):
 
 
 def test_storage_feedback(storage_unit, mock_market_config):
+    """
+    The first market accepts 50 MW of discharge.
+    A second market for the same hour can only get the remaining 50 MW.
+    The next hour starts with the full range again.
+    """
     start = datetime(2022, 1, 1, 0)
     end = datetime(2022, 1, 1, 1)
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
@@ -257,7 +262,7 @@ def test_storage_ramping(storage_unit):
     max_ramp_charge = storage_unit.calculate_ramp_charge(0.5, 60, max_power_charge[0])
 
     assert max_ramp_discharge == 100
-    assert max_ramp_charge == -60
+    assert max_ramp_charge == -60 # ??
 
     # charging scenario
     storage_unit.outputs["energy"][start] = -60
@@ -271,7 +276,7 @@ def test_storage_ramping(storage_unit):
     )
     max_ramp_charge = storage_unit.calculate_ramp_charge(0.5, -60, max_power_charge[0])
 
-    assert max_ramp_discharge == 60
+    assert max_ramp_discharge == 60 # ??
     assert max_ramp_charge == -100
 
 
@@ -283,6 +288,7 @@ def test_execute_dispatch(storage_unit):
     storage_unit.outputs["soc"][start] = 0.5
 
     # dispatch full discharge
+    # Discharging 100 MW for one hour removes 100/0.95 MWh from the storage.
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy[0] == 100
     assert math.isclose(
@@ -291,6 +297,7 @@ def test_execute_dispatch(storage_unit):
     )
 
     # dispatch full charging
+    # Charging 100 MW for one hour adds 100*0.9 MWh.
     storage_unit.outputs["energy"][start] = -100
     storage_unit.outputs["soc"][start] = 0.5
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
@@ -318,6 +325,7 @@ def test_execute_dispatch(storage_unit):
     )
 
     # step into the next hour
+    # SoC is 1, charging is not possible.
     start = start + storage_unit.index.freq
     end = end + storage_unit.index.freq
     storage_unit.outputs["energy"][start] = -100
@@ -340,6 +348,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     storage_unit.outputs["energy"][start] = 100
     storage_unit.outputs["soc"][start] = 0.5
 
+    # Verify that a full existing discharge leaves no additional bid capacity.
     bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
     assert len(bids) == 0
 
