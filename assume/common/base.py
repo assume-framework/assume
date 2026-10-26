@@ -556,13 +556,21 @@ class SupportsMinMaxCharge(BaseUnit):
         # - 800 MW to 0 with charge ramp down and then 200 MW with discharge ramp up
         # if storage was charging before we need to check if we can ramp back to zero
         if (
-            previous_power < 0  # charging
-            and self.calculate_ramp_charge(previous_power, 0, current_power) < 0
+            previous_power < 0
+            and self.ramp_down_charge is not None
+            and previous_power - self.ramp_down_charge < 0
+            # TODO: check if current_power should be included here
+            # example (previous_power = -60, ramp_down_charge = -50, so the least reachable charging is −10):
+            # current_power	    Discharge bid	Total
+            # −20	            10	            −10     --> "discharge" bid as in "charging less"
+            # −10	            0	            −10
+            # --> would that be expected behavior in multi-market settings?
         ):
             # if we can not ramp back to 0, we can not discharge anything
-            return self.calculate_ramp_charge(previous_power, 0, current_power)
+            return 0
 
         # as we can ramp the charging to 0, we can assume that the previous_power = 0
+        # TODO: limit remaining discharge in case of sign switch to avoid net ramping of ~2x single ramp limits
         previous_power = max(previous_power, 0)
 
         # limit the highest possible discharge
@@ -603,10 +611,11 @@ class SupportsMinMaxCharge(BaseUnit):
 
         if (
             previous_power > 0
-            and self.calculate_ramp_discharge(previous_power, 0, current_power) > 0
+            and self.ramp_down_discharge is not None
+            and previous_power - self.ramp_down_discharge > 0
         ):
             # if we can not ramp back to 0, we can not charge anything
-            return self.calculate_ramp_discharge(previous_power, 0, current_power)
+            return 0
         # as we can ramp the charging to 0, we can assume that the previous_power = 0
         previous_power = min(previous_power, 0)
 
