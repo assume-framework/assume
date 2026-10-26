@@ -1111,36 +1111,6 @@ def test_executing_a_step_twice_gives_the_same_dispatch(mock_market_config):
     assert unit.get_soc(t1) == pytest.approx(soc_after)
 
 
-def test_clipped_dispatch_is_reported_once_per_execution(
-    mock_market_config, storage_unit, caplog
-):
-    storage_unit.set_soc(storage_unit.index[0], storage_unit.min_soc)
-    freq = storage_unit.index.freq
-    start, end = storage_unit.index[0], storage_unit.index[2]
-    storage_unit.set_dispatch_plan(
-        mock_market_config, [_energy_order(start, end + freq, 20)]
-    )
-
-    with caplog.at_level("WARNING"):
-        storage_unit.execute_current_dispatch(start, end)
-
-    warnings = [r for r in caplog.records if "not feasible" in r.getMessage()]
-    assert len(warnings) == 1
-    assert "3 time step(s)" in warnings[0].getMessage()
-
-
-def test_float_noise_in_the_plan_is_not_reported(caplog):
-    unit = _min_power_storage()
-    start = unit.index[0]
-    # clipped to zero by the minimum power, but only by float noise
-    unit.outputs["energy"].at[start] = 1e-12
-
-    with caplog.at_level("WARNING"):
-        unit.execute_current_dispatch(start, start)
-
-    assert not [r for r in caplog.records if "not feasible" in r.getMessage()]
-
-
 def test_planning_reads_the_feasible_energy(mock_market_config):
     """
     Bids building on volume already committed to a time step - the previous

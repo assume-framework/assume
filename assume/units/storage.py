@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: MIT
 
 import logging
-import math
 from datetime import datetime, timedelta
 from functools import lru_cache
 
@@ -300,35 +299,15 @@ class Storage(SupportsMinMaxCharge):
         self._soc_valid_until = start
 
         last_executed = None
-        clipped = []
         for t in self.index[start:end]:
             last_executed = t
             soc = self.outputs["soc"].at[t]
-            planned = self.outputs["energy"].at[t]
-            current_power = self.feasible_power(planned, soc)
-
-            if not math.isclose(current_power, planned, abs_tol=1e-6):
-                clipped.append((t, planned, current_power))
-
+            current_power = self.feasible_power(self.outputs["energy"].at[t], soc)
             self.outputs["energy"].at[t] = current_power
             if t != last:
                 self.outputs["soc"].at[t + self.index.freq] = soc + self.delta_soc(
                     current_power
                 )
-
-        if clipped:
-            first_t, first_planned, first_power = clipped[0]
-            logger.warning(
-                "Unit %s: dispatch not feasible at %d time step(s) between %s and %s, "
-                "e.g. at %s planned %s but running at %s",
-                self.id,
-                len(clipped),
-                start,
-                end,
-                first_t,
-                first_planned,
-                first_power,
-            )
 
         if last_executed is not None:
             self._soc_valid_until = min(last_executed + self.index.freq, last)
