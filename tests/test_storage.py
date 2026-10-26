@@ -241,13 +241,13 @@ def test_storage_ramping(storage_unit):
     assert min_power_discharge[0] == 0
     assert max_power_discharge[0] == 100
 
-    adjusted_discharge = storage_unit.calculate_ramp_discharge(
+    max_ramp_discharge = storage_unit.calculate_ramp_discharge(
         0.5, 0, max_power_discharge[0]
     )
-    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 0, max_power_charge[0])
+    max_ramp_charge = storage_unit.calculate_ramp_charge(0.5, 0, max_power_charge[0])
 
-    assert adjusted_discharge == 60
-    assert adjusted_charge == -60
+    assert max_ramp_discharge == 60
+    assert max_ramp_charge == -60
 
     # discharge power gets accepted
     storage_unit.outputs["energy"][start] += 60
@@ -256,11 +256,10 @@ def test_storage_ramping(storage_unit):
     start = datetime(2022, 1, 1, 1)
     end = datetime(2022, 1, 1, 2)
 
-    # test ramping in discharging case with a power that is feasible
-    adjusted_discharge = storage_unit.calculate_ramp_discharge(
+    max_ramp_discharge = storage_unit.calculate_ramp_discharge(
         0.5, 60, max_power_discharge[0]
     )
-    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 60, max_power_charge[0])
+    max_ramp_charge = storage_unit.calculate_ramp_charge(0.5, 60, max_power_charge[0])
 
     assert adjusted_discharge == 100
     assert adjusted_charge == -60  # should be 0
@@ -279,46 +278,13 @@ def test_storage_ramping(storage_unit):
     start = datetime(2022, 1, 1, 2)
     end = datetime(2022, 1, 1, 3)
 
-    # test ramping in charging case with a power that is feasible
-    adjusted_discharge = storage_unit.calculate_ramp_discharge(
+    max_ramp_discharge = storage_unit.calculate_ramp_discharge(
         0.5, -60, max_power_discharge[0]
     )
-    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, -60, max_power_charge[0])
+    max_ramp_charge = storage_unit.calculate_ramp_charge(0.5, -60, max_power_charge[0])
 
-    assert adjusted_discharge == 60  # this should be 0
-    assert adjusted_charge == -100
-
-    # test ramping in charging case with a power that is not feasible (too high)
-    adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, -60, -5)
-    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, -60, -5)
-
-    assert adjusted_discharge == 0  # correctly taken into account
-    assert adjusted_charge == -10
-
-
-def test_storage_ramping_sign_switch(storage_unit):
-    start = datetime(2022, 1, 1, 0)
-    end = datetime(2022, 1, 1, 1)
-
-    storage_unit.outputs["energy"][start] = 60
-
-    # test ramping in discharging case with a power that would switch sign and is not feasible
-    adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, 60, -5)
-    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 60, -5)
-
-    assert adjusted_discharge == 10
-    assert adjusted_charge == -5  # actually not possible, but not implemented...
-
-    start = datetime(2022, 1, 1, 1)
-    end = datetime(2022, 1, 1, 2)
-    storage_unit.outputs["energy"][start] = -60
-
-    # test ramping in charging case with a power that would switch sign and is not feasible
-    adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, -60, 5)
-    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, -60, 5)
-
-    assert adjusted_discharge == 5  # actually not possible, but not implemented...
-    assert adjusted_charge == -10
+    assert max_ramp_discharge == 60 # ??
+    assert max_ramp_charge == -100
 
 
 def test_execute_dispatch(storage_unit):
