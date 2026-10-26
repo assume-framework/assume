@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+from pathlib import Path
 
 import torch as th
 
@@ -70,7 +71,7 @@ class RLAlgorithm:
             "No policy update function of the used Rl algorithm was defined. Please define how the policies should be updated in the specific algorithm you use"
         )
 
-    def load_obj(self, directory: str):
+    def load_obj(self, directory: Path):
         """
         Load an object from a specified directory.
 
@@ -78,14 +79,14 @@ class RLAlgorithm:
         directory and returns it. It uses the `torch.load` function and specifies the device for loading.
 
         Args:
-            directory (str): The directory from which the object should be loaded.
+            directory (Path): The path from which the object should be loaded.
 
         Returns:
             object: The loaded object.
         """
         return th.load(directory, map_location=self.device, weights_only=True)
 
-    def load_params(self, directory: str) -> None:
+    def load_params(self, directory: Path) -> None:
         """
         Load learning params - abstract method to be implemented by the Learning Algorithm
         """

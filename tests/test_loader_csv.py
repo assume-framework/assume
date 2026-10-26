@@ -198,3 +198,16 @@ def test_forecast_interface__save_forecasts():
 
 if __name__ == "__main__":
     pytest.main(["-s", __file__])
+
+
+def test_csv_loader_shares_fuel_prices():
+    """All power plant forecasters should share the same fuel price arrays instead of holding copies."""
+    scenario_data = load_config_and_create_forecaster(
+        inputs_path="examples/inputs", scenario="example_01a", study_case="tiny"
+    )
+    powerplant_ids = scenario_data["powerplant_units"].index
+    first, second = (scenario_data["unit_forecasts"][id] for id in powerplant_ids[:2])
+
+    assert first.fuel_prices.keys() == second.fuel_prices.keys()
+    for fuel in first.fuel_prices:
+        assert first.fuel_prices[fuel] is second.fuel_prices[fuel]
