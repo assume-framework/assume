@@ -428,7 +428,7 @@ class GenericStorage:
         max_power_discharge (float, optional): Maximum discharging power of the storage unit. Defaults to `capacity` if not provided.
         efficiency_charge (float, optional): Efficiency of the charging process. Defaults to 1.0.
         efficiency_discharge (float, optional): Efficiency of the discharging process. Defaults to 1.0.
-        initial_soc (float, optional): State of charge before the first time step as a fraction of `capacity`. Defaults to 1.0.
+        initial_soc (float, optional): Initial state of charge as a fraction of `capacity`. Defaults to 1.0.
         ramp_up (float, optional): Maximum allowed increase in charging/discharging power per time step. Defaults to None (no ramp constraint).
         ramp_down (float, optional): Maximum allowed decrease in charging/discharging power per time step. Defaults to None (no ramp constraint).
         storage_loss_rate (float, optional): Fraction of energy lost per time step due to storage inefficiencies. Defaults to 0.0.
@@ -492,13 +492,13 @@ class GenericStorage:
                 - `max_power_discharge`: Maximum discharging power.
                 - `efficiency_charge`: Charging efficiency.
                 - `efficiency_discharge`: Discharging efficiency.
-                - `initial_soc`: State of charge before the first time step.
+                - `initial_soc`: Initial state of charge.
                 - `ramp_up`: Maximum allowed ramp-up rate for charging and discharging.
                 - `ramp_down`: Maximum allowed ramp-down rate for charging and discharging.
                 - `storage_loss_rate`: Fraction of energy lost during storage.
 
             - **Variables**:
-                - `soc[t]`: State of charge (SOC) at the end of time step `t`, after charging and discharging in `t`.
+                - `soc[t]`: State of charge (SOC) at each time step `t`.
                 - `charge[t]`: Charging power at each time step `t`.
                 - `discharge[t]`: Discharging power at each time step `t`.
 
@@ -1497,7 +1497,7 @@ class ElectricVehicle(GenericStorage):
     efficiency_discharge : float, default 1.0
         Discharging efficiency.
     initial_soc : float, default 1.0
-        SOC before the first time step in fraction of capacity.
+        Initial SOC in fraction of capacity.
     ramp_up : float | None
         Max increase in charge/discharge power between consecutive steps.
     ramp_down : float | None
