@@ -259,6 +259,15 @@ def test_storage_ramping(storage_unit):
     assert adjusted_discharge == 10
     assert adjusted_charge == 0
 
+    # test ramping in discharging case with a discharging power that is 0 and not feasible (too low)
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(
+        0.5, 60, 0
+    )
+    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 60, max_power_charge[0])
+
+    assert adjusted_discharge == 10
+    assert adjusted_charge == 0
+
     # charging scenario
     storage_unit.outputs["energy"][start] = -60
 
@@ -280,6 +289,15 @@ def test_storage_ramping(storage_unit):
         0.5, -60, max_power_discharge[0]
     )
     adjusted_charge = storage_unit.calculate_ramp_charge(0.5, -60, -5)
+
+    assert adjusted_discharge == 0
+    assert adjusted_charge == -10
+
+    # test ramping in charging case with a charging power that is 0 and not feasible (too high)
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(
+        0.5, -60, max_power_discharge[0]
+    )
+    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, -60, 0)
 
     assert adjusted_discharge == 0
     assert adjusted_charge == -10
