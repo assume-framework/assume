@@ -162,7 +162,7 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
     mc.product_type = "energy_pos"
     product_tuples = [(start, end, None)]
 
-    # constant price of 50
+    # constant price of 50, marginal cost of 4, volume of 360, theoretic soc change (without efficiency) of 0.36, capacity of 1000 
     specific_revenue = (50 - 4) * 360 / (0.36 * 1000)
 
     storage.forecaster = UnitForecaster(index, market_prices={"EOM": 50})
@@ -185,10 +185,18 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
     assert bids[0]["price"] == 0
     assert bids[0]["volume"] == 60
 
-    # was charging before
+    # was charging before and ramping constraint makes it impossible to discharge in the next step
     storage.outputs["energy"][start] = -60
     product_tuples = [
         (start + pd.Timedelta(hours=1), end + pd.Timedelta(hours=1), None)
+    ]
+    bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+    assert len(bids) == 0
+
+    # two steps after the charging step, ramping constraint allows to discharge again
+    storage.outputs["energy"][start] = -60
+    product_tuples = [
+        (start + pd.Timedelta(hours=2), end + pd.Timedelta(hours=2), None)
     ]
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     assert len(bids) == 1
@@ -218,10 +226,18 @@ def test_flexable_neg_crm_storage(mock_market_config, storage):
     assert math.isclose(bids[0]["price"], 0)
     assert bids[0]["volume"] == 60
 
-    # was charging before
+    # was charging before and ramping constraint makes it impossible to discharge in the next step
     storage.outputs["energy"][start] = 60
     product_tuples = [
         (start + pd.Timedelta(hours=1), end + pd.Timedelta(hours=1), None)
+    ]
+    bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+    assert len(bids) == 0
+
+    # two steps after the charging step, ramping constraint allows to discharge again
+    storage.outputs["energy"][start] = 60
+    product_tuples = [
+        (start + pd.Timedelta(hours=2), end + pd.Timedelta(hours=2), None)
     ]
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     assert len(bids) == 1
