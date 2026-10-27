@@ -574,22 +574,22 @@ class SupportsMinMaxCharge(BaseUnit):
         previous_power = max(previous_power, 0)
 
         # limit the highest possible discharge
-        requested_power = min(requested_power, self.max_power_discharge - current_power)
+        power_discharge = min(requested_power, self.max_power_discharge - current_power)
         if self.ramp_up_discharge is not None:
             # limit to the ramp
             # what I had + how much I could - what I already sold
             ramp_limited_discharge = max(
                 previous_power + self.ramp_up_discharge - current_power, 0
             )
-            requested_power = min(requested_power, ramp_limited_discharge)
+            power_discharge = min(power_discharge, ramp_limited_discharge)
 
         # restrict only if ramping defined
         if self.ramp_down_discharge is not None:
             # what I had - ramp down = minimum_required
             minimum_required = previous_power - self.ramp_down_discharge
             # as I already provide current_power, need to at least offer minimum_required - current_power
-            requested_power = max(requested_power, minimum_required - current_power, 0)
-        return requested_power
+            power_discharge = max(power_discharge, minimum_required - current_power, 0)
+        return power_discharge
 
     def calculate_ramp_charge(
         self,
@@ -620,21 +620,21 @@ class SupportsMinMaxCharge(BaseUnit):
         previous_power = min(previous_power, 0)
 
         # limit the highest possible charge
-        requested_power = max(requested_power, self.max_power_charge - current_power)
+        power_charge = max(requested_power, self.max_power_charge - current_power)
         if self.ramp_up_charge is not None:
             # what I had + how much I could - what I already sold
             ramp_limited_charge = min(
                 previous_power + self.ramp_up_charge - current_power, 0
             )
-            requested_power = max(requested_power, ramp_limited_charge)
+            power_charge = max(power_charge, ramp_limited_charge)
         # restrict only if ramping defined
         if self.ramp_down_charge is not None:
             # what I had - ramp down = minimum_required
             minimum_required = previous_power - self.ramp_down_charge
             # as I already provide current_power,
             # need to at least offer minimum_required - current_power
-            requested_power = min(requested_power, minimum_required - current_power, 0)
-        return requested_power
+            power_charge = min(power_charge, minimum_required - current_power, 0)
+        return power_charge
 
     def set_dispatch_plan(
         self, marketconfig: MarketConfig, orderbook: Orderbook

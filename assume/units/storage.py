@@ -517,7 +517,7 @@ class Storage(SupportsMinMaxCharge):
         Returns:
             float: The discharging power adjusted to the ramping constraints.
         """
-        requested_power = super().calculate_ramp_discharge(
+        power_discharge = super().calculate_ramp_discharge(
             previous_power,
             requested_power,
             current_power,
@@ -525,11 +525,11 @@ class Storage(SupportsMinMaxCharge):
         # restrict according to min_SOC
 
         max_soc_discharge = self.calculate_soc_max_discharge(soc)
-        requested_power = min(requested_power, max_soc_discharge)
-        if requested_power < min_power_discharge:
-            requested_power = 0
+        power_discharge = min(power_discharge, max_soc_discharge)
+        if power_discharge < min_power_discharge:
+            power_discharge = 0
 
-        return requested_power
+        return power_discharge
 
     def calculate_ramp_charge(
         self,
@@ -552,7 +552,7 @@ class Storage(SupportsMinMaxCharge):
         Returns:
             float: The charging power adjusted to the ramping constraints.
         """
-        requested_power = super().calculate_ramp_charge(
+        power_charge = super().calculate_ramp_charge(
             previous_power,
             requested_power,
             current_power,
@@ -561,11 +561,11 @@ class Storage(SupportsMinMaxCharge):
         # restrict charging according to max_SOC
         max_soc_charge = self.calculate_soc_max_charge(soc)
 
-        requested_power = max(requested_power, max_soc_charge)
-        if requested_power > min_power_charge:
-            requested_power = 0
+        power_charge = max(power_charge, max_soc_charge)
+        if power_charge > min_power_charge:
+            power_charge = 0
 
-        return requested_power
+        return power_charge
 
     def get_starting_costs(self, op_time):
         """
