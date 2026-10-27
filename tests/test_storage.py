@@ -462,6 +462,20 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     end = end + storage_unit.index.freq
     product_tuples = [(start, end, None)]
 
+    # the SoC is 1, charging is not possible
+    # but the previous hour charging is -55.5, while the ramp_down_charge is only -50
+    # this is a special case, where one of both constraints must be violated
+    # as the SoC constraint is enforced after the ramping in the Storage class,
+    # this will result in a bid volume of 0 (soc limit, ramping limit violated).
+    # The empty bid is then removed by self.remove_empty_bids().
+    bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
+    assert len(bids) == 0
+
+    # step into the next hour. The power of the previous hour was 0, bidding is possible again.
+    start = start + storage_unit.index.freq
+    end = end + storage_unit.index.freq
+    product_tuples = [(start, end, None)]
+
     bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
     assert len(bids) == 1
 
