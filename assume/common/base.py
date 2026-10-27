@@ -542,7 +542,7 @@ class SupportsMinMaxCharge(BaseUnit):
         Given previous_power in the step before, we want to offer power_discharge (positive) to some market,
         while we already sold current_power on some other market.
 
-        power_discharge is a power delta to our current output, this function checks if this amount is still feasible to sell.
+        power_discharge is an absolute power, this function checks if this amount is still feasible to sell.
 
         Args:
             previous_power (float): The previous power output of the unit.
@@ -584,7 +584,7 @@ class SupportsMinMaxCharge(BaseUnit):
             power_discharge = min(power_discharge, ramp_limited_discharge)
 
         # restrict only if ramping defined
-        if self.ramp_down_discharge is not None and power_discharge != 0:
+        if self.ramp_down_discharge is not None:
             # what I had - ramp down = minimum_required
             minimum_required = previous_power - self.ramp_down_discharge
             # as I already provide current_power, need to at least offer minimum_required - current_power
@@ -628,7 +628,7 @@ class SupportsMinMaxCharge(BaseUnit):
             )
             power_charge = max(power_charge, ramp_limited_charge)
         # restrict only if ramping defined
-        if self.ramp_down_charge is not None and power_charge != 0:
+        if self.ramp_down_charge is not None:
             # what I had - ramp down = minimum_required
             minimum_required = previous_power - self.ramp_down_charge
             # as I already provide current_power,
