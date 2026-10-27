@@ -266,6 +266,54 @@ def test_redispatch_too_early(grid_data, world):
         world.run()
 
 
+def test_redispatch_at_dispatch_closure(grid_data, world):
+    """
+    A redispatch market opening at the same time the dispatch market is cleared
+    raises an Error, as the dispatch results are not available yet.
+    """
+
+    world.add_market_operator("market_operator")
+    market_products = [
+        MarketProduct(
+            duration=datetime.timedelta(hours=1),
+            count=1,
+            first_delivery=datetime.timedelta(hours=2),
+        )
+    ]
+    # dispatch opens at the start and is cleared one hour later
+    dispatch_config = MarketConfig(
+        "dispatch",
+        opening_hours=rr.rrule(rr.HOURLY, dtstart=world.start, until=world.end),
+        opening_duration=datetime.timedelta(hours=1),
+        market_products=market_products,
+    )
+    redispatch_config = MarketConfig(
+        "redispatch",
+        market_mechanism="redispatch",
+        opening_hours=rr.rrule(
+            rr.HOURLY,
+            dtstart=world.start + datetime.timedelta(hours=1),
+            until=world.end,
+        ),
+        market_products=market_products,
+        param_dict={"grid_data": grid_data},
+        additional_fields=["node", "max_power", "min_power"],
+    )
+    world.add_market(
+        market_operator_id="market_operator", market_config=dispatch_config
+    )
+    world.add_market(
+        market_operator_id="market_operator", market_config=redispatch_config
+    )
+
+    strategies = {"redispatch": "naive_eom", "dispatch": "naive_eom"}
+    world.add_unit_operator("unit_operator", strategies)
+    world.add_unit_operator("unit_operator_2", strategies)
+
+    with pytest.raises(ValueError, match="same time"):
+        world.run()
+
+
 def test_duplicate_market_id(world):
     """Adding a market with a duplicate ID raises an Error."""
 

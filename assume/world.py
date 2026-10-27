@@ -744,10 +744,10 @@ class World:
                 x.opening_hours[0] for x in redispatch_markets
             )
 
-            if earliest_redispatch_opening < earliest_dispatch_closing:
+            if earliest_redispatch_opening <= earliest_dispatch_closing:
                 msg = (
-                    "First redispatch market opens before first dispatch "
-                    "market has closed."
+                    "First redispatch market opens before or at the same time "
+                    "the first dispatch market is cleared."
                 )
                 raise ValueError(msg)
 

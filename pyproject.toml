@@ -43,6 +43,7 @@ dependencies = [
     "pyomo >=6.8.0",
     "xarray",
     "highspy",
+    "termaid >=0.10.0",
 ]
 
 [project.optional-dependencies]
