@@ -500,7 +500,7 @@ class Storage(SupportsMinMaxCharge):
         self,
         soc: float,
         previous_power: float,
-        power_discharge: float,
+        requested_power: float,
         current_power: float = 0,
         min_power_discharge: float = 0,
     ) -> float:
@@ -510,32 +510,32 @@ class Storage(SupportsMinMaxCharge):
         Args:
             soc (float): The current state of charge (between 0 and 1).
             previous_power (float): The previous power output of the unit.
-            power_discharge (float): The discharging power output of the unit.
+            requested_power (float): The requested power output of the unit (positive or negative or zero).
             current_power (float, optional): The current power output of the unit. Defaults to 0.
             min_power_discharge (float, optional): The minimum discharging power output of the unit. Defaults to 0.
 
         Returns:
             float: The discharging power adjusted to the ramping constraints.
         """
-        power_discharge = super().calculate_ramp_discharge(
+        requested_power = super().calculate_ramp_discharge(
             previous_power,
-            power_discharge,
+            requested_power,
             current_power,
         )
         # restrict according to min_SOC
 
         max_soc_discharge = self.calculate_soc_max_discharge(soc)
-        power_discharge = min(power_discharge, max_soc_discharge)
-        if power_discharge < min_power_discharge:
-            power_discharge = 0
+        requested_power = min(requested_power, max_soc_discharge)
+        if requested_power < min_power_discharge:
+            requested_power = 0
 
-        return power_discharge
+        return requested_power
 
     def calculate_ramp_charge(
         self,
         soc: float,
         previous_power: float,
-        power_charge: float,
+        requested_power: float,
         current_power: float = 0,
         min_power_charge: float = 0,
     ) -> float:
@@ -545,27 +545,27 @@ class Storage(SupportsMinMaxCharge):
         Args:
             soc (float): The current state of charge (between 0 and 1).
             previous_power (float): The previous power output of the unit.
-            power_charge (float): The charging power output of the unit.
+            requested_power (float): The requested power output of the unit (positive or negative or zero).
             current_power (float, optional): The current power output of the unit. Defaults to 0.
             min_power_charge (float, optional): The minimum charging power output of the unit. Defaults to 0.
 
         Returns:
             float: The charging power adjusted to the ramping constraints.
         """
-        power_charge = super().calculate_ramp_charge(
+        requested_power = super().calculate_ramp_charge(
             previous_power,
-            power_charge,
+            requested_power,
             current_power,
         )
 
         # restrict charging according to max_SOC
         max_soc_charge = self.calculate_soc_max_charge(soc)
 
-        power_charge = max(power_charge, max_soc_charge)
-        if power_charge > min_power_charge:
-            power_charge = 0
+        requested_power = max(requested_power, max_soc_charge)
+        if requested_power > min_power_charge:
+            requested_power = 0
 
-        return power_charge
+        return requested_power
 
     def get_starting_costs(self, op_time):
         """
