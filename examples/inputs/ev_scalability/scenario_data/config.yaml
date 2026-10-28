@@ -1,0 +1,429 @@
+ev_scalability_1_evs:
+  simulation_id: ev_scalability_1_evs
+  availability_df: common/availability_df.csv
+  demand_df: common/demand_df.csv
+  demand_units: common/demand_units.csv
+  fuel_prices_df: common/fuel_prices_df.csv
+  powerplant_units: common/powerplant_units.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-02 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  electric_vehicle_units: study_cases/ev_scalability_1_evs/electric_vehicle_units.csv
+  forecasts_df: study_cases/ev_scalability_1_evs/forecasts_df.csv
+  unit_operators: study_cases/ev_scalability_1_evs/unit_operators.csv
+  bidding_strategy_params:
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.0
+  markets_config:
+    EOM:
+      operator: eom_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 1000000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+ev_scalability_2_evs:
+  simulation_id: ev_scalability_2_evs
+  availability_df: common/availability_df.csv
+  demand_df: common/demand_df.csv
+  demand_units: common/demand_units.csv
+  fuel_prices_df: common/fuel_prices_df.csv
+  powerplant_units: common/powerplant_units.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-02 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  electric_vehicle_units: study_cases/ev_scalability_2_evs/electric_vehicle_units.csv
+  forecasts_df: study_cases/ev_scalability_2_evs/forecasts_df.csv
+  unit_operators: study_cases/ev_scalability_2_evs/unit_operators.csv
+  bidding_strategy_params:
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.0
+  markets_config:
+    EOM:
+      operator: eom_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 1000000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+ev_scalability_4_evs:
+  simulation_id: ev_scalability_4_evs
+  availability_df: common/availability_df.csv
+  demand_df: common/demand_df.csv
+  demand_units: common/demand_units.csv
+  fuel_prices_df: common/fuel_prices_df.csv
+  powerplant_units: common/powerplant_units.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-02 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  electric_vehicle_units: study_cases/ev_scalability_4_evs/electric_vehicle_units.csv
+  forecasts_df: study_cases/ev_scalability_4_evs/forecasts_df.csv
+  unit_operators: study_cases/ev_scalability_4_evs/unit_operators.csv
+  bidding_strategy_params:
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.0
+  markets_config:
+    EOM:
+      operator: eom_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 1000000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+ev_scalability_8_evs:
+  simulation_id: ev_scalability_8_evs
+  availability_df: common/availability_df.csv
+  demand_df: common/demand_df.csv
+  demand_units: common/demand_units.csv
+  fuel_prices_df: common/fuel_prices_df.csv
+  powerplant_units: common/powerplant_units.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-02 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  electric_vehicle_units: study_cases/ev_scalability_8_evs/electric_vehicle_units.csv
+  forecasts_df: study_cases/ev_scalability_8_evs/forecasts_df.csv
+  unit_operators: study_cases/ev_scalability_8_evs/unit_operators.csv
+  bidding_strategy_params:
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.0
+  markets_config:
+    EOM:
+      operator: eom_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 1000000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+ev_scalability_16_evs:
+  simulation_id: ev_scalability_16_evs
+  availability_df: common/availability_df.csv
+  demand_df: common/demand_df.csv
+  demand_units: common/demand_units.csv
+  fuel_prices_df: common/fuel_prices_df.csv
+  powerplant_units: common/powerplant_units.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-02 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  electric_vehicle_units: study_cases/ev_scalability_16_evs/electric_vehicle_units.csv
+  forecasts_df: study_cases/ev_scalability_16_evs/forecasts_df.csv
+  unit_operators: study_cases/ev_scalability_16_evs/unit_operators.csv
+  bidding_strategy_params:
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.0
+  markets_config:
+    EOM:
+      operator: eom_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 1000000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+ev_scalability_32_evs:
+  simulation_id: ev_scalability_32_evs
+  availability_df: common/availability_df.csv
+  demand_df: common/demand_df.csv
+  demand_units: common/demand_units.csv
+  fuel_prices_df: common/fuel_prices_df.csv
+  powerplant_units: common/powerplant_units.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-02 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  electric_vehicle_units: study_cases/ev_scalability_32_evs/electric_vehicle_units.csv
+  forecasts_df: study_cases/ev_scalability_32_evs/forecasts_df.csv
+  unit_operators: study_cases/ev_scalability_32_evs/unit_operators.csv
+  bidding_strategy_params:
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.0
+  markets_config:
+    EOM:
+      operator: eom_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 1000000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+ev_scalability_64_evs:
+  simulation_id: ev_scalability_64_evs
+  availability_df: common/availability_df.csv
+  demand_df: common/demand_df.csv
+  demand_units: common/demand_units.csv
+  fuel_prices_df: common/fuel_prices_df.csv
+  powerplant_units: common/powerplant_units.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-02 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  electric_vehicle_units: study_cases/ev_scalability_64_evs/electric_vehicle_units.csv
+  forecasts_df: study_cases/ev_scalability_64_evs/forecasts_df.csv
+  unit_operators: study_cases/ev_scalability_64_evs/unit_operators.csv
+  bidding_strategy_params:
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.0
+  markets_config:
+    EOM:
+      operator: eom_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 1000000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+ev_scalability_128_evs:
+  simulation_id: ev_scalability_128_evs
+  availability_df: common/availability_df.csv
+  demand_df: common/demand_df.csv
+  demand_units: common/demand_units.csv
+  fuel_prices_df: common/fuel_prices_df.csv
+  powerplant_units: common/powerplant_units.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-02 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  electric_vehicle_units: study_cases/ev_scalability_128_evs/electric_vehicle_units.csv
+  forecasts_df: study_cases/ev_scalability_128_evs/forecasts_df.csv
+  unit_operators: study_cases/ev_scalability_128_evs/unit_operators.csv
+  bidding_strategy_params:
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.0
+  markets_config:
+    EOM:
+      operator: eom_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 1000000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+ev_scalability_256_evs:
+  simulation_id: ev_scalability_256_evs
+  availability_df: common/availability_df.csv
+  demand_df: common/demand_df.csv
+  demand_units: common/demand_units.csv
+  fuel_prices_df: common/fuel_prices_df.csv
+  powerplant_units: common/powerplant_units.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-02 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  electric_vehicle_units: study_cases/ev_scalability_256_evs/electric_vehicle_units.csv
+  forecasts_df: study_cases/ev_scalability_256_evs/forecasts_df.csv
+  unit_operators: study_cases/ev_scalability_256_evs/unit_operators.csv
+  bidding_strategy_params:
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.0
+  markets_config:
+    EOM:
+      operator: eom_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 1000000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+ev_scalability_512_evs:
+  simulation_id: ev_scalability_512_evs
+  availability_df: common/availability_df.csv
+  demand_df: common/demand_df.csv
+  demand_units: common/demand_units.csv
+  fuel_prices_df: common/fuel_prices_df.csv
+  powerplant_units: common/powerplant_units.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-02 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  electric_vehicle_units: study_cases/ev_scalability_512_evs/electric_vehicle_units.csv
+  forecasts_df: study_cases/ev_scalability_512_evs/forecasts_df.csv
+  unit_operators: study_cases/ev_scalability_512_evs/unit_operators.csv
+  bidding_strategy_params:
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.0
+  markets_config:
+    EOM:
+      operator: eom_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 1000000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+ev_scalability_1024_evs:
+  simulation_id: ev_scalability_1024_evs
+  availability_df: common/availability_df.csv
+  demand_df: common/demand_df.csv
+  demand_units: common/demand_units.csv
+  fuel_prices_df: common/fuel_prices_df.csv
+  powerplant_units: common/powerplant_units.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-02 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  electric_vehicle_units: study_cases/ev_scalability_1024_evs/electric_vehicle_units.csv
+  forecasts_df: study_cases/ev_scalability_1024_evs/forecasts_df.csv
+  unit_operators: study_cases/ev_scalability_1024_evs/unit_operators.csv
+  bidding_strategy_params:
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.0
+  markets_config:
+    EOM:
+      operator: eom_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 1000000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+ev_scalability_2048_evs:
+  simulation_id: ev_scalability_2048_evs
+  availability_df: common/availability_df.csv
+  demand_df: common/demand_df.csv
+  demand_units: common/demand_units.csv
+  fuel_prices_df: common/fuel_prices_df.csv
+  powerplant_units: common/powerplant_units.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-02 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  electric_vehicle_units: study_cases/ev_scalability_2048_evs/electric_vehicle_units.csv
+  forecasts_df: study_cases/ev_scalability_2048_evs/forecasts_df.csv
+  unit_operators: study_cases/ev_scalability_2048_evs/unit_operators.csv
+  bidding_strategy_params:
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.0
+  markets_config:
+    EOM:
+      operator: eom_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 1000000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+ev_scalability_4096_evs:
+  simulation_id: ev_scalability_4096_evs
+  availability_df: common/availability_df.csv
+  demand_df: common/demand_df.csv
+  demand_units: common/demand_units.csv
+  fuel_prices_df: common/fuel_prices_df.csv
+  powerplant_units: common/powerplant_units.csv
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-02 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  electric_vehicle_units: study_cases/ev_scalability_4096_evs/electric_vehicle_units.csv
+  forecasts_df: study_cases/ev_scalability_4096_evs/forecasts_df.csv
+  unit_operators: study_cases/ev_scalability_4096_evs/unit_operators.csv
+  bidding_strategy_params:
+    ev_look_ahead_horizon: 48h
+    ev_background_load_mw: 0.0
+  markets_config:
+    EOM:
+      operator: eom_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 1000000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear

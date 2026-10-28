@@ -1,0 +1,4 @@
+name,technology,fuel_type,emission_factor,max_power,efficiency,additional_cost,unit_operator,min_power,bidding_EOM,bidding_GridTariff
+Solar,solar,renewable,0.0,0.6,1.0,0.0,renewables_operator,0,powerplant_energy_heuristic_flexable,
+Nuclear,nuclear,uranium,0.0,0.8,0.33,10.3,conv_operator,0,powerplant_energy_heuristic_flexable,
+DSO,grid_operator,natural gas,0.0,0.001,1.0,0.0,dso_operator,0,,powerplant_grid_fee_dso

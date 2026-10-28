@@ -1,0 +1,4 @@
+,cold_start_cost,efficiency,emission_factor,fuel_type,hot_start_cost,max_heat_extraction,max_power,min_power,node,simulation,technology,unit_operator,warm_start_cost
+Nuclear,0,0.33,0,uranium,0,0,0.8,0,node0,ev_scalability_1280_evs,nuclear,conv_operator,0
+DSO,0,1,0,natural gas,0,0,0.001,0,node0,ev_scalability_1280_evs,grid_operator,dso_operator,0
+Solar,0,1,0,renewable,0,0,0.6,0,node0,ev_scalability_1280_evs,solar,renewables_operator,0
