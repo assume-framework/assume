@@ -71,7 +71,9 @@ class RedispatchMarketRole(MarketRole):
             loads=self.grid_data["loads"],
         )
 
-        self.flexible_loads = self.grid_data.get("flexible_loads",pd.DataFrame(columns=["node", "p_nom"]))
+        self.flexible_loads = self.grid_data.get(
+            "flexible_loads", pd.DataFrame(columns=["node", "p_nom"])
+        )
         if not self.flexible_loads.empty:
             add_redispatch_flexible_loads(
                 network=self.network,
@@ -172,7 +174,7 @@ class RedispatchMarketRole(MarketRole):
         gen_cols = p_set.columns.intersection(generator_names)
         load_cols = p_set.columns.intersection(load_names)
         flex_cols = p_set.columns.intersection(flexible_load_names)
-        
+
         # 1. Fixed generator dispatch
         gen_p_set = p_set[gen_cols].copy()
 
@@ -189,7 +191,7 @@ class RedispatchMarketRole(MarketRole):
 
         # 2. Fixed demand/load profile
         # PyPSA p_set values to positive values since the sign of the p_set values is usually positive
-        # Here the cleared capacity of flexible loads is also added with the normal loads 
+        # Here the cleared capacity of flexible loads is also added with the normal loads
         load_cols_all = load_cols.union(flex_cols)
         load_p_set = p_set[load_cols_all].copy().abs()
 
@@ -203,7 +205,12 @@ class RedispatchMarketRole(MarketRole):
 
         # All redispatch-capable units
         redisp_cols = gen_cols.union(flex_cols)
-        redisp_p_nom = pd.Series({u: redispatch_network.generators.at[f"{u}_up", "p_nom"] for u in redisp_cols})
+        redisp_p_nom = pd.Series(
+            {
+                u: redispatch_network.generators.at[f"{u}_up", "p_nom"]
+                for u in redisp_cols
+            }
+        )
 
         # Upward redispatch capacity:
         # Possible maximum upwards generation : availability * max_power - market_cleared_capacity

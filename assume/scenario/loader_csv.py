@@ -24,9 +24,9 @@ from assume.common.forecaster import (
     DemandForecaster,
     DsmUnitForecaster,
     ExchangeForecaster,
-    SectorCoupledForecaster,
     HydrogenForecaster,
     PowerplantForecaster,
+    SectorCoupledForecaster,
     SteamgenerationForecaster,
     SteelplantForecaster,
     UnitForecaster,
@@ -203,10 +203,21 @@ def load_dsm_units(path: str, config: dict, file_name: str) -> dict:
 
     # Define columns that are common across different technologies within the same plant
     common_columns = [
-        "unit_operator", "objective", "demand", "cost_tolerance", "unit_type", "node",
-        "flexibility_measure", "is_prosumer", "congestion_threshold", 
-        "peak_load_cap", "load_profile_deviation", "system_type", "market_representation",
-        "enforce_terminal_soc", "primary_carrier",
+        "unit_operator",
+        "objective",
+        "demand",
+        "cost_tolerance",
+        "unit_type",
+        "node",
+        "flexibility_measure",
+        "is_prosumer",
+        "congestion_threshold",
+        "peak_load_cap",
+        "load_profile_deviation",
+        "system_type",
+        "market_representation",
+        "enforce_terminal_soc",
+        "primary_carrier",
     ]
     # Filter the common columns to only include those that exist in the DataFrame
     common_columns = [col for col in common_columns if col in dsm_units.columns]
@@ -218,7 +229,12 @@ def load_dsm_units(path: str, config: dict, file_name: str) -> dict:
     # technology row of each plant; assembled into a dsm_optimisation_config dict below.
     dsm_opt_columns = [
         col
-        for col in ["horizon_mode", "look_ahead_horizon", "commit_horizon", "rolling_step"]
+        for col in [
+            "horizon_mode",
+            "look_ahead_horizon",
+            "commit_horizon",
+            "rolling_step",
+        ]
         if col in dsm_units.columns
     ]
 
@@ -228,7 +244,9 @@ def load_dsm_units(path: str, config: dict, file_name: str) -> dict:
     # Parent/component grouping
     if "parent_unit" in dsm_units.columns:
         grouping_key = dsm_units["parent_unit"].copy()
-        missing_parent = grouping_key.isna() | (grouping_key.astype(str).str.strip() == "")
+        missing_parent = grouping_key.isna() | (
+            grouping_key.astype(str).str.strip() == ""
+        )
         grouping_key = grouping_key.astype(object)
         grouping_key.loc[missing_parent] = dsm_units.index[missing_parent].astype(str)
     else:
@@ -305,7 +323,9 @@ def load_dsm_units(path: str, config: dict, file_name: str) -> dict:
     unit_type_dict = {}
     if "unit_type" in dsm_units_df.columns:
         for unit_type in dsm_units_df["unit_type"].unique():
-            unit_type_dict[unit_type] = dsm_units_df[dsm_units_df["unit_type"] == unit_type]
+            unit_type_dict[unit_type] = dsm_units_df[
+                dsm_units_df["unit_type"] == unit_type
+            ]
 
     return unit_type_dict
 
@@ -760,7 +780,7 @@ def load_config_and_create_forecaster(
 
     # A sector-coupled parent may contain several interacting technologies
     # and carrier balances, for example heat pumps, boilers, electrolysers,
-    # or storage technologies. 
+    # or storage technologies.
     units = load_dsm_units(path=path, config=config, file_name="sector_coupled_units")
 
     if units is None:
@@ -1013,7 +1033,9 @@ def load_config_and_create_forecaster(
                         )
                         if seasonal_storage_schedule is None:
                             seasonal_storage_schedule = 0
-                        extra_profiles["seasonal_storage_schedule"] = seasonal_storage_schedule
+                        extra_profiles["seasonal_storage_schedule"] = (
+                            seasonal_storage_schedule
+                        )
 
                     else:
                         raise ValueError(
@@ -1023,7 +1045,9 @@ def load_config_and_create_forecaster(
 
                     unit_forecasts[id] = SectorCoupledForecaster(
                         index=shared_unit_index,
-                        availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                        availability=availability.get(
+                            id, pd.Series(1.0, index, name=id)
+                        ),
                         forecast_algorithms=unit_forecast_algorithms,
                         fuel_prices=fuel_prices_df,
                         carrier_demands=carrier_demands,

@@ -136,7 +136,7 @@ def add_redispatch_flexible_loads(
         return
 
     required_columns = {"node", "p_nom"}
-    missing_columns = (required_columns- set(flexible_loads.columns))
+    missing_columns = required_columns - set(flexible_loads.columns)
 
     if missing_columns:
         raise ValueError(
@@ -146,20 +146,13 @@ def add_redispatch_flexible_loads(
 
     flexible_loads = flexible_loads.copy()
 
-    flexible_loads["p_nom"] = (
-        flexible_loads["p_nom"]
-        .astype(float)
-        .abs()
-    )
+    flexible_loads["p_nom"] = flexible_loads["p_nom"].astype(float).abs()
 
     if (flexible_loads["p_nom"] <= 0).any():
-        invalid = flexible_loads.index[
-            flexible_loads["p_nom"] <= 0
-        ].tolist()
+        invalid = flexible_loads.index[flexible_loads["p_nom"] <= 0].tolist()
 
         raise ValueError(
-            "Flexible redispatch loads require p_nom > 0. "
-            f"Invalid units: {invalid}"
+            f"Flexible redispatch loads require p_nom > 0. Invalid units: {invalid}"
         )
     zeros = pd.DataFrame(
         0.0,
@@ -174,9 +167,7 @@ def add_redispatch_flexible_loads(
         network.add(
             "Load",
             name=missing_loads,
-            bus=flexible_loads.loc[
-                missing_loads, "node"
-            ],
+            bus=flexible_loads.loc[missing_loads, "node"],
             p_set=zeros[missing_loads],
         )
 
@@ -186,10 +177,7 @@ def add_redispatch_flexible_loads(
     existing_up = pd.Index(network.generators.index).intersection(up_names)
 
     if len(existing_up) > 0:
-        raise ValueError(
-            "Redispatch assets already exist: "
-            f"{existing_up.tolist()}"
-        )
+        raise ValueError(f"Redispatch assets already exist: {existing_up.tolist()}")
 
     network.add(
         "Generator",
@@ -209,10 +197,7 @@ def add_redispatch_flexible_loads(
     existing_down = pd.Index(network.generators.index).intersection(down_names)
 
     if len(existing_down) > 0:
-        raise ValueError(
-            "Redispatch assets already exist: "
-            f"{existing_down.tolist()}"
-        )
+        raise ValueError(f"Redispatch assets already exist: {existing_down.tolist()}")
 
     network.add(
         "Generator",

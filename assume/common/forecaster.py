@@ -906,6 +906,7 @@ class CementForecaster(DsmUnitForecaster):
 
         initializing_unit.setup_model()
 
+
 class SectorCoupledForecaster(DsmUnitForecaster):
     """
     Generic forecaster for SectorCoupledSystem units.
@@ -1038,9 +1039,7 @@ class SectorCoupledForecaster(DsmUnitForecaster):
             carrier = str(carrier).strip()
 
             if not carrier:
-                raise ValueError(
-                    "Carrier names in carrier_demands must not be empty."
-                )
+                raise ValueError("Carrier names in carrier_demands must not be empty.")
 
             demand_series = self._to_series(demand)
 
@@ -1056,9 +1055,7 @@ class SectorCoupledForecaster(DsmUnitForecaster):
         if fuel_prices is None:
             fuel_prices = {}
 
-        self.fuel_prices: dict[str, FastSeries] = self._dict_to_series(
-            fuel_prices
-        )
+        self.fuel_prices: dict[str, FastSeries] = self._dict_to_series(fuel_prices)
 
         # Optional electricity price used specifically for flexibility
         self._electricity_price_flex = (
@@ -1152,9 +1149,7 @@ class SectorCoupledForecaster(DsmUnitForecaster):
         value: ForecastSeries | None,
     ) -> None:
         self._electricity_price_flex = (
-            self._to_series(value)
-            if value is not None
-            else None
+            self._to_series(value) if value is not None else None
         )
 
     # Generic forecast access
@@ -1170,8 +1165,7 @@ class SectorCoupledForecaster(DsmUnitForecaster):
             return getattr(self, key)
         except AttributeError as exc:
             raise KeyError(
-                f"Forecast '{key}' not found in "
-                "SectorCoupledForecaster."
+                f"Forecast '{key}' not found in SectorCoupledForecaster."
             ) from exc
 
     # ASSUME forecast initialization
@@ -1197,9 +1191,7 @@ class SectorCoupledForecaster(DsmUnitForecaster):
             return
 
         # Standard DSM signals used by the flexibility framework
-        initializing_unit.congestion_signal = (
-            self.congestion_signal
-        )
+        initializing_unit.congestion_signal = self.congestion_signal
 
         initializing_unit.renewable_utilisation_signal = (
             self.renewable_utilisation_signal
@@ -1208,6 +1200,7 @@ class SectorCoupledForecaster(DsmUnitForecaster):
         # The unit receives all carrier-specific forecasts through this
         # forecaster before its Pyomo model is constructed
         initializing_unit.setup_model()
+
 
 class SteamgenerationForecaster(DsmUnitForecaster):
     """Forecaster for steam generation units.
