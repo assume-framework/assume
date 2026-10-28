@@ -3,12 +3,13 @@
 # SPDX-License-Identifier: MIT
 
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
-from types import SimpleNamespace
+
 from assume.common.forecaster import UnitForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
@@ -18,7 +19,8 @@ from assume.strategies import (
     EnergyNaiveStrategy,
 )
 from assume.strategies.naive_strategies import (
-    EnergyNaiveRedispatchStrategy, SectorCoupledEnergyNaiveStrategy
+    EnergyNaiveRedispatchStrategy,
+    SectorCoupledEnergyNaiveStrategy,
 )
 from tests.conftest import MockMinMaxUnit
 

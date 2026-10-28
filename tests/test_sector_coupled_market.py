@@ -145,9 +145,9 @@ def test_market_with_sector_coupled_system_clears_at_coal_price(
     assert accepted_by_unit["powerplant_north"]["accepted_volume"] == pytest.approx(
         65.0, abs=TOL
     )
-    assert accepted_by_unit[
-        "powerplant_east_cheap"
-    ]["accepted_volume"] == pytest.approx(4.0, abs=TOL)
+    assert accepted_by_unit["powerplant_east_cheap"][
+        "accepted_volume"
+    ] == pytest.approx(4.0, abs=TOL)
     assert "powerplant_west_cheap" not in accepted_by_unit
 
     expected_sector_bids = {
@@ -158,9 +158,7 @@ def test_market_with_sector_coupled_system_clears_at_coal_price(
 
     for unit_id, expected_volume in expected_sector_bids.items():
         order = accepted_by_unit[unit_id]
-        assert order["accepted_volume"] == pytest.approx(
-            expected_volume, abs=TOL
-        )
+        assert order["accepted_volume"] == pytest.approx(expected_volume, abs=TOL)
         assert order["accepted_price"] == pytest.approx(40.0, abs=TOL)
 
 
@@ -184,18 +182,10 @@ def test_sector_coupled_system_changes_market_outcome(
         validation_product,
     )
 
-    assert meta_without_sector[0]["demand_volume"] == pytest.approx(
-        60.0, abs=TOL
-    )
-    assert meta_with_sector[0]["demand_volume"] == pytest.approx(
-        69.0, abs=TOL
-    )
-    assert meta_without_sector[0]["price"] == pytest.approx(
-        20.0, abs=TOL
-    )
-    assert meta_with_sector[0]["price"] == pytest.approx(
-        40.0, abs=TOL
-    )
+    assert meta_without_sector[0]["demand_volume"] == pytest.approx(60.0, abs=TOL)
+    assert meta_with_sector[0]["demand_volume"] == pytest.approx(69.0, abs=TOL)
+    assert meta_without_sector[0]["price"] == pytest.approx(20.0, abs=TOL)
+    assert meta_with_sector[0]["price"] == pytest.approx(40.0, abs=TOL)
 
 
 if __name__ == "__main__":

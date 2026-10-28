@@ -127,7 +127,6 @@ def test_initialization(simple_redispatch_market_config, grid_data_dict_2_nodes)
     assert rmr.solver_name == "highs"  # Default solver
 
 
-
 def test_initialization_adds_flexible_load_assets(
     simple_redispatch_market_config,
     grid_data_dict_2_nodes_with_flexible_load,
@@ -154,17 +153,11 @@ def test_initialization_adds_flexible_load_assets(
     assert rmr.network.generators.at["flex_S_up", "bus"] == "S"
     assert rmr.network.generators.at["flex_S_down", "bus"] == "S"
 
-    assert rmr.network.generators.at["flex_S_up", "p_nom"] == pytest.approx(
-        500.0
-    )
-    assert rmr.network.generators.at["flex_S_down", "p_nom"] == pytest.approx(
-        500.0
-    )
+    assert rmr.network.generators.at["flex_S_up", "p_nom"] == pytest.approx(500.0)
+    assert rmr.network.generators.at["flex_S_down", "p_nom"] == pytest.approx(500.0)
 
     # Flexible proxies should be unavailable until clear() applies the bid envelope.
-    assert rmr.network.generators_t.p_max_pu["flex_S_up"].iloc[0] == pytest.approx(
-        0.0
-    )
+    assert rmr.network.generators_t.p_max_pu["flex_S_up"].iloc[0] == pytest.approx(0.0)
     assert rmr.network.generators_t.p_max_pu["flex_S_down"].iloc[0] == pytest.approx(
         0.0
     )
@@ -325,7 +318,6 @@ def test_two_nodes_redispatch(
     assert flows_df.loc[0, "line_N_S"] == pytest.approx(expected_flows[0], abs=eps)
 
 
-
 @pytest.mark.require_network
 def test_flexible_load_participates_in_redispatch(
     simple_redispatch_market_config,
@@ -381,10 +373,7 @@ def test_flexible_load_participates_in_redispatch(
     rmr = RedispatchMarketRole(mc)
     accepted_orders, _, _, flows = rmr.clear(orderbook, products)
 
-    accepted = {
-        item["unit_id"]: item["accepted_volume"]
-        for item in accepted_orders
-    }
+    accepted = {item["unit_id"]: item["accepted_volume"] for item in accepted_orders}
 
     assert accepted["coal_N"] == pytest.approx(-500.0, abs=eps)
     assert accepted["flex_S"] == pytest.approx(500.0, abs=eps)
