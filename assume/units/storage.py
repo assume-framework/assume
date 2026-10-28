@@ -302,11 +302,13 @@ class Storage(SupportsMinMaxCharge):
         for t in self.index[start:end]:
             last_executed = t
             soc = self.outputs["soc"].at[t]
-            current_power = self.feasible_power(self.outputs["energy"].at[t], soc)
+            current_power = self.calculate_feasible_power(
+                self.outputs["energy"].at[t], soc
+            )
             self.outputs["energy"].at[t] = current_power
             if t != last:
-                self.outputs["soc"].at[t + self.index.freq] = soc + self.delta_soc(
-                    current_power
+                self.outputs["soc"].at[t + self.index.freq] = (
+                    soc + self.calculate_delta_soc(current_power)
                 )
 
         if last_executed is not None:

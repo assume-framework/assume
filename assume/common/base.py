@@ -652,7 +652,7 @@ class SupportsMinMaxCharge(BaseUnit):
             power_charge = min(power_charge, minimum_required - current_power, 0)
         return power_charge
 
-    def feasible_power(self, current_power: float, soc: float) -> float:
+    def calculate_feasible_power(self, current_power: float, soc: float) -> float:
         """
         Clips a planned power to the power limits and to what ``soc`` can back.
 
@@ -670,7 +670,7 @@ class SupportsMinMaxCharge(BaseUnit):
         # the SOC clip can leave a power below the minimum power
         return self.apply_power_limits(current_power)
 
-    def delta_soc(self, current_power: float) -> float:
+    def calculate_delta_soc(self, current_power: float) -> float:
         """
         The change in state of charge caused by running at ``current_power``.
 
@@ -732,9 +732,11 @@ class SupportsMinMaxCharge(BaseUnit):
 
         for t in self.index[self._soc_valid_until : until - self.index.freq]:
             soc = self.outputs["soc"].at[t]
-            current_power = self.feasible_power(self.outputs["energy"].at[t], soc)
-            self.outputs["soc"].at[t + self.index.freq] = soc + self.delta_soc(
-                current_power
+            current_power = self.calculate_feasible_power(
+                self.outputs["energy"].at[t], soc
+            )
+            self.outputs["soc"].at[t + self.index.freq] = (
+                soc + self.calculate_delta_soc(current_power)
             )
 
         self._soc_valid_until = until
@@ -756,7 +758,7 @@ class SupportsMinMaxCharge(BaseUnit):
         self.ensure_soc(end)
         return np.array(
             [
-                self.feasible_power(
+                self.calculate_feasible_power(
                     self.outputs["energy"].at[t], self.outputs["soc"].at[t]
                 )
                 for t in self.index[start:end]

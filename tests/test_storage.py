@@ -1078,7 +1078,7 @@ def test_soc_clip_below_the_minimum_power_runs_at_zero():
     soc = unit.min_soc + 5 * 1 / unit.efficiency_discharge / unit.capacity
     assert 0 < unit.calculate_soc_max_discharge(soc) < unit.min_power_discharge
 
-    assert unit.feasible_power(50, soc) == 0
+    assert unit.calculate_feasible_power(50, soc) == 0
 
     unit.set_soc(t0, soc)
     unit.outputs["energy"].at[t0] = 50
@@ -1090,8 +1090,8 @@ def test_feasible_power_is_idempotent():
     unit = _min_power_storage()
     for soc in (unit.min_soc, 0.001, 0.5, 0.999, unit.max_soc):
         for power in (-150, -50, -10, 0, 5, 50, 150):
-            once = unit.feasible_power(power, soc)
-            assert unit.feasible_power(once, soc) == once
+            once = unit.calculate_feasible_power(power, soc)
+            assert unit.calculate_feasible_power(once, soc) == once
 
 
 def test_executing_a_step_twice_gives_the_same_dispatch(mock_market_config):
