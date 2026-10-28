@@ -142,14 +142,15 @@ def test_soc_constraint(storage_unit):
     storage_unit.set_soc(start - timedelta(hours=1), 0.05)
     assert storage_unit.get_soc(start - storage_unit.index.freq) == 0.05
     # the SoC at start is propagated from the one just set - the unit is nearly
-    # empty, so the discharge limit binds on the SoC rather than on the power
+    # empty, so the discharge limit binds on the SoC rather than on the power,
+    # and the 10 MW already committed use part of it
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
     )
     assert min_power_discharge[0] == 40
     assert math.isclose(
         max_power_discharge[0],
-        0.05 * storage_unit.capacity * storage_unit.efficiency_discharge,
+        0.05 * storage_unit.capacity * storage_unit.efficiency_discharge - 10,
     )
 
     storage_unit.set_soc(start, 0.95)
@@ -157,8 +158,25 @@ def test_soc_constraint(storage_unit):
         start, end
     )
     assert min_power_charge[0] == -40
-    assert math.isclose(
-        max_power_charge[0], -50 / storage_unit.efficiency_charge, abs_tol=0.1
+    # the committed 10 MW discharge frees room in the SoC, so the power and the
+    # reserved capacity bind: -100 - (10 - 50) = -60
+    assert max_power_charge[0] == -60
+
+
+def test_ramp_soc_limit_covers_the_current_power():
+    """
+    The SoC limits the total power, so the power already sold on another
+    market uses part of it - only the rest can be offered on top.
+    """
+    # 50 MWh stored back 47.5 MW of discharge, 30 MW of them are already sold
+    unit = _storage(initial_soc=0.05)
+    assert unit.calculate_soc_max_discharge(0.05) == pytest.approx(47.5)
+    assert unit.calculate_ramp_discharge(0.05, 0, 100, 30) == pytest.approx(17.5)
+
+    # 50 MWh of room take 55.6 MW of charging, 30 MW of them are already bought
+    assert unit.calculate_soc_max_charge(0.95) == pytest.approx(-50 / 0.9)
+    assert unit.calculate_ramp_charge(0.95, 0, -100, -30) == pytest.approx(
+        -50 / 0.9 + 30
     )
 
 

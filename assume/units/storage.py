@@ -419,11 +419,13 @@ class Storage(SupportsMinMaxCharge):
             min_power_charge >= max_power_charge, min_power_charge, 0
         )
 
-        # restrict charging according to max_soc
+        # restrict charging according to max_soc, which also covers the base load
         if soc is None:
             soc = self.get_soc(start)
         max_soc_charge = self.calculate_soc_max_charge(soc)
-        max_power_charge = max_power_charge.clip(min=max_soc_charge)
+        max_power_charge = max_power_charge.clip(
+            min=np.minimum(max_soc_charge - base_load, 0)
+        )
 
         return min_power_charge, max_power_charge
 
@@ -465,11 +467,13 @@ class Storage(SupportsMinMaxCharge):
             min_power_discharge < max_power_discharge, min_power_discharge, 0
         )
 
-        # restrict according to min_soc
+        # restrict according to min_soc, which also covers the base load
         if soc is None:
             soc = self.get_soc(start)
         max_soc_discharge = self.calculate_soc_max_discharge(soc)
-        max_power_discharge = max_power_discharge.clip(max=max_soc_discharge)
+        max_power_discharge = max_power_discharge.clip(
+            max=np.maximum(max_soc_discharge - base_load, 0)
+        )
 
         return min_power_discharge, max_power_discharge
 
@@ -499,10 +503,11 @@ class Storage(SupportsMinMaxCharge):
             power_discharge,
             current_power,
         )
-        # restrict according to min_SOC
-
+        # restrict according to min_SOC, which also covers the current power
         max_soc_discharge = self.calculate_soc_max_discharge(soc)
-        power_discharge = min(power_discharge, max_soc_discharge)
+        power_discharge = min(
+            power_discharge, max(max_soc_discharge - current_power, 0)
+        )
         if power_discharge < min_power_discharge:
             power_discharge = 0
 
@@ -535,10 +540,9 @@ class Storage(SupportsMinMaxCharge):
             current_power,
         )
 
-        # restrict charging according to max_SOC
+        # restrict charging according to max_SOC, which also covers the current power
         max_soc_charge = self.calculate_soc_max_charge(soc)
-
-        power_charge = max(power_charge, max_soc_charge)
+        power_charge = max(power_charge, min(max_soc_charge - current_power, 0))
         if power_charge > min_power_charge:
             power_charge = 0
 
