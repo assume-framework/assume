@@ -262,7 +262,8 @@ def test_storage_ramping(storage_unit):
     max_ramp_charge = storage_unit.calculate_ramp_charge(0.5, 60, max_power_charge[0])
 
     assert max_ramp_discharge == 100
-    assert max_ramp_charge == -60
+    # from 60 MW the unit can only ramp down to 10 MW, so it cannot charge
+    assert max_ramp_charge == 0
 
     # charging scenario
     storage_unit.outputs["energy"][start] = -60
@@ -276,7 +277,8 @@ def test_storage_ramping(storage_unit):
     )
     max_ramp_charge = storage_unit.calculate_ramp_charge(0.5, -60, max_power_charge[0])
 
-    assert max_ramp_discharge == 60
+    # from -60 MW the unit can only ramp down to -10 MW, so it cannot discharge
+    assert max_ramp_discharge == 0
     assert max_ramp_charge == -100
 
 
@@ -406,8 +408,10 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     end = end + storage_unit.index.freq
     product_tuples = [(start, end, None)]
 
+    # the unit is full and still charging at -55.6 MW, from which it can only
+    # ramp down to -5.6 MW - so it can neither charge nor discharge
     bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
-    assert len(bids) == 1
+    assert len(bids) == 0
 
 
 def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):

@@ -582,10 +582,11 @@ class SupportsMinMaxCharge(BaseUnit):
         # if storage was charging before we need to check if we can ramp back to zero
         if (
             previous_power < 0  # charging
-            and self.calculate_ramp_charge(previous_power, 0, current_power) < 0
+            and self.ramp_down_charge is not None
+            and previous_power - self.ramp_down_charge < 0
         ):
             # if we can not ramp back to 0, we can not discharge anything
-            return self.calculate_ramp_charge(previous_power, 0, current_power)
+            return 0
 
         # as we can ramp the charging to 0, we can assume that the previous_power = 0
         previous_power = max(previous_power, 0)
@@ -626,13 +627,15 @@ class SupportsMinMaxCharge(BaseUnit):
             float: The charging power adjusted to the ramping constraints.
         """
 
+        # if storage was discharging before we need to check if we can ramp back to zero
         if (
-            previous_power > 0
-            and self.calculate_ramp_discharge(previous_power, 0, current_power) > 0
+            previous_power > 0  # discharging
+            and self.ramp_down_discharge is not None
+            and previous_power - self.ramp_down_discharge > 0
         ):
             # if we can not ramp back to 0, we can not charge anything
-            return self.calculate_ramp_discharge(previous_power, 0, current_power)
-        # as we can ramp the charging to 0, we can assume that the previous_power = 0
+            return 0
+        # as we can ramp the discharging to 0, we can assume that the previous_power = 0
         previous_power = min(previous_power, 0)
 
         # limit the highest possible charge

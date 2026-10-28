@@ -108,49 +108,26 @@ def test_flexable_eom_storage(mock_market_config, storage):
     ]
     storage.forecaster = UnitForecaster(index, market_prices={"EOM": forecast})
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
-    assert len(bids) == 24
-    assert math.isclose(
-        bids[0]["price"],
-        np.mean(forecast[0:13]) * storage.efficiency_charge,
-        abs_tol=0.01,
-    )
-    assert bids[0]["volume"] == -60
-    assert math.isclose(
-        bids[1]["price"],
-        np.mean(forecast[0:14]) * storage.efficiency_charge,
-        abs_tol=0.01,
-    )
-    assert bids[1]["volume"] == -100
-    assert math.isclose(
-        bids[2]["price"],
-        np.mean(forecast[0:15]) * storage.efficiency_charge,
-        abs_tol=0.01,
-    )
-    assert bids[2]["volume"] == -100
-    assert math.isclose(
-        bids[3]["price"],
-        np.mean(forecast[0:16]) * storage.efficiency_charge,
-        abs_tol=0.01,
-    )
-    assert bids[3]["volume"] == -100
-    assert math.isclose(
-        bids[4]["price"],
-        np.mean(forecast[0:17]) / storage.efficiency_discharge,
-        abs_tol=0.01,
-    )
-    assert math.isclose(bids[4]["volume"], 60, abs_tol=0.01)
-    assert math.isclose(
-        bids[14]["price"],
-        np.mean(forecast[2:]) * storage.efficiency_charge,
-        abs_tol=0.01,
-    )
-    assert bids[14]["volume"] == -100
-    assert math.isclose(
-        bids[20]["price"],
-        np.mean(forecast[6:]) * storage.efficiency_charge,
-        abs_tol=0.01,
-    )
-    assert bids[20]["volume"] == -60
+    by_hour = {bid["start_time"].hour: bid for bid in bids}
+
+    # the ramp down limits allow no change of direction within one hour, so the
+    # unit keeps charging at the price peak at 4 and cannot charge at 13 after
+    # discharging - and it is full at 6, 7 and 20
+    assert sorted(set(range(24)) - set(by_hour)) == [6, 7, 13, 20]
+    assert [round(by_hour[hour]["volume"], 1) for hour in sorted(by_hour)] == [
+        *[-60, -100, -100, -100, -100, -95.6],  # 0 - 5
+        *[60, 100, 100, 100, 100],  # 8 - 12
+        *[-60, -100, -100, -100, -100, -78],  # 14 - 19
+        *[60, 100, 100],  # 21 - 23
+    ]
+    # the price is the average over the foresight, adjusted by the efficiency
+    for hour, bid in by_hour.items():
+        average_price = np.mean(forecast[max(0, hour - 12) : hour + 13])
+        if bid["volume"] > 0:
+            expected_price = average_price / storage.efficiency_discharge
+        else:
+            expected_price = average_price * storage.efficiency_charge
+        assert math.isclose(bid["price"], expected_price, abs_tol=0.01)
 
 
 def test_flexable_pos_crm_storage(mock_market_config, storage):
@@ -185,13 +162,17 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
     assert bids[0]["price"] == 0
     assert bids[0]["volume"] == 60
 
-    # was charging before
-    storage.outputs["energy"][start] = -60
+    # was charging before - at -40 MW it can ramp down to 0 and discharge, at
+    # -60 MW only down to -10 MW
     product_tuples = [
         (start + pd.Timedelta(hours=1), end + pd.Timedelta(hours=1), None)
     ]
+    storage.outputs["energy"][start] = -40
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     assert len(bids) == 1
+    storage.outputs["energy"][start] = -60
+    bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+    assert len(bids) == 0
 
 
 def test_flexable_neg_crm_storage(mock_market_config, storage):
@@ -218,13 +199,17 @@ def test_flexable_neg_crm_storage(mock_market_config, storage):
     assert math.isclose(bids[0]["price"], 0)
     assert bids[0]["volume"] == 60
 
-    # was charging before
-    storage.outputs["energy"][start] = 60
+    # was discharging before - at 40 MW it can ramp down to 0 and charge, at
+    # 60 MW only down to 10 MW
     product_tuples = [
         (start + pd.Timedelta(hours=1), end + pd.Timedelta(hours=1), None)
     ]
+    storage.outputs["energy"][start] = 40
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     assert len(bids) == 1
+    storage.outputs["energy"][start] = 60
+    bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+    assert len(bids) == 0
 
 
 if __name__ == "__main__":
