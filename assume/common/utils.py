@@ -11,7 +11,7 @@ import re
 import shutil
 import sys
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from functools import wraps
 from itertools import groupby
 from operator import itemgetter
@@ -433,7 +433,7 @@ def get_products_index(orderbook: Orderbook) -> pd.DatetimeIndex:
 
 
 def timestamp2datetime(timestamp: float):
-    return datetime.fromtimestamp(timestamp, tz=timezone.utc).replace(tzinfo=None)
+    return datetime.fromtimestamp(timestamp, tz=UTC).replace(tzinfo=None)
 
 
 def datetime2timestamp(datetime: datetime):

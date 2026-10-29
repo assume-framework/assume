@@ -23,7 +23,7 @@ def init(world, n=1):
     start = timestamp2datetime(start_tz.timestamp())
     end = start + rd(hours=1)
 
-    index = FastIndex(start, end, freq="m")
+    index = FastIndex(start, end, freq="min")
     simulation_id = "world_realtime"
 
     world.setup(

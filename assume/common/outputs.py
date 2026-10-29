@@ -15,7 +15,7 @@ import pandas as pd
 from dateutil import rrule as rr
 from mango import Role
 from pandas.api.types import is_bool_dtype, is_numeric_dtype
-from psycopg2.errors import UndefinedColumn
+from psycopg.errors import UndefinedColumn
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
