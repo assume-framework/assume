@@ -232,7 +232,7 @@ def test_supply_and_demand_curves_full_vertical_overlap():
         - gen1: volume = 800, price = 10
         - gen2: volume = 200, price = 20
     Supply and demand curves fully overlap at volume 800MW from 10€ to 20€.
-    SimpleClearing should clear at 100€ with 800MW, ComplexClearing should clear at 20€ with 800MW
+    SimpleClearing should clear at 10€ with 800MW, ComplexClearing should clear at 10€ with 800MW
     (but any price between 10€ and 20€ is correct in reality).
     """
     orderbook = extend_orderbook(products, -700, 300)
