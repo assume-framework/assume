@@ -70,8 +70,6 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
             start, end = product[0], product[1]
 
             current_power = unit.outputs["energy"].at[start]
-            current_power_discharge = max(current_power, 0)
-            current_power_charge = min(current_power, 0)
 
             # calculate min and max power for charging and discharging
             min_power_charge, max_power_charge = unit.calculate_min_max_charge(
@@ -90,33 +88,34 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
                 max_power_discharge[0],
             )
 
-            # Calculate ramping constraints using helper function
+            # Calculate ramping constraints using helper function - on the whole
+            # committed power, so a bid can also reverse its direction
             max_power_discharge = unit.calculate_ramp_discharge(
                 theoretic_SOC,
                 previous_power,
                 max_power_discharge,
-                current_power_discharge,
+                current_power,
                 min_power_discharge,
             )
             min_power_discharge = unit.calculate_ramp_discharge(
                 theoretic_SOC,
                 previous_power,
                 min_power_discharge,
-                current_power_discharge,
+                current_power,
                 min_power_discharge,
             )
             max_power_charge = unit.calculate_ramp_charge(
                 theoretic_SOC,
                 previous_power,
                 max_power_charge,
-                current_power_charge,
+                current_power,
                 min_power_charge,
             )
             min_power_charge = unit.calculate_ramp_charge(
                 theoretic_SOC,
                 previous_power,
                 min_power_charge,
-                current_power_charge,
+                current_power,
                 min_power_charge,
             )
             price_forecast = unit.forecaster.price[market_config.market_id]

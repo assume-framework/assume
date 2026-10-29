@@ -257,13 +257,11 @@ def _accept(storage, market_config, orders):
 def test_flexable_eom_storage_bids_on_top_of_a_committed_plan(mock_market_config):
     """
     A later energy market bids on hours an earlier one already committed. Its
-    bids build on the committed plan, while the SoC estimate of the strategy
-    follows what the unit can physically run at:
+    bids build on the committed plan and may reverse it in both directions:
 
     - t1: of the 100 MW discharge committed, the 20 MWh stored only deliver
-      20 MW. Nothing more can be discharged, so there is no bid.
-    - t2: the storage is empty, so the 50 MW charge committed is raised to
-      the full charge.
+      20 MW. The bid buys back the 100 MW and charges the storage full.
+    - t2: the 50 MW charge committed is turned into a full discharge.
     """
     index = pd.date_range("2022-01-01", periods=8, freq="h")
     prices = pd.Series([50, 50, 80, 80, 80, 80, 80, 80], index=index)
@@ -280,20 +278,19 @@ def test_flexable_eom_storage_bids_on_top_of_a_committed_plan(mock_market_config
     product_tuples = [(index[i], index[i + 1], None) for i in (1, 2, 3)]
     bids = strategy.calculate_bids(storage, mock_market_config, product_tuples)
 
-    # charge fully at t2 and discharge it again at t3
+    # charge at the cheaper t1, discharge at t2 and charge fully again at t3
     assert [(bid["start_time"], bid["volume"]) for bid in bids] == [
-        (index[2], pytest.approx(-50)),
-        (index[3], pytest.approx(100)),
+        (index[1], pytest.approx(-180)),
+        (index[2], pytest.approx(150)),
+        (index[3], pytest.approx(-100)),
     ]
 
-    # once accepted, everything committed can be delivered - except the 80 MW
-    # at t1 the storage cannot deliver
+    # once accepted, everything committed can be delivered
     _accept(
         storage,
         mock_market_config,
         [(bid["start_time"], bid["end_time"], bid["volume"]) for bid in bids],
     )
     committed = [storage.outputs["energy"].at[index[i]] for i in (1, 2, 3)]
-    assert committed == pytest.approx([100, -100, 100])
-    delivered = storage.execute_current_dispatch(index[1], index[3])
-    assert list(delivered) == pytest.approx([20, -100, 100])
+    assert committed == pytest.approx([-80, 100, -100])
+    assert list(storage.execute_current_dispatch(index[1], index[3])) == committed
