@@ -69,8 +69,7 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
         for product in product_tuples:
             start, end = product[0], product[1]
 
-            # the committed plan may exceed what the SOC backs
-            current_power = unit.get_feasible_energy(start, start)[0]
+            current_power = unit.outputs["energy"].at[start]
             current_power_discharge = max(current_power, 0)
             current_power_charge = min(current_power, 0)
 
@@ -150,24 +149,20 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
                 }
             )
 
-            # calculate theoretic SOC
+            # calculate theoretic SOC - it follows what the unit can physically
+            # run at, as the committed power may exceed what the SOC backs
             time_delta = (end - start) / timedelta(hours=1)
-            if bid_quantity + current_power > 0:
+            feasible_power = unit.calculate_feasible_power(
+                bid_quantity + current_power, theoretic_SOC
+            )
+            if feasible_power > 0:
                 delta_soc = (
-                    -(
-                        (bid_quantity + current_power)
-                        * time_delta
-                        / unit.efficiency_discharge
-                    )
+                    -(feasible_power * time_delta / unit.efficiency_discharge)
                     / unit.capacity
                 )
-            elif bid_quantity + current_power < 0:
+            elif feasible_power < 0:
                 delta_soc = (
-                    -(
-                        (bid_quantity + current_power)
-                        * time_delta
-                        * unit.efficiency_charge
-                    )
+                    -(feasible_power * time_delta * unit.efficiency_charge)
                     / unit.capacity
                 )
             else:
@@ -280,8 +275,7 @@ class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
             product_tuples, max_power_discharge_values
         ):
             start = product[0]
-            # the committed plan may exceed what the SOC backs
-            current_power = unit.get_feasible_energy(start, start)[0]
+            current_power = unit.outputs["energy"].at[start]
 
             # calculate ramping constraints for discharge
             bid_quantity = unit.calculate_ramp_discharge(
@@ -413,8 +407,7 @@ class StorageCapacityHeuristicBalancingNegStrategy(MinMaxChargeStrategy):
         bids = []
         for product, max_power_charge in zip(product_tuples, max_power_charge_values):
             start = product[0]
-            # the committed plan may exceed what the SOC backs
-            current_power = unit.get_feasible_energy(start, start)[0]
+            current_power = unit.outputs["energy"].at[start]
             bid_quantity = abs(
                 unit.calculate_ramp_charge(
                     theoretic_SOC,

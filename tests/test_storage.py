@@ -615,14 +615,14 @@ def test_projected_soc_matches_executed_soc(mock_market_config, storage_unit):
     storage_unit.set_dispatch_plan(mc, [order])
 
     projected_soc = storage_unit.get_soc(t1)
-    projected_energy = storage_unit.get_feasible_energy(t0, t0)[0]
     assert projected_soc >= storage_unit.min_soc
-    assert projected_energy < 100
 
     storage_unit.execute_current_dispatch(t0, t2)
 
     assert math.isclose(storage_unit.get_soc(t1), projected_soc)
-    assert math.isclose(storage_unit.outputs["energy"].at[t0], projected_energy)
+    assert storage_unit.outputs["energy"].at[t0] == pytest.approx(
+        storage_unit.calculate_soc_max_discharge(0.02)
+    )
 
 
 def _storage(**overrides) -> Storage:
@@ -673,9 +673,6 @@ def test_ensure_soc_clips_to_the_power_limits(mock_market_config, storage_unit):
         - (storage_unit.max_power_discharge / storage_unit.efficiency_discharge)
         / storage_unit.capacity
     )
-    assert storage_unit.get_feasible_energy(t0, t0)[0] == (
-        storage_unit.max_power_discharge
-    )
     # ... while the plan itself is left alone until it is executed
     assert storage_unit.outputs["energy"].at[t0] == 250
 
@@ -700,9 +697,6 @@ def test_ensure_soc_clips_volumes_stacked_by_several_markets(
         - (storage_unit.max_power_discharge / storage_unit.efficiency_discharge)
         / storage_unit.capacity
     )
-    assert storage_unit.get_feasible_energy(t0, t0)[0] == (
-        storage_unit.max_power_discharge
-    )
 
 
 def test_ensure_soc_applies_both_the_power_and_the_soc_limit(
@@ -721,7 +715,7 @@ def test_ensure_soc_applies_both_the_power_and_the_soc_limit(
     soc_max_discharge = storage_unit.calculate_soc_max_discharge(0.02)
     assert soc_max_discharge < storage_unit.max_power_discharge
     assert storage_unit.get_soc(t1) == pytest.approx(storage_unit.min_soc)
-    assert storage_unit.get_feasible_energy(t0, t0)[0] == pytest.approx(
+    assert storage_unit.execute_current_dispatch(t0, t0)[0] == pytest.approx(
         soc_max_discharge
     )
 
@@ -746,18 +740,6 @@ def test_ensure_soc_clips_the_last_time_step(mock_market_config, storage_unit):
         storage_unit.max_power_discharge
     )
     assert storage_unit.outputs["energy"].at[t3] == storage_unit.max_power_discharge
-
-
-def test_get_feasible_energy_computes_last_time_step(mock_market_config, storage_unit):
-    """The last time step has no following SoC, but a feasible energy."""
-    mc = mock_market_config
-    t3 = storage_unit.index[-1]
-    storage_unit.set_dispatch_plan(
-        mc, [_energy_order(t3, t3 + storage_unit.index.freq, 250)]
-    )
-
-    feasible = storage_unit.get_feasible_energy(t3, t3)
-    assert feasible[0] == storage_unit.max_power_discharge
 
 
 def test_ensure_soc_drops_power_below_the_minimum():
@@ -787,7 +769,7 @@ def test_ensure_soc_drops_power_below_the_minimum():
     unit.outputs["energy"].at[t1] = -5  # above min_power_charge
 
     assert unit.get_soc(t2) == unit.initial_soc
-    assert unit.get_feasible_energy(t0, t1) == pytest.approx([0, 0])
+    assert list(unit.execute_current_dispatch(t0, t1)) == pytest.approx([0, 0])
 
 
 def test_ensure_soc_is_a_no_op_once_covered(mock_market_config, storage_unit):
@@ -1104,8 +1086,8 @@ def test_soc_clip_below_the_minimum_power_runs_at_zero():
 
     unit.set_soc(t0, soc)
     unit.outputs["energy"].at[t0] = 50
-    assert unit.get_feasible_energy(t0, t0) == pytest.approx([0])
     assert unit.get_soc(t1) == pytest.approx(soc)
+    assert list(unit.execute_current_dispatch(t0, t0)) == pytest.approx([0])
 
 
 def test_feasible_power_is_idempotent():
@@ -1133,20 +1115,52 @@ def test_executing_a_step_twice_gives_the_same_dispatch(mock_market_config):
     assert unit.get_soc(t1) == pytest.approx(soc_after)
 
 
-def test_planning_reads_the_feasible_energy(mock_market_config):
+def test_planning_builds_on_the_committed_plan(mock_market_config):
     """
-    Bids building on volume already committed to a time step - the previous
-    power for ramping and the remaining power for further markets - have to
-    start from what the unit can run at, not from a plan the SoC cannot back.
+    100 MW are sold from a storage that can only deliver 47.5 MW.
+
+    The bids of further markets build on the 100 MW sold, so they see that
+    nothing is left to sell and can buy back the whole volume.
+
+    The SoC is derived from the 47.5 MW the unit can deliver: it ends empty
+    at min_soc. Derived from the 100 MW sold, it would end below min_soc, and
+    that impossible state would carry over into every later time step, where
+    the 52.5 MW not delivered have no effect anymore.
     """
     # 50 MWh stored, so the SoC only backs 47.5 MW of discharge in one hour
     unit = _storage(initial_soc=0.05)
     t0, t1 = unit.index[0], unit.index[1]
     unit.set_dispatch_plan(mock_market_config, [_energy_order(t0, t1, 100)])
-    feasible = unit.get_feasible_energy(t0, t0)[0]
-    assert 0 < feasible < 100
+    assert unit.get_soc(t1) == pytest.approx(unit.min_soc)
 
-    assert unit.get_output_before(t1) == pytest.approx(feasible)
+    # as for every other unit
+    assert unit.get_output_before(t1) == 100
+
+    # nothing left to sell, but the whole plan can be bought back
+    _, max_power_discharge = unit.calculate_min_max_discharge(t0, t1)
+    _, max_power_charge = unit.calculate_min_max_charge(t0, t1)
+    assert max_power_discharge[0] == 0
+    assert max_power_charge[0] + 100 == unit.max_power_charge
+
+    # without a further market, only the 47.5 MW are delivered
+    assert unit.execute_current_dispatch(t0, t0)[0] == pytest.approx(47.5)
+
+
+def test_later_market_can_buy_back_an_oversold_plan(mock_market_config):
+    """
+    Two markets stacked 150 MW on a 100 MW unit. A later market can buy back
+    all of it and still charge at full power, so nothing is left undelivered.
+    """
+    unit = _storage()
+    t0, t1 = unit.index[0], unit.index[1]
+    unit.set_dispatch_plan(mock_market_config, [_energy_order(t0, t1, 100)])
+    unit.set_dispatch_plan(mock_market_config, [_energy_order(t0, t1, 50)])
 
     _, max_power_charge = unit.calculate_min_max_charge(t0, t1)
-    assert max_power_charge[0] == pytest.approx(unit.max_power_charge - feasible)
+    assert max_power_charge[0] == -250
+    unit.set_dispatch_plan(
+        mock_market_config, [_energy_order(t0, t1, max_power_charge[0])]
+    )
+
+    assert unit.outputs["energy"].at[t0] == unit.max_power_charge
+    assert unit.execute_current_dispatch(t0, t0)[0] == unit.max_power_charge

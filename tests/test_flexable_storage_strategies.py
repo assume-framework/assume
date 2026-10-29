@@ -219,50 +219,81 @@ if __name__ == "__main__":
     pytest.main(["-s", __file__])
 
 
-def test_flexable_eom_storage_bids_on_top_of_an_infeasible_plan(mock_market_config):
-    """
-    A later energy market bids on hours an earlier one already committed. The
-    SoC estimate of the strategy has to build on what the unit can actually run
-    at there - 20 MWh are stored, so a committed 100 MW discharge only delivers
-    20 MW - rather than on the plan, which would drive it far below empty.
-    """
-    index = pd.date_range("2022-01-01", periods=8, freq="h")
-    prices = pd.Series([50, 50, 80, 80, 80, 80, 80, 80], index=index)
+def _eom_storage(prices, capacity, initial_soc):
     strategy = StorageEnergyHeuristicFlexableStrategy(eom_foresight="4h")
-    storage = Storage(
+    return Storage(
         id="Test_Storage",
         unit_operator="TestOperator",
         technology="TestTechnology",
         bidding_strategies={"EOM": strategy},
-        forecaster=UnitForecaster(index, availability=1, market_prices={"EOM": prices}),
+        forecaster=UnitForecaster(
+            prices.index, availability=1, market_prices={"EOM": prices}
+        ),
         max_power_charge=-100,
         max_power_discharge=100,
-        capacity=100,
+        capacity=capacity,
         efficiency_charge=1,
         efficiency_discharge=1,
-        initial_soc=0.2,
+        initial_soc=initial_soc,
     )
+
+
+def _accept(storage, market_config, orders):
     storage.set_dispatch_plan(
-        mock_market_config,
+        market_config,
         [
             {
-                "start_time": index[1],
-                "end_time": index[2],
+                "start_time": start,
+                "end_time": end,
                 "only_hours": None,
-                "accepted_volume": 100,
+                "accepted_volume": volume,
                 "accepted_price": 80,
             }
+            for start, end, volume in orders
         ],
     )
-    assert storage.get_feasible_energy(index[1], index[1])[0] == 20
 
+
+def test_flexable_eom_storage_bids_on_top_of_a_committed_plan(mock_market_config):
+    """
+    A later energy market bids on hours an earlier one already committed. Its
+    bids build on the committed plan, while the SoC estimate of the strategy
+    follows what the unit can physically run at:
+
+    - t1: of the 100 MW discharge committed, the 20 MWh stored only deliver
+      20 MW. Nothing more can be discharged, so there is no bid.
+    - t2: the storage is empty, so the 50 MW charge committed is raised to
+      the full charge.
+    """
+    index = pd.date_range("2022-01-01", periods=8, freq="h")
+    prices = pd.Series([50, 50, 80, 80, 80, 80, 80, 80], index=index)
+    storage = _eom_storage(prices, capacity=100, initial_soc=0.2)
+    _accept(
+        storage,
+        mock_market_config,
+        [(index[1], index[2], 100), (index[2], index[3], -50)],
+    )
+    # the storage is empty after delivering 20 MW of the 100 MW
+    assert storage.get_soc(index[2]) == 0
+
+    strategy = storage.bidding_strategies["EOM"]
     product_tuples = [(index[i], index[i + 1], None) for i in (1, 2, 3)]
     bids = strategy.calculate_bids(storage, mock_market_config, product_tuples)
 
-    # empty after t1, the unit can charge 80 MW on top of its 20 MW discharge,
-    # discharge them again at t2 and then charge fully at t3
+    # charge fully at t2 and discharge it again at t3
     assert [(bid["start_time"], bid["volume"]) for bid in bids] == [
-        (index[1], pytest.approx(-80)),
-        (index[2], pytest.approx(80)),
-        (index[3], pytest.approx(-100)),
+        (index[2], pytest.approx(-50)),
+        (index[3], pytest.approx(100)),
     ]
+
+    # once accepted, everything committed can be delivered - except the 80 MW
+    # at t1 the storage cannot deliver
+    _accept(
+        storage,
+        mock_market_config,
+        [(bid["start_time"], bid["end_time"], bid["volume"]) for bid in bids],
+    )
+    committed = [storage.outputs["energy"].at[index[i]] for i in (1, 2, 3)]
+    assert committed == pytest.approx([100, -100, 100])
+    delivered = storage.execute_current_dispatch(index[1], index[3])
+    assert list(delivered) == pytest.approx([20, -100, 100])

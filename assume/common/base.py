@@ -744,30 +744,6 @@ class SupportsMinMaxCharge(BaseUnit):
 
         self._soc_valid_until = until
 
-    def get_feasible_energy(self, start: datetime, end: datetime) -> np.ndarray:
-        """
-        Returns the energy the unit can actually run at over ``[start, end]``.
-
-        Use this instead of ``outputs["energy"]`` before delivery, as the latter
-        holds the committed plan until ``execute_current_dispatch``.
-
-        Args:
-            start (datetime.datetime): The start of the range.
-            end (datetime.datetime): The end of the range, inclusive.
-
-        Returns:
-            numpy.ndarray: The feasible energy over the range.
-        """
-        self.ensure_soc(end)
-        return np.array(
-            [
-                self.calculate_feasible_power(
-                    self.outputs["energy"].at[t], self.outputs["soc"].at[t]
-                )
-                for t in self.index[start:end]
-            ]
-        )
-
     def set_soc(self, t: datetime, soc: float) -> None:
         """
         Sets a known state of charge at ``t``, invalidating everything after it.
@@ -798,22 +774,6 @@ class SupportsMinMaxCharge(BaseUnit):
         """
         self.ensure_soc(t)
         return self.outputs["soc"].at[t]
-
-    def get_output_before(self, dt: datetime, product_type: str = "energy") -> float:
-        """
-        Returns the feasible energy of the time step before ``dt``.
-
-        Args:
-            dt: The datetime.
-            product_type: The product type (default is "energy").
-
-        Returns:
-            The output before the given datetime.
-        """
-        if product_type != "energy" or dt - self.index.freq < self.index[0]:
-            return super().get_output_before(dt, product_type)
-        before = dt - self.index.freq
-        return self.get_feasible_energy(before, before)[0]
 
     def set_dispatch_plan(
         self, marketconfig: MarketConfig, orderbook: Orderbook
