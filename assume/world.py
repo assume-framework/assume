@@ -38,6 +38,7 @@ from assume.common import (
 from assume.common.base import LearningConfig
 from assume.common.forecast_algorithms import get_forecast_registries
 from assume.common.forecaster import UnitForecaster, UnitsOperatorForecaster
+from assume.common.market_timing import check_market_timing
 from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import (
@@ -744,12 +745,18 @@ class World:
                 x.opening_hours[0] for x in redispatch_markets
             )
 
-            if earliest_redispatch_opening < earliest_dispatch_closing:
+            if earliest_redispatch_opening <= earliest_dispatch_closing:
                 msg = (
-                    "First redispatch market opens before first dispatch "
-                    "market has closed."
+                    "First redispatch market opens before or at the same time "
+                    "the first dispatch market is cleared."
                 )
                 raise ValueError(msg)
+
+        # Market timing: no bidding during delivery, results available when needed.
+        for issue in check_market_timing(list(self.markets.values())):
+            if issue.level == "error":
+                raise ValueError(issue.message)
+            warnings.warn(issue.message)
 
         # Existence of demand implies existence of generation and vice versa.
         demand_exists, generation_exists = False, False
