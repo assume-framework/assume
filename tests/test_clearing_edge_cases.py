@@ -293,7 +293,7 @@ def test_supply_and_demand_curves_no_overlap_demand_scarcity():
         - gen3: volume = 60, price = 10
     Supply and demand curves do not overlap and supply is abundant.
     SimpleClearing should clear at 10€ (supply side) with 150MW,
-    ComplexClearing should clear at 15€ (demand side) with 150MW.
+    ComplexClearing should clear at 10€ (demand side) with 150MW.
     """
     orderbook = extend_orderbook(products, -75, 20)
     orderbook = extend_orderbook(products, -75, 15, orderbook)
