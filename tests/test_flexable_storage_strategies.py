@@ -36,9 +36,13 @@ def assert_allclose_with_indices(actual, expected, atol):
         )
     )
 
-
-@pytest.fixture
-def storage() -> Storage:
+# run all tests with two versions of handling simultaneous charge and discharge: True and False
+# True is the new default (10/2026) ramping behavior, False is the previous default behavior. The tests should pass for both versions.
+@pytest.fixture(
+    params=[False, True],
+    ids=["no-simultaneous-charge-discharge", "simultaneous-charge-discharge"],
+)
+def storage(request: pytest.FixtureRequest) -> Storage:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2023-07-01", periods=48, freq="h")
     forecaster = UnitForecaster(index, market_prices={"EOM": 50})
@@ -61,10 +65,11 @@ def storage() -> Storage:
         additional_cost_charge=3,
         additional_cost_discharge=4,
         additional_cost=1,
+        simultaneous_charge_discharge=request.param,
     )
 
 
-def test_flexable_eom_storage_no_simultaneous_charge_and_discharge(mock_market_config, storage):
+def test_flexable_eom_storage(mock_market_config, storage):
     index = pd.date_range("2023-07-01", periods=4, freq="h")
     start = datetime(2023, 7, 1)
     end = datetime(2023, 7, 1, 1)
@@ -127,6 +132,41 @@ def test_flexable_eom_storage_no_simultaneous_charge_and_discharge(mock_market_c
     ]
     storage.forecaster = UnitForecaster(index, market_prices={"EOM": forecast})
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+    if storage.simultaneous_charge_discharge:
+        # if simultaneous charge and discharge is allowed, a storage can switch faster between charging and discharging, ramp constraints are less restricitve
+        assert len(bids) == 24
+        assert_allclose_with_indices(
+            [b["volume"] for b in bids],
+            [
+                -60,
+                -100,
+                -100,
+                -100,
+                0,
+                -60,
+                -100,
+                -35.5,
+                60,
+                100,
+                100,
+                100,
+                100,
+                0,
+                -60,
+                -100,
+                -100,
+                0,
+                60,
+                100,
+                0,
+                60,
+                100,
+                100,
+            ],
+            atol=0.01
+        )
+        #assert_allclose_with_indices
+
     # we have 24 timesteps, from 0 to 23, first 4 we want to charge [-60, -100, -100, -100]
     # the price in timestep 4 is high, so we would like to discharge, but ramp_down_charge=-50 restricts this, the strategy issues a -50 charging bid (could also be handled differently)
     # in timesteps 5, 6, 7 prices favor charging again, but the SoC is near 1, so [-100, -45.55, 0]. Timestep 6 with volume -45.55 violates ramping (-100 - -50) = -50, but SoC is enforced.
