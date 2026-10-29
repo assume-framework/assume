@@ -217,8 +217,8 @@ def test_minmaxcharge_unconstrained():
         node="empty",
     )
 
-    # 1. wenn ramp is undefined, it should not create constraints
-    # 2. all maximum/minimum and ramp values should be given as positive values
+    # 1. when ramp is undefined, it should not create constraints
+    # 2. charging ramps are negative, discharging ramps are positive
 
     mmc.max_power_charge = -1000  # MW
     mmc.max_power_discharge = 1000  # MW
@@ -230,9 +230,10 @@ def test_minmaxcharge_unconstrained():
     # min power
     mmc.min_power_charge = -0
     mmc.min_power_discharge = 0
+    mmc.simultaneous_charge_discharge = False
 
     # calculate ramping
-    # should be previous_power + max_power
+    # should be previous_power + requested power, as ramping is not constraining
     assert mmc.calculate_ramp_discharge(0, 992, 0) == 992
     assert mmc.calculate_ramp_discharge(-10, 992, 0) == 992
 
