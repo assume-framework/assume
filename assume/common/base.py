@@ -588,7 +588,7 @@ class SupportsMinMaxCharge(BaseUnit):
                 power_discharge = min(power_discharge, ramp_limited_discharge)
 
             # restrict only if ramping defined
-            if self.ramp_down_discharge is not None and power_discharge != 0:
+            if self.ramp_down_discharge is not None:
                 # what I had - ramp down = minimum_required
                 minimum_required = previous_power - self.ramp_down_discharge
                 # as I already provide current_power, need to at least offer minimum_required - current_power
@@ -678,7 +678,7 @@ class SupportsMinMaxCharge(BaseUnit):
                 )
                 power_charge = max(power_charge, ramp_limited_charge)
             # restrict only if ramping defined
-            if self.ramp_down_charge is not None and power_charge != 0:
+            if self.ramp_down_charge is not None:
                 # what I had - ramp down = minimum_required
                 minimum_required = previous_power - self.ramp_down_charge
                 # as I already provide current_power,
