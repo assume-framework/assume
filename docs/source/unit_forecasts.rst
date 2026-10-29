@@ -26,7 +26,7 @@ Unit Type                     Forecaster Class                          Addition
 Power Plants                  ``PowerplantForecaster``                  ``fuel_prices``
 Storage Units                 ``UnitForecaster``                        *(base only)*
 Demand Units                  ``DemandForecaster``                      ``demand``
-Exchange Units                ``ExchangeForecaster``                    ``volume_import``, ``volume_export``
+Exchange Units                ``ExchangeForecaster``                    ``volume_import``, ``volume_export``, ``price_import``, ``price_export`` (optional)
 DSM Units                     ``DsmUnitForecaster``                     ``congestion_signal``, ``renewable_utilisation_signal``, ``electricity_price``
 Steelplant Units              ``SteelplantForecaster``                  DSM attrs + ``fuel_prices``
 Cement Plant Units            ``CementForecaster``                      DSM attrs + ``fuel_prices``, ``clinker_demand``, ``normalized_load_profile``, ``electricity_price_flex``, ``thermal_storage_schedule``, ``availability_profiles``
