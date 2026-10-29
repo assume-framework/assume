@@ -420,6 +420,7 @@ class Storage(SupportsMinMaxCharge):
         )
 
         # restrict charging according to max_soc, which also covers the base load
+        # # TODO: doesn't cover the CRM energy reservations or other future commitments?
         if soc is None:
             soc = self.get_soc(start)
         max_soc_charge = self.calculate_soc_max_charge(soc)

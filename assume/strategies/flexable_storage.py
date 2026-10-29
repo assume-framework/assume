@@ -121,7 +121,7 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
             price_forecast = unit.forecaster.price[market_config.market_id]
 
             # calculate average price
-            average_price = calculate_price_average(
+            average_price = calculate_price_average(  # TODO: calculates average *around* the current timestep, flexABLE uses the upcoming timesteps
                 current_time=start,
                 foresight=self.foresight,
                 price_forecast=price_forecast,
@@ -129,7 +129,7 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
 
             # if price is higher than average price, discharge
             # if price is lower than average price, charge
-            # if price forecast favors discharge, but max discharge is zero, set a bid for charging
+            # if price forecast favors discharge, but max discharge is zero, set a bid for charging # TODO: remove this, it's not coming from flexABLE and maybe way introduced because we couldn't handle empty bids?
             if price_forecast[start] >= average_price and max_power_discharge:
                 price = average_price / unit.efficiency_discharge
                 bid_quantity = max_power_discharge
