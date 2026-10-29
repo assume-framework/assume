@@ -121,11 +121,15 @@ class PayAsClearRole(MarketRole):
                 # we only need to see how to arrange it.
 
                 diff = gen_vol - dem_vol
+                supply_scarcity = False
 
                 if diff < 0:
                     # gen < dem
                     # generation is not enough - accept partially
                     demand_order["accepted_volume"] = demand_order["volume"] - diff
+                    # set the supply_scarcity flag if the demand order is partially accepted
+                    # this avoids the edge case of a not accepted demand order setting the price
+                    supply_scarcity = demand_order["accepted_volume"] != 0
                 elif diff > 0:
                     # generation left over - accept generation bid partially
                     supply_order = accepted_supply_orders[-1]
@@ -154,11 +158,15 @@ class PayAsClearRole(MarketRole):
                 ):
                     rejected_product_orders.append(order)
 
-            # set clearing price - merit order - uniform pricing
+            # Set the clearing price using the marginal accepted order. In
+            # scarcity, the last accepted demand order sets the price.
             if accepted_supply_orders:
-                clear_price = float(
-                    max(map(itemgetter("price"), accepted_supply_orders))
-                )
+                if supply_scarcity and accepted_demand_orders:
+                    clear_price = float(accepted_demand_orders[-1]["price"])
+                else:
+                    clear_price = float(
+                        max(map(itemgetter("price"), accepted_supply_orders))
+                    )
             else:
                 clear_price = 0
 
