@@ -130,13 +130,24 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
 
             # if price is higher than average price, discharge
             # if price is lower than average price, charge
-            # if price forecast favors discharge, but max discharge is zero, set a bid for charging
-            if price_forecast[start] >= average_price and max_power_discharge:
-                price = average_price / unit.efficiency_discharge
-                bid_quantity = max_power_discharge
+            if price_forecast[start] >= average_price:
+                # favor discharge:
+                if max_power_discharge != 0:
+                    price = average_price / unit.efficiency_discharge
+                    bid_quantity = max_power_discharge
+                else:
+                    # might be that we must charge, due to technical constraints
+                    price = average_price * unit.efficiency_charge
+                    bid_quantity = min_power_charge
             else:
-                price = average_price * unit.efficiency_charge
-                bid_quantity = max_power_charge
+                # favor charge
+                if max_power_charge != 0:
+                    price = average_price * unit.efficiency_charge
+                    bid_quantity = max_power_charge
+                else:
+                    # might be that we must discharge, due to technical constraints
+                    price = average_price / unit.efficiency_discharge
+                    bid_quantity = min_power_discharge
 
             bids.append(
                 {
@@ -527,15 +538,22 @@ def get_specific_revenue(unit, marginal_cost, t, foresight, price_forecast):
         theoretic_power_discharge = unit.calculate_ramp_discharge(
             theoretic_SOC,
             previous_power=previous_power,
-            power_discharge=max_power_discharge,
+            requested_power=max_power_discharge,
         )
         possible_revenue += (market_price - marginal_cost) * theoretic_power_discharge
-        theoretic_SOC -= theoretic_power_discharge
+        theoretic_SOC -= (
+            theoretic_power_discharge
+            * unit.index.freq
+            / timedelta(hours=1)
+            / unit.efficiency_discharge
+        ) / unit.capacity
         previous_power = theoretic_power_discharge
 
     if soc != theoretic_SOC:
-        possible_revenue = possible_revenue / (soc - theoretic_SOC)
+        possible_revenue = possible_revenue / (
+            (soc - theoretic_SOC) * unit.efficiency_discharge * unit.capacity
+        )
     else:
-        possible_revenue = possible_revenue / unit.max_soc
+        possible_revenue = possible_revenue / unit.capacity
 
     return possible_revenue
