@@ -45,7 +45,7 @@ def storage() -> Storage:
     )
 
 
-def test_flexable_eom_storage(mock_market_config, storage):
+def test_flexable_eom_storage_no_simultaneous_charge_and_discharge(mock_market_config, storage):
     index = pd.date_range("2023-07-01", periods=4, freq="h")
     start = datetime(2023, 7, 1)
     end = datetime(2023, 7, 1, 1)
@@ -108,7 +108,46 @@ def test_flexable_eom_storage(mock_market_config, storage):
     ]
     storage.forecaster = UnitForecaster(index, market_prices={"EOM": forecast})
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
-    assert len(bids) == 24
+    # we have 24 timesteps, from 0 to 23, first 4 we want to charge [-60, -100, -100, -100]
+    # the price in timestep 4 is high, so we would like to discharge, but ramp_down_charge=-50 restricts this, the strategy issues a -50 charging bid (could also be handled differently)
+    # in timesteps 5, 6, 7 prices favor charging again, but the SoC is near 1, so [-100, -45.55, 0]. Timestep 6 with volume -45.55 violates ramping (-100 - -50) = -50, but SoC is enforced.
+    # Timestep 7 is 0 because SoC is 1.
+    # timesteps 8 to 12 favor discharge, we get [60, 100, 100, 100, 100]
+    # timesteps 13 to 16 favor charging, starting from SoC 0.5158. Timestep 12 was discharging 100, so in step 13 we should still discharge 50 because of the ramp limit. timestep 14 0, so [50, 0, -60, -100]
+    # timesteps 17, 18, 19 favor discharge, but we first need to ramp back, so we get [-50, 0, 60]
+    # timestep 20 favors charging but we have previous_power = 60, so we ramp back and get [10]
+    # timesteps 21, 22, 23 discharge, so ramp_up_discharge from previous_power = 10 and we get [70, 100, 100]
+    # 0 volume (empty) bids in 3 timesteps results in 21 bids
+    assert len(bids) == 21
+    assert np.allclose(
+        [b["volume"] for b in bids], [
+        -60,
+        -100,
+        -100,
+        -100,
+        -50,
+        -100,
+        -41/0.9,
+        # 0,
+        60,
+        100,
+        100,
+        100,
+        100,
+        50,
+        # 0,
+        -60,
+        -100,
+        -50,
+        # 0,
+        60,
+        10,
+        70,
+        100,
+        100,
+    ],
+    atol=0.01,
+    )
     assert math.isclose(
         bids[0]["price"],
         np.mean(forecast[0:13]) * storage.efficiency_charge,
