@@ -110,14 +110,15 @@ def test_flexable_eom_storage(mock_market_config, storage):
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     by_hour = {bid["start_time"].hour: bid for bid in bids}
 
-    # the ramp down limits allow no change of direction within one hour, so the
-    # unit keeps charging at the price peak at 4 and cannot charge at 13 after
-    # discharging - and it is full at 6, 7 and 20
-    assert sorted(set(range(24)) - set(by_hour)) == [6, 7, 13, 20]
+    # the ramp down limits allow no change of direction within one hour, so
+    # there is no bid at 4, 13, 17 and 20, where the price favours the opposite
+    # direction of the hour before
+    assert sorted(set(range(24)) - set(by_hour)) == [4, 13, 17, 20]
     assert [round(by_hour[hour]["volume"], 1) for hour in sorted(by_hour)] == [
-        *[-60, -100, -100, -100, -100, -95.6],  # 0 - 5
-        *[60, 100, 100, 100, 100],  # 8 - 12
-        *[-60, -100, -100, -100, -100, -78],  # 14 - 19
+        *[-60, -100, -100, -100],  # 0 - 3
+        *[-60, -100, -35.6, 60, 100, 100, 100, 100],  # 5 - 12
+        *[-60, -100, -100],  # 14 - 16
+        *[60, 100],  # 18 - 19
         *[60, 100, 100],  # 21 - 23
     ]
     # the price is the average over the foresight, adjusted by the efficiency
@@ -278,11 +279,11 @@ def test_flexable_eom_storage_bids_on_top_of_a_committed_plan(mock_market_config
     product_tuples = [(index[i], index[i + 1], None) for i in (1, 2, 3)]
     bids = strategy.calculate_bids(storage, mock_market_config, product_tuples)
 
-    # charge at the cheaper t1, discharge at t2 and charge fully again at t3
+    # charge at the cheaper t1 and discharge at t2 - the storage is then empty,
+    # so nothing is offered at t3, where the price still favours discharging
     assert [(bid["start_time"], bid["volume"]) for bid in bids] == [
         (index[1], pytest.approx(-180)),
         (index[2], pytest.approx(150)),
-        (index[3], pytest.approx(-100)),
     ]
 
     # once accepted, everything committed can be delivered
@@ -292,5 +293,5 @@ def test_flexable_eom_storage_bids_on_top_of_a_committed_plan(mock_market_config
         [(bid["start_time"], bid["end_time"], bid["volume"]) for bid in bids],
     )
     committed = [storage.outputs["energy"].at[index[i]] for i in (1, 2, 3)]
-    assert committed == pytest.approx([-80, 100, -100])
+    assert committed == pytest.approx([-80, 100, 0])
     assert list(storage.execute_current_dispatch(index[1], index[3])) == committed

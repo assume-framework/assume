@@ -129,8 +129,7 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
 
             # if price is higher than average price, discharge
             # if price is lower than average price, charge
-            # if price forecast favors discharge, but max discharge is zero, set a bid for charging # TODO: remove this, it's not coming from flexABLE and maybe way introduced because we couldn't handle empty bids?
-            if price_forecast[start] >= average_price and max_power_discharge:
+            if price_forecast[start] >= average_price:
                 price = average_price / unit.efficiency_discharge
                 bid_quantity = max_power_discharge
             else:

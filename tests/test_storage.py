@@ -368,12 +368,10 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     storage_unit.outputs["energy"][start] = 100
     storage_unit.outputs["soc"][start] = 0.5
 
-    # A full existing discharge leaves no room to discharge more, but it can be
-    # bought back - down to -60 MW, the charge ramp from the previous 0 MW.
+    # A full existing discharge leaves nothing more to discharge, which the
+    # price favours - so there is no bid.
     bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
-    assert [bid["volume"] for bid in bids] == [storage_unit.ramp_up_charge - 100]
-    # the bid is not accepted
-    bids = []
+    assert len(bids) == 0
 
     # dispatch full discharge
     storage_unit.set_dispatch_plan(mc, bids)
@@ -454,12 +452,11 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
     storage_unit.outputs["soc"][start] = 0.5
 
     bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
-    # buy back the committed 100 MW and charge 60 MW in the first hour, then
-    # keep charging - from -60 MW the unit can only ramp down to -10 MW
+    # nothing more to discharge in the first hour, then continue discharging
+    # 100 MW in the second and third hour
     assert [(bid["start_time"], bid["volume"]) for bid in bids] == [
-        (datetime(2022, 1, 1, 0), -160),
-        (datetime(2022, 1, 1, 1), -100),
-        (datetime(2022, 1, 1, 2), -100),
+        (datetime(2022, 1, 1, 1), 100),
+        (datetime(2022, 1, 1, 2), 100),
     ]
     for bid in bids:
         bid["accepted_volume"] = bid["volume"]

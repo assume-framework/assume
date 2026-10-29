@@ -62,6 +62,7 @@ Upcoming Release
     - Frequencies without a fixed length, such as ``"MS"`` or ``"W"``, raise ``ValueError``. Use fixed frequencies such as ``"15min"``, ``"h"`` or ``"D"``.
     - Creating a ``FastSeries`` with values whose length does not match the index raises ``ValueError``.
   - **Removed unused TensorFastSeries class** which has become deprecated after a learning refactoring (#648)
+  - **Flexable storage strategy without charging fallback**: As in flexABLE, a storage offers nothing if the price favours discharging but it cannot discharge, instead of offering to charge below the expected price. These bids rarely cleared but were counted in the SoC estimate of later hours.
 
 **Bug Fixes:**
   - **Fix critic loading skipping only the inner key loop**: In ``TD3.load_critic_params`` the ``continue`` for a checkpoint with missing keys only skipped the inner key loop, so the incomplete critic was still loaded and failed with a ``KeyError``. The agent is now skipped as a whole, with one warning listing all missing keys.
