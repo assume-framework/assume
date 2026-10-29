@@ -121,29 +121,29 @@ def test_calculate_operational_window(storage_unit):
 
 
 def test_soc_constraint(storage_unit):
-    # start should not be the first hour of index to manipulate soc
     start = datetime(2022, 1, 1, 1)
     end = datetime(2022, 1, 1, 2)
 
-    storage_unit.outputs["energy"][start] = 10
-    storage_unit.outputs["capacity_neg"][start] = -50
-    storage_unit.outputs["capacity_pos"][start] = 30
-
-    storage_unit.outputs["soc"][start - timedelta(hours=1)] = 0.05
-    assert storage_unit.outputs["soc"][start - storage_unit.index.freq] == 0.05
+    # 50 MWh stored back 47.5 MW of discharge, below the 100 MW power limit
+    storage_unit.outputs["soc"][start] = 0.05
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
     )
-    assert min_power_discharge[0] == 40
-    assert max_power_discharge[0] == 60
+    assert min_power_discharge[0] == 0
+    assert math.isclose(
+        max_power_discharge[0],
+        0.05 * storage_unit.capacity * storage_unit.efficiency_discharge,
+    )
 
+    # 50 MWh of room take 55.6 MW of charging, below the 100 MW power limit
     storage_unit.outputs["soc"][start] = 0.95
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end
     )
-    assert min_power_charge[0] == -40
+    assert min_power_charge[0] == 0
     assert math.isclose(
-        max_power_charge[0], -50 / storage_unit.efficiency_charge, abs_tol=0.1
+        max_power_charge[0],
+        -0.05 * storage_unit.capacity / storage_unit.efficiency_charge,
     )
 
 
