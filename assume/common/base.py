@@ -490,6 +490,7 @@ class SupportsMinMaxCharge(BaseUnit):
     # negative
     ramp_down_charge: float | None
     # ramp_down_charge is negative
+    simultaneous_charge_discharge: bool
     capacity: float
     efficiency_charge: float
     efficiency_discharge: float
@@ -568,7 +569,33 @@ class SupportsMinMaxCharge(BaseUnit):
         ):
             # if we can not ramp back to 0, we can not discharge anything
             return 0
+        
+        if self.simultaneous_charge_discharge:
+            # disregard a max_net_ramping per timestep. If the unit wants to switch signs within one step, allow this
+            # we can e.g. ramp_down_discharge from 50 to 0 and ramp_up_charge from 0 to -60 in one timestep
 
+            # as we can ramp the charging to 0, we can assume that previous power = 0
+            previous_power = max(previous_power, 0)
+            
+            # limit the highest possible discharge
+            power_discharge = min(requested_power, self.max_power_discharge - current_power)
+            if self.ramp_up_discharge is not None:
+                # limit to the ramp
+                # what I had + how much I could - what I already sold
+                ramp_limited_discharge = max(
+                    previous_power + self.ramp_up_discharge - current_power, 0
+                )
+                power_discharge = min(power_discharge, ramp_limited_discharge)
+
+            # restrict only if ramping defined
+            if self.ramp_down_discharge is not None and power_discharge != 0:
+                # what I had - ramp down = minimum_required
+                minimum_required = previous_power - self.ramp_down_discharge
+                # as I already provide current_power, need to at least offer minimum_required - current_power
+                power_discharge = max(power_discharge, minimum_required - current_power, 0)
+            return power_discharge
+
+        # if simultaneous_charge_discharge is False, we need to check the net ramping to avoid units can ramp ~2x single ramp limits
         remaining_net_ramp = None
         if (
             previous_power < 0
@@ -634,8 +661,32 @@ class SupportsMinMaxCharge(BaseUnit):
         ):
             # if we can not ramp back to 0, we can not charge anything
             return 0
+
+        if self.simultaneous_charge_discharge:
+            # disregard a max_net_ramping per timestep. If the unit wants to switch signs within one step, allow this
+            # we can e.g. ramp_down_discharge from 50 to 0 and ramp_up_charge from 0 to -60 in one timestep
+
+            # as we can ramp the discharging to 0, we can assume that the previous_power = 0
+            previous_power = min(previous_power, 0)
+
+            # limit the highest possible charge
+            power_charge = max(requested_power, self.max_power_charge - current_power)
+            if self.ramp_up_charge is not None:
+                # what I had + how much I could - what I already sold
+                ramp_limited_charge = min(
+                    previous_power + self.ramp_up_charge - current_power, 0
+                )
+                power_charge = max(power_charge, ramp_limited_charge)
+            # restrict only if ramping defined
+            if self.ramp_down_charge is not None and power_charge != 0:
+                # what I had - ramp down = minimum_required
+                minimum_required = previous_power - self.ramp_down_charge
+                # as I already provide current_power,
+                # need to at least offer minimum_required - current_power
+                power_charge = min(power_charge, minimum_required - current_power, 0)
+            return power_charge
         
-        # if switching from discharging to charging, calculate the net ramping to avoid units can ramp ~2x single ramp limits
+        # if simultaneous_charge_discharge is False, we need to check the net ramping to avoid units can ramp ~2x single ramp limits
         remaining_net_ramp = None
         if (previous_power > 0
             and self.ramp_down_discharge is not None

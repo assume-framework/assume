@@ -77,6 +77,7 @@ class Storage(SupportsMinMaxCharge):
         ramp_down_charge: float | None = None,
         ramp_up_discharge: float | None = None,
         ramp_down_discharge: float | None = None,
+        simultaneous_charge_discharge: bool = False,
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
@@ -95,6 +96,7 @@ class Storage(SupportsMinMaxCharge):
             bidding_strategies=bidding_strategies,
             forecaster=forecaster,
             node=node,
+            simultaneous_charge_discharge=simultaneous_charge_discharge,
             location=location,
             **kwargs,
         )
@@ -236,6 +238,7 @@ class Storage(SupportsMinMaxCharge):
         self.ramp_down_charge = ramp_down_charge
         self.ramp_up_discharge = ramp_up_discharge
         self.ramp_down_discharge = ramp_down_discharge
+        self.simultaneous_charge_discharge = simultaneous_charge_discharge
 
         # How long the storage unit has to be in operation before it can be shut down.
         if min_operating_time < 0:
