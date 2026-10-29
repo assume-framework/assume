@@ -569,16 +569,18 @@ class SupportsMinMaxCharge(BaseUnit):
         ):
             # if we can not ramp back to 0, we can not discharge anything
             return 0
-        
+
         if self.simultaneous_charge_discharge:
             # disregard a max_net_ramping per timestep. If the unit wants to switch signs within one step, allow this
             # we can e.g. ramp_down_discharge from 50 to 0 and ramp_up_charge from 0 to -60 in one timestep
 
             # as we can ramp the charging to 0, we can assume that previous power = 0
             previous_power = max(previous_power, 0)
-            
+
             # limit the highest possible discharge
-            power_discharge = min(requested_power, self.max_power_discharge - current_power)
+            power_discharge = min(
+                requested_power, self.max_power_discharge - current_power
+            )
             if self.ramp_up_discharge is not None:
                 # limit to the ramp
                 # what I had + how much I could - what I already sold
@@ -592,7 +594,9 @@ class SupportsMinMaxCharge(BaseUnit):
                 # what I had - ramp down = minimum_required
                 minimum_required = previous_power - self.ramp_down_discharge
                 # as I already provide current_power, need to at least offer minimum_required - current_power
-                power_discharge = max(power_discharge, minimum_required - current_power, 0)
+                power_discharge = max(
+                    power_discharge, minimum_required - current_power, 0
+                )
             return power_discharge
 
         # if simultaneous_charge_discharge is False, we need to check the net ramping to avoid units can ramp ~2x single ramp limits
@@ -608,7 +612,11 @@ class SupportsMinMaxCharge(BaseUnit):
             # could also be weighted average
             net_ramp = (abs(self.ramp_down_charge) + self.ramp_up_discharge) / 2
             utilized_net_ramp = abs(previous_power)  # positive
-            remaining_net_ramp = (net_ramp - utilized_net_ramp) if (self.ramp_down_charge < previous_power) else 0
+            remaining_net_ramp = (
+                (net_ramp - utilized_net_ramp)
+                if (self.ramp_down_charge < previous_power)
+                else 0
+            )
 
         # if we were discharging before, keep previous_power
         # if we were charging before, set 0 and utilize the net_ramp to limit the discharging
@@ -685,20 +693,25 @@ class SupportsMinMaxCharge(BaseUnit):
                 # need to at least offer minimum_required - current_power
                 power_charge = min(power_charge, minimum_required - current_power, 0)
             return power_charge
-        
+
         # if simultaneous_charge_discharge is False, we need to check the net ramping to avoid units can ramp ~2x single ramp limits
         remaining_net_ramp = None
-        if (previous_power > 0
+        if (
+            previous_power > 0
             and self.ramp_down_discharge is not None
-            and previous_power - self.ramp_down_discharge <= 0 # sign switch
+            and previous_power - self.ramp_down_discharge <= 0  # sign switch
             and self.ramp_up_charge is not None
         ):
             # net_ramp is the average of the ramp down and ramp up, as we can not ramp down and up within the same timestep
             # could also be weighted average
-            net_ramp = (self.ramp_down_discharge + abs(self.ramp_up_charge))/2
-            utilized_net_ramp = previous_power # positive
-            remaining_net_ramp = (net_ramp - utilized_net_ramp) if (self.ramp_down_discharge > previous_power) else 0
-        
+            net_ramp = (self.ramp_down_discharge + abs(self.ramp_up_charge)) / 2
+            utilized_net_ramp = previous_power  # positive
+            remaining_net_ramp = (
+                (net_ramp - utilized_net_ramp)
+                if (self.ramp_down_discharge > previous_power)
+                else 0
+            )
+
         # if we were charging before, keep previous_power
         # if we were discharging before, set previous_power to 0 and utilize the net_ramp to limit the charging
         original_previous_power = previous_power
@@ -707,18 +720,20 @@ class SupportsMinMaxCharge(BaseUnit):
         # limit the highest possible charge
         power_charge = max(requested_power, self.max_power_charge - current_power)
         if self.ramp_up_charge is not None:
-            if remaining_net_ramp is None: # no sign switch
+            if remaining_net_ramp is None:  # no sign switch
                 # what I had + how much I could - what I already sold
                 ramp_limited_charge = min(
                     previous_power + self.ramp_up_charge - current_power, 0
                 )
-            else: # sign switch, limit the charging to the remaining net ramp
+            else:  # sign switch, limit the charging to the remaining net ramp
                 ramp_limited_charge = min(
                     previous_power - remaining_net_ramp - current_power, 0
                 )
             power_charge = max(power_charge, ramp_limited_charge)
 
-        previous_power = original_previous_power  # restore previous_power for the next calculation
+        previous_power = (
+            original_previous_power  # restore previous_power for the next calculation
+        )
         # restrict only if ramping defined
         if self.ramp_down_charge is not None:
             # what I had - ramp down = minimum_required

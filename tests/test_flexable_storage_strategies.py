@@ -28,13 +28,11 @@ def assert_allclose_with_indices(actual, expected, atol):
         for index, (actual_value, expected_value) in enumerate(zip(actual, expected))
         if not np.isclose(actual_value, expected_value, atol=atol)
     ]
-    assert not mismatches, (
-        "Values not close: "
-        + ", ".join(
-            f"index {index}: expected {expected_value}, actual {actual_value}"
-            for index, expected_value, actual_value in mismatches
-        )
+    assert not mismatches, "Values not close: " + ", ".join(
+        f"index {index}: expected {expected_value}, actual {actual_value}"
+        for index, expected_value, actual_value in mismatches
     )
+
 
 # run all tests with two versions of handling simultaneous charge and discharge: True and False
 # True is the new default (10/2026) ramping behavior, False is the previous default behavior. The tests should pass for both versions.
@@ -162,7 +160,7 @@ def test_flexable_eom_storage(mock_market_config, storage):
                 100,
                 100,
             ],
-            atol=0.01
+            atol=0.01,
         )
         assert_allclose_with_indices(
             [b["price"] for b in bids],
@@ -192,7 +190,7 @@ def test_flexable_eom_storage(mock_market_config, storage):
                 np.mean(forecast[10:24]) / storage.efficiency_discharge,
                 np.mean(forecast[11:24]) / storage.efficiency_discharge,
             ],
-            atol=0.01
+            atol=0.01,
         )
 
     elif not storage.simultaneous_charge_discharge:
@@ -208,33 +206,34 @@ def test_flexable_eom_storage(mock_market_config, storage):
         # 0 volume (empty) bids in 3 timesteps results in 21 bids
         assert len(bids) == 21
         assert_allclose_with_indices(
-            [b["volume"] for b in bids], [
-            -60,
-            -100,
-            -100,
-            -100,
-            -50,
-            -100,
-            -41/0.9,
-            # 0,
-            60,
-            100,
-            100,
-            100,
-            100,
-            50,
-            # 0,
-            -60,
-            -100,
-            -50,
-            # 0,
-            60,
-            10,
-            70,
-            100,
-            100,
-        ],
-        atol=0.01,
+            [b["volume"] for b in bids],
+            [
+                -60,
+                -100,
+                -100,
+                -100,
+                -50,
+                -100,
+                -41 / 0.9,
+                # 0,
+                60,
+                100,
+                100,
+                100,
+                100,
+                50,
+                # 0,
+                -60,
+                -100,
+                -50,
+                # 0,
+                60,
+                10,
+                70,
+                100,
+                100,
+            ],
+            atol=0.01,
         )
         assert_allclose_with_indices(
             [b["price"] for b in bids],
@@ -277,7 +276,7 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
     mc.product_type = "energy_pos"
     product_tuples = [(start, end, None)]
 
-    # constant price of 50, marginal cost of 4, volume of 360, theoretic soc change (without efficiency) of 0.36, capacity of 1000 
+    # constant price of 50, marginal cost of 4, volume of 360, theoretic soc change (without efficiency) of 0.36, capacity of 1000
     specific_revenue = (50 - 4) * 360 / (0.36 * 1000)
 
     storage.forecaster = UnitForecaster(index, market_prices={"EOM": 50})

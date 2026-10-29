@@ -159,6 +159,7 @@ def test_minmaxcharge_no_simultaneous_charge_discharge():
 
     assert mmc.calculate_ramp_charge(-10, -200, 0) == -110
 
+
 def test_minmaxcharge_simultaneous_charge_discharge():
     index = pd.date_range("2022-01-01", periods=24, freq="h")
     forecaster = UnitForecaster(index, market_prices={"EOM": 50})

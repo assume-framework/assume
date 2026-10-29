@@ -251,18 +251,14 @@ def test_storage_ramping(storage_unit):
     assert adjusted_charge == 0
 
     # test ramping in discharging case with a discharging power that is not feasible (too low)
-    adjusted_discharge = storage_unit.calculate_ramp_discharge(
-        0.5, 60, 5
-    )
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, 60, 5)
     adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 60, max_power_charge[0])
 
     assert adjusted_discharge == 10
     assert adjusted_charge == 0
 
     # test ramping in discharging case with a discharging power that is 0 and not feasible (too low)
-    adjusted_discharge = storage_unit.calculate_ramp_discharge(
-        0.5, 60, 0
-    )
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, 60, 0)
     adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 60, max_power_charge[0])
 
     assert adjusted_discharge == 10
@@ -302,6 +298,7 @@ def test_storage_ramping(storage_unit):
     assert adjusted_discharge == 0
     assert adjusted_charge == -10
 
+
 def test_storage_ramping_sign_switch(storage_unit):
     """
     This test checks that the ramping functions correctly handle cases where the power would switch sign.
@@ -313,13 +310,11 @@ def test_storage_ramping_sign_switch(storage_unit):
 
     # test ramping in discharging case with a power that would switch sign and is not feasible
     # imagine an order that would charge 5 MW
-    adjusted_discharge = storage_unit.calculate_ramp_discharge(
-        0.5, 60, -5
-    )
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, 60, -5)
     adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 60, -5)
 
-    assert adjusted_discharge == 10 # should be 10
-    assert adjusted_charge == 0 # should be 0
+    assert adjusted_discharge == 10  # should be 10
+    assert adjusted_charge == 0  # should be 0
 
     start = datetime(2022, 1, 1, 1)
     end = datetime(2022, 1, 1, 2)
@@ -327,33 +322,41 @@ def test_storage_ramping_sign_switch(storage_unit):
 
     # test ramping in charging case with a power that would switch sign and is not feasible
     # imagine an order that would discharge 5 MW
-    adjusted_discharge = storage_unit.calculate_ramp_discharge(
-        0.5, -60, 5
-    )
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, -60, 5)
     adjusted_charge = storage_unit.calculate_ramp_charge(0.5, -60, 5)
 
-    assert adjusted_discharge == 0 # should be 0
-    assert adjusted_charge == -10 # should be -10
+    assert adjusted_discharge == 0  # should be 0
+    assert adjusted_charge == -10  # should be -10
+
 
 def test_net_ramping_constraint(storage_unit):
     # if simultaneous charge and discharge is not allowed, we use the net ramping constraint to limit ramping in case of sign switches.
     # This test checks, if the net_ramp is correctly distributed between charge and discharge.
     # And it checks that if one of the ramp limits is fully used, no remaining net_ramp is used.
     storage_unit.simultaneous_charge_discharge = False
-    
+
     # case1: discharging -> charging with ramp_down_discharge 30/50 used
     adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 30, -100, 0)
-    assert adjusted_charge == -25  # ramp_down_discharge = 50, 30 used. net_ramp = 55, so we can ramp up charge to -25
-    
+    assert (
+        adjusted_charge == -25
+    )  # ramp_down_discharge = 50, 30 used. net_ramp = 55, so we can ramp up charge to -25
+
     adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 50, -100, 0)
-    assert adjusted_charge == 0  # ramp_down_discharge = 50, 50 used. remaining net_ramp of 55-50=5 cannot be used
+    assert (
+        adjusted_charge == 0
+    )  # ramp_down_discharge = 50, 50 used. remaining net_ramp of 55-50=5 cannot be used
 
     # case2: charging -> discharging with ramp_down_charge -10/-50 used
     adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, -10, 100, 0)
-    assert adjusted_discharge == 45  # ramp_down_charge = -50, -10 used. net_ramp = 55, so we can ramp up discharge to 45
+    assert (
+        adjusted_discharge == 45
+    )  # ramp_down_charge = -50, -10 used. net_ramp = 55, so we can ramp up discharge to 45
 
     adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, -50, 100, 0)
-    assert adjusted_discharge == 0  # ramp_down_charge = -50, -50 used. remaining net_ramp of 55-50=5 cannot be used
+    assert (
+        adjusted_discharge == 0
+    )  # ramp_down_charge = -50, -50 used. remaining net_ramp of 55-50=5 cannot be used
+
 
 def test_net_ramping_constraint_one_ramp_undefined(storage_unit):
     # even if we do not allow simultaneous charging and sicharging ramps within one timestep, we must ensure only existing ramp rates are applied
@@ -362,35 +365,46 @@ def test_net_ramping_constraint_one_ramp_undefined(storage_unit):
     # 1.1 ramp_down_discharge undefined
     storage_unit.ramp_down_discharge = None
     adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 30, -100, 0)
-    assert adjusted_charge == -60  # ramp_down_discharge is undefined, so we can ramp up charge to -60
+    assert (
+        adjusted_charge == -60
+    )  # ramp_down_discharge is undefined, so we can ramp up charge to -60
 
     # 1.2 ramp_down_discharge and ramp_up_charge undefined
     storage_unit.ramp_up_charge = None
     adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 30, -100, 0)
-    assert adjusted_charge == -100  # both ramps are undefined, so we can ramp up charge to -100
+    assert (
+        adjusted_charge == -100
+    )  # both ramps are undefined, so we can ramp up charge to -100
 
     # 1.3 ramp_up_charge undefined
     storage_unit.ramp_down_discharge = 50
     adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 30, -100, 0)
-    assert adjusted_charge == -100 # we can ramp_down_discharge to 0 and are then unrestricted
+    assert (
+        adjusted_charge == -100
+    )  # we can ramp_down_discharge to 0 and are then unrestricted
 
     # case2 discharging -> charging
     # 2.1 ramp_down_charge undefined
     storage_unit.ramp_up_charge = -60
     storage_unit.ramp_down_charge = None
     adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, -90, 100, 0)
-    assert adjusted_discharge == 60  # ramp_down_charge is undefined, so we can ramp up discharge to 60
+    assert (
+        adjusted_discharge == 60
+    )  # ramp_down_charge is undefined, so we can ramp up discharge to 60
 
     # 2.2 ramp_down_charge and ramp_up_discharge undefined
     storage_unit.ramp_up_discharge = None
     adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, -90, 100, 0)
-    assert adjusted_discharge == 100  # both ramps are undefined, so we can ramp up discharge to 100
+    assert (
+        adjusted_discharge == 100
+    )  # both ramps are undefined, so we can ramp up discharge to 100
 
     # 2.3 ramp_up_discharge undefined
     storage_unit.ramp_down_charge = -50
     adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, -40, 100, 0)
-    assert adjusted_discharge == 100  # ramp_up_discharge is undefined, so we can ramp up discharge to 100
-
+    assert (
+        adjusted_discharge == 100
+    )  # ramp_up_discharge is undefined, so we can ramp up discharge to 100
 
 
 def test_execute_dispatch(storage_unit):
