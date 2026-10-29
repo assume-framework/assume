@@ -18,6 +18,25 @@ from assume.strategies import (
 from assume.units import Storage
 
 
+def assert_allclose_with_indices(actual, expected, atol):
+    assert len(actual) == len(expected), (
+        f"Expected {len(expected)} values, got {len(actual)}"
+    )
+
+    mismatches = [
+        (index, expected_value, actual_value)
+        for index, (actual_value, expected_value) in enumerate(zip(actual, expected))
+        if not np.isclose(actual_value, expected_value, atol=atol)
+    ]
+    assert not mismatches, (
+        "Values not close: "
+        + ", ".join(
+            f"index {index}: expected {expected_value}, actual {actual_value}"
+            for index, expected_value, actual_value in mismatches
+        )
+    )
+
+
 @pytest.fixture
 def storage() -> Storage:
     # Create a PowerPlant instance with some example parameters
@@ -119,7 +138,7 @@ def test_flexable_eom_storage_no_simultaneous_charge_and_discharge(mock_market_c
     # timesteps 21, 22, 23 discharge, so ramp_up_discharge from previous_power = 10 and we get [70, 100, 100]
     # 0 volume (empty) bids in 3 timesteps results in 21 bids
     assert len(bids) == 21
-    assert np.allclose(
+    assert_allclose_with_indices(
         [b["volume"] for b in bids], [
         -60,
         -100,
@@ -148,48 +167,36 @@ def test_flexable_eom_storage_no_simultaneous_charge_and_discharge(mock_market_c
     ],
     atol=0.01,
     )
-    assert math.isclose(
-        bids[0]["price"],
-        np.mean(forecast[0:13]) * storage.efficiency_charge,
-        abs_tol=0.01,
+    assert_allclose_with_indices(
+        [b["price"] for b in bids],
+        [
+            np.mean(forecast[0:13]) * storage.efficiency_charge,
+            np.mean(forecast[0:14]) * storage.efficiency_charge,
+            np.mean(forecast[0:15]) * storage.efficiency_charge,
+            np.mean(forecast[0:16]) * storage.efficiency_charge,
+            np.mean(forecast[0:17]) * storage.efficiency_charge,
+            np.mean(forecast[0:18]) * storage.efficiency_charge,
+            np.mean(forecast[0:19]) * storage.efficiency_charge,
+            # 0,
+            np.mean(forecast[0:21]) / storage.efficiency_discharge,
+            np.mean(forecast[0:22]) / storage.efficiency_discharge,
+            np.mean(forecast[0:23]) / storage.efficiency_discharge,
+            np.mean(forecast[0:23]) / storage.efficiency_discharge,
+            np.mean(forecast[0:24]) / storage.efficiency_discharge,
+            np.mean(forecast[1:24]) / storage.efficiency_discharge,
+            # 0,
+            np.mean(forecast[3:24]) * storage.efficiency_charge,
+            np.mean(forecast[4:24]) * storage.efficiency_charge,
+            np.mean(forecast[5:24]) * storage.efficiency_charge,
+            # 0,
+            np.mean(forecast[7:24]) / storage.efficiency_discharge,
+            np.mean(forecast[8:24]) / storage.efficiency_discharge,
+            np.mean(forecast[9:24]) / storage.efficiency_discharge,
+            np.mean(forecast[10:24]) / storage.efficiency_discharge,
+            np.mean(forecast[11:24]) / storage.efficiency_discharge,
+        ],
+        atol=0.01,
     )
-    assert bids[0]["volume"] == -60
-    assert math.isclose(
-        bids[1]["price"],
-        np.mean(forecast[0:14]) * storage.efficiency_charge,
-        abs_tol=0.01,
-    )
-    assert bids[1]["volume"] == -100
-    assert math.isclose(
-        bids[2]["price"],
-        np.mean(forecast[0:15]) * storage.efficiency_charge,
-        abs_tol=0.01,
-    )
-    assert bids[2]["volume"] == -100
-    assert math.isclose(
-        bids[3]["price"],
-        np.mean(forecast[0:16]) * storage.efficiency_charge,
-        abs_tol=0.01,
-    )
-    assert bids[3]["volume"] == -100
-    assert math.isclose(
-        bids[4]["price"],
-        np.mean(forecast[0:17]) / storage.efficiency_discharge,
-        abs_tol=0.01,
-    )
-    assert math.isclose(bids[4]["volume"], 60, abs_tol=0.01)
-    assert math.isclose(
-        bids[14]["price"],
-        np.mean(forecast[2:]) * storage.efficiency_charge,
-        abs_tol=0.01,
-    )
-    assert bids[14]["volume"] == -100
-    assert math.isclose(
-        bids[20]["price"],
-        np.mean(forecast[6:]) * storage.efficiency_charge,
-        abs_tol=0.01,
-    )
-    assert bids[20]["volume"] == -60
 
 
 def test_flexable_pos_crm_storage(mock_market_config, storage):
