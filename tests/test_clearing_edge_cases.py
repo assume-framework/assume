@@ -177,8 +177,8 @@ def test_supply_and_demand_curves_vertical_overlap():
         - gen1: volume = 100, price = 8
         - gen2: volume = 100, price = 12
     Supply and demand curves intersect at volume 100MW from 10€ to 12€.
-    SimpleClearing should clear at 10€ with 100MW, ComplexClearing should clear at 10€ with 100MW
-    (but any price between 10€ and 12€ is correct in reality).
+    SimpleClearing should clear at 8€ with 100MW, ComplexClearing should clear at 10€ with 100MW
+    (but any price between 8€ and 20€ is correct in reality).
     """
     orderbook = extend_orderbook(products, -100, 20)
     orderbook = extend_orderbook(products, -100, 10, orderbook)
