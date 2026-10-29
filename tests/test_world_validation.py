@@ -266,6 +266,7 @@ def test_redispatch_too_early(grid_data, world):
         world.run()
 
 
+@pytest.mark.require_network
 def test_redispatch_at_dispatch_closure(grid_data, world):
     """
     A redispatch market opening at the same time the dispatch market is cleared
@@ -311,6 +312,33 @@ def test_redispatch_at_dispatch_closure(grid_data, world):
     world.add_unit_operator("unit_operator_2", strategies)
 
     with pytest.raises(ValueError, match="same time"):
+        world.run()
+
+
+def test_market_cleared_after_delivery_start(world):
+    """A Market which is cleared after its delivery started raises an Error."""
+
+    world.add_market_operator("market_operator")
+    market_opening = rr.rrule(rr.DAILY, dtstart=world.start, until=world.end)
+    market_products = [
+        MarketProduct(
+            duration=datetime.timedelta(hours=1),
+            count=24,
+            first_delivery=datetime.timedelta(hours=1),
+        )
+    ]
+    market_config = MarketConfig(
+        "test_EOM",
+        opening_hours=market_opening,
+        opening_duration=datetime.timedelta(hours=24),
+        market_products=market_products,
+    )
+
+    world.add_market(market_operator_id="market_operator", market_config=market_config)
+    world.add_unit_operator("unit_operator", {"test_EOM": "naive_eom"})
+    world.add_unit_operator("unit_operator_2", {"test_EOM": "naive_eom"})
+
+    with pytest.raises(ValueError, match="after its delivery starts"):
         world.run()
 
 

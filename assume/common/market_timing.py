@@ -88,6 +88,8 @@ def get_market_openings(
             # the market does not open, as the clearing is after the markets end time
             break
         products = get_available_products(market_config.market_products, opening)
+        if not products:
+            continue
         openings.append(
             MarketOpening(
                 market_id=market_config.market_id,
@@ -99,6 +101,14 @@ def get_market_openings(
             )
         )
     return openings
+
+
+def _has_openings(market_config: MarketConfig) -> bool:
+    try:
+        market_config.opening_hours[0]
+    except IndexError:
+        return False
+    return True
 
 
 def get_default_window(market_configs: list[MarketConfig]) -> tuple[datetime, datetime]:
@@ -149,6 +159,9 @@ def check_market_timing(
     Returns:
         list[TimingIssue]: the issues found, empty if the timing is fine
     """
+    market_configs = [config for config in market_configs if _has_openings(config)]
+    if not market_configs:
+        return []
     default_start, default_end = get_default_window(market_configs)
     start = start or default_start
     end = end or default_end
