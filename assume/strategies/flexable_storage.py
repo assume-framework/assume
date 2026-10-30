@@ -62,7 +62,7 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
         # =============================================================================
         # save a theoretic SOC to calculate the ramping
         start = product_tuples[0][0]
-        theoretic_SOC = unit.outputs["soc"].at[start]
+        theoretic_SOC = unit.get_soc(start)
         previous_power = unit.get_output_before(start)
 
         bids = []
@@ -268,7 +268,7 @@ class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
         end = product_tuples[-1][1]
 
         previous_power = unit.get_output_before(start)
-        theoretic_SOC = unit.outputs["soc"].at[start]
+        theoretic_SOC = unit.get_soc(start)
 
         _, max_power_discharge_values = unit.calculate_min_max_discharge(
             start, end, soc=theoretic_SOC
@@ -404,7 +404,7 @@ class StorageCapacityHeuristicBalancingNegStrategy(MinMaxChargeStrategy):
 
         previous_power = unit.get_output_before(start)
 
-        theoretic_SOC = unit.outputs["soc"].at[start]
+        theoretic_SOC = unit.get_soc(start)
 
         _, max_power_charge_values = unit.calculate_min_max_charge(start, end)
 
@@ -505,7 +505,7 @@ def get_specific_revenue(unit, marginal_cost, t, foresight, price_forecast):
     """
 
     possible_revenue = 0
-    soc = unit.outputs["soc"][t]
+    soc = unit.get_soc(t)
     theoretic_SOC = soc
 
     if t + foresight > price_forecast.index[-1]:
