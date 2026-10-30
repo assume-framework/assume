@@ -135,7 +135,11 @@ def test_soc_constraint(storage_unit):
         start, end
     )
     assert min_power_discharge[0] == 40
-    assert max_power_discharge[0] == 60
+    # the SoC is propagated to start, so it limits the discharge to 47.5 MW
+    assert math.isclose(
+        max_power_discharge[0],
+        0.05 * storage_unit.capacity * storage_unit.efficiency_discharge,
+    )
 
     storage_unit.outputs["soc"][start] = 0.95
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
@@ -423,9 +427,7 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
     for i in range(1, 3):
         s = datetime(2022, 1, 1, i)
         s_next = datetime(2022, 1, 1, i + 1)
-        delta_soc_set_dispatch = (
-            storage_unit.outputs["soc"][s] - storage_unit.outputs["soc"][s_next]
-        )
+        delta_soc_set_dispatch = storage_unit.get_soc(s) - storage_unit.get_soc(s_next)
 
         if delta_soc_set_dispatch <= 0:
             delta_set_dispatch = (
@@ -572,6 +574,222 @@ def test_initialising_invalid_storages():
         d = param_dict.copy()
         d["downtime_warm_start"] = -10
         Storage(**d)
+
+
+class BalancingCapacityMarketConfig:
+    """A balancing capacity market - it awards capacity, not energy."""
+
+    market_id = "CRM_pos"
+    maximum_bid_price = 3000.0
+    minimum_bid_price = -500.0
+    product_type = "capacity_pos"
+    additional_fields = []
+
+
+def _order(start, end, volume, price=45):
+    return {
+        "start_time": start,
+        "end_time": end,
+        "only_hours": None,
+        "accepted_volume": volume,
+        "accepted_price": price,
+    }
+
+
+def _charged_soc(unit, power):
+    """The SoC after charging ``power`` MW for one hour from the initial SoC."""
+    return unit.initial_soc + power * unit.efficiency_charge / unit.capacity
+
+
+def test_soc_is_propagated_over_idle_time_steps(mock_market_config, storage_unit):
+    """
+    Time steps without orders - e.g. after ``remove_empty_bids`` - carry the
+    SoC forward instead of keeping the initial SoC (#562, #884).
+    """
+    t0, t1, t2, t3 = storage_unit.index[:4]
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t0, t1, -100)])
+    storage_unit.set_dispatch_plan(mock_market_config, [])
+
+    charged = _charged_soc(storage_unit, 100)
+    assert storage_unit.get_soc(t1) == pytest.approx(charged)
+    assert storage_unit.get_soc(t2) == pytest.approx(charged)
+    assert storage_unit.get_soc(t3) == pytest.approx(charged)
+
+
+def test_soc_is_invalidated_by_a_later_commitment(mock_market_config, storage_unit):
+    """A commitment within the already propagated range updates the SoC after it."""
+    t0, t1, t3 = storage_unit.index[0], storage_unit.index[1], storage_unit.index[3]
+    assert storage_unit.get_soc(t3) == storage_unit.initial_soc
+
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t0, t1, -100)])
+
+    assert storage_unit.get_soc(t3) == pytest.approx(_charged_soc(storage_unit, 100))
+
+
+def test_balancing_capacity_products_do_not_move_the_soc(storage_unit):
+    """Only energy products move the SoC, capacity products do not."""
+    t0, t1, t3 = storage_unit.index[0], storage_unit.index[1], storage_unit.index[3]
+    storage_unit.set_dispatch_plan(
+        BalancingCapacityMarketConfig(), [_order(t0, t1, 100, price=20)]
+    )
+
+    assert storage_unit.outputs["capacity_pos"].at[t0] == 100
+    assert storage_unit.outputs["energy"].at[t0] == 0
+    assert storage_unit.get_soc(t3) == storage_unit.initial_soc
+
+
+def test_projected_soc_matches_executed_soc(mock_market_config, storage_unit):
+    """
+    The SoC read before delivery equals the SoC after it, also if more is
+    committed than the SoC backs: 20 MWh deliver 19 MW instead of 100 MW.
+    """
+    t0, t1, t2 = storage_unit.index[:3]
+    storage_unit.set_soc(t0, 0.02)
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t0, t1, 100)])
+    projected_soc = storage_unit.get_soc(t1)
+
+    storage_unit.execute_current_dispatch(t0, t2)
+
+    assert projected_soc == pytest.approx(storage_unit.min_soc)
+    assert storage_unit.get_soc(t1) == pytest.approx(projected_soc)
+    assert storage_unit.outputs["energy"].at[t0] == pytest.approx(19)
+
+
+def test_soc_follows_the_power_limits(mock_market_config, storage_unit):
+    """
+    Two markets commit 120 MW on a 100 MW unit. The SoC moves by the 100 MW
+    the unit can run at, the 120 MW stay the plan until delivery.
+    """
+    t0, t1 = storage_unit.index[:2]
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t0, t1, 60)])
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t0, t1, 60)])
+
+    assert storage_unit.get_soc(t1) == pytest.approx(
+        storage_unit.initial_soc
+        - 100 / storage_unit.efficiency_discharge / storage_unit.capacity
+    )
+    assert storage_unit.outputs["energy"].at[t0] == 120
+    assert storage_unit.execute_current_dispatch(t0, t0)[0] == 100
+
+
+@pytest.mark.parametrize("read_soc_in_between", [False, True])
+def test_dispatch_does_not_depend_on_when_the_soc_is_read(
+    mock_market_config, storage_unit, read_soc_in_between
+):
+    """
+    Reading the SoC between two clearings leaves the committed plan as it is:
+    -100 MW and +60 MW add up to -40 MW, also on a nearly full storage.
+    """
+    t0, t1, t2 = storage_unit.index[:3]
+    storage_unit.set_soc(t0, 0.98)
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t0, t1, -100)])
+    if read_soc_in_between:
+        storage_unit.get_soc(t2)
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t0, t1, 60)])
+
+    assert storage_unit.outputs["energy"].at[t0] == -40
+
+
+def test_planning_builds_on_the_committed_plan(mock_market_config, storage_unit):
+    """
+    100 MW are sold, but 50 MWh only deliver 47.5 MW. Further bids build on the
+    100 MW sold: nothing is left to sell, and all of it can be bought back.
+    The SoC builds on the 47.5 MW delivered, so the storage ends empty.
+    """
+    t0, t1 = storage_unit.index[:2]
+    storage_unit.set_soc(t0, 0.05)
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t0, t1, 100)])
+
+    assert storage_unit.get_soc(t1) == pytest.approx(storage_unit.min_soc)
+    assert storage_unit.get_output_before(t1) == 100
+    _, max_power_discharge = storage_unit.calculate_min_max_discharge(t0, t1)
+    _, max_power_charge = storage_unit.calculate_min_max_charge(t0, t1)
+    assert max_power_discharge[0] == 0
+    assert max_power_charge[0] == storage_unit.max_power_charge - 100
+    # without a further market, only 47.5 MW are delivered
+    assert storage_unit.execute_current_dispatch(t0, t0)[0] == pytest.approx(47.5)
+
+
+def test_set_soc_invalidates_everything_after_it(mock_market_config, storage_unit):
+    """The SoC after a set SoC is propagated from it again."""
+    t1, t2, t3 = storage_unit.index[1], storage_unit.index[2], storage_unit.index[3]
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t1, t2, -100)])
+    assert storage_unit.get_soc(t3) != storage_unit.initial_soc
+
+    storage_unit.set_soc(t1, 0.3)
+
+    expected = 0.3 + 100 * storage_unit.efficiency_charge / storage_unit.capacity
+    assert storage_unit.get_soc(t2) == pytest.approx(expected)
+    assert storage_unit.get_soc(t3) == pytest.approx(expected)
+
+
+def test_soc_frontier_stays_on_the_index_grid(storage_unit):
+    """
+    Times between two index steps - the units operator executes from one
+    second past the last executed step - are rounded up to the next step.
+    """
+    t1, t2, t3 = storage_unit.index[1], storage_unit.index[2], storage_unit.index[3]
+    storage_unit.outputs["energy"].at[t1] = -100
+
+    storage_unit.execute_current_dispatch(t1 + timedelta(seconds=1), t2)
+    assert storage_unit._soc_valid_until in storage_unit.index
+
+    storage_unit.ensure_soc(t3 - timedelta(minutes=30))
+    assert storage_unit._soc_valid_until in storage_unit.index
+    assert storage_unit.get_soc(t2) == pytest.approx(_charged_soc(storage_unit, 100))
+
+
+def test_execute_current_dispatch_unaligned_end_does_not_advance_past_executed(
+    storage_unit,
+):
+    """An end between two steps marks the SoC valid only up to the executed steps."""
+    t0, t1 = storage_unit.index[:2]
+    storage_unit.outputs["energy"].at[t0] = -100
+    storage_unit.outputs["energy"].at[t1] = -100
+
+    storage_unit.execute_current_dispatch(t0, t0 + timedelta(minutes=15))
+
+    assert storage_unit._soc_valid_until == t1
+
+
+def test_execute_current_dispatch_after_the_horizon(mock_market_config, storage_unit):
+    """A window after the last time step executes nothing and keeps the plan."""
+    t0, t1 = storage_unit.index[:2]
+    last, freq = storage_unit.index[-1], storage_unit.index.freq
+    storage_unit.set_dispatch_plan(
+        mock_market_config,
+        [_order(t0, t1, -100), _order(last, last + freq, 250)],
+    )
+
+    dispatch = storage_unit.execute_current_dispatch(last + freq, last + 2 * freq)
+
+    assert len(dispatch) == 0
+    assert storage_unit.outputs["energy"].at[last] == 250
+    assert storage_unit._soc_valid_until in storage_unit.index
+    assert storage_unit.get_soc(t1) == pytest.approx(_charged_soc(storage_unit, 100))
+
+
+def test_ensure_soc_stops_at_the_end_of_the_horizon(storage_unit):
+    """Propagating past the last time step stops at the last time step."""
+    t3 = storage_unit.index[-1]
+
+    storage_unit.ensure_soc(t3 + 10 * storage_unit.index.freq)
+
+    assert storage_unit._soc_valid_until == t3
+    assert storage_unit.get_soc(t3) == storage_unit.initial_soc
+
+
+def test_ensure_soc_clips_the_last_time_step(mock_market_config, storage_unit):
+    """The last time step moves no later SoC, but its dispatch is still clipped."""
+    t2, t3 = storage_unit.index[2], storage_unit.index[-1]
+    storage_unit.set_dispatch_plan(
+        mock_market_config, [_order(t3, t3 + storage_unit.index.freq, 250)]
+    )
+    storage_unit.execute_current_dispatch(t2, t2)
+
+    assert storage_unit.execute_current_dispatch(t3, t3)[0] == (
+        storage_unit.max_power_discharge
+    )
 
 
 if __name__ == "__main__":

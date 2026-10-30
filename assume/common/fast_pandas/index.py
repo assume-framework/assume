@@ -267,6 +267,20 @@ class FastIndex:
             return idx + 1
         return idx + 1 if round_up else idx
 
+    def align_up(self, date: datetime) -> datetime:
+        """
+        Rounds ``date`` up to the first step of the index at or after it.
+
+        The result may lie beyond the end of the index.
+
+        Parameters:
+            date (datetime.datetime): The datetime to align.
+
+        Returns:
+            datetime.datetime: The first step at or after ``date``.
+        """
+        return self.start + self._get_idx_from_date(date) * self.freq
+
     @staticmethod
     def _convert_to_datetime(value: datetime | str) -> datetime:
         """Convert input to datetime if it's not already."""

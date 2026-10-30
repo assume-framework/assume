@@ -62,7 +62,7 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
         # =============================================================================
         # save a theoretic SOC to calculate the ramping
         start = product_tuples[0][0]
-        theoretic_SOC = unit.outputs["soc"].at[start]
+        theoretic_SOC = unit.get_soc(start)
         previous_power = unit.get_output_before(start)
 
         bids = []
@@ -149,24 +149,20 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
                 }
             )
 
-            # calculate theoretic SOC
+            # calculate theoretic SOC - it follows what the unit can physically
+            # run at, as the committed power may exceed what the SOC backs
             time_delta = (end - start) / timedelta(hours=1)
-            if bid_quantity + current_power > 0:
+            feasible_power = unit.calculate_feasible_power(
+                bid_quantity + current_power, theoretic_SOC
+            )
+            if feasible_power > 0:
                 delta_soc = (
-                    -(
-                        (bid_quantity + current_power)
-                        * time_delta
-                        / unit.efficiency_discharge
-                    )
+                    -(feasible_power * time_delta / unit.efficiency_discharge)
                     / unit.capacity
                 )
-            elif bid_quantity + current_power < 0:
+            elif feasible_power < 0:
                 delta_soc = (
-                    -(
-                        (bid_quantity + current_power)
-                        * time_delta
-                        * unit.efficiency_charge
-                    )
+                    -(feasible_power * time_delta * unit.efficiency_charge)
                     / unit.capacity
                 )
             else:
@@ -268,7 +264,7 @@ class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
         end = product_tuples[-1][1]
 
         previous_power = unit.get_output_before(start)
-        theoretic_SOC = unit.outputs["soc"].at[start]
+        theoretic_SOC = unit.get_soc(start)
 
         _, max_power_discharge_values = unit.calculate_min_max_discharge(
             start, end, soc=theoretic_SOC
@@ -404,7 +400,7 @@ class StorageCapacityHeuristicBalancingNegStrategy(MinMaxChargeStrategy):
 
         previous_power = unit.get_output_before(start)
 
-        theoretic_SOC = unit.outputs["soc"].at[start]
+        theoretic_SOC = unit.get_soc(start)
 
         _, max_power_charge_values = unit.calculate_min_max_charge(start, end)
 
@@ -505,7 +501,7 @@ def get_specific_revenue(unit, marginal_cost, t, foresight, price_forecast):
     """
 
     possible_revenue = 0
-    soc = unit.outputs["soc"][t]
+    soc = unit.get_soc(t)
     theoretic_SOC = soc
 
     if t + foresight > price_forecast.index[-1]:

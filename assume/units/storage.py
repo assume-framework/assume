@@ -32,7 +32,7 @@ class Storage(SupportsMinMaxCharge):
         capacity (float): The capacity of the storage unit in MWh.
         max_soc (float): The maximum state of charge of the storage unit as a fraction (typically 1).
         min_soc (float): The minimum state of charge of the storage unit as a fraction (typically 0).
-        initial_soc (float): The initial state of charge of the storage unit as a fraction (between 0 and 1).
+        initial_soc (float): The state of charge at the beginning of the first time step as a fraction (between 0 and 1).
         efficiency_charge (float): The efficiency of the storage unit while charging.
         efficiency_discharge (float): The efficiency of the storage unit while discharging.
         additional_cost_charge (float, optional): Additional costs associated with power consumption, in EUR/MWh. Defaults to 0.
@@ -278,8 +278,8 @@ class Storage(SupportsMinMaxCharge):
         """
         Executes the current dispatch of the unit based on the provided timestamps.
 
-        The dispatch is only executed, if it is in the constraints given by the unit.
-        Returns the volume of the unit within the given time range.
+        The committed plan in ``outputs["energy"]`` is clipped to what the unit
+        can run at, and the SOC is derived from the result.
 
         Args:
             start (datetime.datetime): The start time of the dispatch.
@@ -288,54 +288,31 @@ class Storage(SupportsMinMaxCharge):
         Returns:
             np.ndarray: The volume of the unit within the given time range.
         """
-        start = max(start, self.index[0])
-        time_delta = self.index.freq / timedelta(hours=1)
+        last = self.index[-1]
+        start = self.index.align_up(max(start, self.index[0]))
+        if start > last:
+            # nothing left to execute, the returned range is empty
+            return self.outputs["energy"].loc[start:end]
 
+        # the SOC has to be valid at `start`, everything after it is replaced
+        self.ensure_soc(start)
+        self._soc_valid_until = start
+
+        last_executed = None
         for t in self.index[start:end]:
-            current_power = self.outputs["energy"].at[t]
-
-            # adjust power to constraints of the unit
-            if current_power > self.max_power_discharge:
-                current_power = self.max_power_discharge
-            elif current_power < self.max_power_charge:
-                current_power = self.max_power_charge
-            elif (
-                self.min_power_discharge > current_power > self.min_power_charge
-                and current_power != 0
-            ):
-                current_power = 0
-
-            # calculate the change in state of charge
-            delta_soc = 0
+            last_executed = t
             soc = self.outputs["soc"].at[t]
-
-            # discharging
-            if current_power > 0:
-                max_soc_discharge = self.calculate_soc_max_discharge(soc)
-
-                if current_power > max_soc_discharge:
-                    current_power = max_soc_discharge
-
-                delta_soc = (
-                    -current_power * time_delta / self.efficiency_discharge
-                ) / self.capacity
-
-            # charging
-            elif current_power < 0:
-                max_soc_charge = self.calculate_soc_max_charge(soc)
-
-                if current_power < max_soc_charge:
-                    current_power = max_soc_charge
-
-                delta_soc = (
-                    -current_power * time_delta * self.efficiency_charge
-                ) / self.capacity
-
-            # update the values of the state of charge and the energy
-            next_freq = t + self.index.freq
-            if next_freq in self.index:
-                self.outputs["soc"].at[next_freq] = soc + delta_soc
+            current_power = self.calculate_feasible_power(
+                self.outputs["energy"].at[t], soc
+            )
             self.outputs["energy"].at[t] = current_power
+            if t != last:
+                self.outputs["soc"].at[t + self.index.freq] = (
+                    soc + self.calculate_delta_soc(current_power)
+                )
+
+        if last_executed is not None:
+            self._soc_valid_until = min(last_executed + self.index.freq, last)
 
         return self.outputs["energy"].loc[start:end]
 
@@ -444,7 +421,7 @@ class Storage(SupportsMinMaxCharge):
 
         # restrict charging according to max_soc
         if soc is None:
-            soc = self.outputs["soc"].at[start]
+            soc = self.get_soc(start)
         max_soc_charge = self.calculate_soc_max_charge(soc)
         max_power_charge = max_power_charge.clip(min=max_soc_charge)
 
@@ -490,7 +467,7 @@ class Storage(SupportsMinMaxCharge):
 
         # restrict according to min_soc
         if soc is None:
-            soc = self.outputs["soc"].at[start]
+            soc = self.get_soc(start)
         max_soc_discharge = self.calculate_soc_max_discharge(soc)
         max_power_discharge = max_power_discharge.clip(max=max_soc_discharge)
 
