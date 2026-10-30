@@ -107,7 +107,27 @@ def create_parser() -> argparse.ArgumentParser:
         help="run simulation with multiple processes",
         action="store_true",
     )
+    parser.add_argument(
+        "--verify",
+        metavar="DIR",
+        help="check that the scenario folder DIR (with config.yaml and csv files) can be "
+        "loaded into ASSUME, without running a simulation. "
+        "Use -c to only verify one study case",
+        default="",
+        type=str,
+    ).completer = argcomplete.DirectoriesCompleter()
     return parser
+
+
+def verify(scenario_dir: str, study_case: str = "") -> int:
+    """Verify a scenario folder and print the result. Returns the exit code."""
+    from assume.scenario.validation import verify_scenario_folder
+
+    report = verify_scenario_folder(scenario_dir, study_case=study_case)
+    for issue in [*report.errors, *report.warnings]:
+        print(issue)
+    print(report.summary())
+    return 0 if report.ok else 1
 
 
 def cli(args=None):
@@ -117,6 +137,9 @@ def cli(args=None):
 
     argcomplete.autocomplete(parser)
     args = parser.parse_args(args)
+    if args.verify:
+        sys.exit(verify(args.verify, args.case_study))
+
     if args.db_uri:
         db_uri = make_url(args.db_uri)
     else:
