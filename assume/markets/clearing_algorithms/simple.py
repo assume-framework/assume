@@ -92,10 +92,14 @@ class PayAsClearRole(MarketRole):
             # the following algorithm is inspired by one bar for generation and one for demand
             # add generation for currents demand price, until it matches demand
             # generation above it has to be sold for the lower price (or not at all)
+            supply_exhausted = False
+            supply_scarcity = False
             for demand_order in demand_orders:
                 if not supply_orders:
                     # if no more generation - continue
                     # reject left over demand at the end
+                    if supply_exhausted and accepted_demand_orders:
+                        supply_scarcity = True
                     continue
 
                 # assert dem_vol == gen_vol
@@ -121,7 +125,6 @@ class PayAsClearRole(MarketRole):
                 # we only need to see how to arrange it.
 
                 diff = gen_vol - dem_vol
-                supply_scarcity = False
 
                 if diff < 0:
                     # gen < dem
@@ -145,6 +148,7 @@ class PayAsClearRole(MarketRole):
                 else:
                     demand_order["accepted_volume"] = demand_order["volume"]
 
+                supply_exhausted = diff == 0 and not supply_orders
                 if demand_order["accepted_volume"]:
                     accepted_demand_orders.append(demand_order)
 

@@ -215,6 +215,30 @@ def test_supply_and_demand_curves_vertical_overlap():
     assert accepted[0]["accepted_volume"] == -100
 
 
+def test_supply_exhaustion_with_unserved_demand_sets_marginal_demand_price():
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
+    products = get_available_products(
+        simple_dayahead_auction_config.market_products, next_opening
+    )
+    assert len(products) == 1
+
+    orderbook = extend_orderbook(products, -50, 30)
+    orderbook = extend_orderbook(products, -50, 20, orderbook)
+    orderbook = extend_orderbook(products, -50, 10, orderbook)
+    orderbook = extend_orderbook(products, 100, 0, orderbook)
+
+    mr_simple_pac = PayAsClearRole(simple_dayahead_auction_config)
+    accepted, rejected, meta, flows = mr_simple_pac.clear(orderbook, products)
+
+    assert len(accepted) == 3
+    assert len(rejected) == 1
+    assert meta[0]["supply_volume"] == 100
+    assert meta[0]["demand_volume"] == 100
+    assert meta[0]["price"] == 20
+
+
 def test_supply_and_demand_curves_full_vertical_overlap():
     next_opening = simple_dayahead_auction_config.opening_hours.after(
         datetime(2005, 6, 1)
