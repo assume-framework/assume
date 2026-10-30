@@ -16,7 +16,7 @@ import yaml
 from tqdm import tqdm
 
 from assume.common.exceptions import AssumeException
-from assume.common.fast_pandas import FastIndex
+from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecaster import (
     BuildingForecaster,
     CementForecaster,
@@ -703,13 +703,18 @@ def load_config_and_create_forecaster(
     shared_unit_index = FastIndex(
         start=index[0], end=index[-1], freq=pd.infer_freq(index)
     )
+    # convert fuel prices once so all forecasters share the same arrays instead of copying them
+    fuel_prices = {
+        fuel: FastSeries(index=shared_unit_index, value=fuel_prices_df[fuel])
+        for fuel in fuel_prices_df.columns
+    }
     unit_forecasts: dict[str, UnitForecaster] = {}
     if powerplant_units is not None:
         for id, plant in powerplant_units.iterrows():
             unit_forecasts[id] = PowerplantForecaster(
                 index=shared_unit_index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),
-                fuel_prices=fuel_prices_df,
+                fuel_prices=fuel_prices,
                 forecast_algorithms=get_unit_forecast_algorithms(
                     forecast_algorithms, plant
                 ),
@@ -734,7 +739,13 @@ def load_config_and_create_forecaster(
                 ),
             )
     if exchange_units is not None:
+        # collect units without price timeseries to log them once instead of per unit
+        missing_price_series = []
         for id, exchange in exchange_units.iterrows():
+            price_import = exchanges_df.get(f"{id}_price_import")
+            price_export = exchanges_df.get(f"{id}_price_export")
+            if price_import is None or price_export is None:
+                missing_price_series.append(id)
             unit_forecasts[id] = ExchangeForecaster(
                 index=shared_unit_index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),
@@ -743,6 +754,13 @@ def load_config_and_create_forecaster(
                 ),
                 volume_export=exchanges_df[f"{id}_export"],
                 volume_import=exchanges_df[f"{id}_import"],
+                price_import=price_import,
+                price_export=price_export,
+            )
+        if missing_price_series:
+            logger.warning(
+                f"!! No (complete) exchange price timeseries in exchanges_df for {missing_price_series} !! "
+                "Falling back to the scalar price_import/price_export of the units. Make sure this is what you actually want."
             )
     if dsm_units is not None:
         for type, dsm in dsm_units.items():
@@ -785,7 +803,7 @@ def load_config_and_create_forecaster(
                             id, pd.Series(1.0, index, name=id)
                         ),
                         forecast_algorithms=unit_forecast_algorithms,
-                        fuel_prices=fuel_prices_df,
+                        fuel_prices=fuel_prices,
                         load_profile=building_load_profile,
                         ev_load_profile=building_ev_profile,
                         heat_demand=building_heat_demand,
@@ -810,7 +828,7 @@ def load_config_and_create_forecaster(
                         market_prices=unit.get("market_prices"),
                         forecast_algorithms=unit_forecast_algorithms,
                         forecast_registries=None,
-                        fuel_prices=fuel_prices_df,
+                        fuel_prices=fuel_prices,
                         normalized_load_profile=normalized_profile,
                         steel_demand=steel_demand,
                     )
@@ -826,7 +844,7 @@ def load_config_and_create_forecaster(
                         market_prices=unit.get("market_prices"),
                         forecast_algorithms=unit_forecast_algorithms,
                         forecast_registries=None,
-                        fuel_prices=fuel_prices_df,
+                        fuel_prices=fuel_prices,
                         normalized_load_profile=get_unit_forecast_column(
                             forecasts_df, id, "normalized_load_profile"
                         ),
@@ -868,7 +886,7 @@ def load_config_and_create_forecaster(
                         ),
                         forecast_algorithms=unit_forecast_algorithms,
                         demand=unit["demand"],
-                        fuel_prices=fuel_prices_df,
+                        fuel_prices=fuel_prices,
                         electricity_price_flex=0,  # TODO
                         thermal_storage_schedule=0,  # TODO
                         thermal_demand=0,  # TODO
@@ -1119,7 +1137,7 @@ def setup_world(
                 op, config_forecast_algorithms
             ),
         )
-        for op in set(units.keys())
+        for op in units.keys()
     }
 
     # if distributed_role is true - there is a manager available
@@ -1133,7 +1151,7 @@ def setup_world(
             )
     else:
         logger.info("Adding unit operators and units")
-        for company_name in set(units.keys()):
+        for company_name in units.keys():
             strategies = unit_operators_strategies.get(company_name, {})
             world.add_unit_operator(
                 id=str(company_name),

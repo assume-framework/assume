@@ -22,12 +22,18 @@ from assume.common.forecast_algorithms import (
 from assume.common.forecaster import (
     DemandForecaster,
     DsmUnitForecaster,
+    ExchangeForecaster,
     PowerplantForecaster,
     UnitsOperatorForecaster,
 )
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.strategies import EnergyHeuristicElasticStrategy, EnergyNaiveStrategy
+from assume.strategies import (
+    EnergyHeuristicElasticStrategy,
+    EnergyNaiveStrategy,
+    ExchangeEnergyNaiveStrategy,
+)
 from assume.units import Demand, PowerPlant
+from assume.units.exchange import Exchange
 
 path = Path("./tests/fixtures/forecast_init")
 
@@ -505,3 +511,62 @@ def test_units_operator_forecaster__extra_kwargs(index, shared_FastIndex):
 
     assert isinstance(operator_forecaster.custom_forecast, FastSeries)
     assert list(operator_forecaster.custom_forecast) == [2.0] * len(index)
+
+
+def test_naive_forecast__exchange_imports_are_supply(index, shared_FastIndex):
+    """Imports reduce and exports increase the demand of the naive forecasts."""
+    market_config = MarketConfig(market_id="EOM")
+    registries = get_forecast_registries()
+    plants = tuple(
+        PowerPlant(
+            id=f"plant_{cost}",
+            unit_operator="op",
+            technology="gas",
+            bidding_strategies={"EOM": EnergyNaiveStrategy()},
+            max_power=100,
+            min_power=0,
+            efficiency=1,
+            additional_cost=cost,
+            fuel_type="renewable",
+            forecaster=PowerplantForecaster(
+                index=shared_FastIndex, forecast_registries=registries
+            ),
+        )
+        for cost in (10, 50)
+    )
+    demand = Demand(
+        id="demand",
+        unit_operator="op",
+        technology="inflex_demand",
+        bidding_strategies={"EOM": EnergyNaiveStrategy()},
+        max_power=-1000,
+        min_power=0,
+        price=300,
+        forecaster=DemandForecaster(
+            index=shared_FastIndex,
+            demand=pd.Series(-120.0, index=index),
+            forecast_registries=registries,
+        ),
+    )
+    exchange = Exchange(
+        id="exchange",
+        unit_operator="op",
+        bidding_strategies={"EOM": ExchangeEnergyNaiveStrategy()},
+        forecaster=ExchangeForecaster(
+            index=shared_FastIndex,
+            volume_import=pd.Series([50.0] * 3 + [0.0] * 4, index=index),
+            volume_export=pd.Series([0.0] * 3 + [40.0] * 4, index=index),
+            forecast_registries=registries,
+        ),
+    )
+    units = (*plants, demand, exchange)
+
+    price = calculate_naive_price_inelastic(shared_FastIndex, units, market_config)
+    residual_load = calculate_naive_residual_load(
+        shared_FastIndex, units, market_config
+    )
+
+    # import of 50 MW: residual demand of 70 MW is covered by the cheap plant
+    # export of 40 MW: residual demand of 160 MW needs the expensive plant
+    assert list(price) == [10] * 3 + [50] * 4
+    assert list(residual_load) == [70] * 3 + [160] * 4
