@@ -222,6 +222,8 @@ class NodalClearingRole(MarketRole):
         """
         Performs nodal clearing based on optimal linear power flow.
         The returned orderbook contains accepted orders with the accepted volumes and prices.
+        A unit may place more than one bid for the same product, and every bid is
+        cleared on its own volume and price.
 
         Args:
             orderbook (Orderbook): The orderbook to be cleared.
@@ -243,18 +245,61 @@ class NodalClearingRole(MarketRole):
             freq=self.marketconfig.market_products[0].duration,
         )
 
+        # a unit can place more than one bid for a product, as the flexable
+        # strategy for units with a minimum output, the two price learning
+        # strategy and the elastic demand strategy do. PyPSA needs one
+        # generator per bid, so the bids of a unit are numbered within a product
+        # and every bid after the first gets a generator of its own below.
+        orderbook_df["bid_no"] = orderbook_df.groupby(
+            ["unit_id", "start_time"]
+        ).cumcount()
+        # a suffix which cannot turn a unit name into the name of another generator in the grid
+        suffix = "_bid"
+        while (
+            (orderbook_df["unit_id"] + suffix + orderbook_df["bid_no"].astype(str))
+            .isin(self.network.generators.index)
+            .any()
+        ):
+            suffix += "_"
+        orderbook_df["gen_id"] = orderbook_df["unit_id"].where(
+            orderbook_df["bid_no"] == 0,
+            orderbook_df["unit_id"] + suffix + orderbook_df["bid_no"].astype(str),
+        )
+
         # Now you can pivot the DataFrame
         volume_pivot = orderbook_df.pivot(
-            index="start_time", columns="unit_id", values="volume"
+            index="start_time", columns="gen_id", values="volume"
         )
         # volume_pivot.index = snapshots
         price_pivot = orderbook_df.pivot(
-            index="start_time", columns="unit_id", values="price"
+            index="start_time", columns="gen_id", values="price"
         )
         # Copy the network
         n = self.network.copy()
 
         n.set_snapshots(snapshots)
+
+        # each additional bid becomes a copy of the generator of the unit which
+        # placed it, so that it is cleared with its own price and volume
+        extra_bids = orderbook_df.loc[
+            orderbook_df["bid_no"] > 0, ["gen_id", "unit_id"]
+        ].drop_duplicates()
+        extra_bids = extra_bids[extra_bids["unit_id"].isin(n.generators.index)]
+        if not extra_bids.empty:
+            parents = n.generators.loc[extra_bids["unit_id"]]
+            n.add(
+                "Generator",
+                extra_bids["gen_id"].values,
+                bus=parents["bus"].values,
+                p_nom=parents["p_nom"].values,
+                p_min_pu=parents["p_min_pu"].values,
+                p_max_pu=parents["p_max_pu"].values,
+            )
+
+        def bid_generators(unit_idx: pd.Index) -> pd.Index:
+            """Gives the generators of these units and those of their extra bids."""
+            extra = extra_bids.loc[extra_bids["unit_id"].isin(unit_idx), "gen_id"]
+            return unit_idx.append(pd.Index(extra))
 
         # units without a bid in a snapshot get zero volume, so they are not available
         volume_pivot = volume_pivot.reindex(
@@ -266,13 +311,13 @@ class NodalClearingRole(MarketRole):
 
         # Update p_max_pu for all units based on their bids in the actual snapshots
         # generators
-        gen_idx = self.grid_data["generators"].index
+        gen_idx = bid_generators(self.grid_data["generators"].index)
         n.generators_t.p_max_pu.loc[snapshots, gen_idx] = (
             volume_pivot[gen_idx] / n.generators.loc[gen_idx, "p_nom"].values
         )
         n.generators_t.marginal_cost.loc[snapshots, gen_idx] = price_pivot[gen_idx]
         # demand
-        demand_idx = self.grid_data["loads"].index
+        demand_idx = bid_generators(self.grid_data["loads"].index)
         n.generators_t.p_min_pu.loc[snapshots, demand_idx] = (
             volume_pivot[demand_idx] / n.generators.loc[demand_idx, "p_nom"].values
         )
@@ -282,7 +327,7 @@ class NodalClearingRole(MarketRole):
 
         # storage
         if self.grid_data.get("storage_units") is not None:
-            storage_idx = self.grid_data["storage_units"].index
+            storage_idx = bid_generators(self.grid_data["storage_units"].index)
             # discharging (positive bids)
             n.generators_t.p_max_pu.loc[snapshots, storage_idx] = (
                 volume_pivot[storage_idx].clip(lower=0).fillna(0)
@@ -312,20 +357,20 @@ class NodalClearingRole(MarketRole):
             logger.error(f"Solver exited with {termination_condition}")
             raise Exception("Solver in nodal clearing did not converge")
 
-        # Find intersection of unit_ids in orderbook_df and columns in n.generators_t.p
-        valid_units = orderbook_df["unit_id"].unique()
+        # Find intersection of bid generators in orderbook_df and columns in n.generators_t.p
+        valid_gens = orderbook_df["gen_id"].unique()
         dispatch = n.generators_t.p
 
-        for unit in valid_units:
-            if unit in dispatch.columns:
+        for gen in valid_gens:
+            if gen in dispatch.columns:
                 # get accepted volume and price for each time snapshot
-                accepted_volumes = dispatch[unit]
+                accepted_volumes = dispatch[gen]
                 if self.pricing_mechanism == "pay_as_clear":
                     accepted_prices = n.buses_t.marginal_price.loc[
-                        :, n.generators.loc[unit, "bus"]
+                        :, n.generators.loc[gen, "bus"]
                     ]
                 elif self.pricing_mechanism == "pay_as_bid":
-                    accepted_prices = price_pivot[unit]
+                    accepted_prices = price_pivot[gen]
                 else:
                     raise ValueError("Invalid pricing mechanism.")
 
@@ -333,13 +378,14 @@ class NodalClearingRole(MarketRole):
                 for t, (vol, price) in enumerate(
                     zip(accepted_volumes, accepted_prices)
                 ):
-                    mask = (orderbook_df["unit_id"] == unit) & (
+                    mask = (orderbook_df["gen_id"] == gen) & (
                         orderbook_df["start_time"] == snapshots[t]
                     )
                     orderbook_df.loc[mask, "accepted_volume"] = vol
                     orderbook_df.loc[mask, "accepted_price"] = price
 
         # return orderbook_df back to orderbook format as list of dicts
+        orderbook_df = orderbook_df.drop(columns=["bid_no", "gen_id"])
         accepted_orders = orderbook_df[orderbook_df["accepted_volume"] != 0].to_dict(
             "records"
         )
