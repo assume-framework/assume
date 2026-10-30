@@ -121,29 +121,71 @@ def test_calculate_operational_window(storage_unit):
 
 
 def test_soc_constraint(storage_unit):
-    # start should not be the first hour of index to manipulate soc
     start = datetime(2022, 1, 1, 1)
     end = datetime(2022, 1, 1, 2)
 
-    storage_unit.outputs["energy"][start] = 10
-    storage_unit.outputs["capacity_neg"][start] = -50
-    storage_unit.outputs["capacity_pos"][start] = 30
-
-    storage_unit.outputs["soc"][start - timedelta(hours=1)] = 0.05
-    assert storage_unit.outputs["soc"][start - storage_unit.index.freq] == 0.05
+    # 50 MWh stored back 47.5 MW of discharge, below the 100 MW power limit
+    storage_unit.outputs["soc"][start] = 0.05
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
     )
-    assert min_power_discharge[0] == 40
-    assert max_power_discharge[0] == 60
+    assert min_power_discharge[0] == 0
+    assert math.isclose(
+        max_power_discharge[0],
+        0.05 * storage_unit.capacity * storage_unit.efficiency_discharge,
+    )
 
+    # 50 MWh of room take 55.6 MW of charging, below the 100 MW power limit
     storage_unit.outputs["soc"][start] = 0.95
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end
     )
-    assert min_power_charge[0] == -40
+    assert min_power_charge[0] == 0
     assert math.isclose(
-        max_power_charge[0], -50 / storage_unit.efficiency_charge, abs_tol=0.1
+        max_power_charge[0],
+        -0.05 * storage_unit.capacity / storage_unit.efficiency_charge,
+    )
+
+
+def test_soc_limit_covers_the_base_load(storage_unit):
+    """
+    The SoC limits the total power, so the power already sold on another
+    market uses part of it - only the rest can be offered on top.
+    """
+    start = datetime(2022, 1, 1, 1)
+    end = datetime(2022, 1, 1, 2)
+
+    # 50 MWh stored back 47.5 MW of discharge
+    storage_unit.outputs["energy"][start] = 30
+    _, max_power_discharge = storage_unit.calculate_min_max_discharge(
+        start, end, soc=0.05
+    )
+    assert max_power_discharge[0] == pytest.approx(47.5 - 30)
+    # more committed than the SoC backs - nothing is offered on top
+    storage_unit.outputs["energy"][start] = 60
+    _, max_power_discharge = storage_unit.calculate_min_max_discharge(
+        start, end, soc=0.05
+    )
+    assert max_power_discharge[0] == 0
+
+    # 50 MWh of room take 55.6 MW of charging
+    storage_unit.outputs["energy"][start] = -30
+    _, max_power_charge = storage_unit.calculate_min_max_charge(start, end, soc=0.95)
+    assert max_power_charge[0] == pytest.approx(-50 / 0.9 + 30)
+
+
+def test_ramp_soc_limit_covers_the_current_power(storage_unit):
+    """
+    The ramp checks limit the power on top of the current power, so the SoC
+    limit covers the current power as well. The ramps allow 30 MW on top here.
+    """
+    # 50 MWh stored back 47.5 MW of discharge, 30 MW of them are already sold
+    assert storage_unit.calculate_ramp_discharge(0.05, 0, 100, 30) == pytest.approx(
+        47.5 - 30
+    )
+    # 50 MWh of room take 55.6 MW of charging, 30 MW of them are already bought
+    assert storage_unit.calculate_ramp_charge(0.95, 0, -100, -30) == pytest.approx(
+        -50 / 0.9 + 30
     )
 
 

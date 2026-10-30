@@ -86,6 +86,7 @@ Upcoming Release
   - **Fix OEDS queries after the open-mastr migration**: Postcodes with a leading zero (eastern Germany) were excluded, PV units without EEG payments were dropped, appended date filters produced invalid SQL, tracked PV units got a tilt of 180°, the battery of east-west PV+battery units was counted twice, and planned units were counted as built capacity.
   - **Fix non-deterministic results with equal-price bids**: The orderbook order no longer depends on ``PYTHONHASHSEED`` or on process timing in ``--parallel`` mode, so ties between equal-price bids are resolved reproducibly. (#861)
   - **Fix bugs in** ``FastIndex`` **and** ``FastSeries``: Dates before the index start wrapped around to the end of the series, which broke the start-up cost in ``EnergyLearningStrategy.calculate_reward``. ``s[2:4] = 7`` overwrote the whole series, ``fillna(x)`` always filled 0 and modified the original series, ``"MS"`` was read as milliseconds, and arithmetic rejected numpy scalars.
+  - **Fix storage SoC limit ignoring committed power**: ``calculate_min_max_charge/discharge`` and ``calculate_ramp_charge/discharge`` of ``Storage`` applied the SoC limit to the additional power only, so a storage could offer more than its SoC backs on top of power already sold on another market. The SoC limit now covers the committed power.
 
 0.6.0 - (18th March 2026)
 =========================
