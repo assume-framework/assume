@@ -149,24 +149,20 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
                 }
             )
 
-            # calculate theoretic SOC
+            # calculate theoretic SOC - it follows what the unit can physically
+            # run at, as the committed power may exceed what the SOC backs
             time_delta = (end - start) / timedelta(hours=1)
-            if bid_quantity + current_power > 0:
+            feasible_power = unit.calculate_feasible_power(
+                bid_quantity + current_power, theoretic_SOC
+            )
+            if feasible_power > 0:
                 delta_soc = (
-                    -(
-                        (bid_quantity + current_power)
-                        * time_delta
-                        / unit.efficiency_discharge
-                    )
+                    -(feasible_power * time_delta / unit.efficiency_discharge)
                     / unit.capacity
                 )
-            elif bid_quantity + current_power < 0:
+            elif feasible_power < 0:
                 delta_soc = (
-                    -(
-                        (bid_quantity + current_power)
-                        * time_delta
-                        * unit.efficiency_charge
-                    )
+                    -(feasible_power * time_delta * unit.efficiency_charge)
                     / unit.capacity
                 )
             else:

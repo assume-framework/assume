@@ -232,3 +232,79 @@ if __name__ == "__main__":
     import pytest
 
     pytest.main(["-s", __file__])
+
+
+def _eom_storage(prices, capacity, initial_soc):
+    strategy = StorageEnergyHeuristicFlexableStrategy(eom_foresight="4h")
+    return Storage(
+        id="Test_Storage",
+        unit_operator="TestOperator",
+        technology="TestTechnology",
+        bidding_strategies={"EOM": strategy},
+        forecaster=UnitForecaster(
+            prices.index, availability=1, market_prices={"EOM": prices}
+        ),
+        max_power_charge=-100,
+        max_power_discharge=100,
+        capacity=capacity,
+        efficiency_charge=1,
+        efficiency_discharge=1,
+        initial_soc=initial_soc,
+    )
+
+
+def _accept(storage, market_config, orders):
+    storage.set_dispatch_plan(
+        market_config,
+        [
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "accepted_volume": volume,
+                "accepted_price": 80,
+            }
+            for start, end, volume in orders
+        ],
+    )
+
+
+def test_flexable_eom_storage_bids_on_top_of_a_committed_plan(mock_market_config):
+    """
+    The SoC estimate of a later market's bids follows what the storage can
+    deliver: of the 100 MW committed at t1, 20 MWh only deliver 20 MW. The
+    estimate is empty at t2 instead of 80 MWh below empty, so after charging
+    at t2 the storage can discharge fully at t3.
+    """
+    index = pd.date_range("2022-01-01", periods=8, freq="h")
+    prices = pd.Series([50, 50, 80, 80, 80, 80, 80, 80], index=index)
+    storage = _eom_storage(prices, capacity=100, initial_soc=0.2)
+    _accept(
+        storage,
+        mock_market_config,
+        [(index[1], index[2], 100), (index[2], index[3], -50)],
+    )
+    # the storage is empty after delivering 20 MW of the 100 MW
+    assert storage.get_soc(index[2]) == 0
+
+    strategy = storage.bidding_strategies["EOM"]
+    product_tuples = [(index[i], index[i + 1], None) for i in (1, 2, 3)]
+    bids = strategy.calculate_bids(storage, mock_market_config, product_tuples)
+
+    # charge fully at t2 and discharge it again at t3
+    assert [(bid["start_time"], bid["volume"]) for bid in bids] == [
+        (index[2], pytest.approx(-50)),
+        (index[3], pytest.approx(100)),
+    ]
+
+    # once accepted, everything committed can be delivered - except the 80 MW
+    # at t1 the storage cannot deliver
+    _accept(
+        storage,
+        mock_market_config,
+        [(bid["start_time"], bid["end_time"], bid["volume"]) for bid in bids],
+    )
+    committed = [storage.outputs["energy"].at[index[i]] for i in (1, 2, 3)]
+    assert committed == pytest.approx([100, -100, 100])
+    delivered = storage.execute_current_dispatch(index[1], index[3])
+    assert list(delivered) == pytest.approx([20, -100, 100])
