@@ -4,6 +4,7 @@
 
 
 from assume.common.base import BaseUnit
+from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import ExchangeForecaster
 
 
@@ -15,10 +16,10 @@ class Exchange(BaseUnit):
         id (str): The unique identifier of the unit.
         unit_operator (str): The operator of the unit.
         bidding_strategies (dict): The bidding strategies of the unit.
-        forecaster: The forecaster containing the import and export volume time series
+        forecaster: The forecaster containing the import and export volume and price time series
         node (str, optional): The node of the unit. Defaults to "node0".
-        price_import (float): The price for import of the unit.
-        price_export (float): The price for export of the unit.
+        price_import (float): The price for import of the unit. Only used if the forecaster has no import price series.
+        price_export (float): The price for export of the unit. Only used if the forecaster has no export price series.
         location (tuple[float, float], optional): The location of the unit. Defaults to (0.0, 0.0).
 
     Methods
@@ -58,8 +59,17 @@ class Exchange(BaseUnit):
         # export is negative
         self.volume_export = -abs(forecaster.volume_export)
 
-        self.price_import = price_import
-        self.price_export = price_export
+        # prices from the forecaster take precedence over the scalar unit parameters
+        self.price_import = (
+            forecaster.price_import
+            if forecaster.price_import is not None
+            else FastSeries(index=self.index, value=price_import)
+        )
+        self.price_export = (
+            forecaster.price_export
+            if forecaster.price_export is not None
+            else FastSeries(index=self.index, value=price_export)
+        )
 
     def as_dict(self) -> dict:
         """
@@ -72,9 +82,16 @@ class Exchange(BaseUnit):
         unit_dict.update(
             {
                 "unit_type": "exchange",
-                "price_import": self.price_import,
-                "price_export": self.price_export,
+                "price_import": self._constant_or_none(self.price_import),
+                "price_export": self._constant_or_none(self.price_export),
             }
         )
 
         return unit_dict
+
+    @staticmethod
+    def _constant_or_none(series: FastSeries) -> float | None:
+        """Returns the value of a constant price series, or None if the price varies over time."""
+        if series.min() == series.max():
+            return float(series.min())
+        return None
