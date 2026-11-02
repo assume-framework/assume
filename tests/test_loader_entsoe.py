@@ -808,6 +808,37 @@ def test_demand_is_utc_across_spring_dst(tmp_path):
     assert demand.index[0] == pd.Timestamp("2024-03-30 11:00")
 
 
+def test_cache_roundtrip_across_spring_dst(tmp_path):
+    # the cache file holds mixed UTC offsets (+01:00/+02:00) around the DST
+    # switch; reading it back must give the same result as the API query
+    iface = EntsoeInterface.__new__(EntsoeInterface)
+    iface.client = MagicMock()
+    iface.cache_dir = tmp_path
+    local = pd.date_range(
+        "2024-03-30 12:00", "2024-04-01 12:00", freq="h", tz="Europe/Berlin"
+    )
+    iface.client.query_load.return_value = pd.Series(
+        range(len(local)), index=local, dtype=float
+    )
+    iface.client.query_generation.return_value = pd.DataFrame(
+        {"Solar": range(len(local))}, index=local, dtype=float
+    )
+    start, end = datetime(2024, 3, 30, 11), datetime(2024, 4, 1, 10)
+    timestep = timedelta(hours=1)
+
+    demand = iface.get_country_demand(start, end, "DE", timestep)
+    generation = iface.get_country_generation(start, end, "DE", timestep)
+    cached_demand = iface.get_country_demand(start, end, "DE", timestep)
+    cached_generation = iface.get_country_generation(start, end, "DE", timestep)
+
+    assert iface.client.query_load.call_count == 1
+    assert iface.client.query_generation.call_count == 1
+    pd.testing.assert_series_equal(
+        cached_demand, demand, check_names=False, check_freq=False
+    )
+    pd.testing.assert_frame_equal(cached_generation, generation, check_freq=False)
+
+
 def test_single_row_caches_stay_series(tmp_path):
     iface = EntsoeInterface.__new__(EntsoeInterface)
     iface.cache_dir = tmp_path

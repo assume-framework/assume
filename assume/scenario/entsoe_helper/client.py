@@ -70,7 +70,11 @@ class EntsoeInterface:
         if not path.is_file():
             return None
         logger.info(f"using cached ENTSO-E data from {path}")
-        data = pd.read_csv(path, index_col=0, parse_dates=parse_dates)
+        data = pd.read_csv(path, index_col=0)
+        if parse_dates:
+            # cached raw data has mixed UTC offsets across DST switches, which
+            # read_csv cannot parse into a DatetimeIndex, so parse as UTC
+            data.index = pd.to_datetime(data.index, utc=True)
         if (
             squeeze_single_column
             and isinstance(data, pd.DataFrame)
