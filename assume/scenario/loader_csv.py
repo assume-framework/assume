@@ -1002,46 +1002,57 @@ def load_config_and_create_forecaster(
                 if type == "sector_coupled_system":
                     system_type = str(unit.get("system_type", "heat")).strip().lower()
                     node = str(unit["node"]).strip()
+
                     carrier_demands = {}
                     extra_profiles = {}
 
+                    supported_system_types = {"heat", "hydrogen", "heat_hydrogen"}
+                    if system_type not in supported_system_types:
+                        raise ValueError(
+                            f"Unsupported sector-coupled system_type {system_type!r} for '{id}'. "
+                            f"Supported values are {sorted(supported_system_types)}."
+                        )
+
                     if forecasts_df is None:
                         raise ValueError(
-                            f"forecasts_df.csv is required for SectorCoupledSystem '{id}'."
+                            f"SectorCoupledSystem '{id}' requires forecasts_df for carrier demands."
                         )
 
-                    if system_type == "heat":
-                        demand_column = f"heat_demand_{node}"
-                        if demand_column not in forecasts_df.columns:
+                    # Heat demand is required by heat-only and integrated heat+H2 systems.
+                    if system_type in {"heat", "heat_hydrogen"}:
+                        heat_column = f"heat_demand_{node}"
+
+                        if heat_column not in forecasts_df.columns:
                             raise ValueError(
                                 f"No heat-demand forecast found for SectorCoupledSystem '{id}'. "
-                                f"Expected column '{demand_column}' in forecasts_df.csv."
+                                f"Expected column '{heat_column}'."
                             )
-                        carrier_demands["heat"] = forecasts_df[demand_column]
 
-                    elif system_type == "hydrogen":
-                        demand_column = f"h2_demand_{node}"
-                        if demand_column not in forecasts_df.columns:
+                        carrier_demands["heat"] = forecasts_df[heat_column].reindex(index)
+
+
+                    # Hydrogen demand is required by hydrogen-only and integrated heat+H2 systems.
+                    if system_type in {"hydrogen", "heat_hydrogen"}:
+                        h2_column = f"h2_demand_{node}"
+
+                        if h2_column not in forecasts_df.columns:
                             raise ValueError(
                                 f"No hydrogen-demand forecast found for SectorCoupledSystem '{id}'. "
-                                f"Expected column '{demand_column}' in forecasts_df.csv."
+                                f"Expected column '{h2_column}'."
                             )
-                        carrier_demands["hydrogen"] = forecasts_df[demand_column]
+
+                        carrier_demands["hydrogen"] = forecasts_df[h2_column].reindex(index)
 
                         seasonal_storage_schedule = get_unit_forecast_column(
-                            forecasts_df, id, "seasonal_storage_schedule"
-                        )
-                        if seasonal_storage_schedule is None:
-                            seasonal_storage_schedule = 0
-                        extra_profiles["seasonal_storage_schedule"] = (
-                            seasonal_storage_schedule
+                            forecasts_df,
+                            id,
+                            "seasonal_storage_schedule",
                         )
 
-                    else:
-                        raise ValueError(
-                            f"Unsupported system_type '{system_type}' for SectorCoupledSystem '{id}'. "
-                            "Currently supported presets are 'heat' and 'hydrogen'."
-                        )
+                        if seasonal_storage_schedule is None:
+                            seasonal_storage_schedule = 0
+
+                        extra_profiles["seasonal_storage_schedule"] = seasonal_storage_schedule
 
                     unit_forecasts[id] = SectorCoupledForecaster(
                         index=shared_unit_index,
