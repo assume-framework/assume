@@ -1,34 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
-
-"""
-Generic sector-coupled ASSUME unit.
-
-The unit is a physical parent system that coordinates several internal DSM
-components while exposing either:
-
-1. one aggregate market position, or
-2. component-level market positions linked to the physical parent.
-
-The first implementation contains presets for:
-    - heat systems:
-        heat_pump + boiler + thermal_storage
-    - hydrogen systems:
-        electrolyser + hydrogen_seasonal_storage + fuel cell
-
-Additional sectors can be added by supplying ``carrier_balances`` instead of
-creating another parent-unit class.
-
-Important modelling principle
------------------------------
-The internal components are never optimized independently. Carrier balances,
-storage states and all component constraints remain inside one parent Pyomo
-optimization.
-
-Positive ``total_power_input`` means physical electricity consumption.
-Electricity-market demand therefore uses the opposite sign.
-"""
+# SPDX-License-Identifier: MIT
 
 from __future__ import annotations
 
@@ -43,92 +15,102 @@ from assume.common.base import SupportsMinMax
 from assume.units.dsm_load_shift import DSMFlex
 
 
+def _flows(variable, *prefixes):
+    return [{"prefix": p, "variable": variable} for p in prefixes]
+
+
+def _storage(prefix):
+    return dict(prefix=prefix, charge="charge", discharge="discharge", soc="soc")
+
+
+def _heat_balance(required=("heat_pump",)):
+    return {
+        "demand_attr": "heat_demand",
+        "sense": "eq",
+        "required_prefixes": list(required),
+        "allowed_prefixes": ["heat_pump", "boiler", "thermal_storage", "chp"],
+        "producers": _flows("heat_out", "heat_pump", "boiler", "chp"),
+        "storages": [_storage("thermal_storage")],
+    }
+
+
+def _hydrogen_balance(include_chp=False):
+    allowed_prefixes = ["electrolyser", "hydrogen_seasonal_storage", "fuel_cell"]
+
+    consumers = _flows("hydrogen_in", "fuel_cell")
+
+    if include_chp:
+        allowed_prefixes.append("chp")
+        consumers += _flows("hydrogen_in", "chp")
+
+    return {
+        "demand_attr": "hydrogen_demand",
+        "sense": "eq",
+        "required_prefixes": ["electrolyser"],
+        "allowed_prefixes": allowed_prefixes,
+        "producers": _flows("hydrogen_out", "electrolyser"),
+        "consumers": consumers,
+        "storages": [_storage("hydrogen_seasonal_storage")],
+    }
+
+
 class SectorCoupledSystem(DSMFlex, SupportsMinMax):
     """
-    Generic multi-component, sector-coupled parent unit.
+    Generic sector-coupled ASSUME unit.
 
-    Parameters
-    ----------
-    system_type : str
-        Preset physical configuration. Currently ``"heat"`` and
-        ``"hydrogen"`` are provided.
-    carrier_balances : dict, optional
-        Custom carrier-balance description. If given, it overrides the preset
-        balances and allows additional future sectors without defining a new
-        ASSUME unit class.
-    market_representation : {"aggregate", "component"}
-        ``"aggregate"`` exposes the parent unit only.
-        ``"component"`` exposes child market IDs linked by ``parent_unit_id``.
-    absolute_demands : dict[str, float], optional
-        Optional horizon-wide demand constraints per carrier.
-    enforce_terminal_soc : bool
-        If True, storage SOC is returned to its initial/reference terminal
-        level in full-horizon operation.
+    The unit is a physical parent system that coordinates several internal DSM
+    components while exposing either:
+
+    1. one aggregate market position, or
+    2. component-level market positions linked to the physical parent.
+
+    Presets (``system_type``):
+        - ``heat``: heat_pump + boiler + chp + thermal_storage
+        - ``hydrogen``: electrolyser + hydrogen_seasonal_storage + fuel_cell
+        - ``heat_hydrogen``: both balances; an H2-fired CHP draws its hydrogen
+        from the internal H2 balance and supplies the heat balance
+
+    Additional sectors can be added by supplying ``carrier_balances`` instead of
+    creating another parent-unit class.
+
+    Important modelling principle:
+    The internal components are never optimized independently. Carrier balances,
+    storage states and all component constraints remain inside one parent Pyomo
+    optimization.
+
+    Carrier balances:
+    The default heat and hydrogen presets use exact carrier balances. For hydrogen,
+    production must be allocated to hydrogen demand, storage charging, or another
+    explicitly modelled hydrogen-consuming component. Unmodelled hydrogen surplus
+    is not permitted.
+
+    Electrical sign convention:
+    ``total_power_input`` represents the net electrical grid exchange of the
+    sector-coupled parent:
+
+    - positive: electricity import / consumption
+    - negative: electricity export / generation
+
+    Negative values are required for systems containing electricity-producing
+    components such as fuel cells and CHPs.
     """
-
+    
     _component_market_tolerance = 1e-7
 
     SYSTEM_PRESETS: dict[str, dict[str, Any]] = {
         "heat": {
             "primary_carrier": "heat",
-            "balances": {
-                "heat": {
-                    "demand_attr": "heat_demand",
-                    "sense": "eq",
-                    "required_prefixes": ["heat_pump"],
-                    "allowed_prefixes": [
-                        "heat_pump",
-                        "boiler",
-                        "thermal_storage",
-                    ],
-                    "producers": [
-                        {"prefix": "heat_pump", "variable": "heat_out"},
-                        {"prefix": "boiler", "variable": "heat_out"},
-                    ],
-                    "storages": [
-                        {
-                            "prefix": "thermal_storage",
-                            "charge": "charge",
-                            "discharge": "discharge",
-                            "soc": "soc",
-                        }
-                    ],
-                }
-            },
+            "balances": {"heat": _heat_balance()},
         },
         "hydrogen": {
             "primary_carrier": "hydrogen",
+            "balances": {"hydrogen": _hydrogen_balance()},
+        },
+        "heat_hydrogen": {
+            "primary_carrier": "heat",
             "balances": {
-                "hydrogen": {
-                    "demand_attr": "hydrogen_demand",
-                    "sense": "eq",
-                    "required_prefixes": ["electrolyser"],
-                    "allowed_prefixes": [
-                        "electrolyser",
-                        "hydrogen_seasonal_storage",
-                        "fuel_cell",
-                    ],
-                    "producers": [
-                        {
-                            "prefix": "electrolyser",
-                            "variable": "hydrogen_out",
-                        }
-                    ],
-                    "consumers": [
-                        {
-                            "prefix": "fuel_cell",
-                            "variable": "hydrogen_in",
-                        }
-                    ],
-                    "storages": [
-                        {
-                            "prefix": "hydrogen_seasonal_storage",
-                            "charge": "charge",
-                            "discharge": "discharge",
-                            "soc": "soc",
-                        }
-                    ],
-                }
+                "heat": _heat_balance(required=["chp"]),
+                "hydrogen": _hydrogen_balance(include_chp=True),
             },
         },
     }
@@ -181,8 +163,8 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         if carrier_balances is None:
             if system_type not in self.SYSTEM_PRESETS:
                 raise ValueError(
-                    f"Unknown system_type '{system_type}'. "
-                    f"Use one of {list(self.SYSTEM_PRESETS)} or provide carrier_balances."
+                    f"Unknown system_type '{system_type}'. Use one of "
+                    f"{list(self.SYSTEM_PRESETS)} or provide carrier_balances."
                 )
             preset = copy.deepcopy(self.SYSTEM_PRESETS[system_type])
             carrier_balances = preset["balances"]
@@ -225,8 +207,8 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                 )
             self.carrier_demands[carrier] = getattr(forecaster, demand_attr)
 
-        # Existing long-term H2 storage uses an external seasonal schedule.
-        if system_type == "hydrogen" and hasattr(
+        # Long-term H2 storage uses an external seasonal schedule.
+        if system_type in {"hydrogen", "heat_hydrogen"} and hasattr(
             forecaster, "seasonal_storage_schedule"
         ):
             for name, cfg in components.items():
@@ -251,16 +233,16 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
             **kwargs,
         )
 
-        self.storage_components = self._matching_storage_components(
-            self.components
-        )
+        # Store solved rolling windows so redispatch can retrieve the
+        # DA reference that originally committed a requested timestep.
+        self._rh_market_references: dict[int, dict[str, Any]] = {}
+
+        self.storage_components = self._matching_storage_components(self.components)
 
     # Configuration helpers
     @staticmethod
     def _matches_prefix(component_name: str, prefix: str) -> bool:
-        return component_name == prefix or component_name.startswith(
-            f"{prefix}_"
-        )
+        return component_name == prefix or component_name.startswith(f"{prefix}_")
 
     def _names_matching_prefix(
         self,
@@ -268,11 +250,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         components: dict | None = None,
     ) -> list[str]:
         source = self.components if components is None else components
-        return [
-            name
-            for name in source
-            if self._matches_prefix(name, prefix)
-        ]
+        return [name for name in source if self._matches_prefix(name, prefix)]
 
     def _matching_storage_components(
         self,
@@ -303,30 +281,56 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                 term["prefix"] for term in spec.get("producers", [])
             )
             allowed_prefixes.update(
-                term["prefix"] for term in spec.get("storages", [])
+                term["prefix"] for term in spec.get("consumers", [])
             )
+            allowed_prefixes.update(term["prefix"] for term in spec.get("storages", []))
 
         for required in required_prefixes:
-            if not any(
-                self._matches_prefix(name, required)
-                for name in components
-            ):
+            if not any(self._matches_prefix(name, required) for name in components):
                 raise ValueError(
-                    f"SectorCoupledSystem requires at least one "
-                    f"'{required}' component."
+                    f"SectorCoupledSystem requires at least one '{required}' component."
                 )
 
         if allowed_prefixes:
             for name in components:
                 if not any(
-                    self._matches_prefix(name, prefix)
-                    for prefix in allowed_prefixes
+                    self._matches_prefix(name, prefix) for prefix in allowed_prefixes
                 ):
                     raise ValueError(
                         f"Component '{name}' is not valid for "
                         f"system_type='{self.system_type}'. "
                         f"Allowed prefixes: {sorted(allowed_prefixes)}"
                     )
+
+        # An H2-fired CHP has no external fuel price. It must therefore deliver
+        # heat into the heat balance AND draw hydrogen from the hydrogen balance,
+        # so both carriers are coupled in one model. Systems without an
+        # H2-fired CHP are not affected by this check.
+        h2_chps = [
+            name
+            for name, cfg in components.items()
+            if self._matches_prefix(name, "chp")
+            and isinstance(cfg, dict)
+            and str(cfg.get("fuel_type", "natural_gas")).strip().lower() == "hydrogen_gas"
+        ]
+        if h2_chps:
+
+            def chp_term(carrier: str, role: str, variable: str) -> bool:
+                terms = self.carrier_balances.get(carrier, {}).get(role, [])
+                return any(
+                    term["prefix"] == "chp" and term["variable"] == variable
+                    for term in terms
+                )
+
+            if not (
+                chp_term("heat", "producers", "heat_out")
+                and chp_term("hydrogen", "consumers", "hydrogen_in")
+            ):
+                raise ValueError(
+                    f"H2-fired CHP {h2_chps} needs a heat balance with 'chp' "
+                    "producing 'heat_out' and a hydrogen balance with 'chp' "
+                    "consuming 'hydrogen_in', e.g. system_type='heat_hydrogen'."
+                )
 
     def _component_output_variable(
         self,
@@ -367,9 +371,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                     self.model.time_steps,
                     initialize={
                         t: value
-                        for t, value in enumerate(
-                            self._values_for_model(series)
-                        )
+                        for t, value in enumerate(self._values_for_model(series))
                     },
                 ),
             )
@@ -380,45 +382,38 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                 pyo.Param(initialize=float(value)),
             )
 
-        # Fuel prices currently required by Boiler components.
-        raw_components = self.components
-        boiler_fuel_types = {
-            cfg.get("fuel_type", "electricity")
-            for name, cfg in raw_components.items()
-            if self._matches_prefix(name, "boiler")
-            and isinstance(cfg, dict)
-        }
+        # External fuel prices. Natural gas is needed by gas-fired boilers and CHPs;
+        # hydrogen only by H2-fired boilers (H2-fired CHP uses internally balanced H2).
+        # Defaults match the component classes: Boiler -> electricity,
+        # CHP -> natural_gas.
+        def fuel_types(prefix, default):
+            return {
+                cfg.get("fuel_type", default)
+                for name, cfg in self.components.items()
+                if isinstance(cfg, dict) and self._matches_prefix(name, prefix)
+            }
 
-        if "natural_gas" in boiler_fuel_types:
-            self.model.natural_gas_price = pyo.Param(
-                self.model.time_steps,
-                initialize={
-                    t: value
-                    for t, value in enumerate(
-                        self._values_for_model(
-                            self.forecaster.get_price("natural gas")
-                        )
-                    )
-                },
-            )
+        def price_param(commodity):
+            prices = self._values_for_model(self.forecaster.get_price(commodity))
+            return pyo.Param(self.model.time_steps, initialize=dict(enumerate(prices)))
 
-        if "hydrogen_gas" in boiler_fuel_types:
-            self.model.hydrogen_gas_price = pyo.Param(
-                self.model.time_steps,
-                initialize={
-                    t: value
-                    for t, value in enumerate(
-                        self._values_for_model(
-                            self.forecaster.get_price("hydrogen")
-                        )
-                    )
-                },
-            )
+        boiler_fuels = fuel_types("boiler", default="electricity")
+        chp_fuels = fuel_types("chp", default="natural_gas")
+
+        if "natural_gas" in boiler_fuels | chp_fuels:
+            self.model.natural_gas_price = price_param("natural gas")
+        if "hydrogen_gas" in boiler_fuels:
+            self.model.hydrogen_gas_price = price_param("hydrogen")
 
     def define_variables(self):
         self.model.total_power_input = pyo.Var(
             self.model.time_steps,
             within=pyo.Reals,
+            doc=(
+                "Net electrical exchange of the sector-coupled system. "
+                "Positive values denote electricity import/consumption; "
+                "negative values denote electricity export/generation."
+            ),
         )
         self.model.variable_cost = pyo.Var(
             self.model.time_steps,
@@ -450,7 +445,6 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                     )
                 expr += getattr(block, variable)[t]
 
-
         for consumer in spec.get("consumers", []):
             for name in self._names_matching_prefix(consumer["prefix"]):
                 block = m.dsm_blocks[name]
@@ -464,16 +458,11 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
 
                 expr -= getattr(block, variable)[t]
 
-
         for storage in spec.get("storages", []):
             for name in self._names_matching_prefix(storage["prefix"]):
                 block = m.dsm_blocks[name]
-                expr += getattr(
-                    block, storage.get("discharge", "discharge")
-                )[t]
-                expr -= getattr(
-                    block, storage.get("charge", "charge")
-                )[t]
+                expr += getattr(block, storage.get("discharge", "discharge"))[t]
+                expr -= getattr(block, storage.get("charge", "charge"))[t]
 
         return expr
 
@@ -489,9 +478,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
 
                 if absolute > 0:
                     served = getattr(self.model, f"{carrier}_served")[t]
-                    self.model.carrier_balance_constraints.add(
-                        supply == served
-                    )
+                    self.model.carrier_balance_constraints.add(supply == served)
                     continue
 
                 sense = spec.get("sense", "eq")
@@ -505,17 +492,13 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                     )
                 else:
                     raise ValueError(
-                        f"Unsupported balance sense '{sense}' "
-                        f"for carrier '{carrier}'."
+                        f"Unsupported balance sense '{sense}' for carrier '{carrier}'."
                     )
 
     def define_constraints(self):
         @self.model.Constraint(self.model.time_steps)
         def total_power_input_constraint(m, t):
-            return (
-                m.total_power_input[t]
-                == self._component_power_expr(m, t)
-            )
+            return m.total_power_input[t] == self._component_power_expr(m, t)
 
         @self.model.Constraint(self.model.time_steps)
         def variable_cost_constraint(m, t):
@@ -533,14 +516,9 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
             if not value or value <= 0:
                 continue
             served = getattr(self.model, f"{carrier}_served")
-            absolute_param = getattr(
-                self.model, f"absolute_{carrier}_demand"
-            )
+            absolute_param = getattr(self.model, f"absolute_{carrier}_demand")
             self.model.absolute_carrier_demand_constraints.add(
-                pyo.quicksum(
-                    served[t] for t in self.model.time_steps
-                )
-                >= absolute_param
+                pyo.quicksum(served[t] for t in self.model.time_steps) >= absolute_param
             )
 
         if (
@@ -570,18 +548,14 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         return f"{self.id}_{component_name}"
 
     def get_component_market_ids(self) -> dict[str, str]:
-        return {
-            name: self._component_market_id(name)
-            for name in self.components
-        }
+        return {name: self._component_market_id(name) for name in self.components}
 
     def _index_position(self, start) -> int:
         for pos, timestamp in enumerate(self.index):
             if timestamp == start:
                 return pos
         raise KeyError(
-            f"Timestamp {start!r} is not contained in "
-            f"SectorCoupledSystem '{self.id}'."
+            f"Timestamp {start!r} is not contained in SectorCoupledSystem '{self.id}'."
         )
 
     @staticmethod
@@ -596,6 +570,154 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
             return float(series.at[timestamp])
         except (KeyError, AttributeError, TypeError):
             return float(default)
+
+    def _on_rolling_window_solved(
+        self,
+        instance: pyo.ConcreteModel,
+        window_start: int,
+        window_end: int,
+        commit_end: int,
+        saved_index,
+    ) -> None:
+        """
+        Capture the solved rolling-horizon window as the market reference.
+
+        The complete solved look-ahead window is retained in
+        ``_rh_market_reference`` so redispatch can later be evaluated around the
+        exact same physical trajectory and initial state.
+
+        Only the committed part of the rolling window is merged into
+        ``da_power`` and ``da_component_state``.  Look-ahead-only timesteps are
+        provisional and must not overwrite the chronological DA reference until
+        they are actually committed by a later rolling window.
+        """
+        if self.horizon_mode != "rolling_horizon":
+            return
+
+        full_index = list(saved_index)
+        window_index = full_index[window_start:window_end]
+        n_commit = commit_end - window_start
+        committed_index = window_index[:n_commit]
+
+        if len(window_index) != len(list(instance.time_steps)):
+            raise RuntimeError(
+                f"Rolling-window reference length mismatch for '{self.id}': "
+                f"window has {len(window_index)} timestamps but solved instance "
+                f"has {len(list(instance.time_steps))} time steps."
+            )
+
+        window_power = pd.Series(
+            [
+                float(pyo.value(instance.total_power_input[t]))
+                for t in instance.time_steps
+            ],
+            index=window_index,
+            dtype=float,
+        )
+
+        # During the rolling solve self.index is the window index, so this
+        # extracts a physically consistent trajectory on exactly window_index.
+        window_component_state = self._extract_component_trajectory(instance)
+
+        # Keep the whole current look-ahead solution.  This is deliberately
+        # separate from da_* because only the committed part is authoritative.
+        self._rh_market_reference = {
+            "window_start": int(window_start),
+            "window_end": int(window_end),
+            "commit_end": int(commit_end),
+            "index": pd.Index(window_index),
+            "committed_index": pd.Index(committed_index),
+            "power": window_power.copy(deep=True),
+            "component_state": {
+                name: {
+                    variable: series.copy(deep=True)
+                    for variable, series in states.items()
+                }
+                for name, states in window_component_state.items()
+            },
+            # The solved Pyomo instance is no longer mutated after this hook;
+            # retain it so a later rolling-aware redispatch solve can clone/reuse the
+            # exact DA-window model instead of rebuilding a full-horizon model.
+            "instance": instance,
+        }
+
+        # Retain this solved rolling window so redispatch can still refer to it
+        # after a later DA window has been optimized.
+        self._rh_market_references[int(window_start)] = self._rh_market_reference
+
+        # Merge committed parent power into the chronological DA reference.
+        existing_power = getattr(self, "da_power", None)
+        if isinstance(existing_power, pd.Series):
+            self.da_power = existing_power.reindex(full_index).astype(float)
+        else:
+            self.da_power = pd.Series(float("nan"), index=full_index, dtype=float)
+
+        # Anything at/after commit_end is still provisional in rolling mode.
+        # Invalidate an older full-horizon/cache value so it cannot be mistaken
+        # for an already committed DA reference.
+        if commit_end < len(full_index):
+            self.da_power.iloc[commit_end:] = float("nan")
+
+        if committed_index:
+            self.da_power.loc[committed_index] = window_power.iloc[:n_commit].to_numpy()
+
+        # Merge committed component variables into the chronological reference.
+        if not isinstance(getattr(self, "da_component_state", None), dict):
+            self.da_component_state = {}
+
+        for component_name, states in window_component_state.items():
+            target_states = self.da_component_state.setdefault(component_name, {})
+
+            for variable_name, window_series in states.items():
+                existing_series = target_states.get(variable_name)
+
+                if isinstance(existing_series, pd.Series):
+                    full_series = existing_series.reindex(full_index).astype(float)
+                else:
+                    full_series = pd.Series(float("nan"), index=full_index, dtype=float)
+
+                if commit_end < len(full_index):
+                    full_series.iloc[commit_end:] = float("nan")
+
+                if committed_index:
+                    full_series.loc[committed_index] = window_series.iloc[
+                        :n_commit
+                    ].to_numpy()
+
+                target_states[variable_name] = full_series
+
+        self._rebuild_market_reference_views()
+
+    def _rebuild_market_reference_views(self) -> None:
+        """Rebuild derived market-reference views from ``da_component_state``."""
+        self.da_component_power = {}
+        self.da_storage_soc = {}
+        self.da_storage_charge = {}
+        self.da_storage_discharge = {}
+
+        for name, state in self.da_component_state.items():
+            power_in = state.get("power_in")
+            power_out = state.get("power_out")
+
+            if power_in is not None or power_out is not None:
+                if power_in is None:
+                    self.da_component_power[name] = -power_out
+                elif power_out is None:
+                    self.da_component_power[name] = power_in
+                else:
+                    self.da_component_power[name] = power_in - power_out
+
+            if "soc" in state:
+                self.da_storage_soc[name] = state["soc"]
+
+            if "charge" in state:
+                self.da_storage_charge[name] = state["charge"]
+
+            if "discharge" in state:
+                self.da_storage_discharge[name] = state["discharge"]
+
+        # Any cached RD envelope was calculated around the old reference.
+        self._sector_redispatch_cache = {}
 
     def _extract_component_trajectory(
         self,
@@ -631,10 +753,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
 
         return result
 
-    def _store_market_reference(
-        self,
-        instance: pyo.ConcreteModel,
-    ) -> None:
+    def _store_market_reference(self, instance: pyo.ConcreteModel) -> None:
         self.da_power = pd.Series(
             [
                 float(pyo.value(instance.total_power_input[t]))
@@ -644,26 +763,9 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
             dtype=float,
         )
 
-        self.da_component_state = self._extract_component_trajectory(
-            instance
-        )
+        self.da_component_state = self._extract_component_trajectory(instance)
 
-        self.da_component_power = {}
-        self.da_storage_soc = {}
-        self.da_storage_charge = {}
-        self.da_storage_discharge = {}
-
-        for name, state in self.da_component_state.items():
-            if "power_in" in state:
-                self.da_component_power[name] = state["power_in"]
-            if "soc" in state:
-                self.da_storage_soc[name] = state["soc"]
-            if "charge" in state:
-                self.da_storage_charge[name] = state["charge"]
-            if "discharge" in state:
-                self.da_storage_discharge[name] = state["discharge"]
-
-        self._sector_redispatch_cache = {}
+        self._rebuild_market_reference_views()
 
     def prepare_market_state(self, force: bool = False) -> None:
         """Solve and store the physically consistent cost-optimal reference."""
@@ -681,8 +783,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
 
         if not (
             results.solver.status == SolverStatus.ok
-            and results.solver.termination_condition
-            == TerminationCondition.optimal
+            and results.solver.termination_condition == TerminationCondition.optimal
         ):
             raise RuntimeError(
                 f"Reference solve failed for SectorCoupledSystem "
@@ -700,12 +801,28 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         default: float = 0.0,
     ) -> float:
         self.prepare_market_state()
-        series = (
-            self.da_component_state
-            .get(component_name, {})
-            .get(variable_name)
-        )
+        series = self.da_component_state.get(component_name, {}).get(variable_name)
         return self._value_at(series, start, default)
+
+    def _reference_component_net_power(
+        self,
+        component_name: str,
+        start,
+    ) -> float:
+        power_in = self._reference_component_value(
+            component_name,
+            "power_in",
+            start,
+            0.0,
+        )
+        power_out = self._reference_component_value(
+            component_name,
+            "power_out",
+            start,
+            0.0,
+        )
+
+        return power_in - power_out
 
     @staticmethod
     def _snapshot_value(
@@ -714,9 +831,26 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         variable_name: str,
         default: float = 0.0,
     ) -> float:
-        return float(
-            snapshot.get(component_name, {}).get(variable_name, default)
-        )
+        return float(snapshot.get(component_name, {}).get(variable_name, default))
+
+    @staticmethod
+    def _snapshot_component_net_power(
+        snapshot: dict[str, dict[str, float]],
+        component_name: str,
+    ) -> float:
+        """
+        Return the component's net electrical grid exchange from a
+        solved component snapshot.
+
+        Positive values denote electricity consumption/import.
+        Negative values denote electricity generation/export.
+        """
+        values = snapshot.get(component_name, {})
+
+        power_in = float(values.get("power_in", 0.0))
+        power_out = float(values.get("power_out", 0.0))
+
+        return power_in - power_out
 
     def _extract_component_snapshot(
         self,
@@ -733,9 +867,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                 if not variable.is_indexed():
                     continue
                 try:
-                    values[variable.local_name] = float(
-                        pyo.value(variable[target_t])
-                    )
+                    values[variable.local_name] = float(pyo.value(variable[target_t]))
                 except (KeyError, ValueError, TypeError):
                     continue
 
@@ -798,11 +930,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         instance.market_terminal_soc = pyo.ConstraintList()
 
         for name in self.storage_components:
-            reference_soc = (
-                self.da_component_state
-                .get(name, {})
-                .get("soc")
-            )
+            reference_soc = self.da_component_state.get(name, {}).get("soc")
             if reference_soc is None:
                 continue
 
@@ -811,14 +939,209 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                 continue
 
             instance.market_terminal_soc.add(
-                block.soc[final_t]
-                == float(reference_soc.iloc[final_t])
+                block.soc[final_t] == float(reference_soc.iloc[final_t])
             )
 
-    def _solve_redispatch_extreme(
+    def _rolling_reference_for_start(
         self,
         start,
-        sense: str,
+    ) -> tuple[dict[str, Any], int]:
+        """
+        Return the rolling-window reference and local timestep for ``start``.
+
+        Redispatch is evaluated against the rolling DA window that originally
+        committed the requested timestep. This allows redispatch to use an older
+        DA reference even after a newer rolling window has already been solved.
+
+        A timestep that exists only in the provisional look-ahead part of a solved
+        window is rejected until it has actually been committed.
+        """
+        global_t = self._index_position(start)
+
+        reference = None
+        references = getattr(self, "_rh_market_references", {})
+
+        # First look for the window that actually committed this timestep.
+        for stored_window_start in sorted(references, reverse=True):
+            candidate = references[stored_window_start]
+
+            candidate_start = int(candidate["window_start"])
+            candidate_commit_end = int(candidate["commit_end"])
+
+            if candidate_start <= global_t < candidate_commit_end:
+                reference = candidate
+                break
+
+        # Backward-compatible fallback to the current/latest reference.
+        if reference is None:
+            candidate = getattr(self, "_rh_market_reference", None)
+
+            if isinstance(candidate, dict):
+                candidate_start = int(candidate["window_start"])
+                candidate_commit_end = int(candidate["commit_end"])
+
+                if candidate_start <= global_t < candidate_commit_end:
+                    reference = candidate
+
+        # No committed reference was found. Check whether the timestep is known
+        # but still belongs only to a provisional look-ahead region.
+        if reference is None:
+            provisional_reference = None
+
+            for stored_window_start in sorted(references, reverse=True):
+                candidate = references[stored_window_start]
+
+                candidate_start = int(candidate["window_start"])
+                candidate_end = int(candidate["window_end"])
+                candidate_commit_end = int(candidate["commit_end"])
+
+                if (
+                    candidate_start <= global_t < candidate_end
+                    and global_t >= candidate_commit_end
+                ):
+                    provisional_reference = candidate
+                    break
+
+            if provisional_reference is None:
+                candidate = getattr(self, "_rh_market_reference", None)
+
+                if isinstance(candidate, dict):
+                    candidate_start = int(candidate["window_start"])
+                    candidate_end = int(candidate["window_end"])
+                    candidate_commit_end = int(candidate["commit_end"])
+
+                    if (
+                        candidate_start <= global_t < candidate_end
+                        and global_t >= candidate_commit_end
+                    ):
+                        provisional_reference = candidate
+
+            if provisional_reference is not None:
+                window_start = int(provisional_reference["window_start"])
+                commit_end = int(provisional_reference["commit_end"])
+
+                raise RuntimeError(
+                    f"Redispatch timestamp {start} for '{self.id}' is not committed "
+                    f"yet. Active committed range is "
+                    f"[{window_start}:{commit_end})."
+                )
+
+            raise RuntimeError(
+                f"No committed rolling-horizon market reference is available "
+                f"for SectorCoupledSystem '{self.id}' at {start}."
+            )
+
+        window_start = int(reference["window_start"])
+        window_end = int(reference["window_end"])
+        commit_end = int(reference["commit_end"])
+
+        # Defensive consistency check.
+        if not (window_start <= global_t < window_end):
+            raise RuntimeError(
+                f"Redispatch timestamp {start} for '{self.id}' is outside "
+                f"the selected rolling window [{window_start}:{window_end})."
+            )
+
+        if global_t >= commit_end:
+            raise RuntimeError(
+                f"Redispatch timestamp {start} for '{self.id}' is not committed "
+                f"in the selected rolling window. Committed range is "
+                f"[{window_start}:{commit_end})."
+            )
+
+        target_local = global_t - window_start
+
+        return reference, target_local
+
+    def _fix_rolling_past_to_reference(
+        self, instance: pyo.ConcreteModel, target_local: int, reference: dict[str, Any]
+    ) -> None:
+        """
+        Fix local timesteps before the RD target to the rolling DA trajectory.
+
+        The rolling-window model already starts from the correct carried initial
+        state.  Fixing only the local past preserves chronology while leaving the
+        RD target and future look-ahead timesteps free to re-optimise.
+        """
+        if target_local <= 0:
+            return
+
+        component_state = reference["component_state"]
+
+        for component_name, states in component_state.items():
+            if component_name not in instance.dsm_blocks:
+                continue
+
+            block = instance.dsm_blocks[component_name]
+
+            for variable_name, series in states.items():
+                if not hasattr(block, variable_name):
+                    continue
+
+                variable = getattr(block, variable_name)
+                if not variable.is_indexed():
+                    continue
+
+                for local_t in range(target_local):
+                    if local_t not in variable:
+                        continue
+
+                    value = float(series.iloc[local_t])
+                    if pd.isna(value):
+                        continue
+
+                    lb = variable[local_t].lb
+                    ub = variable[local_t].ub
+
+                    if lb is not None:
+                        value = max(value, lb)
+                    if ub is not None:
+                        value = min(value, ub)
+
+                    variable[local_t].fix(value)
+
+        rolling_power = reference["power"]
+        for local_t in range(target_local):
+            value = float(rolling_power.iloc[local_t])
+            if not pd.isna(value):
+                instance.total_power_input[local_t].fix(value)
+
+    def _add_rolling_reference_terminal_soc(
+        self, instance: pyo.ConcreteModel, reference: dict[str, Any]
+    ) -> None:
+        """
+        Preserve the DA storage value at the end of the current look-ahead window.
+
+        RD may change the target hour and re-optimise subsequent hours, but it
+        must return each storage to the SOC of the original rolling DA solution
+        at the end of that same look-ahead window.
+        """
+        if not self.storage_components:
+            return
+
+        final_local = list(instance.time_steps)[-1]
+        instance.market_terminal_soc = pyo.ConstraintList()
+
+        for name in self.storage_components:
+            reference_soc = reference["component_state"].get(name, {}).get("soc")
+            if reference_soc is None or len(reference_soc) == 0:
+                continue
+
+            terminal_soc = float(reference_soc.iloc[-1])
+            if pd.isna(terminal_soc):
+                continue
+
+            if name not in instance.dsm_blocks:
+                continue
+
+            block = instance.dsm_blocks[name]
+            if not hasattr(block, "soc"):
+                continue
+
+            instance.market_terminal_soc.add(block.soc[final_local] == terminal_soc)
+
+    def _solve_redispatch_extreme(
+        self, start, sense: str
     ) -> tuple[float, dict[str, dict[str, float]]]:
         if sense not in {"min", "max"}:
             raise ValueError("sense must be either 'min' or 'max'.")
@@ -826,52 +1149,66 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         self.prepare_market_state()
 
         cache = getattr(self, "_sector_redispatch_cache", {})
-        key = (start, sense)
 
-        if key in cache:
-            return cache[key]
+        if self.horizon_mode == "rolling_horizon":
+            reference, target_t = self._rolling_reference_for_start(start)
 
-        target_t = self._index_position(start)
+            key = (
+                start,
+                sense,
+                int(reference["window_start"]),
+                int(reference["commit_end"]),
+            )
+            if key in cache:
+                return cache[key]
 
-        instance = self.model.create_instance()
-        instance = self.switch_to_opt(instance)
+            # Start from the exact Pyomo instance that generated the rolling DA
+            # trajectory.  Clone it so the stored reference is never mutated by
+            # redispatch-bound calculations.
+            instance = reference["instance"].clone()
 
-        if hasattr(instance, "obj_rule_opt"):
-            instance.obj_rule_opt.deactivate()
+            self._fix_rolling_past_to_reference(instance, target_t, reference)
+            self._add_rolling_reference_terminal_soc(instance, reference)
 
-        self._fix_committed_past_to_reference(instance, target_t)
-        self._add_reference_terminal_soc(instance)
+        else:
+            key = (start, sense)
+            if key in cache:
+                return cache[key]
+
+            target_t = self._index_position(start)
+
+            instance = self.model.create_instance()
+            instance = self.switch_to_opt(instance)
+
+            self._fix_committed_past_to_reference(instance, target_t)
+            self._add_reference_terminal_soc(instance)
+
+        # The RD bound introduces its own objective.  Deactivate whichever
+        # optimization objective is active in the cloned/fresh reference model.
+        for objective in instance.component_objects(pyo.Objective, active=True):
+            objective.deactivate()
 
         total_cost = pyo.quicksum(
-            instance.variable_cost[t]
-            for t in instance.time_steps
+            instance.variable_cost[t] for t in instance.time_steps
         )
         epsilon = 1e-9
 
         if sense == "min":
-            expression = (
-                instance.total_power_input[target_t]
-                + epsilon * total_cost
-            )
+            expression = instance.total_power_input[target_t] + epsilon * total_cost
             objective_sense = pyo.minimize
         else:
-            expression = (
-                instance.total_power_input[target_t]
-                - epsilon * total_cost
-            )
+            expression = instance.total_power_input[target_t] - epsilon * total_cost
             objective_sense = pyo.maximize
 
         instance.sector_market_bound_objective = pyo.Objective(
-            expr=expression,
-            sense=objective_sense,
+            expr=expression, sense=objective_sense
         )
 
         results = self.solver.solve(instance, options={}, tee=False)
 
         if not (
             results.solver.status == SolverStatus.ok
-            and results.solver.termination_condition
-            == TerminationCondition.optimal
+            and results.solver.termination_condition == TerminationCondition.optimal
         ):
             raise RuntimeError(
                 f"{sense} redispatch-bound solve failed for "
@@ -880,13 +1217,8 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                 f"termination={results.solver.termination_condition}"
             )
 
-        power = float(
-            pyo.value(instance.total_power_input[target_t])
-        )
-        snapshot = self._extract_component_snapshot(
-            instance,
-            target_t,
-        )
+        power = float(pyo.value(instance.total_power_input[target_t]))
+        snapshot = self._extract_component_snapshot(instance, target_t)
 
         cache[key] = (power, snapshot)
         self._sector_redispatch_cache = cache
@@ -907,12 +1239,8 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
 
         self.prepare_market_state()
 
-        min_consumption, _ = self._solve_redispatch_extreme(
-            start, "min"
-        )
-        max_consumption, _ = self._solve_redispatch_extreme(
-            start, "max"
-        )
+        min_consumption, _ = self._solve_redispatch_extreme(start, "min")
+        max_consumption, _ = self._solve_redispatch_extreme(start, "max")
         base_consumption = float(self.da_power.at[start])
 
         if min_consumption > base_consumption + tolerance:
@@ -946,11 +1274,9 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         positions = []
 
         for component_name in self.components:
-            power = self._reference_component_value(
+            power = self._reference_component_net_power(
                 component_name,
-                "power_in",
                 start,
-                0.0,
             )
 
             positions.append(
@@ -964,9 +1290,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                 }
             )
 
-        summed_power = sum(
-            item["physical_power"] for item in positions
-        )
+        summed_power = sum(item["physical_power"] for item in positions)
         parent_power = float(self.da_power.at[start])
 
         if abs(summed_power - parent_power) > 1e-6:
@@ -1001,73 +1325,48 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                 charge_var = storage.get("charge", "charge")
                 discharge_var = storage.get("discharge", "discharge")
 
-                base_net = (
-                    self._reference_component_value(
-                        name, discharge_var, start, 0.0
-                    )
-                    - self._reference_component_value(
-                        name, charge_var, start, 0.0
-                    )
-                )
-                min_net = (
-                    self._snapshot_value(
-                        min_snapshot, name, discharge_var, 0.0
-                    )
-                    - self._snapshot_value(
-                        min_snapshot, name, charge_var, 0.0
-                    )
-                )
-                max_net = (
-                    self._snapshot_value(
-                        max_snapshot, name, discharge_var, 0.0
-                    )
-                    - self._snapshot_value(
-                        max_snapshot, name, charge_var, 0.0
-                    )
-                )
+                base_net = self._reference_component_value(
+                    name, discharge_var, start, 0.0
+                ) - self._reference_component_value(name, charge_var, start, 0.0)
+                min_net = self._snapshot_value(
+                    min_snapshot, name, discharge_var, 0.0
+                ) - self._snapshot_value(min_snapshot, name, charge_var, 0.0)
+                max_net = self._snapshot_value(
+                    max_snapshot, name, discharge_var, 0.0
+                ) - self._snapshot_value(max_snapshot, name, charge_var, 0.0)
 
                 up_weights[name] = max(0.0, min_net - base_net)
                 down_weights[name] = max(0.0, base_net - max_net)
                 continue
 
+            # Prefer direct electrical changes whenever the component exchanges
+            # electricity with the grid.
+            base_power = self._reference_component_net_power(name, start)
+            min_power = self._snapshot_component_net_power(min_snapshot, name)
+            max_power = self._snapshot_component_net_power(max_snapshot, name)
+
+            if max(abs(base_power), abs(min_power), abs(max_power)) > tolerance:
+                # Upward redispatch means reducing net consumption or increasing
+                # generation, i.e. moving towards a lower net electrical exchange
+                up_weights[name] = max(0.0, base_power - min_power)
+
+                # Downward redispatch means increasing net consumption or reducing
+                # generation.
+                down_weights[name] = max(0.0, max_power - base_power)
+                continue
+
+            # Components without direct electrical exchange can still influence
+            # electrical flexibility indirectly through the coupled carrier balance
             output_var = self._component_output_variable(name)
             if output_var is None:
                 continue
 
-            base_power = self._reference_component_value(
-                name, "power_in", start, 0.0
-            )
-            min_power = self._snapshot_value(
-                min_snapshot, name, "power_in", 0.0
-            )
-            max_power = self._snapshot_value(
-                max_snapshot, name, "power_in", 0.0
-            )
+            base_output = self._reference_component_value(name, output_var, start, 0.0)
+            min_output = self._snapshot_value(min_snapshot, name, output_var, 0.0)
+            max_output = self._snapshot_value(max_snapshot, name, output_var, 0.0)
 
-            # Direct electrical components are handled by the fallback below.
-            if max(
-                abs(base_power),
-                abs(min_power),
-                abs(max_power),
-            ) > tolerance:
-                continue
-
-            base_output = self._reference_component_value(
-                name, output_var, start, 0.0
-            )
-            min_output = self._snapshot_value(
-                min_snapshot, name, output_var, 0.0
-            )
-            max_output = self._snapshot_value(
-                max_snapshot, name, output_var, 0.0
-            )
-
-            up_weights[name] = max(
-                0.0, min_output - base_output
-            )
-            down_weights[name] = max(
-                0.0, base_output - max_output
-            )
+            up_weights[name] = max(0.0, min_output - base_output)
+            down_weights[name] = max(0.0, base_output - max_output)
 
         return up_weights, down_weights
 
@@ -1079,10 +1378,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         tolerance: float,
     ) -> dict[str, float]:
         allocation = {name: 0.0 for name in names}
-        positive = {
-            name: max(0.0, float(weights.get(name, 0.0)))
-            for name in names
-        }
+        positive = {name: max(0.0, float(weights.get(name, 0.0))) for name in names}
         weight_sum = sum(positive.values())
 
         if total <= tolerance or weight_sum <= tolerance:
@@ -1107,19 +1403,11 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         self.prepare_market_state()
 
         base_consumption = float(self.da_power.at[start])
-        min_consumption, min_snapshot = self._solve_redispatch_extreme(
-            start, "min"
-        )
-        max_consumption, max_snapshot = self._solve_redispatch_extreme(
-            start, "max"
-        )
+        min_consumption, min_snapshot = self._solve_redispatch_extreme(start, "min")
+        max_consumption, max_snapshot = self._solve_redispatch_extreme(start, "max")
 
-        up_total = max(
-            0.0, base_consumption - min_consumption
-        )
-        down_total = max(
-            0.0, max_consumption - base_consumption
-        )
+        up_total = max(0.0, base_consumption - min_consumption)
+        down_total = max(0.0, max_consumption - base_consumption)
 
         names = list(self.components)
 
@@ -1144,21 +1432,12 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
 
         # Fallback: attribute unexplained flexibility to direct changes in
         # electrical input.
-        if (
-            up_total > tolerance
-            and sum(up_allocation.values()) <= tolerance
-        ):
+        if up_total > tolerance and sum(up_allocation.values()) <= tolerance:
             direct_up = {}
             for name in names:
-                base_power = self._reference_component_value(
-                    name, "power_in", start, 0.0
-                )
-                min_power = self._snapshot_value(
-                    min_snapshot, name, "power_in", 0.0
-                )
-                direct_up[name] = max(
-                    0.0, base_power - min_power
-                )
+                base_power = self._reference_component_net_power(name, start)
+                min_power = self._snapshot_component_net_power(min_snapshot, name)
+                direct_up[name] = max(0.0, base_power - min_power)
             up_allocation = self._allocate_total_by_weights(
                 up_total,
                 direct_up,
@@ -1166,21 +1445,12 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                 tolerance,
             )
 
-        if (
-            down_total > tolerance
-            and sum(down_allocation.values()) <= tolerance
-        ):
+        if down_total > tolerance and sum(down_allocation.values()) <= tolerance:
             direct_down = {}
             for name in names:
-                base_power = self._reference_component_value(
-                    name, "power_in", start, 0.0
-                )
-                max_power = self._snapshot_value(
-                    max_snapshot, name, "power_in", 0.0
-                )
-                direct_down[name] = max(
-                    0.0, max_power - base_power
-                )
+                base_power = self._reference_component_net_power(name, start)
+                max_power = self._snapshot_component_net_power(max_snapshot, name)
+                direct_down[name] = max(0.0, max_power - base_power)
             down_allocation = self._allocate_total_by_weights(
                 down_total,
                 direct_down,
@@ -1197,10 +1467,9 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                 return
 
             for name in names:
-                base_power = self._reference_component_value(
-                    name, "power_in", start, 0.0
-                )
-                if base_power > tolerance:
+                base_power = self._reference_component_net_power(name, start)
+
+                if abs(base_power) > tolerance:
                     allocation[name] += residual
                     return
 
@@ -1213,20 +1482,14 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         records = []
 
         for name in names:
-            baseline_power = self._reference_component_value(
+            baseline_power = self._reference_component_net_power(
                 name,
-                "power_in",
                 start,
-                0.0,
             )
             signed_volume = -baseline_power
 
-            up_cap = max(
-                0.0, up_allocation.get(name, 0.0)
-            )
-            down_cap = max(
-                0.0, down_allocation.get(name, 0.0)
-            )
+            up_cap = max(0.0, up_allocation.get(name, 0.0))
+            down_cap = max(0.0, down_allocation.get(name, 0.0))
 
             max_power = signed_volume + up_cap
             min_power = signed_volume - down_cap
@@ -1256,17 +1519,9 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                 }
             )
 
-        child_baseline = sum(
-            item["volume"] for item in records
-        )
-        child_up = sum(
-            item["max_power"] - item["volume"]
-            for item in records
-        )
-        child_down = sum(
-            item["volume"] - item["min_power"]
-            for item in records
-        )
+        child_baseline = sum(item["volume"] for item in records)
+        child_up = sum(item["max_power"] - item["volume"] for item in records)
+        child_down = sum(item["volume"] - item["min_power"] for item in records)
 
         if abs(child_baseline + base_consumption) > 1e-6:
             raise RuntimeError(
@@ -1318,9 +1573,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
             return self.get_component_redispatch_positions(start)
 
         base = float(self.da_power.at[start])
-        min_consumption, max_consumption = (
-            self.get_redispatch_power_bounds(start)
-        )
+        min_consumption, max_consumption = self.get_redispatch_power_bounds(start)
 
         signed_volume = -base
         min_power = -max_consumption
