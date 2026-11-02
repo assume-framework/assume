@@ -12,6 +12,7 @@ from assume.strategies.naive_strategies import (
 )
 from assume.units.sector_coupled_system import SectorCoupledSystem
 
+
 USE_SOLVER = "appsi_highs"
 TOL = 1e-5
 
@@ -178,7 +179,10 @@ def test_sector_coupled_model_solves_successfully(solved_base_sector_system):
     _, _, results = solved_base_sector_system
 
     assert results.solver.status == pyo.SolverStatus.ok
-    assert results.solver.termination_condition == pyo.TerminationCondition.optimal
+    assert (
+        results.solver.termination_condition
+        == pyo.TerminationCondition.optimal
+    )
 
 
 def test_sector_coupled_base_case_uses_heat_pump(solved_base_sector_system):
@@ -192,7 +196,9 @@ def test_sector_coupled_base_case_uses_heat_pump(solved_base_sector_system):
         assert _val(hp.heat_out[t]) == pytest.approx(4.0, abs=TOL)
         assert _val(boiler.natural_gas_in[t]) == pytest.approx(0.0, abs=TOL)
         assert _val(boiler.heat_out[t]) == pytest.approx(0.0, abs=TOL)
-        assert _val(instance.total_power_input[t]) == pytest.approx(2.0, abs=TOL)
+        assert _val(instance.total_power_input[t]) == pytest.approx(
+            2.0, abs=TOL
+        )
 
 
 def test_sector_coupled_heat_balance(solved_base_sector_system):
@@ -212,7 +218,9 @@ def test_sector_coupled_uses_natural_gas_price_key(solved_base_sector_system):
     _, instance, _ = solved_base_sector_system
 
     for t in instance.time_steps:
-        assert _val(instance.natural_gas_price[t]) == pytest.approx(50.0, abs=TOL)
+        assert _val(instance.natural_gas_price[t]) == pytest.approx(
+            50.0, abs=TOL
+        )
 
 
 def test_sector_coupled_uses_boiler_when_electricity_is_more_expensive(
@@ -243,7 +251,9 @@ def test_sector_coupled_uses_boiler_when_electricity_is_more_expensive(
         assert _val(hp.heat_out[t]) == pytest.approx(0.0, abs=TOL)
         assert _val(boiler.natural_gas_in[t]) == pytest.approx(4.0, abs=TOL)
         assert _val(boiler.heat_out[t]) == pytest.approx(4.0, abs=TOL)
-        assert _val(instance.total_power_input[t]) == pytest.approx(0.0, abs=TOL)
+        assert _val(instance.total_power_input[t]) == pytest.approx(
+            0.0, abs=TOL
+        )
 
 
 def test_sector_coupled_uses_boiler_when_heat_pump_capacity_is_binding(
@@ -274,10 +284,14 @@ def test_sector_coupled_uses_boiler_when_heat_pump_capacity_is_binding(
         assert _val(hp.heat_out[t]) == pytest.approx(4.0, abs=TOL)
         assert _val(boiler.natural_gas_in[t]) == pytest.approx(2.0, abs=TOL)
         assert _val(boiler.heat_out[t]) == pytest.approx(2.0, abs=TOL)
-        assert _val(instance.total_power_input[t]) == pytest.approx(2.0, abs=TOL)
+        assert _val(instance.total_power_input[t]) == pytest.approx(
+            2.0, abs=TOL
+        )
 
         heat_supply = _val(hp.heat_out[t]) + _val(boiler.heat_out[t])
-        assert heat_supply == pytest.approx(_val(instance.heat_demand[t]), abs=TOL)
+        assert heat_supply == pytest.approx(
+            _val(instance.heat_demand[t]), abs=TOL
+        )
 
 
 def test_sector_coupled_with_tes_shifts_heat_generation_in_day_ahead(
@@ -321,7 +335,10 @@ def test_sector_coupled_with_tes_shifts_heat_generation_in_day_ahead(
     _, instance, results = _solve_sector_system(sector_system)
 
     assert results.solver.status == pyo.SolverStatus.ok
-    assert results.solver.termination_condition == pyo.TerminationCondition.optimal
+    assert (
+        results.solver.termination_condition
+        == pyo.TerminationCondition.optimal
+    )
 
     hp = instance.dsm_blocks["heat_pump"]
     boiler = instance.dsm_blocks["boiler_gas"]
@@ -336,16 +353,27 @@ def test_sector_coupled_with_tes_shifts_heat_generation_in_day_ahead(
         assert _val(instance.total_power_input[t]) == pytest.approx(
             expected_power[t], abs=TOL
         )
-        assert _val(tes.charge[t]) == pytest.approx(expected_charge[t], abs=TOL)
-        assert _val(tes.discharge[t]) == pytest.approx(expected_discharge[t], abs=TOL)
-        assert _val(tes.soc[t]) == pytest.approx(expected_soc[t], abs=TOL)
+        assert _val(tes.charge[t]) == pytest.approx(
+            expected_charge[t], abs=TOL
+        )
+        assert _val(tes.discharge[t]) == pytest.approx(
+            expected_discharge[t], abs=TOL
+        )
+        assert _val(tes.soc[t]) == pytest.approx(
+            expected_soc[t], abs=TOL
+        )
         assert _val(tes.power_in[t]) == pytest.approx(0.0, abs=TOL)
         assert _val(boiler.heat_out[t]) == pytest.approx(0.0, abs=TOL)
 
         heat_supply = (
-            _val(hp.heat_out[t]) + _val(boiler.heat_out[t]) + _val(tes.discharge[t])
+            _val(hp.heat_out[t])
+            + _val(boiler.heat_out[t])
+            + _val(tes.discharge[t])
         )
-        heat_required = _val(instance.heat_demand[t]) + _val(tes.charge[t])
+        heat_required = (
+            _val(instance.heat_demand[t])
+            + _val(tes.charge[t])
+        )
         assert heat_supply == pytest.approx(heat_required, abs=TOL)
 
 
@@ -355,7 +383,9 @@ def test_sector_coupled_redispatch_bounds_full_boiler_replacement(
 ):
     sector_system, _, _ = solved_base_sector_system
 
-    min_power, max_power = sector_system.get_redispatch_power_bounds(time_index[0])
+    min_power, max_power = sector_system.get_redispatch_power_bounds(
+        time_index[0]
+    )
 
     assert min_power == pytest.approx(0.0, abs=TOL)
     assert max_power == pytest.approx(2.0, abs=TOL)
@@ -381,7 +411,9 @@ def test_sector_coupled_redispatch_bounds_boiler_capacity_binding(
 
     sector_system, _, _ = _solve_sector_system(sector_system)
 
-    min_power, max_power = sector_system.get_redispatch_power_bounds(time_index[0])
+    min_power, max_power = sector_system.get_redispatch_power_bounds(
+        time_index[0]
+    )
 
     assert min_power == pytest.approx(0.5, abs=TOL)
     assert max_power == pytest.approx(2.0, abs=TOL)
@@ -469,6 +501,112 @@ def test_sector_coupled_redispatch_strategy_respects_heat_requirement(
     assert bid["max_power"] == pytest.approx(-0.5, abs=TOL)
     assert bid["p_nom"] == pytest.approx(2.0, abs=TOL)
     assert bid["upward_flexibility"] == pytest.approx(1.5, abs=TOL)
+
+
+
+def test_heat_hydrogen_h2_chp_couples_heat_hydrogen_and_electricity(time_index):
+    """Validate the integrated electrolyser -> H2 CHP -> heat chain."""
+    heat_demand = 5.0
+    hydrogen_demand = 0.0
+
+    forecaster = SectorCoupledForecaster(
+        index=time_index,
+        carrier_demands={
+            "heat": _series(heat_demand, time_index),
+            "hydrogen": _series(hydrogen_demand, time_index),
+        },
+        fuel_prices={},
+        market_prices={
+            "EOM": _series(40.0, time_index),
+        },
+    )
+
+    components = {
+        "electrolyser": {
+            "max_power": 20.0,
+            "min_power": 0.0,
+            "efficiency": 0.8,
+            "ramp_up": 20.0,
+            "ramp_down": 20.0,
+        },
+        "chp_h2": {
+            "max_power": 4.0,
+            "min_power": 0.0,
+            "electrical_efficiency": 0.4,
+            "thermal_efficiency": 0.5,
+            "fuel_type": "hydrogen_gas",
+            "ramp_up": 4.0,
+            "ramp_down": 4.0,
+            "additional_cost": 0.0,
+        },
+    }
+
+    sector_system = SectorCoupledSystem(
+        id="hh_north",
+        unit_operator="test_operator",
+        bidding_strategies={},
+        forecaster=forecaster,
+        components=components,
+        system_type="heat_hydrogen",
+        market_representation="aggregate",
+        objective="min_variable_cost",
+        flexibility_measure="cost_based_load_shift",
+        cost_tolerance=10,
+        node="north",
+    )
+
+    sector_system, instance, results = _solve_sector_system(sector_system)
+
+    assert results.solver.status == pyo.SolverStatus.ok
+    assert (
+        results.solver.termination_condition
+        == pyo.TerminationCondition.optimal
+    )
+
+    electrolyser = instance.dsm_blocks["electrolyser"]
+    chp = instance.dsm_blocks["chp_h2"]
+
+    # 5 MW_th heat demand with eta_th=0.5 requires 10 MW_H2.
+    # The CHP simultaneously produces 4 MW_el at eta_el=0.4.
+    # Producing 10 MW_H2 at eta_ely=0.8 requires 12.5 MW_el.
+    # Parent net grid exchange = 12.5 - 4.0 = +8.5 MW import.
+    for t in instance.time_steps:
+        assert _val(chp.heat_out[t]) == pytest.approx(5.0, abs=TOL)
+        assert _val(chp.fuel_in[t]) == pytest.approx(10.0, abs=TOL)
+        assert _val(chp.hydrogen_in[t]) == pytest.approx(10.0, abs=TOL)
+        assert _val(chp.power_out[t]) == pytest.approx(4.0, abs=TOL)
+
+        assert _val(electrolyser.hydrogen_out[t]) == pytest.approx(10.0, abs=TOL)
+        assert _val(electrolyser.power_in[t]) == pytest.approx(12.5, abs=TOL)
+
+        heat_supply = _val(
+            sector_system._carrier_supply_expr(instance, "heat", t)
+        )
+        hydrogen_supply = _val(
+            sector_system._carrier_supply_expr(instance, "hydrogen", t)
+        )
+
+        assert heat_supply == pytest.approx(
+            _val(instance.heat_demand[t]), abs=TOL
+        )
+        assert hydrogen_supply == pytest.approx(
+            _val(instance.hydrogen_demand[t]), abs=TOL
+        )
+        assert _val(instance.total_power_input[t]) == pytest.approx(
+            8.5, abs=TOL
+        )
+
+    # H2 for the CHP is internal, so no external hydrogen price is required.
+    assert not hasattr(instance, "hydrogen_gas_price")
+
+    # Market sign convention: +8.5 MW physical import -> -8.5 MW EOM demand bid.
+    position = sector_system.get_eom_market_positions(time_index[0])[0]
+    assert position["unit_id"] == "hh_north"
+    assert position["parent_unit_id"] == "hh_north"
+    assert position["component_type"] == "aggregate"
+    assert position["node"] == "north"
+    assert position["physical_power"] == pytest.approx(8.5, abs=TOL)
+    assert position["volume"] == pytest.approx(-8.5, abs=TOL)
 
 
 if __name__ == "__main__":
