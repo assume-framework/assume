@@ -163,13 +163,15 @@ class PayAsClearRole(MarketRole):
                     rejected_product_orders.append(order)
 
             # Set the clearing price using the marginal accepted order. In
-            # scarcity, the last accepted demand order sets the price.
+            # scarcity, the last accepted demand order sets the price (but never below the last accepted supply order).
             if accepted_supply_orders:
+                clear_price = float(
+                    max(map(itemgetter("price"), accepted_supply_orders))
+                    )
                 if supply_scarcity and accepted_demand_orders:
-                    clear_price = float(accepted_demand_orders[-1]["price"])
-                else:
-                    clear_price = float(
-                        max(map(itemgetter("price"), accepted_supply_orders))
+                    clear_price = max(
+                        clear_price,
+                        float(accepted_demand_orders[-1]["price"]),
                     )
             else:
                 clear_price = 0
