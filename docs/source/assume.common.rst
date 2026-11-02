@@ -1,6 +1,6 @@
 .. SPDX-FileCopyrightText: ASSUME Developers
 ..
-.. SPDX-License-Identifier: AGPL-3.0-or-later
+.. SPDX-License-Identifier: MIT
 
 Common components and methods
 =============================
@@ -60,6 +60,14 @@ assume.common.utils module
 --------------------------
 
 .. automodule:: assume.common.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+assume.common.forecast\_algorithms module
+-----------------------------------------
+
+.. automodule:: assume.common.forecast_algorithms
    :members:
    :undoc-members:
    :show-inheritance:

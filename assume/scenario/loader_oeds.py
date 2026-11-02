@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import logging
 import os
@@ -200,7 +200,10 @@ def load_oeds(
                 "node": area,
                 "price": 1e3,
             },
-            DemandForecaster(index, demand=-abs(demand)),
+            DemandForecaster(
+                index,
+                demand=-abs(demand),
+            ),
         )
 
         world.add_unit_operator(f"renewables{area}")
@@ -238,11 +241,17 @@ def load_oeds(
                     "node": area,
                 },
                 PowerplantForecaster(
-                    index, availability=wind / wind.max(), fuel_prices={"others": 0.2}
+                    index,
+                    availability=wind / wind.max(),
+                    fuel_prices={"others": 0.2},
                 ),
             )
 
-        biomass = infra_interface.get_biomass_systems_in_area(area=area)
+        biomass = infra_interface.get_biomass_systems_in_area(
+            area=area,
+            created_before=end,
+            stopped_after=start,
+        )
         # somehow the maximum water power matches half of the entsoe much better
         biomass["maxPower"] /= 2
 
@@ -270,7 +279,11 @@ def load_oeds(
                 fuel_prices={"others": fuel_prices["biomass"] + randomness},
             ),
         )
-        water = infra_interface.get_run_river_systems_in_area(area=area)
+        water = infra_interface.get_run_river_systems_in_area(
+            area=area,
+            created_before=end,
+            stopped_after=start,
+        )
         # somehow the maximum water power matches half of the entsoe much better
         water["maxPower"] /= 2
 
@@ -287,35 +300,42 @@ def load_oeds(
                 "location": (lat, lon),
                 "node": area,
             },
-            PowerplantForecaster(index, availability=1, fuel_prices={"others": 0.2}),
+            PowerplantForecaster(
+                index,
+                availability=1,
+                fuel_prices={"others": 0.2},
+            ),
         )
 
-        if True:
-            storages = infra_interface.get_water_storage_systems(area)
-            world.add_unit_operator(f"storage{area}")
-            for storage in storages:
-                world.add_unit(
-                    f"storage{area}_{storage['unitID']}",
-                    "storage",
-                    f"storage{area}",
-                    # the unit_params have no hints
-                    {
-                        "max_power_charge": storage["max_power_charge"] / 1e3,
-                        "max_power_discharge": storage["max_power_discharge"] / 1e3,
-                        "capacity": storage["capacity"] / 1e3,
-                        "max_soc": storage["max_soc"],
-                        "min_soc": storage["min_soc"],
-                        "efficiency_charge": storage["efficiency_charge"],
-                        "efficiency_discharge": storage["efficiency_discharge"],
-                        "bidding_strategies": bidding_strategies["storage"],
-                        "technology": "hydro_storage",
-                        "location": (lat, lon),
-                        "node": area,
-                    },
-                    PowerplantForecaster(
-                        index, availability=1, fuel_prices={"others": 0.2}
-                    ),
-                )
+        storages = infra_interface.get_water_storage_systems(
+            area,
+            created_before=end,
+            stopped_after=start,
+        )
+        world.add_unit_operator(f"storage{area}")
+        for storage in storages:
+            world.add_unit(
+                f"storage{area}_{storage['unitID']}",
+                "storage",
+                f"storage{area}",
+                # the unit_params have no hints
+                {
+                    "max_power_charge": storage["max_power_charge"] / 1e3,
+                    "max_power_discharge": storage["max_power_discharge"] / 1e3,
+                    "capacity": storage["capacity"] / 1e3,
+                    "max_soc": storage["max_soc"],
+                    "min_soc": storage["min_soc"],
+                    "efficiency_charge": storage["efficiency_charge"],
+                    "efficiency_discharge": storage["efficiency_discharge"],
+                    "bidding_strategies": bidding_strategies["storage"],
+                    "technology": "hydro_storage",
+                    "location": (lat, lon),
+                    "node": area,
+                },
+                PowerplantForecaster(
+                    index, availability=1, fuel_prices={"others": 0.2}
+                ),
+            )
 
         world.add_unit_operator(f"conventional{area}")
 
@@ -323,6 +343,8 @@ def load_oeds(
             plants = infra_interface.get_power_plant_in_area(
                 area,
                 fuel_type,
+                created_before=end,
+                stopped_after=start,
             )
             plants = list(plants.T.to_dict().values())
             i = 0
@@ -334,9 +356,12 @@ def load_oeds(
                     randomness = 0
 
                 availability = 1
-                if plant["endDate"] < end:
-                    availability = pd.Series(index=index, data=1)
-                    availability[availability.index > end] = 0
+                if plant["startDate"] > start or plant["endDate"] < end:
+                    availability = pd.Series(index=index, data=1.0)
+                    if plant["startDate"] > start:
+                        availability[availability.index < plant["startDate"]] = 0.0
+                    if plant["endDate"] < end:
+                        availability[availability.index >= plant["endDate"]] = 0.0
 
                 world.add_unit(
                     f"conventional{area}_{fuel_type}_{i}",
@@ -365,6 +390,8 @@ def load_oeds(
                         },
                     ),
                 )
+
+    world.init_forecasts()
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import math
 from unittest.mock import patch
@@ -33,7 +33,6 @@ def storage_unit() -> Storage:
         "obs_dim": 50,
         "act_dim": 2,
         "unit_id": "test_storage",
-        "max_demand": 1000,
         "learning_config": LearningConfig(
             algorithm="matd3",
             learning_mode=True,

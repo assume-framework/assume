@@ -1,20 +1,22 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import logging
 from datetime import timedelta
 from operator import itemgetter
-import contextlib
-import sys
 
 import pandas as pd
 import pyomo.environ as pyo
 from mango import AgentAddress
-from pyomo.opt import SolverFactory, TerminationCondition
+from pyomo.opt import OptSolver, SolverFactory, TerminationCondition
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
-from assume.common.utils import create_incidence_matrix, get_supported_solver
+from assume.common.utils import (
+    create_incidence_matrix,
+    get_supported_solver_pyomo,
+    sum_line_capacities,
+)
 from assume.markets.base_market import MarketRole
 
 # Set the log level to WARNING
@@ -34,6 +36,7 @@ def market_clearing_opt_constraints(
     with_linked_bids: bool,
     incidence_matrix: pd.DataFrame,
     lines: pd.DataFrame,
+    directional_capacities: pd.DataFrame = None,
 ):
     """
     Adds the constraints to the model.
@@ -61,6 +64,7 @@ def market_clearing_opt_constraints(
         initialize=[order["bid_id"] for order in orders if order["bid_type"] == "SB"],
         doc="simple_bids",
     )
+
     model.bBids = pyo.Set(
         initialize=[
             order["bid_id"] for order in orders if order["bid_type"] in ["BB", "LB"]
@@ -78,6 +82,7 @@ def market_clearing_opt_constraints(
         bounds=(0, 1),
         doc="simple_bid_acceptance",
     )
+
     model.xb = pyo.Var(
         model.bBids,
         domain=pyo.NonNegativeReals,
@@ -184,17 +189,38 @@ def market_clearing_opt_constraints(
         model.transmission_constr = pyo.ConstraintList()
         for t in model.T:
             for line in model.lines:
-                # s_max_pu might also be time variant. but for now we assume it is static
-                s_max_pu = (
-                    lines.at[line, "s_max_pu"]
-                    if "s_max_pu" in lines.columns
-                    and not pd.isna(lines.at[line, "s_max_pu"])
-                    else 1.0
-                )
-                capacity = lines.at[line, "s_nom"] * s_max_pu
-                # Limit the flow on each line
-                model.transmission_constr.add(model.flows[t, line] <= capacity)
-                model.transmission_constr.add(model.flows[t, line] >= -capacity)
+                # If precomputed directional capacities are provided, use them
+                if (
+                    directional_capacities is not None
+                    and line in directional_capacities.index
+                ):
+                    s_max_pu = (
+                        directional_capacities.at[line, "s_max_pu"]
+                        if "s_max_pu" in directional_capacities.columns
+                        and not pd.isna(directional_capacities.at[line, "s_max_pu"])
+                        else 1.0
+                    )
+                    cap_forward = (
+                        directional_capacities.at[line, "cap_forward"] * s_max_pu
+                    )
+                    cap_reverse = (
+                        directional_capacities.at[line, "cap_reverse"] * s_max_pu
+                    )
+                    model.transmission_constr.add(model.flows[t, line] <= cap_forward)
+                    model.transmission_constr.add(model.flows[t, line] >= -cap_reverse)
+                else:
+                    # s_max_pu might also be time variant. but for now we assume it is static
+                    s_max_pu = (
+                        lines.at[line, "s_max_pu"]
+                        if lines is not None
+                        and "s_max_pu" in lines.columns
+                        and not pd.isna(lines.at[line, "s_max_pu"])
+                        else 1.0
+                    )
+                    capacity = lines.at[line, "s_nom"] * s_max_pu
+                    # Limit the flow on each line (symmetric fallback)
+                    model.transmission_constr.add(model.flows[t, line] <= capacity)
+                    model.transmission_constr.add(model.flows[t, line] >= -capacity)
 
 
 def market_clearing_opt_objective(model: pyo.ConcreteModel, orders: Orderbook):
@@ -212,16 +238,6 @@ def market_clearing_opt_objective(model: pyo.ConcreteModel, orders: Orderbook):
 
     model.objective = pyo.Objective(expr=obj_expr, sense=pyo.minimize)
 
-class DummyFile(object):
-    def write(self, x): pass
-    
-    def flush(self): pass
-@contextlib.contextmanager
-def nostdout():
-    save_stdout = sys.stdout
-    sys.stdout = DummyFile()
-    yield
-    sys.stdout = save_stdout
 
 def market_clearing_opt(
     orders: Orderbook,
@@ -230,9 +246,9 @@ def market_clearing_opt(
     with_linked_bids: bool,
     incidence_matrix: pd.DataFrame = None,
     lines: pd.DataFrame = None,
-    solver: str = "appsi_highs",
+    directional_capacities: pd.DataFrame = None,
+    solver: OptSolver = None,
     solver_options: dict = {},
-    solver_instance=None,
     func_constraints=market_clearing_opt_constraints,
     func_objective=market_clearing_opt_objective,
 ):
@@ -246,7 +262,7 @@ def market_clearing_opt(
         with_linked_bids (bool): Whether the market clearing should include linked bids.
         incidence_matrix (pd.DataFrame): The directed incidence matrix of the network.
         lines (pd.DataFrame): The lines and their capacities of the network.
-        solver (str):  Specifies the solver to be used for the optimization problem.
+        solver (pyomo.opt.OptSolver): Specifies the solver instance to be used for the optimization problem.
         solver_options (dict): Additional solver options.
         func_constraints: The function that is executed to add the constraints to the model. Defaults to :meth:`market_clearing_opt_constraints`.
         func_objective: The function that is executed to add the objective function to the model. Defaults to :meth:`market_clearing_opt_objective`.
@@ -267,7 +283,7 @@ def market_clearing_opt(
 
         If linked bids are considered, the acceptance of a child bid is bounded by the acceptance of its parent bid.
 
-        The market clearing is solved using pyomo with the specified solver (HIGHS is used by default).
+        The market clearing is solved using pyomo with the specified solver_name (HIGHS is used by default).
         If the specified solver is not available, the model is solved using available solver.
         If none of the solvers are available, an exception is raised.
 
@@ -278,20 +294,21 @@ def market_clearing_opt(
     model = pyo.ConcreteModel()
 
     func_constraints(
-        model, orders, market_products, mode, with_linked_bids, incidence_matrix, lines
+        model,
+        orders,
+        market_products,
+        mode,
+        with_linked_bids,
+        incidence_matrix,
+        lines,
+        directional_capacities,
     )
 
     func_objective(model, orders)
 
-    # Reuse solver instance if provided, otherwise create new one
-    if solver_instance is None:
-        solver_obj = SolverFactory(solver)
-    else:
-        solver_obj = solver_instance
-    
     # Solve the model
     instance = model.create_instance()
-    results = solver_obj.solve(instance, options=solver_options)
+    results = solver.solve(instance, options=solver_options)
 
     # Fix all model.x to the values in the solution
     if mode == "with_min_acceptance_ratio":
@@ -308,8 +325,7 @@ def market_clearing_opt(
             instance.x[bid_id].domain = pyo.Reals
 
         # Resolve the model
-        with nostdout():
-            results = solver_obj.solve(instance, options=solver_options)
+        results = solver.solve(instance, options=solver_options)
 
     return instance, results
 
@@ -332,7 +348,7 @@ class ComplexClearingRole(MarketRole):
         nodes (list): List of nodes or zones in the network, depending on the selected representation.
 
     Supported Parameters in ``param_dict``:
-        - ``solver`` (str): Specifies the solver to be used for the optimization problem. Default is `'appsi_highs'`.
+        - ``solver_name`` (str): Specifies the solver_name to be used for the optimization problem. Default is `'appsi_highs'`.
         - ``log_flows`` (bool): Indicates whether to log the power flows on the lines. Default is `False`.
         - ``pricing_mechanism`` (str): Defines the pricing mechanism to be used. Default is `'pay_as_clear'`, with an alternative option of `'pay_as_bid'`.
         - ``zones_identifier`` (str): The key in the bus data that identifies the zone each bus belongs to. Used for zonal representation.
@@ -343,7 +359,7 @@ class ComplexClearingRole(MarketRole):
 
         market_mechanism: complex_clearing
         param_dict:
-            solver: appsi_highs
+            solver_name: appsi_highs
             log_flows: true
             pricing_mechanism: pay_as_clear
             zones_identifier: zone_id
@@ -359,14 +375,23 @@ class ComplexClearingRole(MarketRole):
 
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
-
-        self.define_solver(solver=marketconfig.param_dict.get("solver", "appsi_highs"))
+        self.solver_name = get_supported_solver_pyomo(
+            marketconfig.param_dict.get("solver_name", "appsi_highs")
+        )
+        self.solver = SolverFactory(self.solver_name)
+        self.solver_options = {}
+        if self.solver_name == "gurobi":
+            self.solver_options = {
+                "cutoff": -1.0,
+                "MIPGap": EPS,
+            }
 
         # Define grid data
         self.nodes = ["node0"]
         self.zones_id = None
         self.incidence_matrix = None
         self.lines = None
+        self.directional_capacities = None
 
         if self.grid_data:
             self.lines = self.grid_data["lines"]
@@ -393,25 +418,27 @@ class ComplexClearingRole(MarketRole):
                 self.incidence_matrix = create_incidence_matrix(self.lines, buses)
                 self.nodes = buses.index.values
 
+            # Pre-compute directional capacities for use in the clearing constraints
+            self.directional_capacities = sum_line_capacities(
+                self.lines,
+                self.incidence_matrix,
+                node_mapping=self.node_to_zone,
+            )
+
+            # Informational log if input contains directional columns
+            if self.lines is not None:
+                has_directional = (
+                    "s_nom_forward" in self.lines.columns
+                    or "s_nom_reverse" in self.lines.columns
+                )
+                if has_directional:
+                    logger.info(
+                        "Directional NTC columns detected in lines data. Asymmetric transfer limits will be applied."
+                    )
         self.log_flows = self.marketconfig.param_dict.get("log_flows", False)
         self.pricing_mechanism = self.marketconfig.param_dict.get(
             "pricing_mechanism", "pay_as_clear"
         )
-
-    def define_solver(self, solver: str):
-        solver = get_supported_solver(solver)
-
-        if solver == "gurobi":
-            solver_options = {"cutoff": -1.0, "MIPGap": EPS, "LogToConsole": 0}
-        elif solver == "appsi_highs":
-            solver_options = {"output_flag": False, "log_to_console": False}
-        else:
-            solver_options = {}
-
-        self.solver = solver
-        self.solver_options = solver_options
-        # Create solver instance once and reuse it to prevent file descriptor leaks
-        self.solver_instance = SolverFactory(solver)
 
     def validate_orderbook(
         self, orderbook: Orderbook, agent_addr: AgentAddress
@@ -543,9 +570,9 @@ class ComplexClearingRole(MarketRole):
                 with_linked_bids=with_linked_bids,
                 incidence_matrix=self.incidence_matrix,
                 lines=self.lines,
+                directional_capacities=self.directional_capacities,
                 solver=self.solver,
                 solver_options=self.solver_options,
-                solver_instance=self.solver_instance,
             )
 
             if results.solver.termination_condition == TerminationCondition.infeasible:

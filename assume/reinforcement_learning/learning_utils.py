@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import logging
 from collections.abc import Callable
@@ -24,39 +24,6 @@ observation_dict = dict[list[datetime], ObsActRew]
 # A schedule takes the remaining progress as input
 # and outputs a scalar (e.g. learning rate, action noise scale ...)
 Schedule = Callable[[float], float]
-
-
-# Ornstein-Uhlenbeck Noise
-# from https://github.com/songrotek/DDPG/blob/master/ou_noise.py
-class OUNoise:
-    """
-    A class that implements Ornstein-Uhlenbeck noise.
-    """
-
-    def __init__(self, action_dimension, mu=0, sigma=0.5, theta=0.15, dt=1e-2):
-        self.action_dimension = action_dimension
-        self.mu = mu
-        self.theta = theta
-        self.sigma = sigma
-        self.dt = dt
-        self.noise_prev = np.zeros(self.action_dimension)
-        self.noise_prev = (
-            self.initial_noise
-            if self.initial_noise is not None
-            else np.zeros(self.action_dimension)
-        )
-
-    def noise(self):
-        noise = (
-            self.noise_prev
-            + self.theta * (self.mu - self.noise_prev) * self.dt
-            + self.sigma
-            * np.sqrt(self.dt)
-            * np.random.normal(size=self.action_dimension)
-        )
-        self.noise_prev = noise
-
-        return noise
 
 
 class NormalActionNoise:
@@ -188,7 +155,9 @@ def copy_layer_data(dst, src):
             dst[k].data.copy_(src[k].data)
 
 
-def transform_buffer_data(nested_dict: dict, device: th.device) -> np.ndarray:
+def transform_buffer_data(
+    nested_dict: dict, device: th.device, keys_unit_order: list
+) -> np.ndarray:
     """
     Transform nested dict {datetime -> {unit_id -> [values]}} into
     torch tensor of shape (timesteps, powerplants, values). Compatible with buffer storage.
@@ -202,9 +171,6 @@ def transform_buffer_data(nested_dict: dict, device: th.device) -> np.ndarray:
     """
     # Get sorted lists of units and timestamps (for consistent ordering)
     all_times = sorted(nested_dict.keys())
-    unit_ids = sorted(
-        set(dt for unit_data in nested_dict.values() for dt in unit_data.keys())
-    )
 
     # Get feature dimension from first non-empty value
     feature_dim = None
@@ -225,11 +191,13 @@ def transform_buffer_data(nested_dict: dict, device: th.device) -> np.ndarray:
         )
 
     # Pre-allocate tensor (keep on same device as input data)
-    result = th.zeros((len(all_times), len(unit_ids), feature_dim), device=device)
+    result = th.zeros(
+        (len(all_times), len(keys_unit_order), feature_dim), device=device
+    )
 
     # Fill tensor with values (stays on same device as input so if on GPU it stays there during filling)
     for t, timestamp in enumerate(all_times):
-        for u, unit_id in enumerate(unit_ids):
+        for u, unit_id in enumerate(keys_unit_order):
             values = nested_dict[timestamp].get(unit_id, [])
             if values:  # if we have values for this timestamp
                 result[t, u] = values[0]
@@ -335,3 +303,49 @@ def transfer_weights(
             )
 
     return new_state_copy
+
+
+def encode_hourly_features(date: datetime) -> list:
+    """
+    Encode time features for a given datetime object.
+    This function extracts the hour as features from the datetime object
+    and encodes them using sine and cosine transformations to capture periodicity.
+
+    Args:
+        start (datetime): The datetime object to encode.
+
+    Returns:
+        list: A list containing the encoded time features.
+    """
+
+    hour = date.hour / 24.0
+    hour_cos = np.cos(2 * np.pi * hour)
+    hour_sin = np.sin(2 * np.pi * hour)
+
+    return [
+        hour_cos,
+        hour_sin,
+    ]
+
+
+def encode_monthly_features(start: datetime) -> list:
+    """
+    Encode time features for a given datetime object.
+    This function extracts the months from the datetime object
+    and encodes them using sine and cosine transformations to capture periodicity.
+
+    Args:
+        start (datetime): The datetime object to encode.
+
+    Returns:
+        list: A list containing the encoded time features.
+    """
+
+    month = start.month / 12.0
+    month_cos = np.cos(2 * np.pi * month)
+    month_sin = np.sin(2 * np.pi * month)
+
+    return [
+        month_cos,
+        month_sin,
+    ]

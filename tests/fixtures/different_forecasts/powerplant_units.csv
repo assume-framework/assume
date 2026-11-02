@@ -1,0 +1,5 @@
+name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,unit_operator,forecast_price,forecast_residual_load,forecast_other,forecast_preprocess_residual_load,forecast_update_congestion_signal
+Unit 1,nuclear,powerplant_energy_naive,uranium,0.0,1000.0,200.0,0.3,10,Operator 1,price_naive_forecast,,,residual_load_prepare_multiple,
+Unit 2,nuclear,powerplant_energy_naive,uranium,0.0,1000.0,200.0,0.3,10,Operator 1,price_naive_forecast,default_test,default_test,,congestion_signal_neural_net
+Unit 3,nuclear,powerplant_energy_naive,uranium,0.0,1000.0,200.0,0.3,10,Operator 1,,residual_load_naive_forecast,nothing_special,,congestion_signal_special
+Unit 4,nuclear,powerplant_energy_naive,uranium,0.0,1000.0,200.0,0.3,10,Operator 1,default_test,residual_load_naive_forecast,nothing_special,,

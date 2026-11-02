@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import logging
 from datetime import datetime
@@ -103,7 +103,6 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 )
 
         # Add price forecasts
-        self.electricity_price = forecaster.electricity_price
         self.electricity_price_flex = forecaster.electricity_price_flex
         self.demand = demand
         self.thermal_demand = forecaster.thermal_demand
@@ -117,7 +116,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         self.cost_tolerance = cost_tolerance
 
         # Initialize the model
-        self.setup_model()
+        # self.setup_model()  # NOTE: called in forecaster initialization again!!!
 
     def define_parameters(self):
         """
@@ -125,7 +124,12 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         """
         self.model.electricity_price = pyo.Param(
             self.model.time_steps,
-            initialize={t: value for t, value in enumerate(self.electricity_price)},
+            initialize={
+                t: value
+                for t, value in enumerate(
+                    self._values_for_model(self.forecaster.electricity_price)
+                )
+            },
         )
 
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "natural_gas":
@@ -133,7 +137,9 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 self.model.time_steps,
                 initialize={
                     t: value
-                    for t, value in enumerate(self.forecaster.get_price("natural_gas"))
+                    for t, value in enumerate(
+                        self._values_for_model(self.forecaster.get_price("natural_gas"))
+                    )
                 },
             )
 
@@ -142,14 +148,19 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 self.model.time_steps,
                 initialize={
                     t: value
-                    for t, value in enumerate(self.forecaster.get_price("hydrogen"))
+                    for t, value in enumerate(
+                        self._values_for_model(self.forecaster.get_price("hydrogen"))
+                    )
                 },
             )
 
         self.model.absolute_demand = pyo.Param(initialize=self.demand)
         self.model.thermal_demand = pyo.Param(
             self.model.time_steps,
-            initialize={t: value for t, value in enumerate(self.thermal_demand)},
+            initialize={
+                t: value
+                for t, value in enumerate(self._values_for_model(self.thermal_demand))
+            },
         )
 
     def define_variables(self):
@@ -168,7 +179,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
 
     def initialize_process_sequence(self):
         # Per-time-step constraint (default)
-        if not self.forecaster.demand or self.forecaster.demand == 0:
+        if not self.demand:
 
             @self.model.Constraint(self.model.time_steps)
             def direct_heat_balance(m, t):
@@ -215,7 +226,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             """
             Ensures the thermal output meets the absolute demand.
             """
-            if not self.forecaster.demand or self.forecaster.demand == 0:
+            if not self.demand:
                 return pyo.Constraint.Skip
             else:
                 return (

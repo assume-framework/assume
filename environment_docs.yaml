@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 name: assume-doc
 channels:
@@ -19,10 +19,11 @@ dependencies:
 
 - pip:
   - .[all]
-  - sphinx<8.2
+  - sphinx>=8
   - setuptools-scm
   - sphinx-book-theme
   - nbsphinx
   - nbsphinx-link
-  - sphinx-argparse
+  - sphinx-argparse>=0.6.0
   - sphinxcontrib-mermaid
+  - ipython

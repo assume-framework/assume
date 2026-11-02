@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: MIT
+
+Contracts:
+  - SenderId: 300
+    ReceiverId: [100, 400]
+    ProductName: Bids

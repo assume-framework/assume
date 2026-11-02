@@ -1,7 +1,7 @@
 <!--
 SPDX-FileCopyrightText: ASSUME Developers
 
-SPDX-License-Identifier: AGPL-3.0-or-later
+SPDX-License-Identifier: MIT
 -->
 
 # Contribute to ASSUME
@@ -37,9 +37,11 @@ git clone https://github.com/assume-framework/assume.git
 cd assume
 ```
 
-2. Install the package in editable mode:
+2. Install the package in editable mode.
+   Without a GPU, install the CPU-only torch first, otherwise the `learning` extra pulls the multi-GB CUDA build on Linux:
 
 ```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install -e ".[all]"
 ```
 
@@ -59,7 +61,7 @@ pre-commit run --all-files
 4. Install also testing capabilities:
 
 ```bash
-pip install -e ".[testing]"
+pip install -e ".[test]"
 ```
 
 5. Implement your changes and push the changes to a fork
@@ -68,9 +70,9 @@ pip install -e ".[testing]"
 
 ### Creating a new release
 
-To release a new version, create a git tag of the release commit and release notes in GitHub (also possible via `Draft new release` function of Github). No adjusted toml file necessary anymore.
-A github action automatically uploads the release to PyPI.
-The upload to PyPi has to be confirmed by one of the core developers.
+To release a new version, create a git tag of the release commit and release notes in GitHub (also possible via `Draft new release` function of GitHub). No adjusted toml file necessary anymore.
+A GitHub Action automatically uploads the release to PyPI.
+The upload to PyPI has to be confirmed by one of the core developers.
 
 ## Building documentation
 
@@ -106,11 +108,11 @@ sphinx-apidoc -o docs/source -Fa assume
 To create and serve the documentation locally, use:
 
 ```bash
-cd docs/source && python -m sphinx . ../build && cd ../.. && python -m http.server --directory docs/build
+python -m sphinx docs/source docs/build && python -m http.server --directory docs/build
 ```
 
 ## Need some help?
 
 Reach out to us with your questions:
 
-kim.miskiw@kit.edu / manish.khanra@isi.fraunhofer.de / maurer@fh-aachen.de / nick.harder@inatech.uni-freiburg.de
+kim.miskiw@kit.edu / manish.khanra@isi.fraunhofer.de / maurer@fh-aachen.de / gunter.grimm@inatech.uni-freiburg.de

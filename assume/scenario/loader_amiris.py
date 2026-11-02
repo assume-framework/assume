@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import calendar
 import logging
@@ -10,7 +10,6 @@ import dateutil.rrule as rr
 import pandas as pd
 import yaml
 from dateutil.relativedelta import relativedelta as rd
-from yaml_include import Constructor
 
 from assume.common.forecaster import (
     DemandForecaster,
@@ -18,10 +17,12 @@ from assume.common.forecaster import (
     UnitForecaster,
 )
 from assume.common.market_objects import MarketConfig, MarketProduct
+from assume.scenario.yaml_include import Constructor
 from assume.strategies.extended import SupportStrategy
 from assume.world import World
 
 logger = logging.getLogger(__name__)
+
 
 translate_clearing = {
     "SAME_SHARES": "pay_as_clear",
@@ -184,7 +185,10 @@ def add_agent_to_world(
                         "technology": "demand",
                         "price": value,
                     },
-                    DemandForecaster(index, demand=-100000),
+                    DemandForecaster(
+                        index,
+                        demand=-100000,
+                    ),
                 )
         case "EnergyExchange" | "DayAheadMarketSingleZone":
             clearing_section = agent["Attributes"].get("Clearing", agent["Attributes"])
@@ -263,7 +267,10 @@ def add_agent_to_world(
                         "price": load["ValueOfLostLoad"],
                     },
                     # demand_series might contain more values than index
-                    DemandForecaster(index, demand=demand_series[: len(index)]),
+                    DemandForecaster(
+                        index,
+                        demand=demand_series[: len(index)],
+                    ),
                 )
 
         case "StorageTrader":
@@ -535,6 +542,8 @@ def load_amiris(
             supports,
             index,
         )
+
+    world.init_forecasts()
     # calculate market price before simulation
     world
 

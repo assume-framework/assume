@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import math
 
@@ -11,7 +11,7 @@ import pytest
 from assume.units.dst_components import HeatPump
 
 # Define the solver to use
-use_solver = "appsi_highs"  # Replace with the appropriate solver
+solver_name = "appsi_highs"  # Replace with the appropriate solver
 
 
 # Fixture for creating an electricity price profile, including high prices to test logic
@@ -65,7 +65,7 @@ def heat_pump_model(heat_pump_config, price_profile):
     )
 
     # Solve the model
-    solver = pyo.SolverFactory(use_solver)
+    solver = pyo.SolverFactory(solver_name)
     results = solver.solve(model, tee=False)
 
     return model, results
@@ -167,13 +167,13 @@ def test_heat_pump_consumption_behavior(
             if operational_status:
                 # Adjust the assert statement to use math.isclose for comparison
                 assert (
-                    math.isclose(power_in, heat_pump_config["min_power"], rel_tol=1e-6)
+                    math.isclose(power_in, heat_pump_config["min_power"], abs_tol=1e-6)
                     or power_in > heat_pump_config["min_power"]
                 ), (
                     f"Heat pump power at time {t} is {power_in}, which is below the minimum power {heat_pump_config['min_power']}."
                 )
             else:
-                assert power_in == 0, (
+                assert math.isclose(power_in, 0, abs_tol=1e-9), (
                     f"Heat pump should be off at time {t}, but power_in is {power_in}."
                 )
 
@@ -195,7 +195,7 @@ def test_min_operating_steps(heat_pump_model, heat_pump_config):
             future_t = t + step
             if future_t in model.time_steps:
                 status = pyo.value(operational_status[future_t])
-                assert math.isclose(status, 1, rel_tol=1e-6), (
+                assert math.isclose(status, 1, abs_tol=1e-6), (
                     f"Operational status at time {future_t} should be 1 after startup at {t}, but is {status}."
                 )
 
