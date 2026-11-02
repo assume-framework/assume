@@ -415,16 +415,16 @@ class Boiler:
 class CHP:
     """
     A combined heat and power (CHP) unit with a fixed power-to-heat ratio.
- 
+
     One fuel is converted into electricity and heat in fixed proportions
     (back-pressure operation):
- 
+
         power_out[t] = electrical_efficiency * fuel_in[t]
         heat_out[t]  = thermal_efficiency * fuel_in[t]
- 
+
     As for the fuel cell, capacity, minimum load and ramp limits refer to the
     electrical output [MW_el]; fuel input [MW_fuel] follows from the efficiency.
- 
+
     Args:
         time_steps (list[int]): A list of time steps over which the CHP operates.
         max_power (float): Maximum electrical output [MW_el].
@@ -454,12 +454,12 @@ class CHP:
         availability_profile (pd.Series | None, optional): Per-time-step availability
             factor in [0, 1] applied to `max_power`. Defaults to None.
     """
- 
+
     _SUPPORTED_FUELS = {
         "natural_gas",
         "hydrogen_gas",
     }
- 
+
     def __init__(
         self,
         time_steps: list[int],
@@ -501,7 +501,7 @@ class CHP:
             raise ValueError("CHP minimum operating/down steps must be >= 0.")
         if initial_operational_status not in (0, 1):
             raise ValueError("CHP initial_operational_status must be 0 or 1.")
- 
+
         self.time_steps = time_steps
         self.max_power = float(max_power)
         self.min_power = float(min_power)
@@ -518,15 +518,15 @@ class CHP:
             availability_profile, "CHP"
         )
         self.kwargs = kwargs
- 
+
     def add_to_model(
         self, model: pyo.ConcreteModel, model_block: pyo.Block
     ) -> pyo.Block:
         """Add the CHP equations and operating constraints to ``model_block``."""
- 
+
         if self.fuel_type == "natural_gas" and not hasattr(model, "natural_gas_price"):
             raise ValueError("Natural-gas CHP requires model.natural_gas_price.")
- 
+
         # Define parameters
         model_block.max_power = pyo.Param(initialize=self.max_power)
         model_block.min_power = pyo.Param(initialize=self.min_power)
@@ -542,7 +542,7 @@ class CHP:
             initialize=self.initial_operational_status
         )
         model_block.additional_cost = pyo.Param(initialize=self.additional_cost)
- 
+
         # Define physical decision variables.
         # Carrier-specific fuel inputs are exposed below as Expressions.
         model_block.power_out = pyo.Var(
@@ -553,27 +553,27 @@ class CHP:
         model_block.fuel_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.heat_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.operating_cost = pyo.Var(self.time_steps, within=pyo.Reals)
- 
+
         # Fixed-ratio conversion
         @model_block.Constraint(self.time_steps)
         def electrical_output_constraint(b, t):
             return b.power_out[t] == b.fuel_in[t] * b.electrical_efficiency
- 
+
         @model_block.Constraint(self.time_steps)
         def thermal_output_constraint(b, t):
             return b.heat_out[t] == b.fuel_in[t] * b.thermal_efficiency
- 
+
         # Carrier inputs for the parent system's balances (zero for the unused fuel)
         uses_gas = self.fuel_type == "natural_gas"
- 
+
         @model_block.Expression(self.time_steps)
         def natural_gas_in(b, t):
             return b.fuel_in[t] if uses_gas else 0.0
- 
+
         @model_block.Expression(self.time_steps)
         def hydrogen_in(b, t):
             return 0.0 if uses_gas else b.fuel_in[t]
- 
+
         # Operating cost: fuel plus non-fuel variable cost
         @model_block.Constraint(self.time_steps)
         def operating_cost_constraint_rule(b, t):
@@ -587,20 +587,20 @@ class CHP:
                 raise ValueError(f"Unsupported CHP fuel_type {self.fuel_type!r}.")
 
             return b.operating_cost[t] == fuel_cost + b.power_out[t] * b.additional_cost
- 
+
         if self.availability_profile is not None:
- 
+
             @model_block.Constraint(self.time_steps)
             def availability_constraint(b, t):
                 availability = availability_at(self.availability_profile, t)
                 return b.power_out[t] <= availability * b.max_power
- 
+
         add_ramping_constraints(
             model_block=model_block,
             time_steps=self.time_steps,
             ramped=model_block.power_out,
         )
- 
+
         # On/off status is only needed for a minimum load or minimum up/down times
         # longer than one step (same rule as HeatPump, Electrolyser and FuelCell).
         if (
@@ -615,7 +615,7 @@ class CHP:
                 min_quantity="min_power",
                 max_quantity="max_power",
             )
- 
+
         return model_block
 
 
@@ -1313,9 +1313,7 @@ class FuelCell:
             within=pyo.NonNegativeReals,
             bounds=(0, model_block.max_power),
         )
-        model_block.hydrogen_in = pyo.Var(
-            self.time_steps, within=pyo.NonNegativeReals
-        )
+        model_block.hydrogen_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.operating_cost = pyo.Var(
             self.time_steps, within=pyo.NonNegativeReals
         )

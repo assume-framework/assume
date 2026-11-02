@@ -1028,8 +1028,9 @@ def load_config_and_create_forecaster(
                                 f"Expected column '{heat_column}'."
                             )
 
-                        carrier_demands["heat"] = forecasts_df[heat_column].reindex(index)
-
+                        carrier_demands["heat"] = forecasts_df[heat_column].reindex(
+                            index
+                        )
 
                     # Hydrogen demand is required by hydrogen-only and integrated heat+H2 systems.
                     if system_type in {"hydrogen", "heat_hydrogen"}:
@@ -1041,7 +1042,9 @@ def load_config_and_create_forecaster(
                                 f"Expected column '{h2_column}'."
                             )
 
-                        carrier_demands["hydrogen"] = forecasts_df[h2_column].reindex(index)
+                        carrier_demands["hydrogen"] = forecasts_df[h2_column].reindex(
+                            index
+                        )
 
                         seasonal_storage_schedule = get_unit_forecast_column(
                             forecasts_df,
@@ -1052,7 +1055,9 @@ def load_config_and_create_forecaster(
                         if seasonal_storage_schedule is None:
                             seasonal_storage_schedule = 0
 
-                        extra_profiles["seasonal_storage_schedule"] = seasonal_storage_schedule
+                        extra_profiles["seasonal_storage_schedule"] = (
+                            seasonal_storage_schedule
+                        )
 
                     unit_forecasts[id] = SectorCoupledForecaster(
                         index=shared_unit_index,

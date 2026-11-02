@@ -9,9 +9,9 @@ import pandas as pd
 import pypsa
 
 from assume.common.grid_utils import (
+    add_redispatch_flexible_loads,
     add_redispatch_generators,
     add_redispatch_loads,
-    add_redispatch_flexible_loads,
     calculate_network_meta,
     get_supported_solver_linopy,
     read_pypsa_grid,

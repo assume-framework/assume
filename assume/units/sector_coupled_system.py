@@ -94,7 +94,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
     Negative values are required for systems containing electricity-producing
     components such as fuel cells and CHPs.
     """
-    
+
     _component_market_tolerance = 1e-7
 
     SYSTEM_PRESETS: dict[str, dict[str, Any]] = {
@@ -311,7 +311,8 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
             for name, cfg in components.items()
             if self._matches_prefix(name, "chp")
             and isinstance(cfg, dict)
-            and str(cfg.get("fuel_type", "natural_gas")).strip().lower() == "hydrogen_gas"
+            and str(cfg.get("fuel_type", "natural_gas")).strip().lower()
+            == "hydrogen_gas"
         ]
         if h2_chps:
 

@@ -1,4 +1,3 @@
-
 # SPDX-FileCopyrightText: ASSUME Developers
 #
 # SPDX-License-Identifier: MIT
@@ -18,7 +17,6 @@ from assume.common.forecaster import SectorCoupledForecaster
 from assume.units.dst_components import CHP, demand_side_technologies
 from assume.units.sector_coupled_system import SectorCoupledSystem
 
-
 SOLVER = "appsi_highs"
 TOL = 1e-5
 
@@ -29,17 +27,12 @@ def val(x):
 
 def assert_optimal(results):
     assert results.solver.status == pyo.SolverStatus.ok
-    assert (
-        results.solver.termination_condition
-        == pyo.TerminationCondition.optimal
-    )
+    assert results.solver.termination_condition == pyo.TerminationCondition.optimal
 
 
 @pytest.fixture
 def time_index():
-    return pd.date_range(
-        "2023-01-01", periods=4, freq="h"
-    )
+    return pd.date_range("2023-01-01", periods=4, freq="h")
 
 
 def constant_series(value, index):
@@ -88,10 +81,7 @@ def make_chp_model(
     component.add_to_model(model, model.chp)
 
     model.objective = pyo.Objective(
-        expr=sum(
-            model.chp.operating_cost[t]
-            for t in model.time_steps
-        ),
+        expr=sum(model.chp.operating_cost[t] for t in model.time_steps),
         sense=pyo.minimize,
     )
 
@@ -109,19 +99,13 @@ def make_sector_system(
     forecaster = SectorCoupledForecaster(
         index=time_index,
         carrier_demands={
-            "heat": constant_series(
-                heat_demand, time_index
-            ),
+            "heat": constant_series(heat_demand, time_index),
         },
         fuel_prices={
-            "natural gas": constant_series(
-                natural_gas_price, time_index
-            ),
+            "natural gas": constant_series(natural_gas_price, time_index),
         },
         market_prices={
-            "EOM": constant_series(
-                electricity_price, time_index
-            ),
+            "EOM": constant_series(electricity_price, time_index),
         },
     )
 
@@ -171,10 +155,13 @@ def solve_sector_system(system):
 
 # TEST 1: CHP registration
 
+
 def test_chp_registered():
     assert demand_side_technologies["chp"] is CHP
 
+
 # TEST 2: Natural-gas CHP conversion and cost
+
 
 def test_natural_gas_chp():
     model = make_chp_model()
@@ -187,29 +174,18 @@ def test_natural_gas_chp():
     for t in model.time_steps:
         chp = model.chp
 
-        assert val(chp.power_out[t]) == pytest.approx(
-            8.0, abs=TOL
-        )
-        assert val(chp.fuel_in[t]) == pytest.approx(
-            20.0, abs=TOL
-        )
-        assert val(chp.heat_out[t]) == pytest.approx(
-            9.0, abs=TOL
-        )
-        assert val(chp.natural_gas_in[t]) == pytest.approx(
-            20.0, abs=TOL
-        )
-        assert val(chp.hydrogen_in[t]) == pytest.approx(
-            0.0, abs=TOL
-        )
+        assert val(chp.power_out[t]) == pytest.approx(8.0, abs=TOL)
+        assert val(chp.fuel_in[t]) == pytest.approx(20.0, abs=TOL)
+        assert val(chp.heat_out[t]) == pytest.approx(9.0, abs=TOL)
+        assert val(chp.natural_gas_in[t]) == pytest.approx(20.0, abs=TOL)
+        assert val(chp.hydrogen_in[t]) == pytest.approx(0.0, abs=TOL)
 
         # 20 * 20 + 8 * 5 = 440 EUR
-        assert val(chp.operating_cost[t]) == pytest.approx(
-            440.0, abs=TOL
-        )
+        assert val(chp.operating_cost[t]) == pytest.approx(440.0, abs=TOL)
 
 
 # TEST 3: Hydrogen CHP, internally balanced fuel
+
 
 def test_hydrogen_chp():
     model = make_chp_model(
@@ -231,23 +207,15 @@ def test_hydrogen_chp():
     for t in model.time_steps:
         chp = model.chp
 
-        assert val(chp.fuel_in[t]) == pytest.approx(
-            10.0, abs=TOL
-        )
-        assert val(chp.hydrogen_in[t]) == pytest.approx(
-            10.0, abs=TOL
-        )
-        assert val(chp.natural_gas_in[t]) == pytest.approx(
-            0.0, abs=TOL
-        )
-        assert val(chp.heat_out[t]) == pytest.approx(
-            5.0, abs=TOL
-        )
-        assert val(chp.operating_cost[t]) == pytest.approx(
-            8.0, abs=TOL
-        )
+        assert val(chp.fuel_in[t]) == pytest.approx(10.0, abs=TOL)
+        assert val(chp.hydrogen_in[t]) == pytest.approx(10.0, abs=TOL)
+        assert val(chp.natural_gas_in[t]) == pytest.approx(0.0, abs=TOL)
+        assert val(chp.heat_out[t]) == pytest.approx(5.0, abs=TOL)
+        assert val(chp.operating_cost[t]) == pytest.approx(8.0, abs=TOL)
+
 
 # TEST 4: CHP electrical capacity limit
+
 
 def test_chp_capacity_limit():
     model = make_chp_model(max_power=4.0)
@@ -255,7 +223,9 @@ def test_chp_capacity_limit():
     assert model.chp.power_out[0].lb == pytest.approx(0.0)
     assert model.chp.power_out[0].ub == pytest.approx(4.0)
 
+
 # TEST 5: CHP parameter validation
+
 
 @pytest.mark.parametrize(
     "changes",
@@ -286,6 +256,7 @@ def test_chp_invalid_parameters(changes):
 
 # TEST 6: CHP-only natural gas price creation
 
+
 def test_scs_creates_gas_price_for_chp(time_index):
     system = make_sector_system(
         time_index,
@@ -297,12 +268,11 @@ def test_scs_creates_gas_price_for_chp(time_index):
     assert hasattr(system.model, "natural_gas_price")
 
     for t in system.model.time_steps:
-        assert val(
-            system.model.natural_gas_price[t]
-        ) == pytest.approx(25.0, abs=TOL)
+        assert val(system.model.natural_gas_price[t]) == pytest.approx(25.0, abs=TOL)
 
 
 # TEST 7: CHP heat production and electrical export in SCS
+
 
 def test_scs_chp_heat_and_electricity(time_index):
     system = make_sector_system(
@@ -318,33 +288,19 @@ def test_scs_chp_heat_and_electricity(time_index):
     chp = instance.dsm_blocks["chp_gas"]
 
     for t in instance.time_steps:
+        assert val(hp.heat_out[t]) == pytest.approx(0.0, abs=TOL)
 
-        assert val(hp.heat_out[t]) == pytest.approx(
-            0.0, abs=TOL
-        )
+        assert val(chp.heat_out[t]) == pytest.approx(5.0, abs=TOL)
 
-        assert val(chp.heat_out[t]) == pytest.approx(
-            5.0, abs=TOL
-        )
+        assert val(chp.fuel_in[t]) == pytest.approx(10.0, abs=TOL)
 
-        assert val(chp.fuel_in[t]) == pytest.approx(
-            10.0, abs=TOL
-        )
-
-        assert val(chp.power_out[t]) == pytest.approx(
-            4.0, abs=TOL
-        )
+        assert val(chp.power_out[t]) == pytest.approx(4.0, abs=TOL)
 
         # SCS physical exchange:
         # HP import - CHP generation = 0 - 4
-        assert val(
-            instance.total_power_input[t]
-        ) == pytest.approx(-4.0, abs=TOL)
+        assert val(instance.total_power_input[t]) == pytest.approx(-4.0, abs=TOL)
 
-        heat_supply = (
-            val(hp.heat_out[t])
-            + val(chp.heat_out[t])
-        )
+        heat_supply = val(hp.heat_out[t]) + val(chp.heat_out[t])
 
         assert heat_supply == pytest.approx(
             val(instance.heat_demand[t]),
@@ -353,6 +309,7 @@ def test_scs_chp_heat_and_electricity(time_index):
 
 
 # TEST 8: CHP energy conservation
+
 
 def test_chp_energy_conservation():
     model = make_chp_model()
@@ -371,10 +328,6 @@ def test_chp_energy_conservation():
 
         assert electricity + heat <= fuel + TOL
 
-        assert electricity == pytest.approx(
-            fuel * 0.40, abs=TOL
-        )
+        assert electricity == pytest.approx(fuel * 0.40, abs=TOL)
 
-        assert heat == pytest.approx(
-            fuel * 0.45, abs=TOL
-        )
+        assert heat == pytest.approx(fuel * 0.45, abs=TOL)
