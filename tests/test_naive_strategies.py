@@ -264,7 +264,9 @@ def test_sector_coupled_energy_strategy_creates_aggregate_demand_bid(
         "node": node,
         "volume": -power_requirement,
     }
+    
     unit = SimpleNamespace(
+        horizon_mode="full_horizon",
         prepare_market_state=lambda: None,
         get_eom_market_positions=lambda _start: [position],
     )
