@@ -349,3 +349,26 @@ def encode_monthly_features(start: datetime) -> list:
         month_cos,
         month_sin,
     ]
+
+
+_TORCH_BACKEND_CHECK = {
+    "cpu": lambda d: True,
+    "cuda": lambda d: th.cuda.is_available(),
+    "mps": lambda d: th.backends.mps.is_available(),
+}
+
+
+def resolve_device(requested: str) -> th.device:
+    """Return a usable th.device, falling back to CPU if the request cannot be honored."""
+    try:
+        device = th.device(requested)
+        # Check if the backend checker exists and returns True for this device
+        if _TORCH_BACKEND_CHECK.get(device.type, lambda _: False)(device):
+            return device
+        logging.warning(
+            "Device %s is unsupported or unavailable, falling back to CPU", requested
+        )
+    except (RuntimeError, ValueError, TypeError):
+        logging.warning("Invalid device string %r, falling back to CPU", requested)
+
+    return th.device("cpu")
