@@ -484,8 +484,19 @@ def test_exchange_units_need_exchanges_df(scenario):
 # -- shipped examples -----------------------------------------------------------------------
 @pytest.mark.parametrize(
     "example",
-    ["example_01a", "example_01b", "example_01e", "example_02a", "example_02c"],
+    ["example_01a", "example_01b", "example_01e"],
 )
 def test_examples_pass_static_checks(example):
+    report = verify_scenario_folder(Path("examples/inputs") / example, dry_run=False)
+    assert report.ok, messages(report)
+
+
+# -- learning examples
+@pytest.mark.require_learning
+@pytest.mark.parametrize(
+    "example",
+    ["example_02a", "example_02b", "example_02c"],
+)
+def test_learning_examples_pass_static_checks(example):
     report = verify_scenario_folder(Path("examples/inputs") / example, dry_run=False)
     assert report.ok, messages(report)
