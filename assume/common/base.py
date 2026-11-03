@@ -490,7 +490,7 @@ class SupportsMinMaxCharge(BaseUnit):
     # negative
     ramp_down_charge: float | None
     # ramp_down_charge is negative
-    simultaneous_charge_discharge: bool
+    simultaneous_charge_discharge_ramping: bool
     capacity: float
     efficiency_charge: float
     efficiency_discharge: float
@@ -569,7 +569,7 @@ class SupportsMinMaxCharge(BaseUnit):
             # if we can not ramp back to 0, we can not discharge anything
             return 0
 
-        if self.simultaneous_charge_discharge:
+        if self.simultaneous_charge_discharge_ramping:
             # disregard a max_net_ramping per timestep. If the unit wants to switch signs within one step, allow this
             # we can e.g. ramp_down_discharge from 50 to 0 and ramp_up_charge from 0 to -60 in one timestep
 
@@ -598,7 +598,7 @@ class SupportsMinMaxCharge(BaseUnit):
                 )
             return power_discharge
 
-        # If simultaneous_charge_discharge is False, we are more restrictive, but sign switches could still be allowed.
+        # If simultaneous_charge_discharge_ramping is False, we are more restrictive, but sign switches could still be allowed.
         # We need to check the net ramping to avoid units can ramp ~2x single ramp limits
         remaining_net_ramp = None
         if (
@@ -670,7 +670,7 @@ class SupportsMinMaxCharge(BaseUnit):
             # if we can not ramp back to 0, we can not charge anything
             return 0
 
-        if self.simultaneous_charge_discharge:
+        if self.simultaneous_charge_discharge_ramping:
             # disregard a max_net_ramping per timestep. If the unit wants to switch signs within one step, allow this
             # we can e.g. ramp_down_discharge from 50 to 0 and ramp_up_charge from 0 to -60 in one timestep
 
@@ -694,7 +694,7 @@ class SupportsMinMaxCharge(BaseUnit):
                 power_charge = min(power_charge, minimum_required - current_power, 0)
             return power_charge
 
-        # If simultaneous_charge_discharge is False, we are more restrictive, but sign switches could still be allowed.
+        # If simultaneous_charge_discharge_ramping is False, we are more restrictive, but sign switches could still be allowed.
         # We need to check the net ramping to avoid units can ramp ~2x single ramp limits
         remaining_net_ramp = None
         if (

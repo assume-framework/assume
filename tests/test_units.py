@@ -115,7 +115,7 @@ def test_minmax():
     )
 
 
-def test_minmaxcharge_no_simultaneous_charge_discharge():
+def test_minmaxcharge_no_simultaneous_charge_discharge_ramping():
     index = pd.date_range("2022-01-01", periods=24, freq="h")
     forecaster = UnitForecaster(index, market_prices={"EOM": 50})
 
@@ -136,7 +136,7 @@ def test_minmaxcharge_no_simultaneous_charge_discharge():
     mmc.max_power_discharge = 1000
     mmc.min_power_charge = 0
     mmc.min_power_discharge = 0
-    mmc.simultaneous_charge_discharge = False
+    mmc.simultaneous_charge_discharge_ramping = False
 
     # stay turned off
     assert (
@@ -160,7 +160,8 @@ def test_minmaxcharge_no_simultaneous_charge_discharge():
     assert mmc.calculate_ramp_charge(-10, -200, 0) == -110
 
 
-def test_minmaxcharge_simultaneous_charge_discharge():
+
+def test_minmaxcharge_simultaneous_charge_discharge_ramping():
     index = pd.date_range("2022-01-01", periods=24, freq="h")
     forecaster = UnitForecaster(index, market_prices={"EOM": 50})
 
@@ -181,7 +182,7 @@ def test_minmaxcharge_simultaneous_charge_discharge():
     mmc.max_power_discharge = 1000
     mmc.min_power_charge = 0
     mmc.min_power_discharge = 0
-    mmc.simultaneous_charge_discharge = True
+    mmc.simultaneous_charge_discharge_ramping = True
 
     # stay turned off
     assert (
@@ -231,7 +232,7 @@ def test_minmaxcharge_unconstrained():
     # min power
     mmc.min_power_charge = -0
     mmc.min_power_discharge = 0
-    mmc.simultaneous_charge_discharge = False
+    mmc.simultaneous_charge_discharge_ramping = False
 
     # calculate ramping
     # should be previous_power + requested power, as ramping is not constraining

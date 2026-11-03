@@ -333,7 +333,7 @@ def test_net_ramping_constraint(storage_unit):
     # if simultaneous charge and discharge is not allowed, we use the net ramping constraint to limit ramping in case of sign switches.
     # This test checks, if the net_ramp is correctly distributed between charge and discharge.
     # And it checks that if one of the ramp limits is fully used, no remaining net_ramp is used.
-    storage_unit.simultaneous_charge_discharge = False
+    storage_unit.simultaneous_charge_discharge_ramping = False
 
     # case1: discharging -> charging with ramp_down_discharge 30/50 used
     adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 30, -100, 0)
@@ -360,7 +360,7 @@ def test_net_ramping_constraint(storage_unit):
 
 def test_net_ramping_constraint_one_ramp_undefined(storage_unit):
     # even if we do not allow simultaneous charging and sicharging ramps within one timestep, we must ensure only existing ramp rates are applied
-    storage_unit.simultaneous_charge_discharge = False
+    storage_unit.simultaneous_charge_discharge_ramping = False
     # case1 discharging -> charging
     # 1.1 ramp_down_discharge undefined
     storage_unit.ramp_down_discharge = None

@@ -38,7 +38,7 @@ def assert_allclose_with_indices(actual, expected, atol):
 # False is the new default (10/2026) ramping behavior, True is the previous default behavior. The tests should pass for both versions.
 @pytest.fixture(
     params=[False, True],
-    ids=["no-simultaneous-charge-discharge", "simultaneous-charge-discharge"],
+    ids=["no-simultaneous-charge-discharge_ramping", "simultaneous-charge-discharge_ramping"],
 )
 def storage(request: pytest.FixtureRequest) -> Storage:
     # Create a PowerPlant instance with some example parameters
@@ -63,7 +63,7 @@ def storage(request: pytest.FixtureRequest) -> Storage:
         additional_cost_charge=3,
         additional_cost_discharge=4,
         additional_cost=1,
-        simultaneous_charge_discharge=request.param,
+        simultaneous_charge_discharge_ramping=request.param,
     )
 
 
@@ -130,8 +130,8 @@ def test_flexable_eom_storage(mock_market_config, storage):
     ]
     storage.forecaster = UnitForecaster(index, market_prices={"EOM": forecast})
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
-    if storage.simultaneous_charge_discharge:
-        # if simultaneous charge and discharge is allowed, a storage can switch faster between charging and discharging, ramp constraints are less restricitve
+    if storage.simultaneous_charge_discharge_ramping:
+        # if simultaneously ramping charge and discharge is allowed, a storage can switch faster between charging and discharging, ramp constraints are less restricitve
         assert_allclose_with_indices(
             [b["volume"] for b in bids],
             [
@@ -193,7 +193,7 @@ def test_flexable_eom_storage(mock_market_config, storage):
             atol=0.01,
         )
 
-    elif not storage.simultaneous_charge_discharge:
+    elif not storage.simultaneous_charge_discharge_ramping:
         # we have 24 timesteps, from 0 to 23, first 4 we want to charge [-60, -100, -100, -100]
         # the price in timestep 4 is high, so we would like to discharge, but ramp_down_charge=-50 restricts this, the strategy issues a -50 charging bid (could also be handled differently)
         # in timesteps 5, 6, 7 prices favor charging again, but the SoC is near 1, so [-100, -45.55, 0]. Timestep 6 with volume -45.55 violates ramping (-100 - -50) = -50, but SoC is enforced.
