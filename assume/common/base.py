@@ -540,10 +540,11 @@ class SupportsMinMaxCharge(BaseUnit):
     ) -> float:
         """
         Adjusts the discharging power to the ramping constraints.
-        Given previous_power in the step before, we want to offer power_discharge (positive) to some market,
+        Given previous_power in the step before, we want to offer requested_power (positive or negative or zero) to some market,
         while we already sold current_power on some other market.
 
-        requested_power is an absolute power, this function checks if this amount is still feasible to sell.
+        requested_power is a power level, not a change relative to another power level. Its sign indicates direction.
+        This function checks if this amount is still feasible to sell.
 
         Args:
             previous_power (float): The previous power output of the unit.
@@ -551,10 +552,8 @@ class SupportsMinMaxCharge(BaseUnit):
             current_power (float, optional): The current power output of the unit already sold on another market. Defaults to 0.
 
         Returns:
-            float: The discharging power adjusted to the ramping constraints.
+            float: The requested power adjusted to the ramping constraints.
         """
-        # previously charging -800 MW wants to go to 200 MW - but must first check if charging is even possible
-        # - 800 MW to 0 with charge ramp down and then 200 MW with discharge ramp up
         # if storage was charging before we need to check if we can ramp back to zero
         if (
             previous_power < 0
@@ -599,7 +598,8 @@ class SupportsMinMaxCharge(BaseUnit):
                 )
             return power_discharge
 
-        # if simultaneous_charge_discharge is False, we need to check the net ramping to avoid units can ramp ~2x single ramp limits
+        # If simultaneous_charge_discharge is False, we are more restrictive, but sign switches could still be allowed.
+        # We need to check the net ramping to avoid units can ramp ~2x single ramp limits
         remaining_net_ramp = None
         if (
             previous_power < 0
@@ -656,10 +656,10 @@ class SupportsMinMaxCharge(BaseUnit):
         Args:
             previous_power (float): The previous power output of the unit.
             requested_power (float): The requested power output of the unit (positive or negative or zero).
-            current_power (float, optional): The current power output of the unit. Defaults to 0.
+            current_power (float, optional): The power we already sold on some other market. Defaults to 0.
 
         Returns:
-            float: The charging power adjusted to the ramping constraints.
+            float: The requested power adjusted to the ramping constraints.
         """
 
         if (
@@ -694,7 +694,8 @@ class SupportsMinMaxCharge(BaseUnit):
                 power_charge = min(power_charge, minimum_required - current_power, 0)
             return power_charge
 
-        # if simultaneous_charge_discharge is False, we need to check the net ramping to avoid units can ramp ~2x single ramp limits
+        # If simultaneous_charge_discharge is False, we are more restrictive, but sign switches could still be allowed.
+        # We need to check the net ramping to avoid units can ramp ~2x single ramp limits
         remaining_net_ramp = None
         if (
             previous_power > 0

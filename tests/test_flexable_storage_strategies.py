@@ -35,7 +35,7 @@ def assert_allclose_with_indices(actual, expected, atol):
 
 
 # run all tests with two versions of handling simultaneous charge and discharge: True and False
-# True is the new default (10/2026) ramping behavior, False is the previous default behavior. The tests should pass for both versions.
+# False is the new default (10/2026) ramping behavior, True is the previous default behavior. The tests should pass for both versions.
 @pytest.fixture(
     params=[False, True],
     ids=["no-simultaneous-charge-discharge", "simultaneous-charge-discharge"],
