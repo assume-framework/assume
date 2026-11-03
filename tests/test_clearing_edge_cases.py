@@ -198,7 +198,7 @@ def test_supply_and_demand_curves_vertical_overlap():
     assert len(rejected) == 2
     assert meta[0]["supply_volume"] == 100
     assert meta[0]["demand_volume"] == 100
-    assert meta[0]["price"] == 8 # last accepted supply bid sets price
+    assert meta[0]["price"] == 8  # last accepted supply bid sets price
     assert accepted[0]["volume"] == -100
     assert accepted[0]["accepted_volume"] == -100
 
@@ -373,7 +373,7 @@ def test_supply_and_demand_curves_no_overlap_supply_scarcity():
 
 
 def test_supply_and_demand_no_overlap_and_volume_at_supply_and_demand_curve_step():
-    '''
+    """
     Special case of supply scarcity, where the step of the supply curve ends at 100 MW, and there is a step in the demand curve at 100 MW.
     Create Orderbook with constant order volumes and prices:
         - dem1: volume = -50, price = 30
@@ -381,7 +381,7 @@ def test_supply_and_demand_no_overlap_and_volume_at_supply_and_demand_curve_step
         - dem3: volume = -50, price = 10
         - gen1: volume = 100, price = 0
     Supply and demand curves do not overlap and supply is scarce.
-    '''
+    """
     next_opening = simple_dayahead_auction_config.opening_hours.after(
         datetime(2005, 6, 1)
     )
@@ -402,7 +402,7 @@ def test_supply_and_demand_no_overlap_and_volume_at_supply_and_demand_curve_step
     assert len(rejected) == 1
     assert meta[0]["supply_volume"] == 100
     assert meta[0]["demand_volume"] == 100
-    assert meta[0]["price"] == 20 # last accepted demand bid sets price
+    assert meta[0]["price"] == 20  # last accepted demand bid sets price
 
     cr_complex_pac = ComplexClearingRole(complex_dayahead_auction_config)
     accepted, rejected, meta, flows = cr_complex_pac.clear(orderbook, products)

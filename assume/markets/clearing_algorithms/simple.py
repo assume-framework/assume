@@ -169,7 +169,7 @@ class PayAsClearRole(MarketRole):
             if accepted_supply_orders:
                 clear_price = float(
                     max(map(itemgetter("price"), accepted_supply_orders))
-                    )
+                )
                 if supply_scarcity and accepted_demand_orders:
                     clear_price = max(
                         clear_price,
