@@ -626,12 +626,12 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         # Consideration of start-up costs, divided evenly between upward and downward regulation events.
         if (
             unit.outputs[product_type].at[start] != 0
-            and unit.outputs[product_type].at[start - unit.index.freq] == 0
+            and unit.get_output_before(start, product_type) == 0
         ):
             operational_cost += unit.hot_start_cost / 2
         elif (
             unit.outputs[product_type].at[start] == 0
-            and unit.outputs[product_type].at[start - unit.index.freq] != 0
+            and unit.get_output_before(start, product_type) != 0
         ):
             operational_cost += unit.hot_start_cost / 2
 
@@ -1265,12 +1265,12 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
         # Consideration of start-up costs, divided evenly between upward and downward regulation events.
         if (
             unit.outputs[product_type].at[start] != 0
-            and unit.outputs[product_type].at[start - unit.index.freq] == 0
+            and unit.get_output_before(start, product_type) == 0
         ):
             operational_cost += unit.hot_start_cost / 2
         elif (
             unit.outputs[product_type].at[start] == 0
-            and unit.outputs[product_type].at[start - unit.index.freq] != 0
+            and unit.get_output_before(start, product_type) != 0
         ):
             operational_cost += unit.hot_start_cost / 2
 

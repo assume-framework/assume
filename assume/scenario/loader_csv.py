@@ -489,6 +489,46 @@ def make_market_config(
     return market_config
 
 
+def load_market_configs(
+    config_path: str | Path, study_case: str = ""
+) -> list[MarketConfig]:
+    """
+    Create the market configs of a study case directly from a config.yaml,
+    without loading any units or other input files.
+
+    Args:
+        config_path (str | Path): path to the config.yaml or to the scenario folder containing it
+        study_case (str): the study case in the config, defaults to the first one
+
+    Returns:
+        list[MarketConfig]: the market configs of the study case
+    """
+    config_path = Path(config_path)
+    if config_path.is_dir():
+        config_path = config_path / "config.yaml"
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+    if not study_case:
+        study_case = list(config.keys())[0]
+    if study_case not in config:
+        raise ValueError(
+            f"Study case {study_case} not found in {config_path}. "
+            f"Known study cases are: {list(config.keys())}"
+        )
+    config = config[study_case]
+    start = pd.Timestamp(config["start_date"])
+    end = pd.Timestamp(config["end_date"])
+    return [
+        make_market_config(
+            id=market_id,
+            market_params=market_params,
+            world_start=start,
+            world_end=end,
+        )
+        for market_id, market_params in config["markets_config"].items()
+    ]
+
+
 def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame | None]:
     network_path = Path(network_path)
     buses = None
@@ -883,7 +923,13 @@ def load_config_and_create_forecaster(
                 ),
             )
     if exchange_units is not None:
+        # collect units without price timeseries to log them once instead of per unit
+        missing_price_series = []
         for id, exchange in exchange_units.iterrows():
+            price_import = exchanges_df.get(f"{id}_price_import")
+            price_export = exchanges_df.get(f"{id}_price_export")
+            if price_import is None or price_export is None:
+                missing_price_series.append(id)
             unit_forecasts[id] = ExchangeForecaster(
                 index=shared_unit_index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),
@@ -892,6 +938,13 @@ def load_config_and_create_forecaster(
                 ),
                 volume_export=exchanges_df[f"{id}_export"],
                 volume_import=exchanges_df[f"{id}_import"],
+                price_import=price_import,
+                price_export=price_export,
+            )
+        if missing_price_series:
+            logger.warning(
+                f"!! No (complete) exchange price timeseries in exchanges_df for {missing_price_series} !! "
+                "Falling back to the scalar price_import/price_export of the units. Make sure this is what you actually want."
             )
     if dsm_units is not None:
         for type, dsm in dsm_units.items():
