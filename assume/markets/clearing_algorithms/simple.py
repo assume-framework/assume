@@ -51,7 +51,8 @@ class PayAsClearRole(MarketRole):
     ) -> tuple[Orderbook, Orderbook, list[dict]]:
         """
         Performs electricity market clearing using a pay-as-clear mechanism. This means that the clearing price is the
-        highest price that is still accepted. The clearing price is the same for all accepted orders.
+        highest supply price that is still accepted. Only during supply scarcity, the last accepted demand order sets the price.
+        The clearing price is the same for all accepted orders.
 
         Args:
             orderbook (Orderbook): the orders to be cleared as an orderbook
@@ -148,6 +149,7 @@ class PayAsClearRole(MarketRole):
                 else:
                     demand_order["accepted_volume"] = demand_order["volume"]
 
+                # supply is exhausted, if the current demand order was fully matched (diff==0) and there are no more supply orders left
                 supply_exhausted = diff == 0 and not supply_orders
                 if demand_order["accepted_volume"]:
                     accepted_demand_orders.append(demand_order)
