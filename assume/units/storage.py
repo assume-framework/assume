@@ -427,6 +427,7 @@ class Storage(SupportsMinMaxCharge):
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
 
+        # consider already made commitments on other markets and reserved capacities
         base_load = self.outputs["energy"].loc[start:end_excl]
         capacity_pos = self.outputs["capacity_pos"].loc[start:end_excl]
         capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
@@ -435,19 +436,22 @@ class Storage(SupportsMinMaxCharge):
         min_power_charge = min_power_charge.clip(max=0)
 
         max_power_charge = self.max_power_charge - (base_load + capacity_neg)
+
+        # restrict charging according to max_soc, which also covers the base load
+        if soc is None:
+            # soc at beginning of the hour without commitment of base load or capacity
+            soc = self.outputs["soc"].at[start]
+        max_soc_charge = self.calculate_soc_max_charge(soc)
+        max_power_charge = max_power_charge.clip(
+            min=np.minimum(max_soc_charge - (base_load + capacity_neg), 0)
+        )
+
+        # check feasibility of min and max power charge, needs to be last to ensure soc clipping does no violate this
         max_power_charge = np.where(
             max_power_charge <= min_power_charge, max_power_charge, 0
         )
         min_power_charge = np.where(
             min_power_charge >= max_power_charge, min_power_charge, 0
-        )
-
-        # restrict charging according to max_soc, which also covers the base load
-        if soc is None:
-            soc = self.outputs["soc"].at[start]
-        max_soc_charge = self.calculate_soc_max_charge(soc)
-        max_power_charge = max_power_charge.clip(
-            min=np.minimum(max_soc_charge - base_load, 0)
         )
 
         return min_power_charge, max_power_charge
@@ -480,22 +484,21 @@ class Storage(SupportsMinMaxCharge):
 
         max_power_discharge = self.max_power_discharge - (base_load + capacity_pos)
 
-        # Adjust max_power_discharge using np.where
-        max_power_discharge = np.where(
-            max_power_discharge >= min_power_discharge, max_power_discharge, 0
-        )
-
-        # Adjust min_power_discharge using np.where
-        min_power_discharge = np.where(
-            min_power_discharge < max_power_discharge, min_power_discharge, 0
-        )
-
         # restrict according to min_soc, which also covers the base load
         if soc is None:
             soc = self.outputs["soc"].at[start]
         max_soc_discharge = self.calculate_soc_max_discharge(soc)
         max_power_discharge = max_power_discharge.clip(
-            max=np.maximum(max_soc_discharge - base_load, 0)
+            max=np.maximum(max_soc_discharge - (base_load + capacity_pos), 0)
+        )
+
+        # check feasibility of min and max power charge, needs to be last to ensure soc clipping does no violate this
+        max_power_discharge = np.where(
+            max_power_discharge >= min_power_discharge, max_power_discharge, 0
+        )
+
+        min_power_discharge = np.where(
+            min_power_discharge < max_power_discharge, min_power_discharge, 0
         )
 
         return min_power_discharge, max_power_discharge
@@ -526,11 +529,10 @@ class Storage(SupportsMinMaxCharge):
             power_discharge,
             current_power,
         )
-        # restrict according to min_SOC, which also covers the current power
+        # restrict according to min_SOC
+
         max_soc_discharge = self.calculate_soc_max_discharge(soc)
-        power_discharge = min(
-            power_discharge, max(max_soc_discharge - current_power, 0)
-        )
+        power_discharge = min(power_discharge, max_soc_discharge)
         if power_discharge < min_power_discharge:
             power_discharge = 0
 
@@ -563,9 +565,10 @@ class Storage(SupportsMinMaxCharge):
             current_power,
         )
 
-        # restrict charging according to max_SOC, which also covers the current power
+        # restrict charging according to max_SOC
         max_soc_charge = self.calculate_soc_max_charge(soc)
-        power_charge = max(power_charge, min(max_soc_charge - current_power, 0))
+
+        power_charge = max(power_charge, max_soc_charge)
         if power_charge > min_power_charge:
             power_charge = 0
 
