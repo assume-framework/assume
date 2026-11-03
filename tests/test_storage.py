@@ -147,7 +147,7 @@ def test_soc_constraint(storage_unit):
     )
 
 
-def test_soc_limit_covers_the_base_load(storage_unit):
+def test_soc_limit_covers_the_current_power(storage_unit):
     """
     The SoC limits the total power, so the power already sold on another
     market uses part of it - only the rest can be offered on top.

@@ -428,14 +428,14 @@ class Storage(SupportsMinMaxCharge):
         end_excl = end - self.index.freq
 
         # consider already made commitments on other markets and reserved capacities
-        base_load = self.outputs["energy"].loc[start:end_excl]
+        current_power = self.outputs["energy"].loc[start:end_excl]
         capacity_pos = self.outputs["capacity_pos"].loc[start:end_excl]
         capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
 
-        min_power_charge = self.min_power_charge - (base_load + capacity_pos)
+        min_power_charge = self.min_power_charge - (current_power + capacity_pos)
         min_power_charge = min_power_charge.clip(max=0)
 
-        max_power_charge = self.max_power_charge - (base_load + capacity_neg)
+        max_power_charge = self.max_power_charge - (current_power + capacity_neg)
 
         # restrict charging according to max_soc, which also covers the base load
         if soc is None:
@@ -443,7 +443,7 @@ class Storage(SupportsMinMaxCharge):
             soc = self.outputs["soc"].at[start]
         max_soc_charge = self.calculate_soc_max_charge(soc)
         max_power_charge = max_power_charge.clip(
-            min=np.minimum(max_soc_charge - (base_load + capacity_neg), 0)
+            min=np.minimum(max_soc_charge - (current_power + capacity_neg), 0)
         )
 
         # check feasibility of min and max power charge, needs to be last to ensure soc clipping does no violate this
@@ -475,21 +475,21 @@ class Storage(SupportsMinMaxCharge):
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
 
-        base_load = self.outputs["energy"].loc[start:end_excl]
+        current_power = self.outputs["energy"].loc[start:end_excl]
         capacity_pos = self.outputs["capacity_pos"].loc[start:end_excl]
         capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
 
-        min_power_discharge = self.min_power_discharge - (base_load + capacity_neg)
+        min_power_discharge = self.min_power_discharge - (current_power + capacity_neg)
         min_power_discharge = min_power_discharge.clip(min=0)
 
-        max_power_discharge = self.max_power_discharge - (base_load + capacity_pos)
+        max_power_discharge = self.max_power_discharge - (current_power + capacity_pos)
 
         # restrict according to min_soc, which also covers the base load
         if soc is None:
             soc = self.outputs["soc"].at[start]
         max_soc_discharge = self.calculate_soc_max_discharge(soc)
         max_power_discharge = max_power_discharge.clip(
-            max=np.maximum(max_soc_discharge - (base_load + capacity_pos), 0)
+            max=np.maximum(max_soc_discharge - (current_power + capacity_pos), 0)
         )
 
         # check feasibility of min and max power charge, needs to be last to ensure soc clipping does no violate this
