@@ -558,13 +558,13 @@ class SupportsMinMaxCharge(BaseUnit):
         if (
             previous_power < 0
             and self.ramp_down_charge is not None
-            and previous_power - self.ramp_down_charge < 0
-            # TODO: check if current_power should be included here
+            and previous_power - self.ramp_down_charge - current_power < 0
+            # current_power is included here, for multi-market settings.
             # example (previous_power = -60, ramp_down_charge = -50, so the least reachable charging is −10):
             # current_power	    Discharge bid	Total
             # −20	            10	            −10     --> "discharge" bid as in "charging less"
             # −10	            0	            −10
-            # --> would that be expected behavior in multi-market settings?
+            # --> selling energy from market1 on market2 is the expected behavior in multi-market settings.
         ):
             # if we can not ramp back to 0, we can not discharge anything
             return 0
@@ -604,7 +604,7 @@ class SupportsMinMaxCharge(BaseUnit):
         if (
             previous_power < 0
             and self.ramp_down_charge is not None
-            and previous_power - self.ramp_down_charge >= 0
+            and previous_power - self.ramp_down_charge - current_power >= 0
             and self.ramp_up_discharge is not None
         ):
             # if we can ramp back to 0, we can discharge, but need to check the net ramping to avoid units can ramp ~2x single ramp limits
@@ -661,11 +661,17 @@ class SupportsMinMaxCharge(BaseUnit):
         Returns:
             float: The requested power adjusted to the ramping constraints.
         """
-
+        # if storage was discharging before, we need to check if we can ramp back to zero
         if (
             previous_power > 0
             and self.ramp_down_discharge is not None
-            and previous_power - self.ramp_down_discharge > 0
+            and previous_power - self.ramp_down_discharge - current_power > 0
+            # current_power is included here, for multi-market settings.
+            # example (previous_power = 60, ramp_down_discharge = 50, so the least reachable discharging is 10):
+            # current_power	    Charging bid	Total
+            # 20	            -10	            10     --> "charge" bid as in "discharging less"
+            # 10	            0	            10
+            # --> buying energy from market1 on market2 is the expected behavior in multi-market settings.
         ):
             # if we can not ramp back to 0, we can not charge anything
             return 0
