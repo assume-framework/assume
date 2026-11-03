@@ -34,6 +34,8 @@ class ScenarioVerifier:
         if dry_run and report.ok:
             for case in cases:
                 self._dry_run(case)
+        else:
+            print("Skipping dry-run")
         return report
 
     def _check_static(self, cases: list[StudyCase]) -> None:
