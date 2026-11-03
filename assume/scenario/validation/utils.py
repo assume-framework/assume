@@ -7,7 +7,7 @@ import io
 import logging
 import types
 import typing
-from collections.abc import Iterable, Iterator
+from collections.abc import Generator, Iterable
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from typing import Any, TypeAlias
 
@@ -74,7 +74,7 @@ def listed(items: Iterable[object]) -> str:
 
 
 @contextmanager
-def quiet_logging() -> Iterator[None]:
+def quiet_logging() -> Generator[None]:
     """Silence log output and prints (the loader and its libraries are chatty) while verifying."""
     logging.disable(logging.CRITICAL)
     try:

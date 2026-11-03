@@ -43,6 +43,7 @@ Verifying a scenario folder
 Before running a simulation, ``assume --verify <dir>`` checks that a scenario folder
 (the folder containing ``config.yaml`` and the csv files) can be loaded into ASSUME.
 Nothing is simulated and nothing is written to the folder.
+The report is printed to the terminal.
 
 .. code-block:: bash
 
