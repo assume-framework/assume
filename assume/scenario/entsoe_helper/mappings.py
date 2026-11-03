@@ -111,6 +111,7 @@ DEFAULT_BLOCK_SIZE_MW = 650.0
 # Table 5 (fuel prices 2024) and Table 7 (CO2 price 2024: 75-90 EUR/t; the
 # mid-point is used). These are the study's assumptions, not observed prices.
 DEFAULT_COAL_PRICE_EUR_MWH = 11.6  # EUR/MWh thermal, hard coal
+DEFAULT_LIGNITE_PRICE_EUR_MWH = 2.3  # EUR/MWh thermal, lignite
 DEFAULT_GAS_PRICE_EUR_MWH = 38.0  # EUR/MWh thermal, natural gas (27.0 from 2030)
 DEFAULT_CO2_PRICE_EUR_T = 82.5  # EUR/tCO2
 

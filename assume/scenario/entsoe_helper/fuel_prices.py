@@ -14,6 +14,7 @@ from assume.scenario.entsoe_helper.mappings import (
     DEFAULT_CO2_PRICE_EUR_T,
     DEFAULT_COAL_PRICE_EUR_MWH,
     DEFAULT_GAS_PRICE_EUR_MWH,
+    DEFAULT_LIGNITE_PRICE_EUR_MWH,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ GJ_TO_KWH = 1e6 / 3600
 # returns no usable data, so loading does not fail hard on data gaps. Sourced
 # from Kost et al., Fraunhofer ISE (2024), see mappings.py.
 _COAL_FALLBACK_EUR_MWH = DEFAULT_COAL_PRICE_EUR_MWH
+_LIGNITE_FALLBACK_EUR_MWH = DEFAULT_LIGNITE_PRICE_EUR_MWH
 _GAS_FALLBACK_EUR_MWH = DEFAULT_GAS_PRICE_EUR_MWH
 _CO2_FALLBACK_EUR_T = DEFAULT_CO2_PRICE_EUR_T
 
@@ -282,7 +284,7 @@ class InstratFuelPrices:
         """
         Return hourly fuel price series for the simulation index.
 
-        Coal and gas come from instrat_pl; lignite reuses the coal series.
+        Coal and gas come from instrat_pl; lignite takes the default lignite price.
         """
         coal = self.get_coal_price(start, end, use_cache=use_cache)
         gas = self.get_gas_price(start, end, use_cache=use_cache)
@@ -294,7 +296,8 @@ class InstratFuelPrices:
 
         return {
             "hard coal": coal,
-            "lignite": coal,
+            "lignite": _LIGNITE_FALLBACK_EUR_MWH
+            * pd.Series(1.0, index=index, name="lignite"),
             "gas": gas,
             "co2": co2,
         }
