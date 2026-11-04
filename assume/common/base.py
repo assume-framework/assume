@@ -182,8 +182,9 @@ class BaseUnit:
         self, start: datetime, end: datetime, product_type: str
     ) -> None:
         """
-        Calculates the generation cost for a specific product type within the given time range,
-        but only if the end is the last index in the time series.
+        Calculates the generation cost for a specific product type within the given time range.
+
+        A start between two index steps is rounded up to the next step.
 
         Args:
             start (datetime.datetime): The start time for the calculation.
@@ -191,8 +192,7 @@ class BaseUnit:
             product_type (str): The type of product for which the generation cost is to be calculated.
         """
 
-        if start not in self.index:
-            start = self.index[0]
+        start = max(start, self.index[0])
 
         # Adjusted code for accessing product data and mapping over the index
         product_data = self.outputs[product_type].loc[start:end]
