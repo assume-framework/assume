@@ -550,6 +550,41 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
     assert len(bids) == 1
 
+def test_ramping_limits_on_sequential_markets(storage_unit):
+    """
+    EOM1 closing 2 hours before delivery and an EOM2 closing 1 hour before delivery are considered.
+    """
+    start = datetime(2022, 1, 1, 0)
+    end = datetime(2022, 1, 1, 1)
+
+    # previously charging
+    previous_power = -60
+    # assume we have been accepted on EOM1 and now want to bid on EOM2. We have bought -20 MWh on EOM1, which becomes current_power
+    current_power = -20
+    # prices on EOM2 are very high, so we want to discharge as much as possible and request 100 MWh.
+    # ramp_down_charge = -50, so -10 is the best we can do. So we should be able to place a discharge bid between 0 and 10 MWh.
+    # This bid would sell on EOM2 10 of the 20 MWh we have bought on EOM1.
+    ramp_limited_discharge = storage_unit.calculate_ramp_discharge(0.5, previous_power, 100, current_power)
+    #assert ramp_limited_discharge == 10 # fails on current implementation (since a0fb09f)
+    assert ramp_limited_discharge == 20 # should fail when current power is taken into account
+
+    # if we request to discharge 5, this should be allowed and not clipped
+    ramp_limited_discharge = storage_unit.calculate_ramp_discharge(0.5, previous_power, 5, current_power)
+    assert ramp_limited_discharge == 5
+
+    # previously discharging
+    previous_power = 60
+    # assume we have been accepted on EOM1 with a discharge bid of 100 MWh because we expected the prices to be high
+    current_power = 100
+    # but now turns out on EOM2 the prices are very low, so we want to charge as much as possible and request -100 MWh.
+    # ramp_down_discharge = 50, so 60-50=10 is the best we can do. So we should be able to place a charge bid between -90 and 0 MWh.
+    ramp_limited_charge = storage_unit.calculate_ramp_charge(0.5, previous_power, -100, current_power)
+    assert ramp_limited_charge == -90 # fails on current implementation (since a0fb09f)
+    assert ramp_limited_charge == 0 # should fail when current power is taken into account
+
+
+
+
 
 def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
     """
