@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: MIT
+
+[pr_reviewer]
+publish_output_no_suggestions = false  # kills "No major issues detected" comments
+# num_max_findings = 2
+enable_intro_text = false
+final_update_message = false
+enable_review_labels_effort = false    # stops the "Review effort x/5" label spam
+enable_review_labels_security = true   # keep this one, it's actually useful
+require_tests_review = false
+require_estimate_effort_to_review = false
+require_ticket_analysis_review = false
+
+[pr_description]
+publish_labels = false
+final_update_message = false
+enable_pr_diagram = false
+collapsible_file_list = "adaptive"
+
+[pr_code_suggestions]
+persistent_comment = true
