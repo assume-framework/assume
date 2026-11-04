@@ -149,7 +149,7 @@ def test_minmaxcharge_no_simultaneous_charge_discharge_ramping():
     # stay turned off
     assert (
         mmc.calculate_ramp_discharge(
-            previous_power=0, requested_power=0, current_power=0
+            previous_power=0, requested_power_discharge=0, current_power=0
         )
         == 0
     )
@@ -160,6 +160,10 @@ def test_minmaxcharge_no_simultaneous_charge_discharge_ramping():
     assert mmc.calculate_ramp_discharge(-10, 992, 0) == 90
 
     assert mmc.calculate_ramp_charge(-10, -200, 0) == -110
+
+    # check correct behavior of approximated net ramping speed when simultaneous charge and discharge ramping is not allowed
+    mmc.ramp_up_charge = -50
+    assert mmc.calculate_ramp_discharge(-10, 992, 0) == 65
 
 
 def test_minmaxcharge_simultaneous_charge_discharge_ramping():
@@ -196,7 +200,7 @@ def test_minmaxcharge_simultaneous_charge_discharge_ramping():
     # stay turned off
     assert (
         mmc.calculate_ramp_discharge(
-            previous_power=0, requested_power=0, current_power=0
+            previous_power=0, requested_power_discharge=0, current_power=0
         )
         == 0
     )
@@ -204,6 +208,7 @@ def test_minmaxcharge_simultaneous_charge_discharge_ramping():
     # calculate ramping
     # should be previous_power + 100
     assert mmc.calculate_ramp_discharge(0, 992, 0) == 100
+    # should be 0 + 100, as simultaneous charge and discharge ramping is allowed
     assert mmc.calculate_ramp_discharge(-10, 992, 0) == 100
 
     assert mmc.calculate_ramp_charge(-10, -200, 0) == -110
