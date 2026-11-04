@@ -90,6 +90,7 @@ Upcoming Release
   - **Fix bugs in** ``FastIndex`` **and** ``FastSeries``: Dates before the index start wrapped around to the end of the series, which broke the start-up cost in ``EnergyLearningStrategy.calculate_reward``. ``s[2:4] = 7`` overwrote the whole series, ``fillna(x)`` always filled 0 and modified the original series, ``"MS"`` was read as milliseconds, and arithmetic rejected numpy scalars.
   - **Fix redispatch validation for openings at the dispatch clearing**: A redispatch market opening at the same time the first dispatch market is cleared passed the setup validation, although agents bid directly on opening and the dispatch results are not available yet. Such setups now raise a ``ValueError``.
   - **Fix storage SoC limit ignoring committed power**: ``calculate_min_max_charge/discharge`` of ``Storage`` applied the SoC limit to the additional power only, so a storage could offer more than its SoC backs on top of power already sold or capacity reserved on other markets. The SoC limit now covers both.
+  - **Fix storage min discharge dropped if equal to the max**: ``calculate_min_max_discharge`` of ``Storage`` set the min discharge to 0 if it equalled the max discharge, e.g. if the reserves leave exactly one feasible power. A storage could then discharge below the power needed for its negative reserve. A min equal to the max is now kept, as it already was for charging.
 
 0.6.0 - (18th March 2026)
 =========================

@@ -498,7 +498,7 @@ class Storage(SupportsMinMaxCharge):
         )
 
         min_power_discharge = np.where(
-            min_power_discharge < max_power_discharge, min_power_discharge, 0
+            min_power_discharge <= max_power_discharge, min_power_discharge, 0
         )
 
         return min_power_discharge, max_power_discharge
