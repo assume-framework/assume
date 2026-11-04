@@ -558,69 +558,61 @@ class SupportsMinMaxCharge(BaseUnit):
         Returns:
             float: The feasible discharging power adjusted to the ramping constraints and current power.
         """
-
-        # 1. Is requested power violating current power?
-        # check if current power is in same direction as requested power
-        if current_power < 0 and requested_power_discharge > 0:
-            # if current power is charging and requested power is discharging, we can not discharge anything, return that no ramping is possible.
-            logger.warning(
-                f"Unit {self.id} is currently charging ({current_power} MW) and requested to discharge ({requested_power_discharge} MW). No discharging possible."
-            )
+        # if storage was charging before we need to check if we can ramp back to zero
+        if (
+            previous_power < 0
+            and self.ramp_down_charge is not None
+            and previous_power - self.ramp_down_charge - current_power < 0
+            # current_power is included here, for multi-market settings.
+            # example (previous_power = -60, ramp_down_charge = -50, so the least reachable charging is −10):
+            # current_power	    Discharge bid	Total
+            # −20	            10	            −10     --> "discharge" bid as in "charging less"
+            # −10	            0	            −10
+            # --> selling energy from market1 on market2 is the expected behavior in multi-market settings.
+        ):
+            # if we can not ramp back to 0, we can not discharge anything
             return 0
 
         # 2. Can we switch to direction of requested power?
         # previously charging (previous_power < 0) wants to go to discharging (requested_power_discharge > 0 and current_power >= 0) - but must first check if switching to discharging in one time step is even possible
         # if storage was charging before we need to check if we can ramp back to zero, this holds independent of the simultaneous_charge_discharge_ramping attribute
-        if (
-            previous_power < 0
-            and self.ramp_down_charge is not None
-            and previous_power - self.ramp_down_charge < 0
-        ):
-            # if we can not ramp back to 0, we can not discharge anything
-            return 0
 
-        # 3. How do we switch to requested power?
-
-        # 3.1 Allow for simultaneous charge and discharge ramping, if the unit is capable of this
         if self.simultaneous_charge_discharge_ramping:
-            # we can use entire max ramping in one time step e.g. ramp_down_discharge from 50 to 0 and ramp_up_charge from 0 to -60 in one timestep
+            # disregard a max_net_ramping per timestep. If the unit wants to switch signs within one step, allow this
+            # we can e.g. ramp_down_discharge from 50 to 0 and ramp_up_charge from 0 to -60 in one timestep
 
             # as we can ramp the charging to 0, we can assume that previous power = 0
             previous_power = max(previous_power, 0)
 
-            # limit the highest possible discharge by the maximal dischargable power
-            adjusted_power_discharge = min(
-                requested_power_discharge, self.max_power_discharge
+            # limit the highest possible discharge
+            power_discharge = min(
+                requested_power_discharge, self.max_power_discharge - current_power
             )
-
-            # limit ramping up and down, if defined
             if self.ramp_up_discharge is not None:
                 # limit to the ramp
-                # what I had + how much I could
-                limit_ramp_discharge_up = max(
-                    previous_power + self.ramp_up_discharge, 0
+                # what I had + how much I could - what I already sold
+                ramp_limited_discharge = max(
+                    previous_power + self.ramp_up_discharge - current_power, 0
                 )
-                adjusted_power_discharge = min(
-                    adjusted_power_discharge, limit_ramp_discharge_up
-                )
+                power_discharge = min(power_discharge, ramp_limited_discharge)
 
+            # restrict only if ramping defined
             if self.ramp_down_discharge is not None:
                 # what I had - ramp down = minimum_required
-                limit_ramp_discharge_up = previous_power - self.ramp_down_discharge
+                minimum_required = previous_power - self.ramp_down_discharge
                 # as I already provide current_power, need to at least offer minimum_required - current_power
-                adjusted_power_discharge = max(
-                    adjusted_power_discharge, limit_ramp_discharge_up, 0
+                power_discharge = max(
+                    power_discharge, minimum_required - current_power, 0
                 )
-            return adjusted_power_discharge
+            return power_discharge
 
-        # 3.2 No simultaneous charge and discharge
-        # If simultaneous_charge_discharge_ramping is False, we are more restrictive, but sign switches are still allowed.
+        # If simultaneous_charge_discharge_ramping is False, we are more restrictive, but sign switches could still be allowed.
         # We need to check the net ramping to avoid units can ramp ~2x single ramp limits
         remaining_net_ramp = None
         if (
             previous_power < 0
             and self.ramp_down_charge is not None
-            and previous_power - self.ramp_down_charge >= 0
+            and previous_power - self.ramp_down_charge - current_power >= 0
             and self.ramp_up_discharge is not None
         ):
             # if we can ramp back to 0, we can discharge, but need to check the net ramping to avoid units can ramp ~2x single ramp limits
@@ -639,23 +631,27 @@ class SupportsMinMaxCharge(BaseUnit):
         previous_power = max(previous_power, 0)
 
         # limit the highest possible discharge
-        power_discharge = min(requested_power_discharge, self.max_power_discharge)
+        power_discharge = min(
+            requested_power_discharge, self.max_power_discharge - current_power
+        )
         if self.ramp_up_discharge is not None:
             if remaining_net_ramp is None:  # no sign switch
                 # what I had + how much I could - what I already sold
-                limited_ramp_discharge_up = max(
-                    previous_power + self.ramp_up_discharge, 0
+                ramp_limited_discharge = max(
+                    previous_power + self.ramp_up_discharge - current_power, 0
                 )
             else:  # sign switch, limit the discharging to the remaining net ramp
-                limited_ramp_discharge_up = max(previous_power + remaining_net_ramp, 0)
-            power_discharge = min(power_discharge, limited_ramp_discharge_up)
+                ramp_limited_discharge = max(
+                    previous_power + remaining_net_ramp - current_power, 0
+                )
+            power_discharge = min(power_discharge, ramp_limited_discharge)
 
         # restrict only if ramping defined
         if self.ramp_down_discharge is not None:
             # what I had - ramp down = minimum_required
-            limited_ramp_discharge_up = previous_power - self.ramp_down_discharge
-            # as I already provide current_power, need to at least offer minimum_required
-            power_discharge = max(power_discharge, limited_ramp_discharge_up, 0)
+            minimum_required = previous_power - self.ramp_down_discharge
+            # as I already provide current_power, need to at least offer minimum_required - current_power
+            power_discharge = max(power_discharge, minimum_required - current_power, 0)
         return power_discharge
 
     def calculate_ramp_charge(

@@ -515,7 +515,7 @@ class Storage(SupportsMinMaxCharge):
         Args:
             soc (float): The current state of charge (between 0 and 1).
             previous_power (float): The previous power output of the unit.
-            requested_power (float): The requested power output of the unit (positive or negative or zero). On top of current power.
+            requested_power (float): The requested power output of the unit (positive or negative or zero).
             current_power (float, optional): The current power output of the unit. Defaults to 0.
             min_power_discharge (float, optional): The minimum discharging power output of the unit. Defaults to 0.
 
