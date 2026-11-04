@@ -535,7 +535,7 @@ class SupportsMinMaxCharge(BaseUnit):
     def calculate_ramp_discharge(
         self,
         previous_power: float,
-        requested_power_discharge: float,
+        requested_power: float,
         current_power: float = 0,
     ) -> float:
         """
@@ -543,20 +543,16 @@ class SupportsMinMaxCharge(BaseUnit):
         Given previous_power in the step before, we want to offer requested_power (positive or negative or zero) to some market,
         while we already sold current_power on some other market.
 
-        requested_power_discharge is a power level, not a change relative to another power level. Its sign indicates direction.
+        requested_power is a power level, not a change relative to another power level. Its sign indicates direction.
         This function checks if this amount is still feasible to sell.
 
-        This function has two different behaviors, depending on the simultaneous_charge_discharge_ramping attribute of the unit, which incorporates different deifntions of the ramping constraints:
-        - If simultaneous_charge_discharge_ramping is True, the unit can ramp ramp_up_discharge + ramp_down_charge (or ramp_up_charge + ramp_down_discharge) in one time step. This technically necesiates that the charging ramp down takes place simultaneously with the dischargingramp up, which is physically only possible for separate turbines/pumps.
-        - If simultaneous_charge_discharge_ramping is False, the unit cannot ramp charging and discharging at the same time, leading to a division of the ramping constraints.
-
         Args:
-            previous_power (float): The previous power output of the unit int the simulation step before the current one.
-            requested_power_discharge (float): The requested power output of the unit (positive or negative or zero).
+            previous_power (float): The previous power output of the unit.
+            requested_power (float): The requested power output of the unit (positive or negative or zero).
             current_power (float, optional): The current power output of the unit already sold on another market. Defaults to 0.
 
         Returns:
-            float: The feasible discharging power adjusted to the ramping constraints and current power.
+            float: The requested power adjusted to the ramping constraints.
         """
         # if storage was charging before we need to check if we can ramp back to zero
         if (
@@ -586,7 +582,7 @@ class SupportsMinMaxCharge(BaseUnit):
 
             # limit the highest possible discharge
             power_discharge = min(
-                requested_power_discharge, self.max_power_discharge - current_power
+                requested_power, self.max_power_discharge - current_power
             )
             if self.ramp_up_discharge is not None:
                 # limit to the ramp
@@ -631,9 +627,7 @@ class SupportsMinMaxCharge(BaseUnit):
         previous_power = max(previous_power, 0)
 
         # limit the highest possible discharge
-        power_discharge = min(
-            requested_power_discharge, self.max_power_discharge - current_power
-        )
+        power_discharge = min(requested_power, self.max_power_discharge - current_power)
         if self.ramp_up_discharge is not None:
             if remaining_net_ramp is None:  # no sign switch
                 # what I had + how much I could - what I already sold
