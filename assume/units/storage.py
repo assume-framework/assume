@@ -437,16 +437,16 @@ class Storage(SupportsMinMaxCharge):
 
         max_power_charge = self.max_power_charge - (current_power + capacity_neg)
 
-        # restrict charging according to max_soc, which also covers the base load
+        # restrict charging according to max_soc, which also covers the current power and reserved capacity
         if soc is None:
-            # soc at beginning of the hour without commitment of base load or capacity
+            # soc at beginning of the hour without commitment of current power or capacity
             soc = self.outputs["soc"].at[start]
         max_soc_charge = self.calculate_soc_max_charge(soc)
         max_power_charge = max_power_charge.clip(
             min=np.minimum(max_soc_charge - (current_power + capacity_neg), 0)
         )
 
-        # check feasibility of min and max power charge, needs to be last to ensure soc clipping does no violate this
+        # check feasibility of min and max power charge, needs to be last to ensure soc clipping does not violate this
         max_power_charge = np.where(
             max_power_charge <= min_power_charge, max_power_charge, 0
         )
@@ -484,7 +484,7 @@ class Storage(SupportsMinMaxCharge):
 
         max_power_discharge = self.max_power_discharge - (current_power + capacity_pos)
 
-        # restrict according to min_soc, which also covers the base load
+        # restrict according to min_soc, which also covers the current power and reserved capacity
         if soc is None:
             soc = self.outputs["soc"].at[start]
         max_soc_discharge = self.calculate_soc_max_discharge(soc)
@@ -492,7 +492,7 @@ class Storage(SupportsMinMaxCharge):
             max=np.maximum(max_soc_discharge - (current_power + capacity_pos), 0)
         )
 
-        # check feasibility of min and max power charge, needs to be last to ensure soc clipping does no violate this
+        # check feasibility of min and max power discharge, needs to be last to ensure soc clipping does not violate this
         max_power_discharge = np.where(
             max_power_discharge >= min_power_discharge, max_power_discharge, 0
         )
