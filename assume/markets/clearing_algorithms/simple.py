@@ -50,7 +50,6 @@ def clear_merit_order(
     demand_price: np.ndarray,
     demand_volume: np.ndarray,
     rng: np.random.Generator | None = None,
-    tolerance: float = 1e-9,
 ) -> tuple[float, np.ndarray, np.ndarray]:
     """
     Clears a single product with a uniform (pay-as-clear) price.
@@ -59,11 +58,9 @@ def clear_merit_order(
     matched against each other as long as the supply price does not exceed the demand price.
     Price ties are traded, so the accepted volume is maximised on horizontal overlaps.
 
-    The last accepted supply bid sets the clearing price. Only during supply scarcity the last
-    accepted demand bid sets the price (never below the supply price), which is the case if
-
-    - the marginal demand bid is only partially accepted, or
-    - the supply is exhausted exactly with a demand bid, while further demand bids are left.
+    The last accepted supply bid sets the clearing price. Only during supply scarcity, i.e. the
+    supply is exhausted while demand is left, the last accepted demand bid sets the price.
+    If nothing is traded, the price is 0.
 
     Args:
         supply_price (np.ndarray): prices of the supply bids
@@ -72,8 +69,8 @@ def clear_merit_order(
         demand_volume (np.ndarray): positive volumes of the demand bids
         rng (np.random.Generator | None): breaks price ties randomly if given (anything with a
             ``random(size)`` method, e.g. ``np.random``), otherwise ties keep the input order
-        tolerance (float): volume below which a bid counts as fully accepted (float residue);
-            bids with a volume below it are ignored
+
+    Bids with a volume of 0 are ignored.
 
     Returns:
         tuple[float, np.ndarray, np.ndarray]: clearing price, accepted supply volumes and accepted
@@ -85,9 +82,9 @@ def clear_merit_order(
     demand_volume = np.asarray(demand_volume, dtype=float)
 
     # indices of the bids taking part in the clearing, in merit order
-    supply_idx = np.flatnonzero(supply_volume > tolerance)
+    supply_idx = np.flatnonzero(supply_volume > 0)
     supply_idx = supply_idx[_argsort_prices(supply_price[supply_idx], rng)]
-    demand_idx = np.flatnonzero(demand_volume > tolerance)
+    demand_idx = np.flatnonzero(demand_volume > 0)
     demand_idx = demand_idx[_argsort_prices(-demand_price[demand_idx], rng)]
 
     clear_price, sorted_supply_accepted, sorted_demand_accepted = _match_sorted_bids(
@@ -95,7 +92,6 @@ def clear_merit_order(
         supply_volume[supply_idx].tolist(),
         demand_price[demand_idx].tolist(),
         demand_volume[demand_idx].tolist(),
-        tolerance,
     )
 
     supply_accepted = np.zeros(len(supply_price))
@@ -118,7 +114,6 @@ def _match_sorted_bids(
     supply_volume: list[float],
     demand_price: list[float],
     demand_volume: list[float],
-    tolerance: float,
 ) -> tuple[float, list[float], list[float]]:
     """
     Matches the supply (ascending prices) against the demand (descending prices) bid by bid.
@@ -126,38 +121,42 @@ def _match_sorted_bids(
     Returns the clearing price and the accepted volumes in the given (sorted) order.
     """
     n_supply, n_demand = len(supply_price), len(demand_price)
-    supply_accepted = [0.0] * n_supply
-    demand_accepted = [0.0] * n_demand
+    # volumes which are not yet traded
+    supply_left = list(supply_volume)
+    demand_left = list(demand_volume)
     clear_price = 0.0
 
     # i and j point to the current supply and demand bid
     i = j = 0
     while i < n_supply and j < n_demand and supply_price[i] <= demand_price[j]:
-        traded = min(
-            supply_volume[i] - supply_accepted[i],
-            demand_volume[j] - demand_accepted[j],
-        )
-        supply_accepted[i] += traded
-        demand_accepted[j] += traded
+        # the smaller bid is fully accepted, its volume left becomes exactly 0
+        traded = min(supply_left[i], demand_left[j])
+        supply_left[i] -= traded
+        demand_left[j] -= traded
         clear_price = supply_price[i]
 
         # move on to the next bid on each side which is fully accepted
-        if supply_volume[i] - supply_accepted[i] <= tolerance:
-            supply_accepted[i] = supply_volume[i]
+        if supply_left[i] == 0:
             i += 1
-        if demand_volume[j] - demand_accepted[j] <= tolerance:
-            demand_accepted[j] = demand_volume[j]
+        if demand_left[j] == 0:
             j += 1
 
-    # supply scarcity: demand bid j is not fully served, then the demand sets the price
-    if j < n_demand:
-        if demand_accepted[j] > tolerance:
-            # the marginal demand bid is partially accepted
-            clear_price = max(clear_price, demand_price[j])
-        elif i == n_supply and j > 0:
-            # the supply was exhausted exactly with the previous demand bid
-            clear_price = max(clear_price, demand_price[j - 1])
+    # supply scarcity: the supply is exhausted while demand is left, the last accepted demand bid
+    # sets the price, which is never below the supply price as only bids with
+    # supply price <= demand price are traded
+    if i == n_supply and j < n_demand:
+        if demand_left[j] < demand_volume[j]:
+            # demand bid j is partially accepted
+            clear_price = demand_price[j]
+        elif j > 0:
+            # the supply was exhausted exactly with demand bid j - 1
+            clear_price = demand_price[j - 1]
+        # else: there is no supply at all, nothing is traded and the price stays 0
+    # else: no scarcity, as all demand is served (j == n_demand) or the 
+    # next supply price > next demand price, so marginal supply bid sets price (0 if no trade)
 
+    supply_accepted = [v - left for v, left in zip(supply_volume, supply_left)]
+    demand_accepted = [v - left for v, left in zip(demand_volume, demand_left)]
     return clear_price, supply_accepted, demand_accepted
 
 

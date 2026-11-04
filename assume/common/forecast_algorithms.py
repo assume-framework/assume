@@ -15,7 +15,11 @@ from assume.common.forecaster import ForecastIndex, ForecastSeries
 from assume.common.market_objects import MarketConfig, is_renewable
 from assume.common.utils import get_available_products
 from assume.markets.clearing_algorithms.complex_clearing import ComplexClearingRole
-from assume.markets.clearing_algorithms.simple import PayAsBidRole, PayAsClearRole
+from assume.markets.clearing_algorithms.simple import (
+    PayAsBidRole,
+    PayAsClearRole,
+    clear_merit_order,
+)
 from assume.strategies import EnergyHeuristicElasticStrategy
 from assume.units.demand import Demand
 from assume.units.dsm_load_shift import DSMFlex
@@ -58,6 +62,25 @@ def calculate_max_power(units, index=None):
     return pd.DataFrame(
         [unit.max_power * unit.forecaster.availability for unit in units], index=index
     )
+
+
+def get_supply_bids(
+    powerplant_units: list[PowerPlant], num_steps: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Returns the supply bids of the power plants: marginal cost and available power.
+    Shape: (num_steps, num_units) each
+    """
+    price = np.array(
+        [np.broadcast_to(unit.marginal_cost, num_steps) for unit in powerplant_units]
+    )
+    volume = np.array(
+        [
+            unit.max_power * np.broadcast_to(unit.forecaster.availability, num_steps)
+            for unit in powerplant_units
+        ]
+    )
+    return price.T, volume.T
 
 
 @lru_cache
@@ -151,9 +174,9 @@ def calculate_naive_price_inelastic(
         1. **Sort units** by type, keeping only those with a bidding strategy for the market.
         2. **Build supply and demand curves** — compute per-unit marginal costs and
            available power, then sum demand (including exchange volumes) for each timestep.
-        3. **Merit-order dispatch** — sort supply by ascending marginal cost, stack capacity
-           until demand is met, and set the clearing price to the marginal unit's cost
-           (defaults to 1000 if capacity is insufficient).
+        3. **Merit-order dispatch** — clear the supply against the summed demand with
+           :func:`clear_merit_order` for each timestep. The marginal unit's cost sets the price,
+           or the highest willingness to pay of the demand units if capacity is insufficient.
     """
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
@@ -164,53 +187,36 @@ def calculate_naive_price_inelastic(
     )
 
     # 2. Build supply and demand curves
-    # Calculate marginal costs for each unit and time step.
-    # The resulting DataFrame has rows = time steps and columns = units.
     # shape: (index_len, num_pp_units)
-    marginal_costs = pd.DataFrame(
-        [unit.marginal_cost for unit in powerplants_units]
-    ).T.set_index(index)
+    supply_price, supply_volume = get_supply_bids(powerplants_units, len(index))
 
-    # Compute available power for each unit at each time step.
-    # shape: (index_len, num_pp_units)
-    power = calculate_max_power(powerplants_units).T.set_index(index)
-
-    # Process the demand.
-    # Filter demand units with a bidding strategy and sum their forecasts for each time step.
-    sum_demand = pd.DataFrame(
-        calculate_sum_demand(demand_units, exchange_units), index=index
+    # The demand is a single bid of the summed demand (incl. exchanges)
+    # at the highest willingness to pay of the demand units.
+    # shape: (index_len,)
+    demand_price = np.max(
+        [np.broadcast_to(unit.price, len(index)) for unit in demand_units], axis=0
     )
+    demand_volume = calculate_sum_demand(demand_units, exchange_units)
 
     # 3. Merit-order dispatch
-    # Initialize the price forecast series.
-    price_forecast = pd.Series(index=index, data=0.0)
+    prices = np.zeros(len(index))
+    for t in range(len(index)):
+        if demand_volume[t] <= 0:
+            # without demand (e.g. imports exceed the demand) the cheapest unit sets the price
+            prices[t] = supply_price[t].min()
+            continue
+        # the demand price sets the price if the capacity is insufficient
+        prices[t], _, accepted_demand = clear_merit_order(
+            supply_price[t],
+            supply_volume[t],
+            demand_price[t : t + 1],
+            demand_volume[t : t + 1],
+        )
+        if accepted_demand[0] == 0:
+            # no unit is cheaper than the willingness to pay, so nothing is traded
+            prices[t] = demand_price[t]
 
-    # Loop over each time step
-    for t in index:
-        # Get marginal costs and available power for time t (both are Series indexed by unit)
-        mc_t = marginal_costs.loc[t]
-        power_t = power.loc[t]
-        demand_t = sum_demand.loc[t].item()
-
-        # Sort units by their marginal cost in ascending order for time t.
-        sorted_units = mc_t.sort_values().index
-        sorted_mc = mc_t.loc[sorted_units]
-        sorted_power = power_t.loc[sorted_units]
-
-        # Compute the cumulative sum of available power in the sorted order.
-        cumsum_power = sorted_power.cumsum()
-        # Find the first unit where the cumulative available power meets or exceeds demand.
-        matching_units = cumsum_power[cumsum_power >= demand_t]
-        if matching_units.empty:
-            # If available capacity is insufficient, set the price to max willingnes to pay.
-            price = max([unit.price[t] for unit in demand_units])
-        else:
-            # The marginal cost of the first unit that meets demand becomes the price.
-            price = sorted_mc.loc[matching_units.index[0]]
-
-        price_forecast.loc[t] = price
-
-    return price_forecast
+    return pd.Series(prices, index=index)
 
 
 @lru_cache
