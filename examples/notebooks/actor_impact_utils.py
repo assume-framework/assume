@@ -635,3 +635,116 @@ def build_redispatch_panel(archives: pd.DataFrame) -> pd.DataFrame:
         ]
         return pd.DataFrame(columns=cols)
     return pd.concat(frames, ignore_index=True)
+
+
+# --------------------------------------------------------------------------- #
+# Grid maps: line loading before/after redispatch, nodal redispatch
+# --------------------------------------------------------------------------- #
+
+import numpy as np  # noqa: E402
+
+
+def load_line_flows(case: str, family: str, year: int, archive_path: Path) -> pd.DataFrame:
+    """Signed pre-redispatch line flow (MW, bus0 -> bus1), hours x lines.
+
+    grid_line_loading.csv is written from the linear power flow of the market dispatch
+    *before* the redispatch optimisation resolves congestion, so these are the
+    pre-redispatch flows; loading = |flow| / s_nom.
+    """
+    cp = _cache_path("line_flows", case, f"{family}_{year}")
+    if cp.exists():
+        return pd.read_pickle(cp)
+    with tarfile.open(archive_path, "r:gz") as tf:
+        member = next((m for m in tf.getmembers() if m.name.endswith("/grid_line_loading.csv")), None)
+        if member is None:
+            raise FileNotFoundError(f"grid_line_loading.csv not found in {archive_path}")
+        df = pd.read_csv(tf.extractfile(member), usecols=["datetime", "line", "flow_mw"])
+    df["datetime"] = pd.to_datetime(df["datetime"])
+    flows = df.pivot_table(index="datetime", columns="line", values="flow_mw", aggfunc="first")
+    flows = flows[flows.index >= _warmup_safe_start(year)]
+    flows.to_pickle(cp)
+    return flows
+
+
+def load_redispatch_nodal(case: str, family: str, year: int, archive_path: Path) -> pd.DataFrame:
+    """Per (hour, node): net / upward / downward accepted redispatch volume in MW.
+
+    Up- and down-instructions are signed as changes in nodal injection (positive =
+    more injection), and balance system-wide per hour, so the net is what moves flows.
+    """
+    cp = _cache_path("redispatch_nodal", case, f"{family}_{year}")
+    if cp.exists():
+        return pd.read_pickle(cp)
+    parts = []
+    with tarfile.open(archive_path, "r:gz") as tf:
+        member = next((m for m in tf.getmembers() if m.name.endswith("/market_orders.csv")), None)
+        if member is None:
+            raise FileNotFoundError(f"market_orders.csv not found in {archive_path}")
+        fobj = tf.extractfile(member)
+        for chunk in pd.read_csv(fobj, chunksize=1_000_000, on_bad_lines="skip", low_memory=False):
+            chunk = chunk[["market_id", "start_time", "node", "accepted_volume"]]
+            chunk = chunk[(chunk["market_id"] == "redispatch") & (chunk["accepted_volume"] != 0)].copy()
+            if chunk.empty:
+                continue
+            chunk["up"] = chunk["accepted_volume"].clip(lower=0)
+            chunk["down"] = chunk["accepted_volume"].clip(upper=0)
+            parts.append(chunk.groupby(["start_time", "node"], as_index=False)[["accepted_volume", "up", "down"]].sum())
+    if parts:
+        agg = pd.concat(parts).groupby(["start_time", "node"], as_index=False).sum()
+    else:
+        agg = pd.DataFrame(columns=["start_time", "node", "accepted_volume", "up", "down"])
+    agg = agg.rename(columns={"accepted_volume": "net"})
+    agg["start_time"] = pd.to_datetime(agg["start_time"])
+    agg.to_pickle(cp)
+    return agg
+
+
+def load_grid(case: str, family: str, year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    d = INPUTS_DIR / case / f"{family}_{year}"
+    return pd.read_csv(d / "buses.csv"), pd.read_csv(d / "lines.csv", index_col=0)
+
+
+def build_ptdf(buses: pd.DataFrame, lines: pd.DataFrame) -> np.ndarray:
+    """DC power-transfer-distribution matrix (lines x buses), flow sign = bus0 -> bus1.
+
+    All buses are 380 kV AC and there are no DC links, so susceptance is 1/x.
+    Flow changes from any balanced nodal injection change are PTDF @ d_inj.
+    """
+    idx = {b: i for i, b in enumerate(buses["name"])}
+    K = np.zeros((len(lines), len(buses)))
+    for li, (bus0, bus1) in enumerate(zip(lines["bus0"], lines["bus1"])):
+        K[li, idx[bus0]] = 1.0
+        K[li, idx[bus1]] = -1.0
+    b = 1.0 / lines["x"].to_numpy()
+    B = K.T @ (b[:, None] * K)
+    return (b[:, None] * K) @ np.linalg.pinv(B)
+
+
+def grid_snapshot(case: str, family: str, year: int, archive_path: Path, ts) -> dict:
+    """Line loading before/after redispatch and nodal redispatch for one hour.
+
+    post-redispatch flow = pre-redispatch flow + PTDF @ (net nodal redispatch). Validated
+    on a full scenario: this brings the worst line of every congested hour back to exactly
+    100% loading, while the opposite sign makes it worse.
+    """
+    flows = load_line_flows(case, family, year, archive_path)
+    rd = load_redispatch_nodal(case, family, year, archive_path)
+    buses, lines = load_grid(case, family, year)
+    lines = lines.loc[flows.columns]
+    cap = lines["s_nom"].to_numpy()
+    ts = pd.Timestamp(ts)
+    net = rd[rd["start_time"] == ts].set_index("node")["net"].reindex(buses["name"]).fillna(0.0)
+    P = build_ptdf(buses, load_grid(case, family, year)[1])
+    row_idx = load_grid(case, family, year)[1].index.get_indexer(flows.columns)
+    pre_flow = flows.loc[ts].to_numpy()
+    post_flow = pre_flow + (P @ net.to_numpy())[row_idx]
+    d = INPUTS_DIR / case / f"{family}_{year}" / "demand_units.csv"
+    du = pd.read_csv(d, usecols=["technology", "node"])
+    plants = {
+        "cement": du[du["technology"] == "cement plant da"]["node"].value_counts().to_dict(),
+        "steel": du[du["technology"] == "steel plant da"]["node"].value_counts().to_dict(),
+    }
+    return {
+        "buses": buses, "lines": lines, "pre": np.abs(pre_flow) / cap, "post": np.abs(post_flow) / cap,
+        "net": net, "plants": plants, "ts": ts,
+    }
