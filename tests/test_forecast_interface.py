@@ -605,6 +605,8 @@ def test_naive_forecast__exchange_imports_are_supply(index, shared_FastIndex):
     # export of 40 MW: residual demand of 160 MW needs the expensive plant
     assert list(price) == [10] * 3 + [50] * 4
     assert list(residual_load) == [70] * 3 + [160] * 4
+
+
 def _adaptive_merit_order_forecast_inputs(
     periods: int = 240,
     merit_order: float | np.ndarray = 55.0,
