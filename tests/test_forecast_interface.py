@@ -355,7 +355,12 @@ def test_forecast_interface__empty_grid(market_setup, forecast_setup):
 
 def test_forecast_interface__elastic_demand(index, market_setup, forecast_setup):
     """
-    TODO: make better test scenario for elastic demand
+    Elastic demand bids are setting the price for all timesteps in the underlying SimpleClearing, because we have supply scarcity in all timesteps.
+    300 demand bids for each hour, with max_price=300 and max_volume=-3000 MW, and elasticity_model=linear.
+    The corresponding bids are each 10 MW, with prices from 300 to 1 €/MWh.
+    08:00 - 10:00: nuclear + wind = 2500 MW -> 2500 MW demand accepted, last accepted demand bid sets price to 51 €/MWh
+    11:00 - 13:00: nuclear + wind + solar = 2800 MW -> 2800 MW demand accepted, last accepted demand bid sets price to 21 €/MWh
+    14:00 - 15:00: nuclear + wind = 2750 MW -> 2750 MW demand accepted, last accepted demand bid sets price to 26 €/MWh
     """
     mock_dsm_forecaster = forecast_setup["mock_dsm_forecaster"]
 
@@ -369,7 +374,7 @@ def test_forecast_interface__elastic_demand(index, market_setup, forecast_setup)
     # 2. Assert that results are generated like expected
     market_forecast = mock_dsm_forecaster.price
 
-    assert np.isclose(list(market_forecast["EOM"]), [8.0] * 7).all()
+    assert np.isclose(list(market_forecast["EOM"]), [51, 51, 51, 21, 21, 21, 26]).all()
 
 
 def test_forecast_interface__elastic_demand_complex_clearing(
