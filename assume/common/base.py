@@ -665,15 +665,15 @@ class SupportsMinMaxCharge(BaseUnit):
     def calculate_ramp_charge(
         self,
         previous_power: float,
-        requested_power: float,
+        requested_power_charge: float,
         current_power: float = 0,
     ) -> float:
         """
         Adjusts the charging power to the ramping constraints.
-        Given previous_power in the step before, we want to offer requested_power (positive or negative or zero) to some market,
+        Given previous_power in the step before, we want to offer requested_power_charge (positive or negative or zero) to some market,
         while we already sold current_power on some other market.
 
-        requested_power is a power level, not a change relative to another power level. Its sign indicates direction.
+        requested_power_charge is a power level, not a change relative to another power level. Its sign indicates direction.
         This function checks if this amount is still feasible to sell.
 
         This function has two different behaviors, depending on the simultaneous_charge_discharge_ramping attribute of the unit, which incorporates different definitions of the ramping constraints:
@@ -682,14 +682,14 @@ class SupportsMinMaxCharge(BaseUnit):
 
         Args:
             previous_power (float): The previous power output of the unit.
-            requested_power (float): The requested power output of the unit (positive or negative or zero).
+            requested_power_charge (float): The requested charging power of the unit (positive or negative or zero).
             current_power (float, optional): The power we already sold on some other market. Defaults to 0.
 
         Returns:
             float: The feasible charging power adjusted to the ramping constraints and current power.
         """
         # 1. Can we switch to direction of requested power?
-        # previously discharging (previous_power > 0) wants to go to charging (requested_power < 0) - but must first check if switching to charging in one time step is even possible
+        # previously discharging (previous_power > 0) wants to go to charging (requested_power_charge < 0) - but must first check if switching to charging in one time step is even possible
         # if storage was discharging before we need to check if we can ramp back to zero, this holds independent of the simultaneous_charge_discharge_ramping attribute
         if (
             previous_power > 0
@@ -715,7 +715,9 @@ class SupportsMinMaxCharge(BaseUnit):
             previous_power = min(previous_power, 0)
 
             # limit the highest possible charge
-            power_charge = max(requested_power, self.max_power_charge - current_power)
+            power_charge = max(
+                requested_power_charge, self.max_power_charge - current_power
+            )
             if self.ramp_up_charge is not None:
                 # what I had + how much I could - what I already sold
                 ramp_limited_charge = min(
@@ -757,7 +759,9 @@ class SupportsMinMaxCharge(BaseUnit):
         previous_power = min(previous_power, 0)
 
         # limit the highest possible charge
-        power_charge = max(requested_power, self.max_power_charge - current_power)
+        power_charge = max(
+            requested_power_charge, self.max_power_charge - current_power
+        )
         if self.ramp_up_charge is not None:
             if remaining_net_ramp is None:  # no sign switch
                 # what I had + how much I could - what I already sold
