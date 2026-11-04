@@ -162,7 +162,7 @@ def test_minmaxcharge_no_simultaneous_charge_discharge_ramping():
     assert mmc.calculate_ramp_charge(-10, -200, 0) == -110
 
     # check correct behavior of approximated net ramping speed when simultaneous charge and discharge ramping is not allowed
-    mmc.ramp_up_charge = -50
+    mmc.ramp_up_discharge = 50
     assert mmc.calculate_ramp_discharge(-10, 992, 0) == 65
 
 
@@ -212,6 +212,52 @@ def test_minmaxcharge_simultaneous_charge_discharge_ramping():
     assert mmc.calculate_ramp_discharge(-10, 992, 0) == 100
 
     assert mmc.calculate_ramp_charge(-10, -200, 0) == -110
+
+
+def test_current_power_commitment_charge_discharge_ramping():
+    index = pd.date_range("2022-01-01", periods=24, freq="h")
+    forecaster = UnitForecaster(index, market_prices={"EOM": 50})
+
+    mmc = SupportsMinMaxCharge(
+        id="Test",
+        unit_operator="TestOperator",
+        technology="TestTechnology",
+        bidding_strategies={},
+        forecaster=forecaster,
+        node="empty",
+    )
+
+    mmc.ramp_down_charge = -100
+    mmc.ramp_down_discharge = 100
+    mmc.ramp_up_charge = -100
+    mmc.ramp_up_discharge = 100
+    mmc.max_power_charge = -1000
+    mmc.max_power_discharge = 1000
+    mmc.min_power_charge = 0
+    mmc.min_power_discharge = 0
+    mmc.simultaneous_charge_discharge_ramping = True
+
+    # current_power already uses part of the available ramp
+    assert mmc.calculate_ramp_discharge(0, 992, 40) == 60
+    assert mmc.calculate_ramp_charge(0, -992, -40) == -60
+
+    # current power committed in different direction than requested power, should use full ramp
+    assert mmc.calculate_ramp_discharge(0, 992, -40) == 100
+    assert mmc.calculate_ramp_charge(0, -992, 40) == -100
+
+    mmc.simultaneous_charge_discharge_ramping = False
+
+    # current_power already uses part of the available ramp
+    assert mmc.calculate_ramp_discharge(0, 992, 40) == 60
+    assert mmc.calculate_ramp_charge(0, -992, -40) == -60
+
+    # current power committed in different direction than requested power, should use full ramp
+    assert mmc.calculate_ramp_discharge(0, 992, -40) == 60
+    assert mmc.calculate_ramp_charge(0, -992, 40) == -60
+
+    # current power committed in different direction than requested power, should use full ramp
+    assert mmc.calculate_ramp_discharge(0, 992, -60) == 40
+    assert mmc.calculate_ramp_charge(0, -992, 60) == -40
 
 
 def test_minmaxcharge_unconstrained():
