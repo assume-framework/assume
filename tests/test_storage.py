@@ -117,6 +117,21 @@ def test_calculate_operational_window(storage_unit):
     assert min_power_discharge[0] == 40
     assert max_power_discharge[0] == 60
 
+    # the reserves leave exactly one feasible power, min equals max
+    storage_unit.outputs["capacity_pos"][start] = 50
+
+    min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
+        start, end
+    )
+    assert min_power_charge[0] == -60
+    assert max_power_charge[0] == -60
+
+    min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
+        start, end
+    )
+    assert min_power_discharge[0] == 40
+    assert max_power_discharge[0] == 40
+
     start = start + timedelta(hours=1)
 
 
