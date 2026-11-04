@@ -7,7 +7,7 @@ name: PR Agent
 # build step for the PR head to this job: PR-Agent only needs the GitHub API.
 on:
   pull_request_target:
-    types: [opened, reopened, synchronize, ready_for_review, review_requested]
+    types: [opened, reopened, ready_for_review]
   issue_comment:
 jobs:
   pr_agent_job:
@@ -34,6 +34,6 @@ jobs:
           pr_description.final_update_message: "false"
           pr_reviewer.final_update_message: "false"
           pr_description.enable_pr_description: "false"
-          github_action_config.pr_actions: '["opened", "reopened", "synchronize", "ready_for_review", "review_requested"]'
+          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
           github_action_config.auto_review: "true"
           github_action_config.auto_improve: "true"
