@@ -15,9 +15,19 @@ expertise in electricity market modeling, deep reinforcement learning, demand si
 flexibility, and infrastructure modeling.
 
 The following people are the core development team of ASSUME Framework:
-
-* 2022 - present: Nick Harder (INATECH, Uni Freiburg)
+ 
 * 2022 - present: Kim K. Miskiw (IISM, KIT)
 * 2022 - present: Florian Maurer (FH Aachen)
 * 2022 - present: Manish Khanra (Fraunhofer ISI)
 * 2023 - present: Patil Parag (Fraunhofer IEG)
+* 2024 - present: Marie Thederan (IISM, KIT)
+* 2025 - present: Gunter Grimm (INATECH, Uni Freiburg)
+* 2025 - present: Finn Reinecke (INATECH, Uni Freiburg)
+* 2025 - present: Jannik Raskob (FH Aachen)
+* 2026 - present: Julius Grams (ESIS, KIT)
+* 2026 - present: Gloria Colmenares Montero (Fraunhofer IEG)
+
+Former developers:
+
+* 2022 - 2025: Nick Harder (INATECH, Uni Freiburg)
+* 2025 - 2026: Carl Wanninger (INATECH, Uni Freiburg)
