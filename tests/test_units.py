@@ -147,7 +147,7 @@ def test_minmaxcharge_no_simultaneous_charge_discharge_ramping():
     # stay turned off
     assert (
         mmc.calculate_ramp_discharge(
-            previous_power=0, requested_power=0, current_power=0
+            previous_power=0, requested_power_discharge=0, current_power=0
         )
         == 0
     )
@@ -192,7 +192,7 @@ def test_minmaxcharge_simultaneous_charge_discharge_ramping():
     # stay turned off
     assert (
         mmc.calculate_ramp_discharge(
-            previous_power=0, requested_power=0, current_power=0
+            previous_power=0, requested_power_discharge=0, current_power=0
         )
         == 0
     )
