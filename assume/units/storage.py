@@ -238,7 +238,9 @@ class Storage(SupportsMinMaxCharge):
         self.ramp_down_charge = ramp_down_charge
         self.ramp_up_discharge = ramp_up_discharge
         self.ramp_down_discharge = ramp_down_discharge
-        self.simultaneous_charge_discharge_ramping = simultaneous_charge_discharge_ramping
+        self.simultaneous_charge_discharge_ramping = (
+            simultaneous_charge_discharge_ramping
+        )
 
         # How long the storage unit has to be in operation before it can be shut down.
         if min_operating_time < 0:
@@ -513,7 +515,7 @@ class Storage(SupportsMinMaxCharge):
         Args:
             soc (float): The current state of charge (between 0 and 1).
             previous_power (float): The previous power output of the unit.
-            requested_power (float): The requested power output of the unit (positive or negative or zero).
+            requested_power (float): The requested power output of the unit (positive or negative or zero). On top of current power.
             current_power (float, optional): The current power output of the unit. Defaults to 0.
             min_power_discharge (float, optional): The minimum discharging power output of the unit. Defaults to 0.
 

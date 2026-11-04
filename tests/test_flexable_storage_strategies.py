@@ -38,7 +38,10 @@ def assert_allclose_with_indices(actual, expected, atol):
 # False is the new default (10/2026) ramping behavior, True is the previous default behavior. The tests should pass for both versions.
 @pytest.fixture(
     params=[False, True],
-    ids=["no-simultaneous-charge-discharge_ramping", "simultaneous-charge-discharge_ramping"],
+    ids=[
+        "no-simultaneous-charge-discharge_ramping",
+        "simultaneous-charge-discharge_ramping",
+    ],
 )
 def storage(request: pytest.FixtureRequest) -> Storage:
     # Create a PowerPlant instance with some example parameters
