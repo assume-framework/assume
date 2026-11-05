@@ -136,9 +136,8 @@ class SupportStrategy(EnergyNaiveStrategy):
             return super().calculate_bids(unit, market_config, product_tuples, **kwargs)
 
         bids = []
-        # demand is the other way around
-        # TODO should be generic without asking for Demand name
-        power = unit.min_power if type(unit).__name__ == "Demand" else unit.max_power
+        # demand is negative, supply units are positive
+        power = unit.max_power
         # bid a fraction as support for showcase reasons - not everything should be bid on contracts
         power *= self.contract_amount_fraction
         for product in product_tuples:
@@ -151,7 +150,16 @@ class SupportStrategy(EnergyNaiveStrategy):
                 price = self.contract_value
             price = min(price, market_config.maximum_bid_price)
 
-            for contract_type in self.contract_types:
+            allowed_contracts = market_config.param_dict.get("allowed_contracts")
+            contract_types = self.contract_types
+
+            if allowed_contracts is not None:
+                contract_types = [
+                    contract for contract in contract_types
+                    if contract in allowed_contracts
+                ]
+
+            for contract_type in contract_types:    
                 bids.append(
                     {
                         "start_time": start,
