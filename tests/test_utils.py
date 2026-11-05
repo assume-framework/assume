@@ -4,6 +4,7 @@
 
 import asyncio
 import calendar
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -54,9 +55,22 @@ def test_convert_rrule():
     assert interval == 99
 
 
-async def test_utc_rrule_recurrent_task_timing():
+@pytest.fixture
+def non_utc_timezone(monkeypatch):
+    # time.tzset is not available on Windows, the machine timezone is used there
+    if not hasattr(time, "tzset"):
+        yield
+        return
+    monkeypatch.setenv("TZ", "CET-1")
+    time.tzset()
+    yield
+    monkeypatch.undo()
+    time.tzset()
+
+
+async def test_utc_rrule_recurrent_task_timing(non_utc_timezone):
     # mango interprets naive recurrence rules in local time, which shifts
-    # recurrent tasks on machines not running in UTC (CI runs with TZ set)
+    # recurrent tasks on machines not running in UTC
     start = datetime(2019, 1, 1)
     end = datetime(2019, 1, 2)
     clock = ExternalClock(datetime2timestamp(start) - 1)
