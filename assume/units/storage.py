@@ -427,26 +427,32 @@ class Storage(SupportsMinMaxCharge):
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
 
-        base_load = self.outputs["energy"].loc[start:end_excl]
+        # consider already made commitments on other markets and reserved capacities
+        current_power = self.outputs["energy"].loc[start:end_excl]
         capacity_pos = self.outputs["capacity_pos"].loc[start:end_excl]
         capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
 
-        min_power_charge = self.min_power_charge - (base_load + capacity_pos)
+        min_power_charge = self.min_power_charge - (current_power + capacity_pos)
         min_power_charge = min_power_charge.clip(max=0)
 
-        max_power_charge = self.max_power_charge - (base_load + capacity_neg)
+        max_power_charge = self.max_power_charge - (current_power + capacity_neg)
+
+        # restrict charging according to max_soc, which also covers the current power and reserved capacity
+        if soc is None:
+            # soc at beginning of the hour without commitment of current power or capacity
+            soc = self.outputs["soc"].at[start]
+        max_soc_charge = self.calculate_soc_max_charge(soc)
+        max_power_charge = max_power_charge.clip(
+            min=np.minimum(max_soc_charge - (current_power + capacity_neg), 0)
+        )
+
+        # check feasibility of min and max power charge, needs to be last to ensure soc clipping does not violate this
         max_power_charge = np.where(
             max_power_charge <= min_power_charge, max_power_charge, 0
         )
         min_power_charge = np.where(
             min_power_charge >= max_power_charge, min_power_charge, 0
         )
-
-        # restrict charging according to max_soc
-        if soc is None:
-            soc = self.outputs["soc"].at[start]
-        max_soc_charge = self.calculate_soc_max_charge(soc)
-        max_power_charge = max_power_charge.clip(min=max_soc_charge)
 
         return min_power_charge, max_power_charge
 
@@ -469,30 +475,31 @@ class Storage(SupportsMinMaxCharge):
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
 
-        base_load = self.outputs["energy"].loc[start:end_excl]
+        current_power = self.outputs["energy"].loc[start:end_excl]
         capacity_pos = self.outputs["capacity_pos"].loc[start:end_excl]
         capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
 
-        min_power_discharge = self.min_power_discharge - (base_load + capacity_neg)
+        min_power_discharge = self.min_power_discharge - (current_power + capacity_neg)
         min_power_discharge = min_power_discharge.clip(min=0)
 
-        max_power_discharge = self.max_power_discharge - (base_load + capacity_pos)
+        max_power_discharge = self.max_power_discharge - (current_power + capacity_pos)
 
-        # Adjust max_power_discharge using np.where
+        # restrict according to min_soc, which also covers the current power and reserved capacity
+        if soc is None:
+            soc = self.outputs["soc"].at[start]
+        max_soc_discharge = self.calculate_soc_max_discharge(soc)
+        max_power_discharge = max_power_discharge.clip(
+            max=np.maximum(max_soc_discharge - (current_power + capacity_pos), 0)
+        )
+
+        # check feasibility of min and max power discharge, needs to be last to ensure soc clipping does not violate this
         max_power_discharge = np.where(
             max_power_discharge >= min_power_discharge, max_power_discharge, 0
         )
 
-        # Adjust min_power_discharge using np.where
         min_power_discharge = np.where(
-            min_power_discharge < max_power_discharge, min_power_discharge, 0
+            min_power_discharge <= max_power_discharge, min_power_discharge, 0
         )
-
-        # restrict according to min_soc
-        if soc is None:
-            soc = self.outputs["soc"].at[start]
-        max_soc_discharge = self.calculate_soc_max_discharge(soc)
-        max_power_discharge = max_power_discharge.clip(max=max_soc_discharge)
 
         return min_power_discharge, max_power_discharge
 
