@@ -166,7 +166,7 @@ class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
     ):
         """
         Previously calculated and wrote the costs and profits to the unit's output.
-        Now only keps the updates the average operation time of the unit, until fully refactored, see #853.
+        Now only updates the average operation time of the unit, until fully refactored, see #853.
 
         Args:
             unit (SupportsMinMax): A unit that the unit operator manages.
