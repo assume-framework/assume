@@ -207,6 +207,30 @@ class BaseUnit:
             generation_costs
         )
 
+    def calculate_costs(self, start: datetime, end: datetime) -> None:
+        """
+        Calculates the generation, start-up and total costs of the executed dispatch.
+
+        Args:
+            start (datetime.datetime): The start time for the calculation.
+            end (datetime.datetime): The end time for the calculation.
+        """
+        self.calculate_generation_cost(start, end, "energy")
+
+        start = max(start, self.index[0])
+        for t in self.index[start:end]:
+            starting_cost = 0.0
+            if self.outputs["energy"].at[t] != 0 and self.get_output_before(t) == 0:
+                op_time = self.get_operation_time(t)
+                if op_time < 0:
+                    starting_cost = self.get_starting_costs(op_time)
+            self.outputs["starting_costs"].at[t] = starting_cost
+
+        self.outputs["total_costs"].loc[start:end] = (
+            self.outputs["energy_generation_costs"].loc[start:end]
+            + self.outputs["starting_costs"].loc[start:end]
+        )
+
     def execute_current_dispatch(
         self,
         start: datetime,
@@ -303,6 +327,18 @@ class BaseUnit:
         """
         return 0
 
+    def get_operation_time(self, start: datetime) -> int:
+        """
+        Returns the time the unit is operating (positive) or shut down (negative).
+
+        Args:
+            start (datetime.datetime): The start time.
+
+        Returns:
+            int: The operation time as a positive integer if operating, or negative if shut down.
+        """
+        return 0
+
 
 class SupportsMinMax(BaseUnit):
     """
@@ -318,6 +354,11 @@ class SupportsMinMax(BaseUnit):
     emission_factor: float
     min_operating_time: int = 0
     min_down_time: int = 0
+    downtime_hot_start: int = 0
+    downtime_warm_start: int = 0
+    hot_start_cost: float = 0
+    warm_start_cost: float = 0
+    cold_start_cost: float = 0
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
