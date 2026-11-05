@@ -8,7 +8,7 @@ Developers of ASSUME
 
 The project is developed by a collaborative team of researchers from INATECH at the University of Freiburg,
 WIN (formerly IISM) at Karlsruhe Institute of Technology,
-Fraunhofer Institute for Systems and Innovation Research,
+Fraunhofer Institute for Systems and Innovation Research (ISI),
 Fraunhofer Institution for Energy Infrastructures and Geothermal Energy,
 and FH Aachen - University of Applied Sciences. Each contributor brings valuable
 expertise in electricity market modeling, deep reinforcement learning, demand side
