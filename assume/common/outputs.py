@@ -24,6 +24,7 @@ from assume.common.utils import (
     calculate_content_size,
     convert_tensors,
     separate_orders,
+    utc_rrule,
 )
 
 logger = logging.getLogger(__name__)
@@ -200,12 +201,11 @@ class WriteOutput(Role):
             self.delete_db_scenario(self.simulation_id)
 
         if self.save_frequency_hours is not None:
-            recurrency_task = rr.rrule(
+            recurrency_task = utc_rrule(
                 freq=rr.HOURLY,
                 interval=self.save_frequency_hours,
                 dtstart=self.start,
                 until=self.end,
-                cache=True,
             )
             self.context.schedule_recurrent_task(
                 self.store_dfs,
