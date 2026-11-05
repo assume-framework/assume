@@ -337,6 +337,7 @@ class BaseUnit:
         Returns:
             int: The operation time as a positive integer if operating, or negative if shut down.
         """
+        # no operation tracking if not overwritten, so units like storages book no start-up costs yet
         return 0
 
 
