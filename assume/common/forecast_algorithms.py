@@ -64,25 +64,6 @@ def calculate_max_power(units, index=None):
     )
 
 
-def get_supply_bids(
-    powerplant_units: list[PowerPlant], num_steps: int
-) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Returns the supply bids of the power plants: marginal cost and available power.
-    Shape: (num_steps, num_units) each
-    """
-    price = np.array(
-        [np.broadcast_to(unit.marginal_cost, num_steps) for unit in powerplant_units]
-    )
-    volume = np.array(
-        [
-            unit.max_power * np.broadcast_to(unit.forecaster.availability, num_steps)
-            for unit in powerplant_units
-        ]
-    )
-    return price.T, volume.T
-
-
 @lru_cache
 def sort_units(units: list[BaseUnit], market_id: str | None = None):
     """
@@ -188,7 +169,10 @@ def calculate_naive_price_inelastic(
 
     # 2. Build supply and demand curves
     # shape: (index_len, num_pp_units)
-    supply_price, supply_volume = get_supply_bids(powerplants_units, len(index))
+    supply_price = np.array(
+        [np.broadcast_to(unit.marginal_cost, len(index)) for unit in powerplants_units]
+    ).T
+    supply_volume = calculate_max_power(powerplants_units).to_numpy().T
 
     # The demand is a single bid of the summed demand (incl. exchanges)
     # at the highest willingness to pay of the demand units.
