@@ -538,7 +538,7 @@ def get_specific_revenue(unit, marginal_cost, t, foresight, price_forecast):
         theoretic_power_discharge = unit.calculate_ramp_discharge(
             theoretic_SOC,
             previous_power=previous_power,
-            requested_power=max_power_discharge,
+            requested_power_discharge=max_power_discharge,
         )
         possible_revenue += (market_price - marginal_cost) * theoretic_power_discharge
         theoretic_SOC -= (
