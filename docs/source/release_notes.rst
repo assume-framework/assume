@@ -93,6 +93,7 @@ Upcoming Release
   - **Fix storage SoC limit ignoring committed power**: ``calculate_min_max_charge/discharge`` of ``Storage`` applied the SoC limit to the additional power only, so a storage could offer more than its SoC backs on top of power already sold or capacity reserved on other markets. The SoC limit now covers both.
   - **Fix storage min discharge dropped if equal to the max**: ``calculate_min_max_discharge`` of ``Storage`` set the min discharge to 0 if it equalled the max discharge, e.g. if the reserves leave exactly one feasible power. A storage could then discharge below the power needed for its negative reserve. A min equal to the max is now kept, as it already was for charging.
   - **Fix stale storage SoC after time steps without orders** (#562, #884): Time steps without orders - e.g. after ``remove_empty_bids`` - no longer keep the initial SoC. Storages propagate their SoC on demand from what they can actually run at, so read it through ``get_soc``. ``outputs['energy']`` keeps the committed plan until delivery.
+  - **Fix swapped storage efficiencies in the unit export**: ``efficiency_charge`` and ``efficiency_discharge`` were written to ``storage_meta`` under each other's names.
 
 0.6.0 - (18th March 2026)
 =========================
