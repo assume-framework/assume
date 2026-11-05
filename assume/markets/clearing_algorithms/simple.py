@@ -58,9 +58,10 @@ def clear_merit_order(
     matched against each other as long as the supply price does not exceed the demand price.
     Price ties are traded, so the accepted volume is maximised on horizontal overlaps.
 
-    The last accepted supply bid sets the clearing price. Only during supply scarcity, i.e. the
-    supply is exhausted while demand is left, the last accepted demand bid sets the price.
-    If nothing is traded, the price is 0.
+    The last accepted supply bid sets the clearing price. Only if the first demand bid which is
+    not fully served would pay more than that, e.g. during supply scarcity, this demand bid sets
+    the price, so that no bid is paradoxically accepted or rejected. If nothing is traded, the
+    price is 0.
 
     Args:
         supply_price (np.ndarray): prices of the supply bids
@@ -141,19 +142,13 @@ def _match_sorted_bids(
         if demand_left[j] == 0:
             j += 1
 
-    # supply scarcity: the supply is exhausted while demand is left, the last accepted demand bid
-    # sets the price, which is never below the supply price as only bids with
-    # supply price <= demand price are traded
-    if i == n_supply and j < n_demand:
-        if demand_left[j] < demand_volume[j]:
-            # demand bid j is partially accepted
-            clear_price = demand_price[j]
-        elif j > 0:
-            # the supply was exhausted exactly with demand bid j - 1
-            clear_price = demand_price[j - 1]
-        # else: there is no supply at all, nothing is traded and the price stays 0
-    # else: no scarcity, as all demand is served (j == n_demand) or the 
-    # next supply price > next demand price, so marginal supply bid sets price (0 if no trade)
+    # demand bid j is not fully served, although it would pay more than the last accepted supply
+    # bid, so it sets the price (otherwise it would be paradoxically rejected), which happens
+    # during supply scarcity or if the next supply bid is too expensive (vertical overlap)
+    # else: all demand is served or demand bid j would not pay the last accepted supply price,
+    # so the last accepted supply bid sets the price (0 if nothing is traded)
+    if j < n_demand and (i > 0 or j > 0):
+        clear_price = max(clear_price, demand_price[j])
 
     supply_accepted = [v - left for v, left in zip(supply_volume, supply_left)]
     demand_accepted = [v - left for v, left in zip(demand_volume, demand_left)]
@@ -169,7 +164,8 @@ class PayAsClearRole(MarketRole):
     ) -> tuple[Orderbook, Orderbook, list[dict]]:
         """
         Performs electricity market clearing using a pay-as-clear mechanism. This means that the clearing price is the
-        highest supply price that is still accepted. Only during supply scarcity, the last accepted demand order sets the price.
+        highest supply price that is still accepted. Only if the first demand order which is not fully served would pay
+        more than that, e.g. during supply scarcity, this demand order sets the price.
         The clearing price is the same for all accepted orders. See :func:`clear_merit_order` for the clearing itself.
 
         Args:
