@@ -765,7 +765,8 @@ class SupportsMinMaxCharge(BaseUnit):
         if (
             previous_power > 0
             and self.ramp_down_discharge is not None
-            and previous_power - self.ramp_down_discharge <= 0  # sign switch
+            and previous_power - self.ramp_down_discharge - current_power
+            <= 0  # sign switch
             and self.ramp_up_charge is not None
         ):
             # if we can ramp back to 0, we can charge, but need to check the net ramping to avoid units can ramp ~2x single ramp limits
