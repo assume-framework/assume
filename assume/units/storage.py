@@ -77,6 +77,7 @@ class Storage(SupportsMinMaxCharge):
         ramp_down_charge: float | None = None,
         ramp_up_discharge: float | None = None,
         ramp_down_discharge: float | None = None,
+        simultaneous_charge_discharge_ramping: bool = False,
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
@@ -95,6 +96,7 @@ class Storage(SupportsMinMaxCharge):
             bidding_strategies=bidding_strategies,
             forecaster=forecaster,
             node=node,
+            simultaneous_charge_discharge_ramping=simultaneous_charge_discharge_ramping,
             location=location,
             **kwargs,
         )
@@ -236,6 +238,9 @@ class Storage(SupportsMinMaxCharge):
         self.ramp_down_charge = ramp_down_charge
         self.ramp_up_discharge = ramp_up_discharge
         self.ramp_down_discharge = ramp_down_discharge
+        self.simultaneous_charge_discharge_ramping = (
+            simultaneous_charge_discharge_ramping
+        )
 
         # How long the storage unit has to be in operation before it can be shut down.
         if min_operating_time < 0:
@@ -484,7 +489,7 @@ class Storage(SupportsMinMaxCharge):
         self,
         soc: float,
         previous_power: float,
-        power_discharge: float,
+        requested_power_discharge: float,
         current_power: float = 0,
         min_power_discharge: float = 0,
     ) -> float:
@@ -494,7 +499,7 @@ class Storage(SupportsMinMaxCharge):
         Args:
             soc (float): The current state of charge (between 0 and 1).
             previous_power (float): The previous power output of the unit.
-            power_discharge (float): The discharging power output of the unit.
+            requested_power_discharge (float): The requested discharging power of the unit (positive or negative or zero).
             current_power (float, optional): The current power output of the unit. Defaults to 0.
             min_power_discharge (float, optional): The minimum discharging power output of the unit. Defaults to 0.
 
@@ -503,7 +508,7 @@ class Storage(SupportsMinMaxCharge):
         """
         power_discharge = super().calculate_ramp_discharge(
             previous_power,
-            power_discharge,
+            requested_power_discharge,
             current_power,
         )
         # restrict according to min_SOC
@@ -519,7 +524,7 @@ class Storage(SupportsMinMaxCharge):
         self,
         soc: float,
         previous_power: float,
-        power_charge: float,
+        requested_power_charge: float,
         current_power: float = 0,
         min_power_charge: float = 0,
     ) -> float:
@@ -529,7 +534,7 @@ class Storage(SupportsMinMaxCharge):
         Args:
             soc (float): The current state of charge (between 0 and 1).
             previous_power (float): The previous power output of the unit.
-            power_charge (float): The charging power output of the unit.
+            requested_power_charge (float): The requested charging power of the unit (positive or negative or zero).
             current_power (float, optional): The current power output of the unit. Defaults to 0.
             min_power_charge (float, optional): The minimum charging power output of the unit. Defaults to 0.
 
@@ -538,7 +543,7 @@ class Storage(SupportsMinMaxCharge):
         """
         power_charge = super().calculate_ramp_charge(
             previous_power,
-            power_charge,
+            requested_power_charge,
             current_power,
         )
 

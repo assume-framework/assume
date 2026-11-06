@@ -19,4 +19,6 @@ The primary unit types in this context include:
 Each unit type has specific characteristics that affect how the power system operates, and understanding these is key to modeling and optimizing grid performance.
 
 
+.. include:: storages.rst
+
 .. include:: demand_side_agent.rst
