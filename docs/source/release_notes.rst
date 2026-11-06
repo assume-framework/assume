@@ -65,6 +65,7 @@ Upcoming Release
     - Frequencies without a fixed length, such as ``"MS"`` or ``"W"``, raise ``ValueError``. Use fixed frequencies such as ``"15min"``, ``"h"`` or ``"D"``.
     - Creating a ``FastSeries`` with values whose length does not match the index raises ``ValueError``.
   - **Removed unused TensorFastSeries class** which has become deprecated after a learning refactoring (#648)
+  - **Export start-up costs in the unit dispatch** (#695): The new ``starting_costs`` column holds the start-up costs. ``total_costs`` is now the sum of generation and start-up costs of the executed dispatch for all units, instead of being written by some strategies at clearing.
 
 **Bug Fixes:**
   - **Fix critic loading skipping only the inner key loop**: In ``TD3.load_critic_params`` the ``continue`` for a checkpoint with missing keys only skipped the inner key loop, so the incomplete critic was still loaded and failed with a ``KeyError``. The agent is now skipped as a whole, with one warning listing all missing keys.
@@ -94,6 +95,7 @@ Upcoming Release
   - **Fix storage min discharge dropped if equal to the max**: ``calculate_min_max_discharge`` of ``Storage`` set the min discharge to 0 if it equalled the max discharge, e.g. if the reserves leave exactly one feasible power. A storage could then discharge below the power needed for its negative reserve. A min equal to the max is now kept, as it already was for charging.
   - **Fix stale storage SoC after time steps without orders** (#562, #884): Time steps without orders - e.g. after ``remove_empty_bids`` - no longer keep the initial SoC. Storages propagate their SoC on demand from what they can actually run at, so read it through ``get_soc``. ``outputs['energy']`` keeps the committed plan until delivery.
   - **Fix swapped storage efficiencies in the unit export**: ``efficiency_charge`` and ``efficiency_discharge`` were written to ``storage_meta`` under each other's names.
+  - **Fix generation costs of demand units**: ``energy_generation_costs`` of demand units held the bid price times the volume, which is some kind of willingness to pay instead of generation costs. It is now 0, their procurement is already part of the cashflow.
 
 0.6.0 - (18th March 2026)
 =========================
