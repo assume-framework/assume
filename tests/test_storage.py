@@ -560,8 +560,8 @@ def test_ramping_limits_on_sequential_markets(storage_unit):
     # previously charging, bought -20 on first market, now request_discharge of 100
     # ramp_down_charge = -50, so -10 is the best we can do. So we should be able to place a discharge bid between 0 and 10 MWh.
     # This bid would sell on market2 10 of the 20 MWh we have bought on market1.
-    assert storage_unit.calculate_ramp_discharge(0.5, -20, 100, -60) == 95 # works
-    #assert storage_unit.calculate_ramp_discharge(0.5, -60, 100, -20) == 10 # fails because |previous_power| is > |ramp_down_charge|
+    assert storage_unit.calculate_ramp_discharge(0.5, -20, 100, -60) == 95
+    assert storage_unit.calculate_ramp_discharge(0.5, -60, 100, -20) == 10
 
     # if we request to discharge 5, this should be allowed and not clipped
     assert storage_unit.calculate_ramp_discharge(0.5, -60, 5, -20) == 5
@@ -569,8 +569,8 @@ def test_ramping_limits_on_sequential_markets(storage_unit):
     # previously discharging, sold 100 on first market, now request -100 MWh.
     # ramp_down_discharge = 50, so 60-50=10 is the best we can do. So we should be able to place a charge bid between -90 and 0 MWh.
     # This bid would buy on market2 90 of the 100 MWh we have sold on market1.
-    assert storage_unit.calculate_ramp_charge(0.5, 20, -100, 60) == -95 # works
-    #assert storage_unit.calculate_ramp_charge(0.5, 60, -100, 100) == -90 # fails because |previous_power| is > |ramp_down_discharge|
+    assert storage_unit.calculate_ramp_charge(0.5, 20, -100, 60) == -95
+    assert storage_unit.calculate_ramp_charge(0.5, 60, -100, 100) == -90
 
 
 

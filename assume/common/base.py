@@ -575,6 +575,19 @@ class SupportsMinMaxCharge(BaseUnit):
             # if we can not ramp back to 0, we can not discharge anything
             return 0
 
+        # A true sign switch is handled by the net-ramp calculation below (cases with ramp_down_charge < previous_power).
+        # If the previous charging power cannot reach zero, constrain this bid to keep the unavoidable residual charging power in the total output.
+        # Only afterwards can the code treat the previous_power as 0 for the remaining ramp calculations.
+        if (
+            previous_power < 0
+            and self.ramp_down_charge is not None
+            and previous_power < self.ramp_down_charge
+        ):
+            requested_power_discharge = min(
+                requested_power_discharge,
+                previous_power - self.ramp_down_charge - current_power,
+            )
+
         # 2. How do we switch to requested power?
         # 2.1 Allow for simultaneous charge and discharge ramping, if the unit is capable of this
 
@@ -704,6 +717,19 @@ class SupportsMinMaxCharge(BaseUnit):
         ):
             # if we can not ramp back to 0, we can not charge anything
             return 0
+
+        # A true sign switch is handled by the net-ramp calculation below (cases with ramp_down_discharge > previous_power).
+        # If the previous discharging power cannot reach zero, constrain this bid to keep the unavoidable residual discharging power in the total output.
+        # Only afterwards can the code treat the previous_power as 0 for the remaining ramp calculations.
+        if (
+            previous_power > 0
+            and self.ramp_down_discharge is not None
+            and previous_power > self.ramp_down_discharge
+        ):
+            requested_power_charge = max(
+                requested_power_charge,
+                previous_power - self.ramp_down_discharge - current_power,
+            )
 
         # 2. How do we switch to requested power?
         # 2.1 Allow for simultaneous charge and discharge ramping, if the unit is capable of this
