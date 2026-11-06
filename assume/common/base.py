@@ -556,7 +556,7 @@ class SupportsMinMaxCharge(BaseUnit):
             current_power (float, optional): The current power output of the unit already sold on another market. Defaults to 0.
 
         Returns:
-            float: The feasible discharging power adjusted to the ramping constraints and current power.
+            float: The feasible charging power adjusted by current power commitments and limited by ramping constraints and current power.
         """
         # 1. Can we switch to direction of requested power?
         # previously charging (previous_power < 0) wants to go to discharging (requested_power_discharge > 0) - but must first check if switching to discharging in one time step is even possible
@@ -699,7 +699,7 @@ class SupportsMinMaxCharge(BaseUnit):
             current_power (float, optional): The power we already sold on some other market. Defaults to 0.
 
         Returns:
-            float: The feasible charging power adjusted to the ramping constraints and current power.
+            float: The feasible charging power adjusted by current power commitments and limited by ramping constraints and current power.
         """
         # 1. Can we switch to direction of requested power?
         # previously discharging (previous_power > 0) wants to go to charging (requested_power_charge < 0) - but must first check if switching to charging in one time step is even possible

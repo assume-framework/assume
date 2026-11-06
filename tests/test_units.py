@@ -248,8 +248,8 @@ def test_current_power_commitment_charge_discharge_ramping():
     assert mmc.calculate_ramp_charge(60, -992, -40) == -60
 
     # current power committed in different direction than requested power, should use full ramp
-    assert mmc.calculate_ramp_discharge(0, 992, -40) == 140 # Gunter: should be 140 not 100
-    assert mmc.calculate_ramp_charge(0, -992, 40) == -140 # Gunter: should be -140 not -100
+    assert mmc.calculate_ramp_discharge(0, 992, -40) == 140
+    assert mmc.calculate_ramp_charge(0, -992, 40) == -140
 
     # with previous_power != 0
     assert mmc.calculate_ramp_discharge(60, 992, -40) == 200
@@ -266,27 +266,39 @@ def test_current_power_commitment_charge_discharge_ramping():
     # with previous_power != 0
     assert mmc.calculate_ramp_discharge(60, 992, 40) == 120
     assert mmc.calculate_ramp_charge(-60, -992, -40) == -120
-    assert mmc.calculate_ramp_discharge(-60, 992, 40) == 0 # bid of 40 already uses full net ramp
-    assert mmc.calculate_ramp_charge(60, -992, -40) == 0 # bid of -40 already uses full net ramp
-    
+    assert (
+        mmc.calculate_ramp_discharge(-60, 992, 40) == 0
+    )  # bid of 40 already uses full net ramp
+    assert (
+        mmc.calculate_ramp_charge(60, -992, -40) == 0
+    )  # bid of -40 already uses full net ramp
+
     # current power committed in different direction than requested power, should use full ramp
-    assert mmc.calculate_ramp_discharge(0, 992, -40) == 140 # Gunter: should be 140 not 60
-    assert mmc.calculate_ramp_charge(0, -992, 40) == -140 # Gunter: should be -140 not -60
+    assert mmc.calculate_ramp_discharge(0, 992, -40) == 140
+    assert mmc.calculate_ramp_charge(0, -992, 40) == -140
 
     # with previous_power != 0
-    assert mmc.calculate_ramp_discharge(60, 992, -40) == 200 # -40 is already infeasible, but anyway
+    assert (
+        mmc.calculate_ramp_discharge(60, 992, -40) == 200
+    )  # -40 is already infeasible, but anyway
     assert mmc.calculate_ramp_charge(60, -992, 40) == -80
-    assert mmc.calculate_ramp_charge(-60, -992, 40) == -200 # 40 is already infeasible, but anyway
+    assert (
+        mmc.calculate_ramp_charge(-60, -992, 40) == -200
+    )  # 40 is already infeasible, but anyway
     assert mmc.calculate_ramp_discharge(-60, 992, -40) == 80
 
     # current power committed in different direction than requested power, should use full ramp
-    assert mmc.calculate_ramp_discharge(0, 992, -60) == 160 # Gunter: should be 160 not 40
-    assert mmc.calculate_ramp_charge(0, -992, 60) == -160 # Gunter: should be -160 not -40
+    assert mmc.calculate_ramp_discharge(0, 992, -60) == 160
+    assert mmc.calculate_ramp_charge(0, -992, 60) == -160
 
     # with previous_power != 0
-    assert mmc.calculate_ramp_discharge(60, 992, -60) == 220 # -60 is already infeasible, but anyway
+    assert (
+        mmc.calculate_ramp_discharge(60, 992, -60) == 220
+    )  # -60 is already infeasible, but anyway
     assert mmc.calculate_ramp_charge(60, -992, 60) == -100
-    assert mmc.calculate_ramp_charge(-60, -992, 60) == -220 # 60 is already infeasible, but anyway
+    assert (
+        mmc.calculate_ramp_charge(-60, -992, 60) == -220
+    )  # 60 is already infeasible, but anyway
     assert mmc.calculate_ramp_discharge(-60, 992, -60) == 100
 
 
