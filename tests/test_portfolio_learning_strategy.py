@@ -195,10 +195,10 @@ def test_portfolio_calculate_bids(
     assert len(bids) == n_units
 
     # Observation and action must be cached for subsequent learning updates
-    assert start in lr.all_obs
-    assert "test_portfolio_operator" in lr.all_obs[start]
-    assert start in lr.all_actions
-    assert "test_portfolio_operator" in lr.all_actions[start]
+    assert start in lr.cache["obs"]
+    assert "test_portfolio_operator" in lr.cache["obs"][start]
+    assert start in lr.cache["actions"]
+    assert "test_portfolio_operator" in lr.cache["actions"][start]
 
 
 @pytest.mark.require_learning
@@ -224,6 +224,6 @@ def test_portfolio_calculate_reward(
         portfolio_units_operator, portfolio_market_config, orderbook=bids
     )
 
-    assert len(lr.all_rewards) == 1
-    assert "test_portfolio_operator" in lr.all_rewards[start]
-    assert "test_portfolio_operator" in lr.all_profits[start]
+    assert len(lr.cache["rewards"]) == 1
+    assert "test_portfolio_operator" in lr.cache["rewards"][start]
+    assert "test_portfolio_operator" in lr.cache["profit"][start]
