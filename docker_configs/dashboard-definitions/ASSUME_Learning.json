@@ -3659,13 +3659,13 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT  min(start_time) FROM market_orders WHERE simulation = '$simulation' ",
+        "definition": "SELECT min(datetime) FROM rl_params WHERE simulation = '$simulation'",
         "description": "Epoch ms of the simulation start, used for the full range link",
         "hide": 2,
         "includeAll": false,
         "name": "simulation_start",
         "options": [],
-        "query": "SELECT  min(start_time) FROM market_orders WHERE simulation = '$simulation' ",
+        "query": "SELECT min(datetime) FROM rl_params WHERE simulation = '$simulation'",
         "refresh": 1,
         "regex": "",
         "type": "query"
@@ -3679,13 +3679,13 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT  max(start_time) FROM market_orders WHERE simulation = '$simulation' ",
+        "definition": "SELECT max(datetime) FROM rl_params WHERE simulation = '$simulation'",
         "description": "Epoch ms of the simulation end, used for the full range link",
         "hide": 2,
         "includeAll": false,
         "name": "simulation_end",
         "options": [],
-        "query": "SELECT  max(start_time) FROM market_orders WHERE simulation = '$simulation' ",
+        "query": "SELECT max(datetime) FROM rl_params WHERE simulation = '$simulation'",
         "refresh": 1,
         "regex": "",
         "type": "query"
