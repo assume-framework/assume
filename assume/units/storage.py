@@ -41,6 +41,7 @@ class Storage(SupportsMinMaxCharge):
         ramp_down_charge (float): The ramp down rate of charging the storage unit in MW/15 minutes (negative value).
         ramp_up_discharge (float): The ramp up rate of discharging the storage unit in MW/15 minutes.
         ramp_down_discharge (float): The ramp down rate of discharging the storage unit in MW/15 minutes.
+        simultaneous_charge_discharge_ramping (bool): Defines if ramping limits can be used on both sides simultaneously. Defaults to False.
         hot_start_cost (float): The hot start cost of the storage unit in €/MW.
         warm_start_cost (float): The warm start cost of the storage unit in €/MW.
         cold_start_cost (float): The cold start cost of the storage unit in €/MW.
@@ -515,7 +516,7 @@ class Storage(SupportsMinMaxCharge):
         Args:
             soc (float): The current state of charge (between 0 and 1).
             previous_power (float): The previous power output of the unit.
-            requested_power_discharge (float): The requested discharging power of the unit (positive or negative or zero).
+            requested_power_discharge (float): The requested discharging power of the unit (positive or zero).
             current_power (float, optional): The current power output of the unit. Defaults to 0.
             min_power_discharge (float, optional): The minimum discharging power output of the unit. Defaults to 0.
 
@@ -550,7 +551,7 @@ class Storage(SupportsMinMaxCharge):
         Args:
             soc (float): The current state of charge (between 0 and 1).
             previous_power (float): The previous power output of the unit.
-            requested_power_charge (float): The requested charging power of the unit (positive or negative or zero).
+            requested_power_charge (float): The requested charging power of the unit (negative or zero).
             current_power (float, optional): The current power output of the unit. Defaults to 0.
             min_power_charge (float, optional): The minimum charging power output of the unit. Defaults to 0.
 

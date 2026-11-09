@@ -5,6 +5,7 @@
 from datetime import datetime
 
 import pandas as pd
+import pytest
 
 from assume.common.base import SupportsMinMax, SupportsMinMaxCharge
 from assume.common.forecaster import UnitForecaster
@@ -300,6 +301,38 @@ def test_current_power_commitment_charge_discharge_ramping():
         mmc.calculate_ramp_charge(-60, -992, 60) == -220
     )  # 60 is already infeasible, but anyway
     assert mmc.calculate_ramp_discharge(-60, 992, -60) == 100
+
+
+def test_switched_ramp_method_call_raises():
+    index = pd.date_range("2022-01-01", periods=24, freq="h")
+    forecaster = UnitForecaster(index, market_prices={"EOM": 50})
+    mmc = SupportsMinMaxCharge(
+        id="Test",
+        unit_operator="TestOperator",
+        technology="TestTechnology",
+        bidding_strategies={},
+        forecaster=forecaster,
+        node="empty",
+    )
+
+    mmc.ramp_down_charge = -100
+    mmc.ramp_down_discharge = 100
+    mmc.ramp_up_charge = -100
+    mmc.ramp_up_discharge = 100
+    mmc.max_power_charge = -1000
+    mmc.max_power_discharge = 1000
+    mmc.simultaneous_charge_discharge_ramping = False
+
+    with pytest.raises(
+        ValueError,
+        match="requested_power_discharge=-50 must be positive or zero for unit Test",
+    ):
+        mmc.calculate_ramp_discharge(0, -50, 0)
+    with pytest.raises(
+        ValueError,
+        match="requested_power_charge=50 must be negative or zero for unit Test",
+    ):
+        mmc.calculate_ramp_charge(0, 50, 0)
 
 
 def test_minmaxcharge_unconstrained():

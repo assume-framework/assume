@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 
 import numpy as np
 
+from assume.common.exceptions import ValidationError
 from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecaster import UnitForecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
@@ -540,24 +541,30 @@ class SupportsMinMaxCharge(BaseUnit):
     ) -> float:
         """
         Adjusts the discharging power to the ramping constraints.
-        Given previous_power in the step before, we want to offer requested_power (positive or negative or zero) to some market,
+        Given previous_power in the step before, we want to offer requested_power_discharge (positive or zero) to some market,
         while we already sold current_power on some other market.
 
-        requested_power is a power level, not a change relative to another power level. Its sign indicates direction.
+        requested_power_discharge is a power level, not a change relative to another power level. Its sign indicates direction.
         This function checks if this amount is still feasible to sell.
 
-        This function has two different behaviors, depending on the simultaneous_charge_discharge_ramping attribute of the unit, which incorporates different deifntions of the ramping constraints:
-        - If simultaneous_charge_discharge_ramping is True, the unit can ramp ramp_up_discharge + ramp_down_charge (or ramp_up_charge + ramp_down_discharge) in one time step. This technically necesiates that the charging ramp down takes place simultaneously with the dischargingramp up, which is physically only possible for separate turbines/pumps.
+        This function has two different behaviors, depending on the simultaneous_charge_discharge_ramping attribute of the unit, which incorporates different definitions of the ramping constraints:
+        - If simultaneous_charge_discharge_ramping is True, the unit can ramp ramp_up_discharge + ramp_down_charge (or ramp_up_charge + ramp_down_discharge) in one time step. This technically necessitates that the charging ramp down takes place simultaneously with the discharging ramp up, which is physically only possible for separate turbines/pumps.
         - If simultaneous_charge_discharge_ramping is False, the unit cannot ramp charging and discharging at the same time, leading to a division of the ramping constraints.
 
         Args:
             previous_power (float): The previous power output of the unit.
-            requested_power_discharge (float): The requested discharging power output of the unit (positive or negative or zero).
+            requested_power_discharge (float): The requested discharging power output of the unit (positive or zero).
             current_power (float, optional): The current power output of the unit already sold on another market. Defaults to 0.
 
         Returns:
-            float: The feasible charging power adjusted by current power commitments and limited by ramping constraints and current power.
+            float: The feasible discharging power adjusted by current power commitments and limited by ramping constraints and current power.
         """
+        if requested_power_discharge < 0:
+            raise ValidationError(
+                message=f"{requested_power_discharge=} must be positive or zero for unit {self.id}",
+                id=self.id,
+                field="requested_power_discharge",
+            )
         # 1. Can we switch to direction of requested power?
         # previously charging (previous_power < 0) wants to go to discharging (requested_power_discharge > 0) - but must first check if switching to discharging in one time step is even possible
         # if storage was charging before we need to check if we can ramp back to zero, this holds independent of the simultaneous_charge_discharge_ramping attribute
@@ -683,11 +690,11 @@ class SupportsMinMaxCharge(BaseUnit):
     ) -> float:
         """
         Adjusts the charging power to the ramping constraints.
-        Given previous_power in the step before, we want to offer requested_power_charge (positive or negative or zero) to some market,
+        Given previous_power in the step before, we want to offer requested_power_charge (negative or zero) to some market,
         while we already sold current_power on some other market.
 
         requested_power_charge is a power level, not a change relative to another power level. Its sign indicates direction.
-        This function checks if this amount is still feasible to sell.
+        This function checks if this amount is still feasible to buy.
 
         This function has two different behaviors, depending on the simultaneous_charge_discharge_ramping attribute of the unit, which incorporates different definitions of the ramping constraints:
         - If simultaneous_charge_discharge_ramping is True, the unit can ramp ramp_up_discharge + ramp_down_charge (or ramp_up_charge + ramp_down_discharge) in one time step. This technically necessitates that the charging ramp down takes place simultaneously with the discharging ramp up, which is physically only possible for separate turbines/pumps.
@@ -695,12 +702,18 @@ class SupportsMinMaxCharge(BaseUnit):
 
         Args:
             previous_power (float): The previous power output of the unit.
-            requested_power_charge (float): The requested charging power of the unit (positive or negative or zero).
+            requested_power_charge (float): The requested charging power of the unit (negative or zero).
             current_power (float, optional): The power we already sold on some other market. Defaults to 0.
 
         Returns:
             float: The feasible charging power adjusted by current power commitments and limited by ramping constraints and current power.
         """
+        if requested_power_charge > 0:
+            raise ValidationError(
+                message=f"{requested_power_charge=} must be negative or zero for unit {self.id}",
+                id=self.id,
+                field="requested_power_charge",
+            )
         # 1. Can we switch to direction of requested power?
         # previously discharging (previous_power > 0) wants to go to charging (requested_power_charge < 0) - but must first check if switching to charging in one time step is even possible
         # if storage was discharging before we need to check if we can ramp back to zero, this holds independent of the simultaneous_charge_discharge_ramping attribute

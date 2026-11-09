@@ -303,30 +303,13 @@ def test_storage_ramping_sign_switch(storage_unit):
     """
     This test checks that the ramping functions correctly handle cases where the power would switch sign.
     """
-    # discharging case
-    start = datetime(2022, 1, 1, 0)
-    end = datetime(2022, 1, 1, 1)
-    storage_unit.outputs["energy"][start] = 60
-
     # test ramping in discharging case with a power that would switch sign and is not feasible
     # imagine an order that would charge 5 MW
-    adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, 60, -5)
-    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 60, -5)
-
-    assert adjusted_discharge == 10  # should be 10
-    assert adjusted_charge == 0  # should be 0
-
-    start = datetime(2022, 1, 1, 1)
-    end = datetime(2022, 1, 1, 2)
-    storage_unit.outputs["energy"][start] = -60
+    assert storage_unit.calculate_ramp_charge(0.5, 60, -5) == 0
 
     # test ramping in charging case with a power that would switch sign and is not feasible
     # imagine an order that would discharge 5 MW
-    adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, -60, 5)
-    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, -60, 5)
-
-    assert adjusted_discharge == 0  # should be 0
-    assert adjusted_charge == -10  # should be -10
+    assert storage_unit.calculate_ramp_discharge(0.5, -60, 5) == 0
 
 
 def test_net_ramping_constraint(storage_unit):
