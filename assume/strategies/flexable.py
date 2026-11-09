@@ -204,21 +204,18 @@ class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
             for start in order_times:
                 idx = index_map.get(start)
 
-                marginal_cost = unit.calculate_marginal_cost(
-                    start, unit.outputs[product_type].at[start]
+                vol = (
+                    accepted_volume.get(start, 0)
+                    if isinstance(accepted_volume, dict)
+                    else accepted_volume
+                )
+                price = (
+                    accepted_price.get(start, 0)
+                    if isinstance(accepted_price, dict)
+                    else accepted_price
                 )
 
-                if isinstance(accepted_volume, dict):
-                    accepted_volume = accepted_volume.get(start, 0)
-                else:
-                    accepted_volume = accepted_volume
-
-                if isinstance(accepted_price, dict):
-                    accepted_price = accepted_price.get(start, 0)
-                else:
-                    accepted_price = accepted_price
-
-                profit[idx] += accepted_price * accepted_volume
+                profit[idx] += price * vol
 
         # consideration of start-up costs
         for i, start in enumerate(products_index):

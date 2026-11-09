@@ -191,7 +191,10 @@ class FastSeries:
             TypeError: If the index type is unsupported.
             KeyError: If dates are outside of the index range or not aligned with the frequency.
         """
-        if isinstance(item, slice):
+        if isinstance(item, datetime):
+            return self._data[self._index.get_position(item)]
+
+        elif isinstance(item, slice):
             return self.data[self._data_slice(item)]
 
         elif isinstance(
@@ -249,7 +252,10 @@ class FastSeries:
             ValueError: If lengths of indices and values do not match.
             KeyError: If dates are outside of the index range or not aligned with the frequency.
         """
-        if isinstance(item, slice):
+        if isinstance(item, datetime):
+            self._data[self._index.get_position(item)] = value
+
+        elif isinstance(item, slice):
             data_slice = self._data_slice(item)
 
             # Assign values to the slice

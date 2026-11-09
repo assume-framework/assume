@@ -403,33 +403,31 @@ class SupportsMinMax(BaseUnit):
         Returns:
             int: The operation time as a positive integer if operating, or negative if shut down.
         """
-        # Set the time window based on max of min operating/down time
         max_time = max(self.min_operating_time, self.min_down_time, 1)
-        begin = max(start - self.index.freq * max_time, self.index[0])
-        end = start - self.index.freq
 
         if start <= self.index[0]:
             # before start of index
             return max_time
 
-        # Check energy output in the defined time window, reversed for most recent state
-        arr = (self.outputs["energy"].loc[begin:end] > 0)[::-1]
+        energy = self.outputs["energy"].data
+        # window of the last max_time intervals before start, clipped to the index
+        freq = self.index.freq
+        begin_idx = max(0, self.index._get_idx_from_date(start - freq * max_time))
+        end_idx = min(
+            self.index._get_idx_from_date(start - freq, round_up=False),
+            len(energy) - 1,
+        )
+        if end_idx < begin_idx:
+            return 0
+        is_on = energy[end_idx] > 0
 
-        # Determine initial state (off if the first period shows zero energy output)
-        if len(arr) > 0:
-            is_off = not arr[0]
-        else:
-            is_off = False
+        # count consecutive intervals with the same status, newest first
         run = 0
-
-        # Count consecutive periods with the same status, break on change
-        for val in arr:
-            if val != (not is_off):  # Stop if the state changes
-                break
+        while end_idx - run >= begin_idx and (energy[end_idx - run] > 0) == is_on:
             run += 1
 
-        # Return positive time if operating, negative if shut down
-        return -run if is_off else run
+        # positive if operating, negative if shut down
+        return run if is_on else -run
 
     def get_starting_costs(self, op_time: int) -> float:
         """

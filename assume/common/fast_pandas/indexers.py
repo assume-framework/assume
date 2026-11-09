@@ -155,6 +155,9 @@ class FastSeriesAtIndexer:
         Returns:
             float: The retrieved value.
         """
+        if isinstance(item, datetime):
+            series = self._series
+            return series._data[series._index.get_position(item)]
         return self._series[item]
 
     def __setitem__(self, item, value: float):
@@ -165,7 +168,11 @@ class FastSeriesAtIndexer:
             item (datetime | str): The label.
             value (float): The value to assign.
         """
-        self._series[item] = value
+        if isinstance(item, datetime):
+            series = self._series
+            series._data[series._index.get_position(item)] = value
+        else:
+            self._series[item] = value
 
 
 class FastSeriesIatIndexer:

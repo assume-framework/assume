@@ -377,6 +377,7 @@ class UnitsOperator(Role):
         )
 
         unit_dispatch = []
+        valid_outputs = ("soc", "cashflow", "generation_costs", "total_costs", "heat")
         for unit_id, unit in self.units.items():
             # the step at last was already executed in the previous call
             start = unit.index.align_up(last)
@@ -386,18 +387,10 @@ class UnitsOperator(Role):
             end = now
             dispatch = {"power": current_dispatch}
             unit.calculate_generation_cost(start, now, "energy")
-            valid_outputs = [
-                "soc",
-                "cashflow",
-                "generation_costs",
-                "total_costs",
-                "heat",
-            ]
 
-            for key in unit.outputs.keys():
-                for output in valid_outputs:
-                    if output in key:
-                        dispatch[key] = unit.outputs[key].loc[start:end]
+            for key, series in unit.outputs.items():
+                if any(output in key for output in valid_outputs):
+                    dispatch[key] = series.loc[start:end]
             dispatch["time"] = unit.index.get_date_list(start, end)
             dispatch["unit"] = unit_id
             unit_dispatch.append(dispatch)
