@@ -385,6 +385,7 @@ class WriteOutput(Role):
         )
         if not df.empty:
             df["simulation"] = self.simulation_id
+            df.set_index("datetime", inplace=True)
         return df
 
     def convert_unit_dispatch(self, unit_dispatch: list[dict]):
