@@ -94,6 +94,7 @@ Upcoming Release
   - **Fix storage min discharge dropped if equal to the max**: ``calculate_min_max_discharge`` of ``Storage`` set the min discharge to 0 if it equalled the max discharge, e.g. if the reserves leave exactly one feasible power. A storage could then discharge below the power needed for its negative reserve. A min equal to the max is now kept, as it already was for charging.
   - **Fix stale storage SoC after time steps without orders** (#562, #884): Time steps without orders - e.g. after ``remove_empty_bids`` - no longer keep the initial SoC. Storages propagate their SoC on demand from what they can actually run at, so read it through ``get_soc``. ``outputs['energy']`` keeps the committed plan until delivery.
   - **Fix recurrent tasks shifted by the local timezone**: Since ``mango-agents`` 2.3.0, recurrence rules with naive datetimes are interpreted in the local time of the machine, while ASSUME treats naive datetimes as UTC. On machines not running in UTC, the periodic output storage, the learning buffer updates and the contract executions therefore ran shifted by the UTC offset, e.g. the last hour of each learning episode never reached the replay buffer. These rules are now created UTC-aware with the new ``utc_rrule`` helper and ``mango-agents >=2.3.0`` is required.
+  - **Fix swapped storage efficiencies in the unit export**: ``efficiency_charge`` and ``efficiency_discharge`` were written to ``storage_meta`` under each other's names.
 
 0.6.0 - (18th March 2026)
 =========================
