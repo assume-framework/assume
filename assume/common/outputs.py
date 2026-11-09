@@ -2,12 +2,14 @@
 #
 # SPDX-License-Identifier: MIT
 
+import asyncio
 import logging
 import shutil
 from collections import defaultdict
 from datetime import datetime
 from multiprocessing import Lock
 from pathlib import Path
+from threading import Lock as ThreadLock
 from typing import TypedDict
 
 import numpy as np
@@ -103,6 +105,8 @@ class WriteOutput(Role):
         # initializes dfs for storing and writing asynchronous
         self.write_buffers: dict = defaultdict(list)
         self.locks = defaultdict(lambda: Lock())
+        self._buffer_lock = ThreadLock()
+        self._store_lock: asyncio.Lock | None = None
 
         self.kpi_defs: dict[str, OutputDef] = {
             "avg_price": {
@@ -229,32 +233,36 @@ class WriteOutput(Role):
         if content_data is None or len(content_data) == 0:
             return
 
-        if content_type in [
-            "market_meta",
-            "market_dispatch",
-            "unit_dispatch",
-            "rl_params",
-            "rl_grad_params",
-        ]:
-            # these can be processed as a single dataframe
-            self.write_buffers[content_type].extend(content_data)
-        elif content_type == "store_units":
-            table_name = content_data["unit_type"] + "_meta"
-            self.write_buffers[table_name].append(content_data)
+        with self._buffer_lock:
+            if content_type in [
+                "market_meta",
+                "market_dispatch",
+                "unit_dispatch",
+                "rl_params",
+                "rl_grad_params",
+            ]:
+                # these can be processed as a single dataframe
+                self.write_buffers[content_type].extend(content_data)
+            elif content_type == "store_units":
+                table_name = content_data["unit_type"] + "_meta"
+                self.write_buffers[table_name].append(content_data)
 
-        elif content_type == "grid_flows":
-            # these need to be converted to df individually
-            self.write_buffers[content_type].append(content_data)
-        elif content_type in ["market_orders", "grid_topology"]:
-            # here we need an additional market_id
-            self.write_buffers[content_type].append((content_data, market_id))
+            elif content_type == "grid_flows":
+                # these need to be converted to df individually
+                self.write_buffers[content_type].append(content_data)
+            elif content_type in ["market_orders", "grid_topology"]:
+                # here we need an additional market_id
+                self.write_buffers[content_type].append((content_data, market_id))
 
-        # keep track of the memory usage of the data
-        self.current_dfs_size_bytes += calculate_content_size(content_data)
+            # keep track of the memory usage of the data
+            self.current_dfs_size_bytes += calculate_content_size(content_data)
+
         # if the current size is larger than self.outputs_buffer_size_bytes, store the data
         if self.current_dfs_size_bytes > self.outputs_buffer_size_bytes:
             logger.debug("storing output data due to size limit")
-            self.context.schedule_instant_task(coroutine=self.store_dfs())
+            self.context.schedule_instant_task(
+                coroutine=self.store_dfs(), src="no_wait"
+            )
 
     def convert_rl_params(self, rl_params: list[dict]):
         """
@@ -455,51 +463,67 @@ class WriteOutput(Role):
         if not self.db and not self.export_csv_path:
             return
 
-        for table, data_list in self.write_buffers.items():
+        if self._store_lock is None:
+            self._store_lock = asyncio.Lock()
+
+        async with self._store_lock:
+            buffers_to_store = {}
+            with self._buffer_lock:
+                for table, data_list in list(self.write_buffers.items()):
+                    if len(data_list) > 0:
+                        buffers_to_store[table] = list(data_list)
+                        data_list.clear()
+                self.current_dfs_size_bytes = 0
+
+            if not buffers_to_store:
+                return
+
+            await asyncio.to_thread(self._sync_store_dfs, buffers_to_store)
+
+    def _sync_store_dfs(self, buffers_to_store: dict):
+        for table, data_list in buffers_to_store.items():
             if len(data_list) == 0:
                 continue
 
             df = None
-            with self.locks[table]:
-                if table == "grid_topology":
-                    for grid_data, market_id in data_list:
-                        self.store_grid(grid_data, market_id)
-                    data_list.clear()
-                    continue
+            if table == "grid_topology":
+                for grid_data, market_id in data_list:
+                    self.store_grid(grid_data, market_id)
+                continue
 
-                match table:
-                    case "market_meta":
-                        df = self.convert_market_results(data_list)
-                    case "market_dispatch":
-                        df = self.convert_market_dispatch(data_list)
-                    case "unit_dispatch":
-                        df = self.convert_unit_dispatch(data_list)
-                    case "rl_params":
-                        df = self.convert_rl_params(data_list)
-                    case "rl_grad_params":
-                        df = self.convert_rl_grad_params(data_list)
-                    case "rl_meta":
-                        df = pd.DataFrame(data_list)
-                    case "grid_flows":
-                        dfs = []
-                        for data in data_list:
-                            df = self.convert_flows(data)
-                            dfs.append(df)
-                        df = pd.concat(dfs, axis=0, join="outer")
-                    case "market_orders":
-                        dfs = []
-                        for market_data, market_id in data_list:
-                            df = self.convert_market_orders(market_data, market_id)
-                            dfs.append(df)
-                        df = pd.concat(dfs, axis=0, join="outer")
-                    case _:
-                        # store_units has the name of the units_meta
-                        dfs = []
-                        for data in data_list:
-                            df = self.convert_units_definition(data)
-                            dfs.append(df)
-                        df = pd.concat(dfs, axis=0, join="outer")
-                data_list.clear()
+            match table:
+                case "market_meta":
+                    df = self.convert_market_results(data_list)
+                case "market_dispatch":
+                    df = self.convert_market_dispatch(data_list)
+                case "unit_dispatch":
+                    df = self.convert_unit_dispatch(data_list)
+                case "rl_params":
+                    df = self.convert_rl_params(data_list)
+                case "rl_grad_params":
+                    df = self.convert_rl_grad_params(data_list)
+                case "rl_meta":
+                    df = pd.DataFrame(data_list)
+                case "grid_flows":
+                    dfs = []
+                    for data in data_list:
+                        df = self.convert_flows(data)
+                        dfs.append(df)
+                    df = pd.concat(dfs, axis=0, join="outer")
+                case "market_orders":
+                    dfs = []
+                    for market_data, market_id in data_list:
+                        df = self.convert_market_orders(market_data, market_id)
+                        dfs.append(df)
+                    df = pd.concat(dfs, axis=0, join="outer")
+                case _:
+                    # store_units has the name of the units_meta
+                    dfs = []
+                    for data in data_list:
+                        df = self.convert_units_definition(data)
+                        dfs.append(df)
+                    df = pd.concat(dfs, axis=0, join="outer")
+
             # concat all dataframes
             # use join='outer' to keep all columns and fill missing values with NaN
             if df is None or df.empty:
@@ -534,8 +558,6 @@ class WriteOutput(Role):
                     # now try again
                     with self.db.begin() as db:
                         df.to_sql(table, db, if_exists="append")
-
-        self.current_dfs_size_bytes = 0
 
     def store_grid(
         self,
