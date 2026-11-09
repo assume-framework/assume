@@ -7,7 +7,7 @@ name: PR Agent
 # build step for the PR head to this job: PR-Agent only needs the GitHub API.
 on:
   pull_request_target:
-    types: [opened, reopened, synchronize, ready_for_review, review_requested]
+    types: [opened, reopened, synchronize, ready_for_review]
   issue_comment:
 jobs:
   pr_agent_job:
@@ -19,7 +19,7 @@ jobs:
       contents: write
     steps:
       - name: PR Agent action step
-        uses: the-pr-agent/pr-agent@v0.47.0
+        uses: the-pr-agent/pr-agent@v0.49.0
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -29,11 +29,23 @@ jobs:
           config.custom_model_max_tokens: "256000"
           config.max_model_tokens: "100000"
           config.output_run_details: "true"
-          pr_description.publish_labels: "true"
-          pr_description.publish_description_as_comment: "true"
+          config.publish_output_progress: "false"
+
+          pr_description.publish_labels: "false"
           pr_description.final_update_message: "false"
+          pr_description.enable_pr_diagram: "false"
+          pr_description.collapsible_file_list: "adaptive"
+
+          pr_reviewer.publish_output_no_suggestions: "false"
+          pr_reviewer.publish_description_as_comment: "true"
+          pr_reviewer.enable_intro_text: "false"
+          pr_reviewer.require_tests_review: "false"
+          pr_reviewer.enable_review_labels_effort: "false"
+          pr_reviewer.enable_review_labels_security: "true"
           pr_reviewer.final_update_message: "false"
-          pr_description.enable_pr_description: "false"
-          github_action_config.pr_actions: '["opened", "reopened", "synchronize", "ready_for_review", "review_requested"]'
+
+          pr_code_suggestions.persistent_comment: "true"
+
+          github_action_config.pr_actions: '["opened", "reopened", "synchronize", "ready_for_review"]'
           github_action_config.auto_review: "true"
           github_action_config.auto_improve: "true"
