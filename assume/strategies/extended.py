@@ -137,7 +137,8 @@ class SupportStrategy(EnergyNaiveStrategy):
 
         bids = []
         # demand is negative, supply units are positive
-        power = unit.max_power
+        # but on the demand side, we take the minimum power that must always be served as contract volume
+        power = unit.min_power if type(unit).__name__ == "Demand" else unit.max_power
         # bid a fraction as support for showcase reasons - not everything should be bid on contracts
         power *= self.contract_amount_fraction
         for product in product_tuples:
