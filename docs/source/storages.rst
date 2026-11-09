@@ -40,11 +40,11 @@ output is allowed to change from one time step to the next:
 Because a unit can be active on several markets in the same time step, the ramping check always distinguishes between three power values:
 
 - **Previous power**: the power the unit was dispatched at in the *previous* time step   (``previous_power``).
-- **Current power**: the power already committed/sold on *other* markets in the *same* time step   (``current_power``).
+- **Current power**: the power already committed/sold on *other* markets for the *same* time step   (``current_power``).
 - **Requested power**: the power level a new market product is being checked for (``requested_power_discharge`` / ``requested_power_charge``). This is an absolute power level defined from zero (not a delta between current or previous power) and its sign indicates the direction (discharging or charging).
 
 Example (as shown above): with ``Requested_power = 50 MW`` and ``Current_power = 10 MW`` already
-committed on another market, the ramping constraint is checked for a **total** of 60 MW,
+committed on another market, the ramping constraint is checked for a **total** power level of 60 MW,
 i.e. ``requested_power + current_power``.
 
 
