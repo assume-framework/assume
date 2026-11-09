@@ -558,7 +558,7 @@ def test_ramping_limits_on_sequential_markets(storage_unit):
 
     # previously charging, bought -20 on first market, now request_discharge of 100
     # ramp_down_charge = -50 and ramp_up_discharge=60, to switch sign from previous power we use net ramping which is 55.
-    # We can ramp up to 35 and since we can technically offset the previous power (-60), we can place a bid of up to 95, knowigly that we will only run 35.
+    # We can ramp up to 35 and since we can technically offset the current power (-60), we can place a bid of up to 95, knowingly that we will only run 35.
     # This bid would sell on market2 10 of the 20 MWh we have bought on market1.
     assert storage_unit.calculate_ramp_discharge(0.5, -20, 100, -60) == 95
 
@@ -571,7 +571,7 @@ def test_ramping_limits_on_sequential_markets(storage_unit):
 
     # previously discharging, sold 60 on first market, now request -100 MWh.
     # the request requires switching sign, so we use net ramping. The net ramp is 55, so we can ramp down to -35
-    # and since we can technically offset the previous power (60), we can place a bid of up to -95, knowigly that we will only run -35.
+    # and since we can technically offset the current power (60), we can place a bid of up to -95, knowingly that we will only run -35.
     assert storage_unit.calculate_ramp_charge(0.5, 20, -100, 60) == -95
 
     # previously discharging, sold 100 on first market, now request -100 MWh.
