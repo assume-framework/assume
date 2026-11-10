@@ -159,19 +159,17 @@ async def test_concurrent_contract_settlement():
         unit = Demand(
             unit_id,
             index=forecaster.index,
-            **{
-                "bidding_strategies": {
-                    "EOM": EnergyNaiveStrategy(),
-                    "Support": EnergyNaiveStrategy(),
-                },
-                "technology": "energy",
-                "unit_operator": "seller_operator"
-                if unit_id != "demand1"
-                else "buyer_operator",
-                "max_power": -1000,
-                "min_power": 0,
-                "forecaster": forecaster,
+            bidding_strategies={
+                "EOM": EnergyNaiveStrategy(),
+                "Support": EnergyNaiveStrategy(),
             },
+            technology="energy",
+            unit_operator="seller_operator"
+            if unit_id != "demand1"
+            else "buyer_operator",
+            max_power=-1000,
+            min_power=0,
+            forecaster=forecaster,
         )
         if unit_id == "demand1":
             buyer_role.add_unit(unit)
@@ -181,8 +179,12 @@ async def test_concurrent_contract_settlement():
     # generation of the selling units - different values to detect mixups
     evaluation_begin = start + timedelta(days=8) - timedelta(days=7)
     evaluation_end = start + timedelta(days=8) - timedelta(hours=1)
-    seller_role.units["seller1"].outputs["energy"].loc[evaluation_begin:evaluation_end] = 100
-    seller_role.units["seller2"].outputs["energy"].loc[evaluation_begin:evaluation_end] = 200
+    seller_role.units["seller1"].outputs["energy"].loc[
+        evaluation_begin:evaluation_end
+    ] = 100
+    seller_role.units["seller2"].outputs["energy"].loc[
+        evaluation_begin:evaluation_end
+    ] = 200
 
     # EOM price results used for the CFD settlement
     eom_role = market_agent.roles[0]
