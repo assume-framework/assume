@@ -13,7 +13,7 @@ from assume.common.utils import parse_duration
 
 class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
     """
-    The strategy is analogue to the storage strategy in flexABLE.
+    The strategy is based on the storage strategy in flexABLE.
 
     If the current price forecast is higher than the average price forecast for a given foresight,
     the unit will discharge.
@@ -54,7 +54,7 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
             Orderbook: Bids containing start_time, end_time, only_hours, price, volume.
 
         Note:
-            The strategy is analogue to flexABLE
+            The strategy is based on flexABLE
         """
 
         # =============================================================================
@@ -230,7 +230,7 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
 
 class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
     """
-    The strategy is analogue to the storage strategy in flexABLE.
+    The strategy is based on the storage strategy in flexABLE.
 
     The strategy bids the energy_price for the energy_pos product if the specific revenue is positive.
     Otherwise, the strategy bids the capacity_price for the capacity_pos product.

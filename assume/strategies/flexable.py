@@ -13,7 +13,7 @@ from assume.common.utils import get_products_index, parse_duration
 
 class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
     """
-    A strategy that bids on the EOM-market.
+    A strategy that bids on the EOM-market. This strategy is based on the flexABLE methodology.
 
     Attributes:
         foresight (datetime.timedelta): The foresight of the unit.
@@ -244,7 +244,7 @@ class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
 
 class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
     """
-    A strategy that bids the energy_price or the capacity_price of the unit on the CRM (reserve market).
+    A strategy that bids the energy_price or the capacity_price of the unit on the CRM (reserve market). This strategy is based on the flexABLE methodology.
 
     Attributes:
         foresight (datetime.timedelta): The foresight of the unit.
@@ -362,7 +362,7 @@ class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
 
 class CapacityHeuristicBalancingNegStrategy(MinMaxStrategy):
     """
-    A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
+    A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market). This strategy is based on the flexABLE methodology.
 
     Attributes:
         foresight (datetime.timedelta): The foresight of the unit.
