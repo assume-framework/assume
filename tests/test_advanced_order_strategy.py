@@ -67,7 +67,6 @@ def test_eom_with_blocks(mock_market_config, power_plant):
     assert bids[-1]["volume"] == {time: 200 for time in product_index}
 
     # add min_down_time, min_operating_time
-    power_plant.index = pd.date_range("2023-07-01", periods=48, freq="h")
     power_plant.min_down_time = 2
     power_plant.min_operating_time = 3
     product_index = pd.date_range("2023-07-02", periods=24, freq="h")
@@ -122,7 +121,6 @@ def test_eom_with_links(mock_market_config, power_plant):
     assert bids[-1]["bid_id"] == power_plant.id + "_block"
 
     # add min_down_time, min_operating_time
-    power_plant.index = pd.date_range("2023-07-01", periods=48, freq="h")
     power_plant.min_down_time = 2
     power_plant.min_operating_time = 3
     product_index = pd.date_range("2023-07-02", periods=24, freq="h")
