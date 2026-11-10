@@ -620,6 +620,27 @@ def test_ramping_limits_on_sequential_markets(storage_unit):
     assert storage_unit.calculate_ramp_charge(0.5, 60, -100, 100) == -90
 
 
+def test_feasible_bid_can_exceed_the_nominal_power_limit(storage_unit):
+    """
+    A feasible bid for one market is checked against max_power_discharge/max_power_charge
+    net of current_power (already committed on another market), so it can be numerically
+    larger in magnitude than the unit's own max_power_discharge/max_power_charge.
+    """
+
+    # previously charging -20, now market1 already charges -90 for this hour.
+    # Net ramping from -20 allows ramping up to 35 (net_ramp=55, utilized=20).
+    # Offsetting the current power (-90) on top of that gives a feasible bid of 125,
+    # 25 MW above max_power_discharge=100 - but combined with the -90 already on
+    # market1, the real total of 35 stays well within the physical limit.
+    assert storage_unit.calculate_ramp_discharge(0.5, -20, 992, -90) == 125
+
+    # mirrored on the charging side: previously discharging 20, market1 already
+    # sold 90 for this hour. Net ramping from 20 allows ramping down to -35
+    # (net_ramp=55, utilized=20). Offsetting the current power (90) gives a
+    # feasible bid of -125, 25 MW beyond max_power_charge=-100 in magnitude.
+    assert storage_unit.calculate_ramp_charge(0.5, 20, -992, 90) == -125
+
+
 def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
     """
     This test checks that the dispatch of a storage does set the SoC output correctly.
