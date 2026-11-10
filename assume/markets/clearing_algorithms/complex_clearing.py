@@ -156,6 +156,8 @@ def market_clearing_opt_constraints(
             bool: True if the energy balance is zero, False otherwise.
         """
         balance_expr = 0.0  # Initialize the balance expression
+        # if the balance expression is empty, we use the flag to return a feasible constraint instead of a zero balance constraint, which would cause pyomo to fail
+        has_balance_terms = False
         # Iterate over orders to adjust the balance expression based on bid type
         for order in orders:
             if (
@@ -164,10 +166,12 @@ def market_clearing_opt_constraints(
                 and order["start_time"] == t
             ):
                 balance_expr += order["volume"] * model.xs[order["bid_id"]]
+                has_balance_terms = True
             elif order["bid_type"] in ["BB", "LB"] and order["node"] == node:
                 for start_time, volume in order["volume"].items():
                     if start_time == t:
                         balance_expr += volume * model.xb[order["bid_id"]]
+                        has_balance_terms = True
 
         # Add contributions from line flows based on the incidence matrix
         if incidence_matrix is not None:
@@ -175,7 +179,10 @@ def market_clearing_opt_constraints(
                 incidence_value = incidence_matrix.loc[node, line]
                 if incidence_value != 0:
                     balance_expr += incidence_value * model.flows[t, line]
+                    has_balance_terms = True
 
+        if not has_balance_terms:
+            return pyo.Constraint.Feasible
         return balance_expr == 0
 
     # Add the energy balance constraints for each node and time period using the rule
