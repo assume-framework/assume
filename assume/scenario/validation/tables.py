@@ -163,6 +163,7 @@ class BiddingTable(Table):
                 self.log.error(
                     f"{unit}: unknown bidding strategy '{strategy}' in '{column}'"
                     f"{hint(strategy, strategies)}{learning}"
+                    f"Ignore this message if you defined this custom strategy"
                 )
 
     def _check_strategies_given(self) -> None:
