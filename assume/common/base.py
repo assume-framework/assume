@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+import math
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -440,9 +441,34 @@ class SupportsMinMax(BaseUnit):
             )
         return power
 
+    def get_max_lookback_op_time(self) -> int:
+        """
+        Returns the number of time steps the operation time looks back.
+
+        The window covers the longest of the minimum operating time, the minimum down
+        time and the hot and warm start thresholds, plus one step for the thresholds. This
+        way a downtime longer than the warm start threshold can be told apart from a
+        warm start and is charged as a cold start.
+
+        Returns:
+            int: The lookback window in time steps.
+        """
+        return math.ceil(
+            max(
+                self.min_operating_time,
+                self.min_down_time,
+                self.downtime_hot_start + 1,
+                self.downtime_warm_start + 1,
+                1,
+            )
+        )
+
     def get_operation_time(self, start: datetime) -> int:
         """
-        Returns the time the unit is operating (positive) or shut down (negative).
+        Returns the time in simulation time steps the unit is operating (positive) or shut down (negative).
+
+        The operation time is limited by the lookback window of
+        :meth:`get_max_lookback_op_time`.
 
         Args:
             start (datetime.datetime): The start time.
@@ -450,8 +476,7 @@ class SupportsMinMax(BaseUnit):
         Returns:
             int: The operation time as a positive integer if operating, or negative if shut down.
         """
-        # Set the time window based on max of min operating/down time
-        max_time = max(self.min_operating_time, self.min_down_time, 1)
+        max_time = self.get_max_lookback_op_time()
         begin = max(start - self.index.freq * max_time, self.index[0])
         end = start - self.index.freq
 
