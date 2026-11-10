@@ -23,7 +23,8 @@ Throughout the code and this page, the same sign convention is used everywhere:
 - A power of ``0`` means the unit is idle.
 
 
-The usable energy content of the storage is tracked as a **state of charge (SOC)**, a value between 0 and 1 relative to the unit's ``capacity`` in MWh. It is kept within ``min_soc`` and ``max_soc``. How far the unit can charge or discharge in the current step is additionally capped by how much energy is actually left in (or missing from) the storage -- this is computed by :meth:`~assume.units.storage.Storage.calculate_soc_max_charge` and :meth:`~assume.units.storage.Storage.calculate_soc_max_discharge`.
+The usable energy content of the storage is tracked as a **state of charge (SOC)**, a value between 0 and 1 relative to the unit's ``capacity`` in MWh. The value is alaways defined for the beginning of an hour without the dispatch that happens in that ver hour. For example an SoC of 0.5 stored for the hour 22:00 means that at the beginning of the hour 22:00, the storage has 50% of its capacity available for discharge/charge. Every dispatch for products ranging from 22:00 to 23:00 will change the SoC for the next hour (23:00).
+The SoC is kept within ``min_soc`` and ``max_soc``. How far the unit can charge or discharge in the current step is additionally capped by how much energy is actually left in (or missing from) the storage -- this is computed by :meth:`~assume.units.storage.Storage.calculate_soc_max_charge` and :meth:`~assume.units.storage.Storage.calculate_soc_max_discharge`.
 
 
 On top of the SOC-based limits, the unit has **ramping constraints** that limit how much the power

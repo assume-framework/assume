@@ -561,7 +561,7 @@ class SupportsMinMaxCharge(BaseUnit):
             current_power (float, optional): The current power output of the unit already sold on another market. Defaults to 0.
 
         Returns:
-            float: The feasible discharging power adjusted by current power commitments and limited by ramping constraints and current power.
+            float: The feasible discharging power adjusted by current power commitments and limited by ramping constraints.
         """
         if requested_power_discharge < 0:
             raise ValidationError(
@@ -710,7 +710,7 @@ class SupportsMinMaxCharge(BaseUnit):
             current_power (float, optional): The power we already sold on some other market. Defaults to 0.
 
         Returns:
-            float: The feasible charging power adjusted by current power commitments and limited by ramping constraints and current power.
+            float: The feasible charging power adjusted by current power commitments and limited by ramping constraints.
         """
         if requested_power_charge > 0:
             raise ValidationError(
