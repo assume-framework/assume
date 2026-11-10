@@ -101,20 +101,20 @@ Multi-Market Ramping and Reachable Power
 
 Since ``current_power`` (power already committed on another market in the same time step) is part of every ramping check, a unit can offer power on a new market even if, in isolation, that power level looks like it violates the ramp -- as long as the *combined* dispatch stays within what is physically reachable from ``previous_power``.
 
-.. image:: img/Storage_Definitions_ReachablePower.jpg
+.. image:: img/Storage_Definitions_ReachablePower.png
     :align: center
     :width: 700px
 
-In the figure, "Requested power" is the bid being checked for this market and "Output = feasible bid" is what the function actually returns for it. Both are for this one market only, never the combined total with "Current power". "Reachable power" is the physical ramp limit from ``previous_power``; checking feasibility means verifying that ``current_power`` plus the feasible bid stays within it.
+In the figure, "Reachable power" is the physical ramp limit from ``previous_power`` alone (``previous_power + ramp_up_discharge``), ignoring any other market. "Requested power" is what gets checked and returned for *this* market and it can sit *above* "Reachable power", because "Current power" (already committed, and charging here, so negative) is netted into the check. As long as ``current_power + feasible_bid`` stays at or below "Reachable power", the bid itself is allowed to be larger than what the ramp alone would suggest.
 
-Example: a unit with ``simultaneous_charge_discharge_ramping = True``, ``ramp_up_discharge = 100`` and a previous power of ``previous_power = 10`` MW already charges ``current_power = -40`` MW on another market. Even though a new market requests far more than the ramp could ever deliver (``requested_power_discharge = 160``), the unit can still offer the amount of discharge that, *combined* with the -40 MW it already charges, stays within the reachable power:
+Example: a unit with ``simultaneous_charge_discharge_ramping = True``, ``ramp_up_discharge = 40`` and a previous power of ``previous_power = 10`` MW already charges ``current_power = -20`` MW on another market. "Reachable power" is ``10 + 40 = 50`` MW. Even though a new market requests more than that (``requested_power_discharge = 90``), the unit can still offer 70 MW on it:
 
 .. code-block:: python
 
     unit.calculate_ramp_discharge(
         previous_power=10,
-        requested_power_discharge=160,
-        current_power=-40,
-    ) == 150
+        requested_power_discharge=90,
+        current_power=-20,
+    ) == 70
 
-The feasible discharge bid is 150 MW -- the previous power plus the full ``ramp_up_discharge``, net of the ``current_power`` already committed elsewhere (``10 + 100 - (-40) = 150``). Combined with the -40 MW charged on the other market, the resulting net output of 110 MW is exactly the "Reachable power" shown above.
+The feasible discharge bid is 70 MW. This is the previous power plus the full ``ramp_up_discharge``, net of the ``current_power`` already committed elsewhere (``10 + 40 - (-20) = 70``), i.e. 20 MW above "Reachable power". Combined with the -20 MW charged on the other market, the resulting net output of 50 MW matches "Reachable power" exactly, as it must: that combined total is what is actually physically delivered and is the quantity the ramp constraint really limits.
