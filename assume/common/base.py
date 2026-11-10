@@ -355,6 +355,9 @@ class SupportsMinMax(BaseUnit):
     ramp_up: float = None
     efficiency: float
     emission_factor: float
+    # in whole time steps of the index, converted from hours by the unit:
+    # minimum times are rounded up, as they are "at least" values, and
+    # downtime thresholds are rounded down, as they are "up to" values
     min_operating_time: int = 0
     min_down_time: int = 0
     downtime_hot_start: int = 0
