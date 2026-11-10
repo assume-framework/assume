@@ -298,9 +298,7 @@ class PayAsBidContractRole(MarketRole):
         # the reply_with keys must be unique per contract - contracts which share
         # the same buyer and start time (e.g. cleared in the same auction) would
         # otherwise overwrite each others futures and be settled with wrong data
-        contract_key = (
-            f"{contract['contract']}_{contract['bid_id']}_{buyer}_{seller}_{contract['start_time']}"
-        )
+        contract_key = f"{contract['contract']}_{contract['bid_id']}_{buyer}_{seller}_{contract['start_time']}"
         reply_with = contract_key
         self.futures[reply_with] = asyncio.Future()
         self.context.schedule_instant_message(
