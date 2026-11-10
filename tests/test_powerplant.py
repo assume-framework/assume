@@ -681,6 +681,159 @@ def test_powerplant_start_up_costs(power_plant_1):
     assert total_costs.at[running] == generation_costs.at[running]
 
 
+def _make_start_cost_plant(freq: str = "h", periods: int = 40, **kwargs) -> PowerPlant:
+    """Creates a plant with distinct start-up costs per tier (10, 20 and 30 €/MW), a hot
+    start up to 2 h and a warm start up to 4 h of downtime, and minimum times of 1 h."""
+    index = pd.date_range("2022-01-01", periods=periods, freq=freq)
+    forecaster = PowerplantForecaster(
+        index=index,
+        availability=1,
+        fuel_prices={"lignite": 10, "co2": 0},
+        market_prices={"EOM": 0},
+    )
+    params = {
+        "hot_start_cost": 10,
+        "warm_start_cost": 20,
+        "cold_start_cost": 30,
+        "downtime_hot_start": 2,
+        "downtime_warm_start": 4,
+        "min_operating_time": 1,
+        "min_down_time": 1,
+    }
+    params.update(kwargs)
+    return PowerPlant(
+        id="test_pp",
+        unit_operator="test_operator",
+        technology="coal",
+        bidding_strategies={"EOM": EnergyNaiveStrategy()},
+        index=forecaster.index,
+        max_power=500,
+        min_power=50,
+        efficiency=0.5,
+        additional_cost=0,
+        fuel_type="lignite",
+        emission_factor=0,
+        ramp_down=500,
+        ramp_up=500,
+        forecaster=forecaster,
+        **params,
+    )
+
+
+def _start_costs(pp: PowerPlant, off_steps: int, on_steps: int = 2) -> list[float]:
+    """Runs the plant for 3 steps, stops it for off_steps and runs it again, then returns
+    the start-up costs booked per step."""
+    values = [200] * 3 + [0] * off_steps + [200] * on_steps
+    for t, value in zip(pp.index, values):
+        pp.outputs["energy"].at[t] = value
+    pp.calculate_costs(pp.index[0], pp.index[len(values) - 1])
+    return [float(pp.outputs["starting_costs"].at[t]) for t in pp.index[: len(values)]]
+
+
+@pytest.mark.parametrize(
+    "off_steps, cost",
+    [
+        (1, 10),  # hot start
+        (2, 10),  # on the hot start threshold
+        (3, 20),  # warm start
+        (4, 20),  # on the warm start threshold
+        (5, 30),  # cold start, beyond the min_down_time of one step
+        (20, 30),  # a downtime beyond the lookback is still a cold start
+    ],
+)
+def test_start_costs_tier_by_downtime(off_steps, cost):
+    """The tier of a start depends on the downtime before it, including the thresholds
+    themselves. A downtime beyond the warm start threshold has to be a cold start, which
+    was unreachable before because the lookback ended at the minimum times."""
+    pp = _make_start_cost_plant()
+    series = _start_costs(pp, off_steps)
+
+    restart = 3 + off_steps
+    assert series[restart] == cost * pp.max_power
+    assert sum(series) == cost * pp.max_power
+
+
+def test_operation_time_is_not_capped_by_min_times():
+    """The operation time looks back one step beyond the warm start threshold, even if
+    the minimum times are shorter, so that a cold start can be told apart from a warm
+    start. Longer downtimes are capped there, as they are all cold starts."""
+    pp = _make_start_cost_plant()
+    _start_costs(pp, off_steps=10)
+
+    # min_down_time is only one step, but the window reaches one step beyond the
+    # warm start threshold, so a downtime of more than 4 steps can be told apart
+    assert pp.min_down_time == 1
+    assert pp.get_max_lookback_op_time() == 5
+    assert pp.get_operation_time(pp.index[3 + 10]) == -5
+    assert pp.get_operation_time(pp.index[3 + 10 + 2]) == 2
+
+
+def test_operation_time_lookback_covers_longest_min_time():
+    """If a minimum time is longer than the start thresholds, the lookback covers it, as
+    the ramping checks whether the unit has run or stood still long enough."""
+    pp = _make_start_cost_plant(min_operating_time=8, min_down_time=6)
+    assert pp.get_max_lookback_op_time() == 8
+
+
+def test_start_costs_in_quarter_hourly_simulation():
+    """The thresholds and minimum times are given in hours, so in 15-minute steps the hot
+    start lasts up to 8 steps and the warm start up to 16 steps. Before, the minimum times
+    were taken as steps, so 1 h meant 15 minutes."""
+    # thresholds are given in hours: 2 h = 8 steps, 4 h = 16 steps
+    pp = _make_start_cost_plant(freq="15min", periods=80)
+
+    assert pp.downtime_hot_start == 8
+    assert pp.downtime_warm_start == 16
+    # 1 h = 4 steps
+    assert pp.min_operating_time == 4
+    assert pp.min_down_time == 4
+
+    for off_steps, cost in [(6, 10), (8, 10), (12, 20), (16, 20), (17, 30), (40, 30)]:
+        pp = _make_start_cost_plant(freq="15min", periods=80)
+        series = _start_costs(pp, off_steps)
+        assert sum(series) == cost * pp.max_power, off_steps
+        assert series[3 + off_steps] == cost * pp.max_power, off_steps
+
+
+def test_min_times_are_converted_to_steps():
+    """The times are converted from hours to whole steps. Minimum times are rounded up, so
+    they last at least as long as configured, start thresholds are rounded down, so a hot
+    or warm start lasts at most as long as configured."""
+    pp = _make_start_cost_plant(
+        freq="15min", periods=8, min_operating_time=1.5, min_down_time=0.25
+    )
+    assert pp.min_operating_time == 6
+    assert pp.min_down_time == 1
+
+    # a fraction of a step is rounded up to a whole step
+    pp = _make_start_cost_plant(freq="h", periods=8, min_operating_time=0.25)
+    assert pp.min_operating_time == 1
+
+    # 1.1 h are 4.4 steps of 15 minutes: at least 5 steps, but at most 4 steps
+    pp = _make_start_cost_plant(
+        freq="15min", periods=8, min_down_time=1.1, downtime_hot_start=1.1
+    )
+    assert pp.min_down_time == 5
+    assert pp.downtime_hot_start == 4
+
+
+def test_min_down_time_in_quarter_hourly_ramping():
+    """The ramping keeps a unit off until its minimum down time has passed. In 15-minute
+    steps, a minimum down time of 1 h blocks a restart for 4 steps."""
+    pp = _make_start_cost_plant(freq="15min", periods=12, min_down_time=1)
+    for t, value in zip(pp.index, [200, 200, 0, 0, 0, 0]):
+        pp.outputs["energy"].at[t] = value
+
+    # off for 3 steps at index 5, less than min_down_time of 4 steps
+    op_time = pp.get_operation_time(pp.index[5])
+    assert op_time == -3
+    assert pp.calculate_ramp(op_time, 0, 200, current_power=0) == 0
+    # off for 4 steps at index 6
+    op_time = pp.get_operation_time(pp.index[6])
+    assert op_time == -4
+    assert pp.calculate_ramp(op_time, 0, 200, current_power=0) == 200
+
+
 if __name__ == "__main__":
     # run pytest and enable prints
     pytest.main(["-s", __file__])
