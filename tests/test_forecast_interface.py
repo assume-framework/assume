@@ -415,7 +415,9 @@ def test_forecast_interface__elastic_demand_complex_clearing(
     fast_index_24h = FastIndex(
         start=index_24h[0], end=index_24h[-1], freq=pd.infer_freq(index_24h)
     )
-    market_config.market_products = [MarketProduct(pd.Timedelta(hours=1), 24, pd.Timedelta(hours=24))]
+    market_config.market_products = [
+        MarketProduct(pd.Timedelta(hours=1), 24, pd.Timedelta(hours=24))
+    ]
     units_24h = tuple(forecast_setup["units_elastic_case"])
 
     def extend_series(series):
