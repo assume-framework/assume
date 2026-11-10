@@ -33,19 +33,25 @@ output is allowed to change from one time step to the next:
 - ``ramp_up_charge`` / ``ramp_down_charge`` (both ``<= 0``): the maximum increase/decrease of the charging power per time step (recall that charging power is negative, so "ramping up the charge"
   means becoming more negative).
 
-.. image:: img/Storage_Definitions_Ramp_SOC.jpg
+The figure below illustrates these four quantities as the maximum reach of a single time step. On the left, a unit starting from the same ``previous_power`` can ramp up towards discharging or towards charging within one step -- ``ramp_up_discharge`` and ``ramp_up_charge`` are the two (independent) distances it can cover in either direction. On the right, two different starting points (one already discharging near its maximum, one already charging near its maximum) both ramp *down* towards the same ``current_power`` -- ``ramp_down_discharge`` and ``ramp_down_charge`` are how far each of them can move towards that point within one step.
+
+.. image:: img/Storage_Ramp_Directions.webp
     :align: center
     :width: 700px
 
-Because a unit can be active on several markets in the same time step, the ramping check always distinguishes between three power values:
+Because a unit can be active on several markets in the same time step, every ramping check distinguishes between three power values:
 
-- **Previous power**: the power the unit was dispatched at in the *previous* time step   (``previous_power``).
-- **Current power**: the power already committed/sold on *other* markets for the *same* time step   (``current_power``).
-- **Requested power**: the power level a new market product is being checked for (``requested_power_discharge`` / ``requested_power_charge``). This is an absolute power level defined from zero (not a delta between current or previous power) and its sign indicates the direction (discharging or charging).
+- **Previous power**: the power the unit was dispatched at in the *previous* time step (``previous_power``).
+- **Current power**: the power already committed/sold on *other* markets for the *same* time step (``current_power``).
+- **Requested power**: the bid being checked for a *new* market product (``requested_power_discharge``   / ``requested_power_charge``). This always answers the question "what do I want to offer on *this*   market right now?" -- it is a standalone power level for this one market, **not** a delta relative to ``current_power`` and **not** the combined total across all markets.
 
-Example (as shown above): with ``Requested_power = 50 MW`` and ``Current_power = 10 MW`` already
-committed on another market, the ramping constraint is checked for a **total** power level of 60 MW,
-i.e. ``requested_power + current_power``.
+.. image:: img/Storage_Definitions_Overview.webp
+    :align: center
+    :width: 700px
+
+Ramping (and the SOC limit) are always checked on the *combination* of ``current_power`` and the requested power, because that combination is what the unit physically has to deliver. The function then returns the **feasible bid**: the largest/smallest power level for *this* market that keeps ``current_power + feasible_bid`` within what the unit can actually ramp to and what the SOC can back. That feasible bid is, again, a value for this one market -- ``current_power`` is only used internally to net the check, it is never added into the returned number.
+
+Example (as shown above): with ``requested_power = 50 MW`` for this market and ``current_power = 10 MW`` already committed on another market, the ramping constraint is checked for a combined power level of 60 MW, i.e. ``requested_power + current_power`` -- but the function still only returns the feasible value for *this* market's bid, not the combined 60 MW.
 
 
 Ramping Behaviour
@@ -98,6 +104,8 @@ Since ``current_power`` (power already committed on another market in the same t
 .. image:: img/Storage_Definitions_ReachablePower.jpg
     :align: center
     :width: 700px
+
+In the figure, "Requested power" is the bid being checked for this market and "Output = feasible bid" is what the function actually returns for it. Both are for this one market only, never the combined total with "Current power". "Reachable power" is the physical ramp limit from ``previous_power``; checking feasibility means verifying that ``current_power`` plus the feasible bid stays within it.
 
 Example: a unit with ``simultaneous_charge_discharge_ramping = True``, ``ramp_up_discharge = 100`` and a previous power of ``previous_power = 10`` MW already charges ``current_power = -40`` MW on another market. Even though a new market requests far more than the ramp could ever deliver (``requested_power_discharge = 160``), the unit can still offer the amount of discharge that, *combined* with the -40 MW it already charges, stays within the reachable power:
 

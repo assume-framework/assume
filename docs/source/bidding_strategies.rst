@@ -45,7 +45,7 @@ Heuristic                       Basic methodology to form bids, based on partici
 Optimization                    Methodology, based on the flexABLE methodology [`Qussous et al. 2022 <https://doi.org/10.3390/en15020494>`_], offers more refined strategising
                                 compared to the Naive methods. Applicable to power plant and storage units, it incorporates market dynamics to a greater degree by forecasting market
                                 prices, as well as accounting for operational history, potential power loss due to heat production, and the fact that a plant can make bids for
-                                multiple markets at the same time.
+                                multiple markets at the same time. In comparison to the original flexABLE methodology, it now forces bids according to feasible ramping constraints.
 Learning                        A :doc:`reinforcement learning <learning>` (RL) approach to formulating bids for an Energy-Only Market.
                                 Agents perform actions (choose bid price(s) and for storage a direction) informed by observations (including forecasted residual load, forecasted
                                 price, marginal cost). Bid volumes are fixed to the maximum possible volume. Based on the reward (profits) from accepted bids, agents learn to optimise
