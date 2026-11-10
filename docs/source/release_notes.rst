@@ -103,6 +103,7 @@ Upcoming Release
   - **Fix generation costs of demand units**: ``energy_generation_costs`` of demand units held the bid price times the volume, which is some kind of willingness to pay instead of generation costs. It is now 0, their procurement is already part of the cashflow.
   - **Fix inconsistent power plant behavior at the start of the simulation**: Established a consistent default: first dispatch of a power plant is always treated as a genuine cold start accounting for starting costs and ramping.
   - **Unify storage initial SoC default**: ``Storage.initial_soc`` defaults to ``0.5`` instead of ``0.0``, matching the existing fallback used when ``None`` is passed explicitly (e.g. by the ENTSO-E loader). The CSV scenario loader is unaffected, since it fills an empty ``initial_soc`` column with ``0.0`` before it reaches the unit.
+  - **Fix start-up cost tiers and time units of power plants** (#695): The operation time only looked back as far as the longest minimum time, so a longer downtime was charged as a hot or warm start instead of a cold start. It now looks back one step beyond the warm start threshold. ``min_operating_time`` and ``min_down_time`` are now converted from hours to time steps like the start thresholds, so they also hold below hourly resolution. Fractions of an hour are allowed: minimum times are rounded up and downtime thresholds down to whole time steps.
 
 0.6.0 - (18th March 2026)
 =========================
