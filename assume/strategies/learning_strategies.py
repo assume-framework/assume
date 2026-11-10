@@ -21,7 +21,10 @@ from assume.common.fast_pandas import FastSeries
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
-from assume.reinforcement_learning.learning_utils import NormalActionNoise
+from assume.reinforcement_learning.neural_network_architecture import (
+    ActorPPO,
+    LSTMActorPPO,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +33,9 @@ class TorchLearningStrategy(LearningStrategy):
     """
     A strategy to enable machine learning with pytorch.
     """
+
+    # Only algorithms with exploration noise turn this on
+    collect_initial_experience_mode: bool = False
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -44,11 +50,27 @@ class TorchLearningStrategy(LearningStrategy):
         # tells us whether we are training the agents or just executing per-learning strategies
         self.learning_mode = self.learning_config.learning_mode
         self.evaluation_mode = self.learning_config.evaluation_mode
+        self.algorithm = self.learning_config.algorithm
 
         self.actor_architecture = self.learning_config.actor_architecture
 
-        # check if actor architecture is available
-        if self.actor_architecture in actor_architecture_aliases.keys():
+        # PPO actors have stochastic output heads and therefore must be
+        # reconstructed with their algorithm-specific architecture when a
+        # trained policy is loaded for inference.
+        if self.algorithm == "mappo":
+            ppo_actor_architecture_aliases = {
+                "mlp": ActorPPO,
+                "lstm": LSTMActorPPO,
+            }
+            if self.actor_architecture not in ppo_actor_architecture_aliases:
+                raise ValueError(
+                    f"Policy '{self.actor_architecture}' unknown for MAPPO. "
+                    f"Supported architectures are {list(ppo_actor_architecture_aliases.keys())}"
+                )
+            self.actor_architecture_class = ppo_actor_architecture_aliases[
+                self.actor_architecture
+            ]
+        elif self.actor_architecture in actor_architecture_aliases.keys():
             self.actor_architecture_class = actor_architecture_aliases[
                 self.actor_architecture
             ]
@@ -68,17 +90,6 @@ class TorchLearningStrategy(LearningStrategy):
         self.exploration_noise_std = self.learning_config.exploration_noise_std
 
         if self.learning_mode or self.evaluation_mode:
-            # learning role overwrites this if loaded from file or after initial experience episodes
-            self.collect_initial_experience_mode = True
-
-            self.action_noise = NormalActionNoise(
-                mu=0.0,
-                sigma=self.learning_config.noise_sigma,
-                action_dimension=self.act_dim,
-                scale=self.learning_config.noise_scale,
-                dt=self.learning_config.noise_dt,
-            )
-
             self.learning_role.register_strategy(self)
 
         # actor policies are only loaded here from file if learning mode is off (otherwise handled by learning_role)
@@ -241,8 +252,10 @@ class TorchLearningStrategy(LearningStrategy):
         return np.array([])
 
     def get_actions(self, next_observation):
-        """
-        Determines actions based on the current observation, applying noise for exploration if in learning mode.
+        """Determine action and exploration noise for the current observation.
+
+        All algorithm-specific sampling logic lives in the
+        algorithm class via get_action.
 
         Args
         ----
@@ -255,53 +268,29 @@ class TorchLearningStrategy(LearningStrategy):
             Actions that include bid price and direction.
         torch.Tensor
             Noise component which is already added to actions for exploration, if applicable.
+        dict | None
+            Extra per-action data to cache (e.g. PPO/MAPPO's value estimate
+            and log-prob), or None if the algorithm has nothing extra to cache.
 
         Notes
         -----
         In learning mode, actions incorporate noise for exploration. Initial exploration relies
         solely on noise to cover the action space broadly.
+        For PPO, `extra_data` carries the log_prob and value estimate for later use.
         """
+        if self.learning_mode or self.evaluation_mode:
+            return self.learning_role.rl_algorithm.get_action(self, next_observation)
 
-        # distinction whether we are in learning mode or not to handle exploration realised with noise
-        if self.learning_mode and not self.evaluation_mode:
-            # if we are in learning mode the first x episodes we want to explore the entire action space
-            # to get a good initial experience, in the area around the costs of the agent
-            if self.collect_initial_experience_mode:
-                # define current action as solely noise
-                noise = th.normal(
-                    mean=0.0,
-                    std=self.exploration_noise_std,
-                    size=(self.act_dim,),
-                    dtype=self.float_type,
-                    device=self.device,
-                )
-
-                # =============================================================================
-                # 2.1 Get Actions and handle exploration
-                # =============================================================================
-                # only use noise as the action to enforce exploration
-                curr_action = noise
-
+        # A final inference run does not create an RL algorithm. Use the actor
+        # loaded by ``load_actor_params`` directly and keep PPO deterministic.
+        with th.no_grad():
+            if self.algorithm == "mappo":
+                action = self.actor(next_observation, deterministic=True)
             else:
-                # if we are not in the initial exploration phase we chose the action with the actor neural net
-                # and add noise to the action
-                curr_action = self.actor(next_observation).detach()
-                noise = self.action_noise.noise(
-                    device=self.device, dtype=self.float_type
-                )
-                curr_action += noise
+                action = self.actor(next_observation)
 
-                # make sure that noise adding does not exceed the actual output of the NN as it pushes results in a direction that actor can't even reach
-                curr_action = th.clamp(
-                    curr_action, self.actor.min_output, self.actor.max_output
-                )
-        else:
-            # if we are not in learning mode we just use the actor neural net to get the action without adding noise
-            curr_action = self.actor(next_observation).detach()
-            # noise is an tensor with zeros, because we are not in learning mode
-            noise = th.zeros_like(curr_action, dtype=self.float_type)
-
-        return curr_action, noise
+        noise = th.zeros_like(action, dtype=self.float_type)
+        return action, noise, None
 
 
 class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
@@ -349,6 +338,8 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         Number of time steps for which the agent forecasts market conditions. Defaults to 12.
     max_bid_price : float
         Maximum allowable bid price. Defaults to 100.
+    max_demand : float
+        Maximum demand capacity of the unit. Defaults to 10e3.
     device : str
         Device for computation, such as "cpu" or "cuda". Defaults to "cpu".
     float_type : str
@@ -361,10 +352,14 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         Class of the neural network architecture used for the actor network. Defaults to MLPActor.
     actor : torch.nn.Module
         Actor network for determining actions.
+    order_types : list[str]
+        Types of market orders supported by the strategy. Defaults to ["SB"].
     action_noise : NormalActionNoise
-        Noise model added to actions during learning to encourage exploration. Defaults to None.
+        Noise model added to actions during learning to encourage exploration. Only set by
+        algorithms that use exploration noise.
     collect_initial_experience_mode : bool
-        Whether the agent is collecting initial experience through exploration. Defaults to True.
+        Whether the agent is collecting initial experience through exploration. Only enabled by
+        algorithms that use exploration noise. Defaults to False.
 
     Args
     ----
@@ -385,6 +380,9 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
             *args,
             **kwargs,
         )
+
+        # define allowed order types
+        self.order_types = kwargs.get("order_types", ["SB"])
 
     def calculate_bids(
         self,
@@ -443,7 +441,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         # =============================================================================
         # 2. Get the Actions, based on the observations
         # =============================================================================
-        actions, noise = self.get_actions(next_observation)
+        actions, noise, extra_data = self.get_actions(next_observation)
 
         # =============================================================================
         # 3. Transform Actions into bids
@@ -483,7 +481,9 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         ]
 
         if self.learning_mode:
-            self.learning_role.add_actions_to_cache(self.unit_id, start, actions, noise)
+            self.learning_role.add_actions_to_cache(
+                self.unit_id, start, actions, noise, extra_data
+            )
 
         return bids
 
@@ -500,6 +500,8 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         -------
         tuple of torch.Tensor
             A tuple containing: Actions to be taken (with or without noise). The noise component (if any), useful for diagnostics.
+        dict | None
+            Extra per-action data to cache, passed through unchanged from the parent implementation.
 
         Notes
         -----
@@ -507,7 +509,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         """
 
         # Get the base action and associated noise from the parent implementation
-        curr_action, noise = super().get_actions(next_observation)
+        curr_action, noise, extra_data = super().get_actions(next_observation)
 
         if self.learning_mode and not self.evaluation_mode:
             if self.collect_initial_experience_mode:
@@ -518,7 +520,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
                 # Add marginal cost to the action directly for initial random exploration
                 curr_action += marginal_cost
 
-        return curr_action, noise
+        return curr_action, noise, extra_data
 
     def get_individual_observations(
         self, unit: SupportsMinMax, start: datetime, end: datetime
@@ -763,7 +765,7 @@ class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
         # =============================================================================
         # 2. Get the Actions, based on the observations
         # =============================================================================
-        actions, noise = self.get_actions(next_observation)
+        actions, noise, extra_data = self.get_actions(next_observation)
 
         # =============================================================================
         # 3. Transform Actions into bids
@@ -785,7 +787,9 @@ class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
         ]
 
         if self.learning_mode:
-            self.learning_role.add_actions_to_cache(self.unit_id, start, actions, noise)
+            self.learning_role.add_actions_to_cache(
+                self.unit_id, start, actions, noise, extra_data
+            )
 
         return bids
 
@@ -828,6 +832,8 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         Number of time steps for forecasting market conditions. Defaults to 24.
     max_bid_price : float
         Maximum allowable bid price. Defaults to 100.
+    max_demand : float
+        Maximum demand capacity of the storage. Defaults to 10e3.
     device : str
         Device used for computation ("cpu" or "cuda"). Defaults to "cpu".
     float_type : str
@@ -840,10 +846,14 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         Class of the neural network for the actor network. Defaults to MLPActor.
     actor : torch.nn.Module
         The neural network used to predict actions.
+    order_types : list[str]
+        Types of market orders used by the strategy. Defaults to ["SB"].
     action_noise : NormalActionNoise
-        Noise model added to actions during learning for exploration. Defaults to None.
+        Noise model added to actions during learning for exploration. Only set by algorithms
+        that use exploration noise.
     collect_initial_experience_mode : bool
-        Whether the agent is in an exploration mode for initial experience. Defaults to True.
+        Whether the agent is in an exploration mode for initial experience. Only enabled by
+        algorithms that use exploration noise. Defaults to False.
 
     Args
     ----
@@ -864,6 +874,9 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
             *args,
             **kwargs,
         )
+
+        # define allowed order types
+        self.order_types = kwargs.get("order_types", ["SB"])
 
     def get_individual_observations(
         self, unit: SupportsMinMaxCharge, start: datetime, end: datetime
@@ -942,7 +955,7 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         # =============================================================================
         # Get the Actions, based on the observations
         # =============================================================================
-        actions, noise = self.get_actions(next_observation)
+        actions, noise, extra_data = self.get_actions(next_observation)
 
         # =============================================================================
         # 3. Transform Actions into bids
@@ -988,7 +1001,9 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
             )
 
         if self.learning_mode:
-            self.learning_role.add_actions_to_cache(self.unit_id, start, actions, noise)
+            self.learning_role.add_actions_to_cache(
+                self.unit_id, start, actions, noise, extra_data
+            )
 
         return bids
 
@@ -1132,10 +1147,14 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
         Class of the neural network for the actor network. Defaults to MLPActor.
     actor : torch.nn.Module
         The neural network used to predict actions.
+    order_types : list[str]
+        Types of market orders used by the strategy. Defaults to ["SB"].
     action_noise : NormalActionNoise
-        Noise model added to actions during learning for exploration. Defaults to None.
+        Noise model added to actions during learning for exploration. Only set by algorithms
+        that use exploration noise.
     collect_initial_experience_mode : bool
-        Whether the agent is in an exploration mode for initial experience. Defaults to True.
+        Whether the agent is in an exploration mode for initial experience. Only enabled by
+        algorithms that use exploration noise. Defaults to False.
 
     Args
     ----
@@ -1156,6 +1175,9 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
             *args,
             **kwargs,
         )
+
+        # define allowed order types
+        self.order_types = kwargs.get("order_types", ["SB"])
 
     def get_individual_observations(
         self, unit: SupportsMinMaxCharge, start: datetime, end: datetime
