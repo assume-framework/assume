@@ -582,7 +582,9 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         **Opportunity Cost**: Penalty for underutilizing capacity, calculated as potential lost income.
         **Regret Term**: A scaled regret term penalizes high opportunity costs to guide effective bidding.
 
-        The reward is scaled and stored along with other outputs in the unit’s data to support learning.
+        The reward is scaled and finally cached along with regret and profit values to support learning
+        (updating policy based on experiences in buffer and storing data in outputs).
+
         """
         # Function is called after the market is cleared, and we get the market feedback,
         # allowing us to calculate profit based on the realized transactions.
@@ -1006,6 +1008,10 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         Notes
         -----
         Rewards are based on profit and include fixed costs for charging and discharging.
+
+        The reward is scaled and finally cached along with profit values to support learning
+        (updating policy based on experiences in buffer and storing data in outputs).
+
         """
         product_type = marketconfig.product_type
         reward = 0
@@ -1207,7 +1213,9 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
         **Opportunity Cost**: Penalty for underutilizing capacity, calculated as potential lost income.
         **Regret Term**: A scaled regret term penalizes high opportunity costs to guide effective bidding.
 
-        The reward is scaled and stored along with other outputs in the unit’s data to support learning.
+        The reward is scaled and finally cached along with regret and profit values to support learning
+        (updating policy based on experiences in buffer and storing data in outputs).
+
         """
         # Function is called after the market is cleared, and we get the market feedback,
         # allowing us to calculate profit based on the realized transactions.
