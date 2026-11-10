@@ -375,6 +375,14 @@ class Learning(Role):
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
+        # Strategies are recreated each episode with the initial noise_dt, so apply the
+        # decay of the episode start instead of waiting for the first policy update
+        noise_decay = self.calc_noise_from_progress(
+            self.get_progress_remaining(timestamp=self.start)
+        )
+        for strategy in self.rl_strats.values():
+            strategy.action_noise.update_noise_decay(noise_decay)
+
         # Disable initial exploration if initial experience collection is complete
         if (
             self.episodes_done
@@ -421,13 +429,17 @@ class Learning(Role):
             else:
                 strategy.collect_initial_experience_mode = False
 
-    def get_progress_remaining(self) -> float:
+    def get_progress_remaining(self, timestamp: float | None = None) -> float:
         """
         Get the remaining learning progress from the simulation run.
 
+        Args:
+            timestamp (float, optional): The timestamp to get the progress for. Defaults to the current simulation time.
         """
+        if timestamp is None:
+            timestamp = self.context.current_timestamp
         total_duration = self.end - self.start
-        elapsed_duration = self.context.current_timestamp - self.start
+        elapsed_duration = timestamp - self.start
 
         learning_episodes = (
             self.learning_config.training_episodes
