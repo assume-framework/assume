@@ -65,7 +65,7 @@ Upcoming Release
     - Frequencies without a fixed length, such as ``"MS"`` or ``"W"``, raise ``ValueError``. Use fixed frequencies such as ``"15min"``, ``"h"`` or ``"D"``.
     - Creating a ``FastSeries`` with values whose length does not match the index raises ``ValueError``.
   - **Removed unused TensorFastSeries class** which has become deprecated after a learning refactoring (#648)
-  - **Export start-up costs in the unit dispatch** (#695): The new ``starting_costs`` column holds the start-up costs. ``total_costs`` is now the sum of generation and start-up costs of the executed dispatch for all units, instead of being written by some strategies at clearing.
+  - **Export start-up costs in the unit dispatch** (#695): The new ``starting_costs`` column holds the start-up costs. ``total_costs`` is now the sum of generation and start-up costs of the executed dispatch for all units, instead of being written by some strategies at clearing. The Grafana dashboard shows the start-up costs and calculates the profit from ``total_costs``.
 
 **Bug Fixes:**
   - **Fix critic loading skipping only the inner key loop**: In ``TD3.load_critic_params`` the ``continue`` for a checkpoint with missing keys only skipped the inner key loop, so the incomplete critic was still loaded and failed with a ``KeyError``. The agent is now skipped as a whole, with one warning listing all missing keys.
