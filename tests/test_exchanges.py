@@ -101,8 +101,8 @@ def test_exchange_initialization(exchange_unit):
     """Test if the Exchange unit initializes correctly with both import and export forecast."""
     assert exchange_unit.id == "test_unit"
     assert exchange_unit.unit_operator == "test_operator"
-    assert exchange_unit.price_import == 10.0
-    assert exchange_unit.price_export == 2000.0
+    assert exchange_unit.price_import.at["2024-01-01 00:00:00"] == 10.0
+    assert exchange_unit.price_export.at["2024-01-01 00:00:00"] == 2000.0
 
     # Validate correct forecasting data
     assert exchange_unit.volume_import.at["2024-01-01 00:00:00"] == 100, (
@@ -154,9 +154,9 @@ def test_exchange_energy_naive_strategy_bidding(exchange_unit, market_config):
         assert "volume" in bid, "Missing volume in bid"
 
         if bid["volume"] > 0:  # Import case
-            assert bid["price"] == exchange_unit.price_import, "Incorrect import price"
+            assert bid["price"] == 10.0, "Incorrect import price"
         else:  # Export case
-            assert bid["price"] == exchange_unit.price_export, "Incorrect export price"
+            assert bid["price"] == 2000.0, "Incorrect export price"
 
 
 def test_exchange_energy_naive_strategy_import_only(
@@ -170,9 +170,7 @@ def test_exchange_energy_naive_strategy_import_only(
 
     assert len(bids) == 1, "Only import bid should be generated"
     assert bids[0]["volume"] > 0, "Import volume should be positive"
-    assert bids[0]["price"] == exchange_import_only.price_import, (
-        "Incorrect import price"
-    )
+    assert bids[0]["price"] == 10.0, "Incorrect import price"
 
 
 def test_exchange_energy_naive_strategy_export_only(
@@ -186,6 +184,44 @@ def test_exchange_energy_naive_strategy_export_only(
 
     assert len(bids) == 1, "Only export bid should be generated"
     assert bids[0]["volume"] < 0, "Export volume should be negative"
-    assert bids[0]["price"] == exchange_export_only.price_export, (
-        "Incorrect export price"
+    assert bids[0]["price"] == 2000.0, "Incorrect export price"
+
+
+def test_exchange_price_series_override_scalar(market_config):
+    """Test that price series from the forecaster override the scalar unit prices."""
+    index = pd.date_range(start=datetime(2024, 1, 1), periods=24, freq="1h")
+    forecaster = ExchangeForecaster(
+        index,
+        volume_import=100,
+        volume_export=50,
+        price_import=pd.Series(range(24), index=index, dtype=float),
+        price_export=pd.Series(range(100, 124), index=index, dtype=float),
     )
+    unit = Exchange(
+        id="test_unit",
+        unit_operator="test_operator",
+        bidding_strategies={"EOM": ExchangeEnergyNaiveStrategy()},
+        forecaster=forecaster,
+        price_import=10.0,
+        price_export=2000.0,
+    )
+
+    strategy = ExchangeEnergyNaiveStrategy()
+    product_tuple = (datetime(2024, 1, 1, 5), datetime(2024, 1, 1, 6), None)
+    bids = strategy.calculate_bids(unit, market_config, [product_tuple])
+
+    import_bid = next(bid for bid in bids if bid["volume"] > 0)
+    export_bid = next(bid for bid in bids if bid["volume"] < 0)
+    assert import_bid["price"] == 5.0
+    assert export_bid["price"] == 105.0
+
+    # time-varying prices cannot be represented as a single value in the unit metadata
+    assert unit.as_dict()["price_import"] is None
+    assert unit.as_dict()["price_export"] is None
+
+
+def test_exchange_scalar_prices_in_as_dict(exchange_unit):
+    """Test that constant prices are written as scalars to the unit metadata."""
+    unit_dict = exchange_unit.as_dict()
+    assert unit_dict["price_import"] == 10.0
+    assert unit_dict["price_export"] == 2000.0

@@ -2,7 +2,9 @@
 #
 # SPDX-License-Identifier: MIT
 
+import asyncio
 import calendar
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -12,6 +14,8 @@ import pandas as pd
 import pytest
 from dateutil import rrule as rr
 from dateutil.tz import tzlocal
+from mango import ExternalClock
+from mango.util.scheduling import RecurrentScheduledTask
 
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
@@ -30,6 +34,7 @@ from assume.common.utils import (
     set_random_seed,
     sum_line_capacities,
     timestamp2datetime,
+    utc_rrule,
     visualize_orderbook,
 )
 from assume.scenario.loader_csv import make_market_config
@@ -48,6 +53,45 @@ def test_convert_rrule():
     freq, interval = convert_to_rrule_freq("99d")
     assert freq == rr.DAILY
     assert interval == 99
+
+
+@pytest.fixture
+def non_utc_timezone(monkeypatch):
+    # time.tzset is not available on Windows, the machine timezone is used there
+    if not hasattr(time, "tzset"):
+        yield
+        return
+    monkeypatch.setenv("TZ", "CET-1")
+    time.tzset()
+    yield
+    monkeypatch.undo()
+    time.tzset()
+
+
+async def test_utc_rrule_recurrent_task_timing(non_utc_timezone):
+    # mango interprets naive recurrence rules in local time, which shifts
+    # recurrent tasks on machines not running in UTC
+    start = datetime(2019, 1, 1)
+    end = datetime(2019, 1, 2)
+    clock = ExternalClock(datetime2timestamp(start) - 1)
+    fired = []
+
+    async def task():
+        fired.append(timestamp2datetime(clock.time))
+
+    recurrency_rule = utc_rrule(freq=rr.HOURLY, interval=24, dtstart=start, until=end)
+    assert recurrency_rule[0] == start.replace(tzinfo=UTC)
+
+    scheduled_task = RecurrentScheduledTask(task, recurrency_rule, clock=clock)
+    runner = asyncio.create_task(scheduled_task.run())
+    await asyncio.sleep(0)  # let the task read the clock before it advances
+    for hour in range(25):
+        clock.set_time(datetime2timestamp(start + timedelta(hours=hour)))
+        for _ in range(5):
+            await asyncio.sleep(0)
+    runner.cancel()
+
+    assert fired == [start, end]
 
 
 def test_reproducability_with_seed():
