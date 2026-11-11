@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 
 from datetime import date, datetime, timedelta
@@ -14,6 +14,7 @@ from pandas._testing import assert_series_equal
 
 from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecast_algorithms import (
+    ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS,
     ADAPTIVE_MERIT_ORDER_SETTINGS,
     calculate_adaptive_merit_order_forecast_inputs,
     calculate_naive_congestion_signal,
@@ -21,7 +22,6 @@ from assume.common.forecast_algorithms import (
     calculate_naive_price_inelastic,
     calculate_naive_renewable_utilisation,
     calculate_naive_residual_load,
-    evaluate_adaptive_merit_order_forecasts,
     fit_adaptive_merit_order_feature_scaling,
     fit_online_regularized_regression,
     gaussian_residual_quantile,
@@ -30,7 +30,6 @@ from assume.common.forecast_algorithms import (
     initialize_adaptive_merit_order_model,
     initialize_online_regularized_regression,
     issue_adaptive_merit_order_correction,
-    johnson_su_residual_quantile,
     transform_adaptive_merit_order_features,
     update_adaptive_merit_order_correction,
     update_online_regularized_regression,
@@ -38,12 +37,18 @@ from assume.common.forecast_algorithms import (
 from assume.common.forecaster import (
     DemandForecaster,
     DsmUnitForecaster,
+    ExchangeForecaster,
     PowerplantForecaster,
     UnitsOperatorForecaster,
 )
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.strategies import EnergyHeuristicElasticStrategy, EnergyNaiveStrategy
+from assume.strategies import (
+    EnergyHeuristicElasticStrategy,
+    EnergyNaiveStrategy,
+    ExchangeEnergyNaiveStrategy,
+)
 from assume.units import Demand, PowerPlant
+from assume.units.exchange import Exchange
 
 path = Path("./tests/fixtures/forecast_init")
 
@@ -365,7 +370,12 @@ def test_forecast_interface__empty_grid(market_setup, forecast_setup):
 
 def test_forecast_interface__elastic_demand(index, market_setup, forecast_setup):
     """
-    TODO: make better test scenario for elastic demand
+    Elastic demand bids are setting the price for all timesteps in the underlying SimpleClearing, because we have supply scarcity in all timesteps.
+    300 demand bids for each hour, with max_price=300 and max_volume=-3000 MW, and elasticity_model=linear.
+    The corresponding bids are each 10 MW, with prices from 300 to 1 €/MWh.
+    08:00 - 10:00: nuclear + wind = 2500 MW -> 2500 MW demand accepted, last accepted demand bid sets price to 51 €/MWh
+    11:00 - 13:00: nuclear + wind + solar = 2800 MW -> 2800 MW demand accepted, last accepted demand bid sets price to 21 €/MWh
+    14:00 - 15:00: nuclear + wind = 2750 MW -> 2750 MW demand accepted, last accepted demand bid sets price to 26 €/MWh
     """
     mock_dsm_forecaster = forecast_setup["mock_dsm_forecaster"]
 
@@ -379,7 +389,41 @@ def test_forecast_interface__elastic_demand(index, market_setup, forecast_setup)
     # 2. Assert that results are generated like expected
     market_forecast = mock_dsm_forecaster.price
 
-    assert np.isclose(list(market_forecast["EOM"]), [8.0] * 7).all()
+    assert np.isclose(list(market_forecast["EOM"]), [51, 51, 51, 21, 21, 21, 26]).all()
+
+
+def test_forecast_interface__elastic_demand_complex_clearing(
+    market_setup, forecast_setup
+):
+    """
+    The elastic price forecast clears its own orderbook without validate_orderbook,
+    so the generated orders must contain the additional fields of the market,
+    e.g. min_acceptance_ratio for complex clearing.
+    """
+    market_config = next(iter(market_setup["empty_grid_markets"]))
+    market_config.market_mechanism = "complex_clearing"
+    market_config.additional_fields = [
+        "bid_type",
+        "min_acceptance_ratio",
+        "parent_bid_id",
+    ]
+    market_config.param_dict = {"grid_data": {}, "solver_name": "appsi_highs"}
+
+    mock_dsm_forecaster = forecast_setup["mock_dsm_forecaster"]
+    mock_dsm_forecaster.initialize(
+        forecast_setup["units_elastic_case"],
+        {"EOM": market_config}.values(),
+        None,
+        None,
+    )
+
+    price_forecast = np.array(list(mock_dsm_forecaster.price["EOM"]))
+
+    # supply is fully dispatched, so the price is set by the elastic demand bids
+    assert len(price_forecast) == 7
+    assert np.isfinite(price_forecast).all()
+    assert (price_forecast >= 8.0).all()
+    assert (price_forecast <= market_config.maximum_bid_price).all()
 
 
 def test_forecast_interface__cache(market_setup, forecast_setup, shared_FastIndex):
@@ -440,6 +484,7 @@ def test_forecast_interface__cache(market_setup, forecast_setup, shared_FastInde
     assert calculate_naive_price_inelastic.cache_info().misses == 1
 
 
+@pytest.mark.require_learning
 def test_adaptive_merit_order_inputs_use_fast_series(
     market_setup, forecast_setup, shared_FastIndex
 ):
@@ -503,6 +548,65 @@ def test_units_operator_forecaster__extra_kwargs(index, shared_FastIndex):
     assert list(operator_forecaster.custom_forecast) == [2.0] * len(index)
 
 
+def test_naive_forecast__exchange_imports_are_supply(index, shared_FastIndex):
+    """Imports reduce and exports increase the demand of the naive forecasts."""
+    market_config = MarketConfig(market_id="EOM")
+    registries = get_forecast_registries()
+    plants = tuple(
+        PowerPlant(
+            id=f"plant_{cost}",
+            unit_operator="op",
+            technology="gas",
+            bidding_strategies={"EOM": EnergyNaiveStrategy()},
+            max_power=100,
+            min_power=0,
+            efficiency=1,
+            additional_cost=cost,
+            fuel_type="renewable",
+            forecaster=PowerplantForecaster(
+                index=shared_FastIndex, forecast_registries=registries
+            ),
+        )
+        for cost in (10, 50)
+    )
+    demand = Demand(
+        id="demand",
+        unit_operator="op",
+        technology="inflex_demand",
+        bidding_strategies={"EOM": EnergyNaiveStrategy()},
+        max_power=-1000,
+        min_power=0,
+        price=300,
+        forecaster=DemandForecaster(
+            index=shared_FastIndex,
+            demand=pd.Series(-120.0, index=index),
+            forecast_registries=registries,
+        ),
+    )
+    exchange = Exchange(
+        id="exchange",
+        unit_operator="op",
+        bidding_strategies={"EOM": ExchangeEnergyNaiveStrategy()},
+        forecaster=ExchangeForecaster(
+            index=shared_FastIndex,
+            volume_import=pd.Series([50.0] * 3 + [0.0] * 4, index=index),
+            volume_export=pd.Series([0.0] * 3 + [40.0] * 4, index=index),
+            forecast_registries=registries,
+        ),
+    )
+    units = (*plants, demand, exchange)
+
+    price = calculate_naive_price_inelastic(shared_FastIndex, units, market_config)
+    residual_load = calculate_naive_residual_load(
+        shared_FastIndex, units, market_config
+    )
+
+    # import of 50 MW: residual demand of 70 MW is covered by the cheap plant
+    # export of 40 MW: residual demand of 160 MW needs the expensive plant
+    assert list(price) == [10] * 3 + [50] * 4
+    assert list(residual_load) == [70] * 3 + [160] * 4
+
+
 def _adaptive_merit_order_forecast_inputs(
     periods: int = 240,
     merit_order: float | np.ndarray = 55.0,
@@ -541,6 +645,7 @@ def _issue_adaptive_merit_order_forecast(state, forecast_inputs, position):
     return product_start, issued
 
 
+@pytest.mark.require_learning
 def test_adaptive_residual_and_additive_correction_are_immutable():
     forecast_inputs = _adaptive_merit_order_forecast_inputs()
     state, _ = _adaptive_merit_order_state(
@@ -566,6 +671,7 @@ def test_adaptive_residual_and_additive_correction_are_immutable():
     assert outcome["corrected_price_mean_forecast"] == 55
 
 
+@pytest.mark.require_learning
 def test_adaptive_merit_order_gaussian_quantiles_use_inverse_cdf():
     assert gaussian_residual_quantile(50, 10, 0.5) == pytest.approx(50)
     assert gaussian_residual_quantile(50, 10, 0.1) == pytest.approx(
@@ -576,6 +682,7 @@ def test_adaptive_merit_order_gaussian_quantiles_use_inverse_cdf():
     )
 
 
+@pytest.mark.require_learning
 def test_adaptive_features_are_separate_missing_safe_and_frozen():
     feature_state = initialize_adaptive_merit_order_feature_state(
         (
@@ -624,6 +731,7 @@ def test_adaptive_features_are_separate_missing_safe_and_frozen():
     assert th.equal(feature_state["scales"], scaling[1])
 
 
+@pytest.mark.require_learning
 def test_adaptive_holiday_feature_is_optional():
     forecast_inputs = _adaptive_merit_order_forecast_inputs()
     _, model = _adaptive_merit_order_state(
@@ -636,6 +744,7 @@ def test_adaptive_holiday_feature_is_optional():
     assert "holiday" in model["residual_scale_features"]["feature_names"]
 
 
+@pytest.mark.require_learning
 def test_online_regularized_regression_sparsity_l2_and_forgetting():
     generator = th.Generator().manual_seed(7)
     relevant = th.linspace(-2, 2, 200, dtype=th.float64)
@@ -661,6 +770,7 @@ def test_online_regularized_regression_sparsity_l2_and_forgetting():
     )
 
 
+@pytest.mark.require_learning
 def test_online_irls_reuses_pre_outcome_statistics():
     model = initialize_online_regularized_regression(1, 0, 0, 0.9, 100, 1e-10)
     features = th.ones((2, 1), dtype=th.float64)
@@ -685,29 +795,88 @@ def test_online_irls_reuses_pre_outcome_statistics():
     assert model["effective_weight"] == pytest.approx(0.9 * 2 + 2)
 
 
-def test_johnson_su_quantiles_allow_asymmetric_uncertainty():
-    q10 = johnson_su_residual_quantile(50, 2, 1, 2, 0.1)
-    q50 = johnson_su_residual_quantile(50, 2, 1, 2, 0.5)
-    q90 = johnson_su_residual_quantile(50, 2, 1, 2, 0.9)
+@pytest.mark.require_learning
+def test_nonlinear_quantiles_are_asymmetric_non_crossing_and_keep_point_forecast():
+    forecast_inputs = _adaptive_merit_order_forecast_inputs(periods=12, merit_order=50)
+    gaussian_state, _ = _adaptive_merit_order_state(
+        forecast_inputs,
+        minimum_training_samples=8,
+        features=(),
+        scale_features=(),
+        residual_mean_l1_regularization=0,
+        residual_mean_l2_regularization=0,
+    )
+    quantile_state, quantile_model = _adaptive_merit_order_state(
+        forecast_inputs,
+        distribution="nonlinear_quantile",
+        minimum_training_samples=8,
+        features=(),
+        scale_features=(),
+        residual_mean_l1_regularization=0,
+        residual_mean_l2_regularization=0,
+        quantile_initial_iterations=200,
+        quantile_update_iterations=2,
+    )
+    residuals = (-3, -3, -2, -2, -1, 0, 8, 20)
+    for position, residual in enumerate(residuals):
+        for state in (gaussian_state, quantile_state):
+            product_start, _ = _issue_adaptive_merit_order_forecast(
+                state, forecast_inputs, position
+            )
+            update_adaptive_merit_order_correction(
+                state,
+                "EOM",
+                [{"product_start": product_start, "price": 50 + residual}],
+            )
 
-    assert q10 < q50 < q90
-    assert q50 != pytest.approx(50)
-    assert (50 - q10) != pytest.approx(q90 - 50)
+    _, gaussian = _issue_adaptive_merit_order_forecast(
+        gaussian_state, forecast_inputs, 8
+    )
+    _, quantile = _issue_adaptive_merit_order_forecast(
+        quantile_state, forecast_inputs, 8
+    )
+
+    assert quantile_model["residual_quantile_model"] is not None
+    assert quantile["uncertainty_model"] == "nonlinear_quantile"
+    assert quantile["corrected_price_mean_forecast"] == pytest.approx(
+        gaussian["corrected_price_mean_forecast"]
+    )
+    assert quantile["price_q10"] < quantile["price_q50"] < quantile["price_q90"]
+    assert quantile["price_q50"] - quantile["price_q10"] != pytest.approx(
+        quantile["price_q90"] - quantile["price_q50"], abs=0.1
+    )
+    frozen_quantiles = (
+        quantile["price_q10"],
+        quantile["price_q50"],
+        quantile["price_q90"],
+    )
+    product_start = quantile["product_start"]
+    update_adaptive_merit_order_correction(
+        quantile_state,
+        "EOM",
+        [{"product_start": product_start, "price": 100}],
+    )
+    assert (
+        quantile["price_q10"],
+        quantile["price_q50"],
+        quantile["price_q90"],
+    ) == frozen_quantiles
+    assert len(quantile_model["residual_quantile_model"]["targets"]) == 9
 
 
+@pytest.mark.require_learning
 def test_adaptive_default_features_match_lasso_selection():
     assert ADAPTIVE_MERIT_ORDER_SETTINGS["features"] == (
         "merit_order_price",
         "wind_availability_factor",
         "solar_availability_factor",
         "residual_load",
-        "previous_day_same_hour_residual",
         "previous_day_same_hour_price",
         "weekday",
-        "weekend",
     )
 
 
+@pytest.mark.require_learning
 def test_adaptive_fallback_activation_and_no_lookahead():
     forecast_inputs = _adaptive_merit_order_forecast_inputs()
     state, model = _adaptive_merit_order_state(
@@ -746,6 +915,7 @@ def test_adaptive_fallback_activation_and_no_lookahead():
     assert third_start not in model["price_by_product"]
 
 
+@pytest.mark.require_learning
 def test_adaptive_empirical_fallback_and_time_varying_scale():
     residual_load = np.tile([0.0, 1.0], 13)
     forecast_inputs = _adaptive_merit_order_forecast_inputs(
@@ -789,65 +959,80 @@ def test_adaptive_empirical_fallback_and_time_varying_scale():
     assert low["residual_std_forecast"] < high["residual_std_forecast"]
 
 
-def test_adaptive_evaluation_uses_only_earlier_issue_times():
-    records = [
-        {
-            "issue_time": "2025-01-01",
-            "product_start": "2025-01-02 00:00",
-            "merit_order_price_forecast": 50,
-            "corrected_price_mean_forecast": 51,
-            "price_q10": 45,
-            "price_q50": 51,
-            "price_q90": 57,
-            "realised_price": 52,
-        },
-        {
-            "issue_time": "2025-01-01",
-            "product_start": "2025-01-02 01:00",
-            "merit_order_price_forecast": 50,
-            "corrected_price_mean_forecast": 51,
-            "price_q10": 45,
-            "price_q50": 51,
-            "price_q90": 57,
-            "realised_price": 54,
-        },
-        {
-            "issue_time": "2025-01-02",
-            "product_start": "2025-01-03 00:00",
-            "merit_order_price_forecast": 50,
-            "corrected_price_mean_forecast": 53,
-            "price_q10": 47,
-            "price_q50": 53,
-            "price_q90": 59,
-            "realised_price": 53,
-        },
-    ]
-    evaluation = evaluate_adaptive_merit_order_forecasts(records)
-    assert list(evaluation["samples"]["constant_historical_bias_forecast"]) == [
-        50,
-        50,
-        53,
-    ]
-    assert set(evaluation["summary"]["method"]) == {
-        "merit_order_only",
-        "constant_historical_bias",
-        "adaptive_merit_order_correction",
-    }
-
-
-def test_adaptive_forecast_uses_requested_horizon_without_changing_price(
+@pytest.mark.require_learning
+def test_adaptive_forecast_price_signal_usage_does_not_change_merit_order(
     market_setup, forecast_setup, shared_FastIndex
 ):
+    """Show the public adaptive price-signal interface used by simulations."""
     forecaster = UnitsOperatorForecaster(
         index=shared_FastIndex, forecast_registries=get_forecast_registries()
     )
     forecaster.initialize(forecast_setup["units"], market_setup["empty_grid_markets"])
     original_price = forecaster.price["EOM"].data.copy()
+
+    # Enable once before the simulation starts. Gaussian uncertainty is the
+    # built-in default and need not be selected by the caller.
+    forecaster.enable_adaptive_merit_order_correction()
+
+    # UnitsOperator calls this at market opening. A day-ahead opening would
+    # use timedelta(hours=24); this compact fixture issues two products.
+    issue_time = shared_FastIndex.start
     forecasts = forecaster.get_adaptive_merit_order_forecast(
-        "EOM", shared_FastIndex.start, timedelta(hours=2)
+        "EOM", issue_time, timedelta(hours=2)
     )
 
     assert len(forecasts) == 2
     assert forecasts[0]["product_start"] == shared_FastIndex.start + timedelta(hours=1)
     assert "EOM" in forecaster.adaptive_merit_order_state["markets"]
     assert np.array_equal(forecaster.price["EOM"].data, original_price)
+
+    # Read one issued price just like forecaster.price["EOM"][delivery_time].
+    adaptive_price = forecaster.adaptive_forecast.price["EOM"]
+    delivery_time = issue_time + timedelta(hours=1)
+    one_hour_price = adaptive_price[delivery_time]
+    assert one_hour_price == pytest.approx(
+        forecasts[0]["corrected_price_mean_forecast"]
+    )
+
+    # Read every issued price in the forecast window. For a 24-hour auction,
+    # use delivery_time : delivery_time + timedelta(hours=23).
+    issued_price_window = adaptive_price[
+        delivery_time : delivery_time + timedelta(hours=1)
+    ]
+    assert np.allclose(
+        issued_price_window,
+        [forecast["corrected_price_mean_forecast"] for forecast in forecasts],
+    )
+    assert np.isnan(adaptive_price[shared_FastIndex.start])
+    assert forecaster.adaptive_merit_order_correction_enabled is True
+    assert forecaster.adaptive_merit_order_settings["distribution"] == "gaussian"
+
+
+@pytest.mark.require_learning
+def test_adaptive_uncertainty_model_is_selected_before_first_forecast(
+    market_setup, forecast_setup, shared_FastIndex
+):
+    forecaster = UnitsOperatorForecaster(
+        index=shared_FastIndex, forecast_registries=get_forecast_registries()
+    )
+    forecaster.initialize(forecast_setup["units"], market_setup["empty_grid_markets"])
+    assert forecaster.adaptive_merit_order_correction_enabled is False
+    forecaster.set_adaptive_merit_order_uncertainty_model(
+        "nonlinear_quantile", quantile_hidden_size=8
+    )
+    forecaster.get_adaptive_merit_order_forecast(
+        "EOM", shared_FastIndex.start, timedelta(hours=2)
+    )
+
+    model = forecaster.adaptive_merit_order_state["markets"]["EOM"]
+    assert model["config"]["distribution"] == "nonlinear_quantile"
+    assert model["config"]["quantile_hidden_size"] == 8
+    assert forecaster.adaptive_merit_order_correction_enabled is True
+    assert ADAPTIVE_MERIT_ORDER_SETTINGS["distribution"] == "gaussian"
+    with pytest.raises(RuntimeError, match="cannot change"):
+        forecaster.set_adaptive_merit_order_uncertainty_model("gaussian")
+    with pytest.raises(ValueError, match="must be one of"):
+        UnitsOperatorForecaster(
+            index=shared_FastIndex
+        ).set_adaptive_merit_order_uncertainty_model("unknown")
+    assert "nonlinear_quantile" in ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS

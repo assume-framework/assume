@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import asyncio
 import logging
@@ -23,7 +23,7 @@ from assume.common.market_objects import (
     Order,
     Orderbook,
 )
-from assume.common.utils import timestamp2datetime
+from assume.common.utils import timestamp2datetime, utc_rrule
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
@@ -254,11 +254,10 @@ class PayAsBidContractRole(MarketRole):
             from functools import partial
 
             for order in accepted_supply_orders:
-                recurrency_task = rr.rrule(
+                recurrency_task = utc_rrule(
                     freq=order["evaluation_frequency"],
                     dtstart=order["start_time"],
                     until=order["end_time"],
-                    cache=True,
                 )
                 self.context.schedule_recurrent_task(
                     partial(self.execute_contract, contract=order), recurrency_task

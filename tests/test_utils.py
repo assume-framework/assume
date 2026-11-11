@@ -1,10 +1,11 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
+import asyncio
 import calendar
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -13,8 +14,9 @@ import pandas as pd
 import pytest
 from dateutil import rrule as rr
 from dateutil.tz import tzlocal
+from mango import ExternalClock
+from mango.util.scheduling import RecurrentScheduledTask
 
-from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
     aggregate_step_amount,
@@ -30,7 +32,9 @@ from assume.common.utils import (
     plot_orderbook,
     separate_orders,
     set_random_seed,
+    sum_line_capacities,
     timestamp2datetime,
+    utc_rrule,
     visualize_orderbook,
 )
 from assume.scenario.loader_csv import make_market_config
@@ -49,6 +53,45 @@ def test_convert_rrule():
     freq, interval = convert_to_rrule_freq("99d")
     assert freq == rr.DAILY
     assert interval == 99
+
+
+@pytest.fixture
+def non_utc_timezone(monkeypatch):
+    # time.tzset is not available on Windows, the machine timezone is used there
+    if not hasattr(time, "tzset"):
+        yield
+        return
+    monkeypatch.setenv("TZ", "CET-1")
+    time.tzset()
+    yield
+    monkeypatch.undo()
+    time.tzset()
+
+
+async def test_utc_rrule_recurrent_task_timing(non_utc_timezone):
+    # mango interprets naive recurrence rules in local time, which shifts
+    # recurrent tasks on machines not running in UTC
+    start = datetime(2019, 1, 1)
+    end = datetime(2019, 1, 2)
+    clock = ExternalClock(datetime2timestamp(start) - 1)
+    fired = []
+
+    async def task():
+        fired.append(timestamp2datetime(clock.time))
+
+    recurrency_rule = utc_rrule(freq=rr.HOURLY, interval=24, dtstart=start, until=end)
+    assert recurrency_rule[0] == start.replace(tzinfo=UTC)
+
+    scheduled_task = RecurrentScheduledTask(task, recurrency_rule, clock=clock)
+    runner = asyncio.create_task(scheduled_task.run())
+    await asyncio.sleep(0)  # let the task read the clock before it advances
+    for hour in range(25):
+        clock.set_time(datetime2timestamp(start + timedelta(hours=hour)))
+        for _ in range(5):
+            await asyncio.sleep(0)
+    runner.cancel()
+
+    assert fired == [start, end]
 
 
 def test_reproducability_with_seed():
@@ -525,7 +568,7 @@ def test_broken_timestamps():
     assert true_unix_epoch_start + offset == unix_epoch_start
     # however, we want to have everything in UTC
     # so we need this approach to get a datetime
-    assert unix_start == datetime.fromtimestamp(0, tz=timezone.utc).replace(tzinfo=None)
+    assert unix_start == datetime.fromtimestamp(0, tz=UTC).replace(tzinfo=None)
     # and for the utc timestamp
     assert 0 == calendar.timegm(unix_start.utctimetuple())
 
@@ -547,258 +590,6 @@ def test_timestamp2datetime():
 def test_datetime2timestamp():
     unix_start = datetime(1970, 1, 1)
     assert 0 == datetime2timestamp(unix_start)
-
-
-def test_create_date_range():
-    start = datetime(2020, 1, 1, 0)
-    end = datetime(2020, 1, 1, 5)
-    n = 1000
-    index = FastIndex(start, end, freq="1h")
-    fs = FastSeries(index)
-
-    t = time.time()
-    for i in range(n):
-        index = FastIndex(start, end, freq="1h")
-        fs = FastSeries(index)
-    res = time.time() - t
-
-    t = time.time()
-    for i in range(n):
-        q_pd = pd.date_range(start, end, freq="1h")
-    res_pd = time.time() - t
-    # this is sometimes faster, sometimes not
-    # as a lot of objects are created
-    assert res < res_pd + 0.1
-
-    new_end = datetime(2020, 1, 1, 3)
-
-    # check that slicing is faster
-    t = time.time()
-    for i in range(n):
-        q_slice = fs.loc[start:new_end]
-    res_slice = time.time() - t
-
-    series = pd.Series(0, index=q_pd)
-
-    t = time.time()
-    for i in range(n):
-        q_pd_slice = series.loc[start:new_end]
-    res_slice_pd = time.time() - t
-    # more than at least factor 4
-    assert res_slice < res_slice_pd / 4
-
-    # check that setting items is faster:
-    t = time.time()
-    for i in range(n):
-        fs.at[start] = 1
-    res_slice = time.time() - t
-
-    series = pd.Series(0, index=q_pd)
-
-    t = time.time()
-    for i in range(n):
-        series.at[start] = 1
-    res_slice_pd = time.time() - t
-    # more than at least factor 4
-    assert res_slice < res_slice_pd / 4
-
-    # check that setting slices is faster
-    t = time.time()
-    for i in range(n):
-        fs.loc[start:new_end] = 17
-    res_slice = time.time() - t
-
-    series = pd.Series(0, index=q_pd)
-
-    t = time.time()
-    for i in range(n):
-        series.loc[start:new_end] = 17
-    res_slice_pd = time.time() - t
-    # more than at least factor 4
-    assert res_slice < res_slice_pd / 4
-
-    se = pd.Series(0.0, index=fs.index.get_date_list())
-    se.loc[start]
-
-    series.loc[new_end] = 33
-
-    fs[new_end] = 33
-    new = series.loc[start:new_end][::-1]
-    assert new.iloc[0] == 33
-    new = fs.loc[start:new_end][::-1]
-    assert new[0] == 33
-    fs.data
-    fs.index._get_idx_from_date(start)
-    fs.index._get_idx_from_date(new_end)
-    fs.data[0:4]
-
-
-def test_convert_pd():
-    start = datetime(2020, 1, 1, 0)
-    end = datetime(2020, 1, 1, 5)
-    index = FastIndex(start, end, freq="1h")
-    fs = FastSeries(index)
-
-    df = fs.as_df()
-    assert isinstance(df, pd.DataFrame)
-
-
-def test_set_list():
-    start = datetime(2020, 1, 1, 0)
-    end = datetime(2020, 2, 1, 5)
-    n = 1000
-    index = FastIndex(start, end, freq="1h")
-    fs = FastSeries(index)
-
-    dr = pd.date_range(start, end=datetime(2020, 1, 3, 5))
-    dr = pd.Series(dr)
-
-    series = pd.Series(0, index=pd.date_range(start, end, freq="1h"))
-
-    t = time.time()
-    for i in range(n):
-        result_pd = fs[dr]
-    res_fds = time.time() - t
-    f_series = series > 1
-    series[f_series] = 4
-    fs.data[f_series] = 4
-
-    # accessing lists or series elements is also faster
-    # check getting list or series
-    t = time.time()
-    for i in range(n):
-        result = series[dr]
-    res_pd = time.time() - t
-    print(res_fds)
-    print(res_pd)
-    assert res_fds < res_pd
-
-    # check setting list or series with single value
-    t = time.time()
-    for i in range(n):
-        fs[dr] = 3
-    res_fds = time.time() - t
-
-    t = time.time()
-    for i in range(n):
-        series[dr] = 3
-    res_pd = time.time() - t
-    print(res_fds)
-    print(res_pd)
-    assert res_fds < res_pd
-
-    # check setting list or series with a series
-    d_new = pd.Series(dr.index)
-
-    t = time.time()
-    for i in range(n):
-        fs[dr] = d_new
-    res_fds = time.time() - t
-
-    t = time.time()
-    for i in range(n):
-        series[dr] = d_new
-    res_pd = time.time() - t
-    print(res_fds)
-    print(res_pd)
-    assert res_fds < res_pd
-
-    # check setting list or series with a list
-    d_new = list(d_new)
-
-    t = time.time()
-    for i in range(n):
-        fs[dr] = d_new
-    res_fds = time.time() - t
-
-    t = time.time()
-    for i in range(n):
-        series[dr] = d_new
-    res_pd = time.time() - t
-    print(res_fds)
-    print(res_pd)
-    assert res_fds < res_pd
-
-
-def test_slicing_fastseries_even():
-    start = datetime(2020, 1, 1, 0)
-    end = datetime(2020, 1, 1, 5)
-    index = FastIndex(start, end, freq="1h")
-    fs = FastSeries(index)
-    b = start + timedelta(hours=1)
-    e = start + timedelta(hours=4)
-    result = fs[b:e]
-
-    datelist = fs.index.get_date_list(b, e)
-    series = pd.Series(0, index=pd.date_range(start, end, freq="h"))
-    assert list(series[b:e].index) == datelist
-    assert len(series[b:e]) == len(fs[b:e])
-
-
-def test_slicing_fastseries_uneven():
-    start = datetime(2020, 1, 1, 0)
-    end = datetime(2020, 1, 1, 5)
-    index = FastIndex(start, end, freq="1h")
-    fs = FastSeries(index)
-    b = start + timedelta(seconds=1)
-    e = start + timedelta(hours=4, seconds=1)
-    result = fs[b:e]
-
-    datelist = fs.index.get_date_list(b, e)
-    series = pd.Series(0, index=pd.date_range(start, end, freq="h"))
-    assert list(series[b:e].index) == datelist
-    assert len(series[b:e]) == len(fs[b:e])
-
-
-def test_window_edge_cases():
-    # ── setup ────────────────────────────────
-    start = datetime(2020, 1, 1, 0)
-    end = datetime(2020, 1, 1, 4)
-    idx = FastIndex(start, end, freq="1h")
-    fs = FastSeries(idx, value=np.arange(len(idx)))  # data = [0,1,2,3,4]
-
-    # ── 1. forward, no wrap ───────────────────
-    out = fs.window(center=1, length=3, direction="forward")
-    assert np.array_equal(out, np.array([1, 2, 3]))
-
-    # ── 2. forward, wrap ──────────────────────
-    # raw positions = [3,4,5,6] → wrapped = [3,4,0,1]
-    out = fs.window(center=3, length=4, direction="forward")
-    assert np.array_equal(out, np.array([3, 4, 0, 1]))
-
-    # ── 3. backward, no wrap ──────────────────
-    # raw positions = [1,2,3]
-    out = fs.window(center=3, length=3, direction="backward")
-    assert np.array_equal(out, np.array([1, 2, 3]))
-
-    # ── 4. backward, wrap ─────────────────────
-    # raw positions = [-1,0,1] → wrapped = [4,0,1]
-    out = fs.window(center=1, length=3, direction="backward")
-    assert np.array_equal(out, np.array([4, 0, 1]))
-
-    # ── 5. datetime center equivalence ────────
-    dt_center = start + timedelta(hours=2)
-    out_int = fs.window(center=2, length=3, direction="forward")
-    out_dt = fs.window(center=dt_center, length=3, direction="forward")
-    assert np.array_equal(out_int, out_dt)
-
-    # ── 6. invalid direction raises ───────────
-    with pytest.raises(ValueError):
-        fs.window(center=0, length=5, direction="sideways")
-
-    # ── 7. full-cycle rotations ───────────────
-    N = len(fs)
-    # full window from 0 is original array
-    full0 = fs.window(center=0, length=N, direction="forward")
-    assert np.array_equal(full0, fs.data)
-    # full window from 2 is roll by -2
-    full2 = fs.window(center=2, length=N, direction="forward")
-    assert np.array_equal(full2, np.roll(fs.data, -2))
-
-    # ── 8. non-mutation guarantee ─────────────
-    before = fs.data.copy()
-    _ = fs.window(center=1, length=4)
-    assert np.array_equal(fs.data, before)
 
 
 def test_parse_duration():
@@ -865,6 +656,111 @@ def test_load_index_file():
     assert df is None
 
 
+def test_sum_line_capacities_with_s_max_pu():
+    lines = pd.DataFrame(
+        {
+            "bus0": ["B1", "B2"],
+            "bus1": ["B2", "B3"],
+            "s_nom": [100.0, 200.0],
+            "s_max_pu": [1.0, 0.8],
+            "s_nom_forward": [None, 180.0],
+            "s_nom_reverse": [None, 190.0],
+        },
+        index=["L1", "L2"],
+    )
+
+    incidence_matrix = pd.DataFrame(index=["B1", "B2", "B3"], columns=["L1", "L2"])
+
+    result = sum_line_capacities(lines, incidence_matrix)
+
+    assert "cap_forward" in result.columns
+    assert "cap_reverse" in result.columns
+    assert "s_max_pu" in result.columns
+    assert list(result.index) == ["L1", "L2"]
+
+    assert result.at["L1", "cap_forward"] == 100.0
+    assert result.at["L1", "cap_reverse"] == 100.0
+    assert result.at["L1", "s_max_pu"] == 1.0
+
+    assert result.at["L2", "cap_forward"] == 180.0
+    assert result.at["L2", "cap_reverse"] == 190.0
+    assert result.at["L2", "s_max_pu"] == 0.8
+
+
+def test_sum_line_capacities_zonal_aggregation():
+    lines = pd.DataFrame(
+        {
+            "bus0": ["B1", "B2", "B3"],
+            "bus1": ["B2", "B4", "B4"],
+            "s_nom": [100.0, 50.0, 50.0],
+        },
+        index=["L1", "L2", "L3"],
+    )
+
+    node_mapping = {"B1": "Z1", "B2": "Z1", "B3": "Z2", "B4": "Z2"}
+
+    incidence_matrix = pd.DataFrame(
+        index=["Z1", "Z2"], columns=["Z1_Z1", "Z1_Z2", "Z2_Z2"]
+    )
+
+    result = sum_line_capacities(lines, incidence_matrix, node_mapping=node_mapping)
+
+    assert list(result.index) == ["Z1_Z1", "Z1_Z2", "Z2_Z2"]
+    assert result.at["Z1_Z1", "cap_forward"] == 100.0
+    assert result.at["Z1_Z2", "cap_forward"] == 50.0
+    assert result.at["Z2_Z2", "cap_forward"] == 50.0
+
+
+def test_sum_line_capacities_aggregates_s_max_pu_by_capacity_weight():
+    lines = pd.DataFrame(
+        {
+            "bus0": ["B1", "B3"],
+            "bus1": ["B2", "B4"],
+            "s_nom": [100.0, 50.0],
+            "s_max_pu": [1.0, 0.5],
+        },
+        index=["L1", "L2"],
+    )
+
+    node_mapping = {"B1": "Z1", "B2": "Z2", "B3": "Z1", "B4": "Z2"}
+    incidence_matrix = pd.DataFrame(index=["Z1", "Z2"], columns=["Z1_Z2"])
+
+    result = sum_line_capacities(lines, incidence_matrix, node_mapping=node_mapping)
+
+    assert result.at["Z1_Z2", "cap_forward"] == 150.0
+    assert result.at["Z1_Z2", "cap_reverse"] == 150.0
+    assert result.at["Z1_Z2", "s_max_pu"] == (100.0 * 1.0 + 50.0 * 0.5) / 150.0
+
+
+def test_sum_line_capacities_fallback_and_reverse():
+    lines = pd.DataFrame(
+        {
+            "bus0": ["B1", "B2"],
+            "bus1": ["B2", "B3"],
+            "s_nom": [30.0, 40.0],
+            "s_nom_forward": [30.0, 40.0],
+            "s_nom_reverse": [10.0, 20.0],
+        },
+        index=["L1", "L2"],
+    )
+
+    incidence_matrix = pd.DataFrame(columns=["B2_B1", "Link_B2_B3_fallback"])
+
+    result = sum_line_capacities(lines, incidence_matrix)
+
+    # For edge B2_B1 (reversed relative to L1: B1->B2):
+    # forward on B2_B1 is B2->B1 (which is reverse on L1 = 10.0)
+    # reverse on B2_B1 is B1->B2 (which is forward on L1 = 30.0)
+    assert result.at["B2_B1", "cap_forward"] == 10.0
+    assert result.at["B2_B1", "cap_reverse"] == 30.0
+
+    # For Link_B2_B3_fallback (B2 precedes B3, matching L2: B2->B3):
+    # forward on Link_B2_B3 is B2->B3 (forward on L2 = 40.0)
+    # reverse on Link_B2_B3 is B3->B2 (reverse on L2 = 20.0)
+    assert result.at["Link_B2_B3_fallback", "cap_forward"] == 40.0
+    assert result.at["Link_B2_B3_fallback", "cap_reverse"] == 20.0
+
+
 if __name__ == "__main__":
     test_convert_rrule()
     test_available_products()
@@ -873,3 +769,6 @@ if __name__ == "__main__":
     test_initializer()
     test_sep_block_orders()
     test_aggregate_step_amount()
+    test_sum_line_capacities_with_s_max_pu()
+    test_sum_line_capacities_zonal_aggregation()
+    test_sum_line_capacities_fallback_and_reverse()

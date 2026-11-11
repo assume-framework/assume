@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import logging
 from datetime import timedelta
@@ -256,17 +256,23 @@ class NodalClearingRole(MarketRole):
 
         n.set_snapshots(snapshots)
 
+        # units without a bid in a snapshot get zero volume, so they are not available
+        volume_pivot = volume_pivot.reindex(
+            index=snapshots, columns=n.generators.index
+        ).fillna(0)
+        price_pivot = price_pivot.reindex(
+            index=snapshots, columns=n.generators.index
+        ).fillna(0)
+
         # Update p_max_pu for all units based on their bids in the actual snapshots
         # generators
         gen_idx = self.grid_data["generators"].index
-        gen_idx = gen_idx.intersection(volume_pivot.columns)
         n.generators_t.p_max_pu.loc[snapshots, gen_idx] = (
             volume_pivot[gen_idx] / n.generators.loc[gen_idx, "p_nom"].values
         )
         n.generators_t.marginal_cost.loc[snapshots, gen_idx] = price_pivot[gen_idx]
         # demand
         demand_idx = self.grid_data["loads"].index
-        demand_idx = demand_idx.intersection(volume_pivot.columns)
         n.generators_t.p_min_pu.loc[snapshots, demand_idx] = (
             volume_pivot[demand_idx] / n.generators.loc[demand_idx, "p_nom"].values
         )
@@ -277,7 +283,6 @@ class NodalClearingRole(MarketRole):
         # storage
         if self.grid_data.get("storage_units") is not None:
             storage_idx = self.grid_data["storage_units"].index
-            storage_idx = storage_idx.intersection(volume_pivot.columns)
             # discharging (positive bids)
             n.generators_t.p_max_pu.loc[snapshots, storage_idx] = (
                 volume_pivot[storage_idx].clip(lower=0).fillna(0)

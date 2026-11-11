@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 from datetime import datetime
 
@@ -83,7 +83,7 @@ class Demand(SupportsMinMax):
         self.price = FastSeries(index=self.index, value=price)
 
         # Elastic demand parameters
-        self.max_price = price
+        self.max_price = kwargs.get("max_price", price)
         self.elasticity = kwargs.get("elasticity", 0)
         self.elasticity_model = kwargs.get("elasticity_model", 0)
         self.num_bids = int(kwargs.get("num_bids", 0))

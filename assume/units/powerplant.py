@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import logging
 from datetime import datetime, timedelta
@@ -310,7 +310,7 @@ class PowerPlant(SupportsMinMax):
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
 
-        base_load = self.outputs["energy"].loc[start:end_excl]
+        current_power = self.outputs["energy"].loc[start:end_excl]
         heat_demand = self.outputs["heat"].loc[start:end_excl]
         capacity_pos = self.outputs["capacity_pos"].loc[start:end_excl]
         capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
@@ -326,8 +326,8 @@ class PowerPlant(SupportsMinMax):
                 field="availability",
             )
 
-        # subtract positive reserve commitment and already-dispatched base_load from available power
-        max_power = available_power - capacity_pos - base_load
+        # subtract positive reserve commitment and already-dispatched current_power from available power
+        max_power = available_power - capacity_pos - current_power
 
         # warn if previous dispatch exceeded available power
         if (max_power < 0).any():
@@ -337,11 +337,11 @@ class PowerPlant(SupportsMinMax):
         # additional power can never be negative
         max_power = max_power.clip(min=0)
 
-        # actual minimum is technical minimum + negative reserve obligation - already dispatched base_load
-        min_power = self.min_power + capacity_neg - base_load
-        # must also cover any heat demand not yet met by base_load
-        # clip to 0: negative values mean base_load already covers heat demand fully
-        heat_demand_still_needed = (heat_demand - base_load).clip(min=0)
+        # actual minimum is technical minimum + negative reserve obligation - already dispatched current_power
+        min_power = self.min_power + capacity_neg - current_power
+        # must also cover any heat demand not yet met by current_power
+        # clip to 0: negative values mean current_power already covers heat demand fully
+        heat_demand_still_needed = (heat_demand - current_power).clip(min=0)
         min_power = min_power.clip(min=heat_demand_still_needed)
 
         # if additional max_power is below the technical minimum, the unit cannot run at all

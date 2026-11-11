@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 from __future__ import annotations
 
 import logging
@@ -115,7 +115,10 @@ def calculate_sum_demand(
 
 
 def calculate_exchange_volume(exchange_units: list[Exchange]):
-    """Returns summed exchange volume at every timestep (imports - exports)"""
+    """Returns summed exchange volume at every timestep (exports - imports)
+
+    Imports are supply and reduce the demand, exports are demand and increase it.
+    """
     sum_demand = 0
 
     # get exchanges if exchange_units are available
@@ -128,8 +131,8 @@ def calculate_exchange_volume(exchange_units: list[Exchange]):
         sum_exports = abs(
             np.array([unit.forecaster.volume_export for unit in exchange_units])
         ).sum(axis=0)
-        # add imports and exports to the sum_demand
-        sum_demand += sum_imports - sum_exports
+        # imports reduce and exports increase the sum_demand
+        sum_demand += sum_exports - sum_imports
 
     return sum_demand
 
@@ -358,6 +361,8 @@ def calculate_naive_price_elastic(
                     continue
             elif bid["volume"] == 0:
                 continue
+            for field in config.additional_fields:
+                bid.setdefault(field, None)
             cleaned_orderbook.append(bid)
 
         mps = get_available_products(
@@ -501,15 +506,13 @@ ADAPTIVE_MERIT_ORDER_FEATURES = (
     # Selected by chronological LASSO screening on example_03, using January
     # through September 2019 for selection and a separate October--December
     # holdout for confirmation. Together they model system tightness, daily
-    # persistence, and the weekday/weekend market regime.
+    # persistence, and the weekday market regime.
     "merit_order_price",
     "wind_availability_factor",
     "solar_availability_factor",
     "residual_load",
-    "previous_day_same_hour_residual",
     "previous_day_same_hour_price",
     "weekday",
-    "weekend",
 )
 
 ADAPTIVE_MERIT_ORDER_SUPPORTED_FEATURES = (
@@ -519,8 +522,7 @@ ADAPTIVE_MERIT_ORDER_SUPPORTED_FEATURES = (
     "residual_load",
     "previous_day_same_hour_residual",
     "previous_day_same_hour_price",
-    # Evaluated but not selected as a default: its incremental contribution
-    # was inconsistent once weekday and weekend were included.
+    # Evaluated but not selected as default predictors.
     "hour",
     "weekday",
     "weekend",
@@ -542,12 +544,20 @@ ADAPTIVE_MERIT_ORDER_SETTINGS = {
     # The same penalties for the log-standard-deviation equation.
     "residual_scale_l1_regularization": 0.01,
     "residual_scale_l2_regularization": 0.001,
-    # Predictive distribution used to derive price quantiles.
+    # Uncertainty method used to derive price quantiles. ``nonlinear_quantile``
+    # learns asymmetric quantiles of the error around the unchanged corrected
+    # mean forecast; Gaussian is the default distributional alternative.
     "distribution": "gaussian",
-    # Johnson SU shape fitting uses only previous standardised forecast errors.
-    "johnson_su_history_size": 1008,
-    "johnson_su_solver_iterations": 5,
-    "johnson_su_learning_rate": 0.01,
+    # Small nonlinear PyTorch model for direct q10/q50/q90 error forecasts.
+    # Its ordered output layer prevents quantile crossing by construction.
+    "quantile_hidden_size": 16,
+    "quantile_initial_iterations": 500,
+    "quantile_update_iterations": 20,
+    "quantile_learning_rate": 0.01,
+    "quantile_l1_regularization": 1e-5,
+    "quantile_l2_regularization": 1e-5,
+    "quantile_history_size": 2160,
+    "quantile_random_seed": 0,
     # Inputs for the residual-mean model. A None scale feature list reuses these.
     "features": ADAPTIVE_MERIT_ORDER_FEATURES,
     "scale_features": None,
@@ -564,6 +574,11 @@ ADAPTIVE_MERIT_ORDER_SETTINGS = {
     "solver_max_iterations": 1000,
     "solver_tolerance": 1e-8,
 }
+
+ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS = (
+    "gaussian",
+    "nonlinear_quantile",
+)
 
 
 def initialize_adaptive_merit_order_feature_state(features, holiday_dates=()) -> dict:
@@ -824,94 +839,100 @@ def gaussian_residual_quantile(mean, standard_deviation, probability):
     )
 
 
-def johnson_su_standardised_moments(shape_a, shape_b):
-    """Return mean and standard deviation of a Johnson SU variate."""
-    shape_a = th.as_tensor(shape_a, dtype=th.float64)
-    shape_b = th.as_tensor(shape_b, dtype=th.float64)
-    inverse_shape_b = 1 / shape_b
-    mean = -th.exp(inverse_shape_b.square() / 2) * th.sinh(shape_a * inverse_shape_b)
-    second_moment = (
-        th.exp(2 * inverse_shape_b.square()) * th.cosh(2 * shape_a * inverse_shape_b)
-        - 1
-    ) / 2
-    standard_deviation = th.sqrt(th.clamp(second_moment - mean.square(), min=1e-12))
-    return mean, standard_deviation
-
-
-def johnson_su_residual_quantile(
-    mean, standard_deviation, shape_a, shape_b, probability
-):
-    """Calculate a mean-standardised Johnson SU residual quantile."""
-    if not 0 < probability < 1 or standard_deviation < 0 or shape_b <= 0:
-        raise ValueError("Invalid Johnson SU quantile parameters")
-    normal = th.distributions.Normal(
-        th.tensor(0.0, dtype=th.float64),
-        th.tensor(1.0, dtype=th.float64),
+def initialize_nonlinear_quantile_model(n_features: int, config: dict) -> dict:
+    """Create the nonlinear non-crossing residual-error quantile model."""
+    if (
+        n_features <= 0
+        or config["quantile_hidden_size"] <= 0
+        or config["quantile_history_size"] <= 0
+        or config["quantile_learning_rate"] <= 0
+        or config["quantile_l1_regularization"] < 0
+        or config["quantile_l2_regularization"] < 0
+        or config["quantile_initial_iterations"] < 0
+        or config["quantile_update_iterations"] < 0
+    ):
+        raise ValueError("Invalid nonlinear quantile model settings")
+    with th.random.fork_rng():
+        th.manual_seed(config["quantile_random_seed"])
+        network = th.nn.Sequential(
+            th.nn.Linear(n_features, config["quantile_hidden_size"]),
+            th.nn.Tanh(),
+            th.nn.Linear(config["quantile_hidden_size"], 3),
+        ).double()
+    optimizer = th.optim.Adam(
+        network.parameters(),
+        lr=config["quantile_learning_rate"],
+        weight_decay=config["quantile_l2_regularization"],
     )
-    raw_mean, raw_standard_deviation = johnson_su_standardised_moments(shape_a, shape_b)
-    raw_quantile = th.sinh(
-        (normal.icdf(th.tensor(probability, dtype=th.float64)) - shape_a) / shape_b
-    )
-    return (
-        mean
-        + standard_deviation
-        * ((raw_quantile - raw_mean) / raw_standard_deviation).item()
-    )
+    return {
+        "network": network,
+        "optimizer": optimizer,
+        "features": [],
+        "targets": [],
+        "forgetting_factor": config["forgetting_factor"],
+        "l1": config["quantile_l1_regularization"],
+        "history_size": config["quantile_history_size"],
+    }
 
 
-def fit_johnson_su_shape(model: dict) -> None:
-    """Update Johnson SU shape from past standardised forecast errors only."""
-    errors = model["johnson_su_standardised_errors"]
-    if not errors:
+def predict_nonlinear_quantiles(model: dict, features) -> th.Tensor:
+    """Predict ordered q10, q50 and q90 post-forecast residuals."""
+    features = th.as_tensor(features, dtype=th.float64)
+    raw = model["network"](features)
+    median = raw[..., 0]
+    lower = median - th.nn.functional.softplus(raw[..., 1])
+    upper = median + th.nn.functional.softplus(raw[..., 2])
+    return th.stack((lower, median, upper), dim=-1)
+
+
+def fit_nonlinear_quantile_model(model: dict, iterations: int) -> None:
+    """Fit all three quantiles with discounted pinball loss."""
+    if not model["targets"] or iterations <= 0:
         return
-    config = model["config"]
-    errors = th.tensor(errors[-config["johnson_su_history_size"] :], dtype=th.float64)
-    age = th.arange(len(errors) - 1, -1, -1, dtype=th.float64)
-    weights = th.tensor(config["forgetting_factor"], dtype=th.float64) ** age
-    parameters = th.tensor(
-        [model["johnson_su_shape_a"], model["johnson_su_log_shape_b"]],
-        dtype=th.float64,
-        requires_grad=True,
-    )
-    iterations = config["johnson_su_solver_iterations"]
-    if model["johnson_su_shape"] is None:
-        iterations *= 20
+    features = th.stack(model["features"])
+    targets = th.tensor(model["targets"], dtype=th.float64)
+    age = th.arange(len(targets) - 1, -1, -1, dtype=th.float64)
+    weights = th.tensor(model["forgetting_factor"], dtype=th.float64) ** age
+    probabilities = th.tensor((0.1, 0.5, 0.9), dtype=th.float64)
+
     for _ in range(iterations):
-        shape_a = th.clamp(parameters[0], min=-5.0, max=5.0)
-        log_shape_b = th.clamp(
-            parameters[1], min=th.log(th.tensor(0.5)), max=th.log(th.tensor(20.0))
-        )
-        shape_b = th.exp(log_shape_b)
-        raw_mean, raw_standard_deviation = johnson_su_standardised_moments(
-            shape_a, shape_b
-        )
-        raw_errors = raw_mean + raw_standard_deviation * errors
-        transformed_errors = shape_a + shape_b * th.asinh(raw_errors)
-        log_density = (
-            log_shape_b
-            - 0.5 * th.log1p(raw_errors.square())
-            - 0.5 * transformed_errors.square()
-        )
-        loss = -(weights * log_density).sum() / weights.sum()
-        gradient = th.autograd.grad(loss, parameters)[0]
-        parameters = (
-            (parameters - config["johnson_su_learning_rate"] * gradient)
-            .detach()
-            .requires_grad_()
-        )
-    model["johnson_su_shape_a"] = th.clamp(parameters[0], min=-5.0, max=5.0).item()
-    model["johnson_su_log_shape_b"] = th.clamp(
-        parameters[1], min=th.log(th.tensor(0.5)), max=th.log(th.tensor(20.0))
-    ).item()
-    model["johnson_su_shape"] = (
-        model["johnson_su_shape_a"],
-        th.exp(th.tensor(model["johnson_su_log_shape_b"])).item(),
+        model["optimizer"].zero_grad()
+        predictions = predict_nonlinear_quantiles(model, features)
+        errors = targets[:, None] - predictions
+        pinball = th.maximum(probabilities * errors, (probabilities - 1) * errors)
+        loss = (weights[:, None] * pinball).sum() / (weights.sum() * 3)
+        if model["l1"]:
+            loss = loss + model["l1"] * sum(
+                parameter.abs().sum()
+                for name, parameter in model["network"].named_parameters()
+                if "weight" in name
+            )
+        loss.backward()
+        model["optimizer"].step()
+
+
+def add_nonlinear_quantile_observations(
+    model: dict, features, targets, iterations: int
+) -> None:
+    """Append chronological errors, retain the configured history, and update."""
+    model["features"].extend(
+        th.as_tensor(row, dtype=th.float64).clone() for row in features
     )
+    model["targets"].extend(float(target) for target in targets)
+    history_size = model["history_size"]
+    model["features"] = model["features"][-history_size:]
+    model["targets"] = model["targets"][-history_size:]
+    fit_nonlinear_quantile_model(model, iterations)
 
 
 def initialize_adaptive_merit_order_model(market_id, forecast_inputs, config) -> dict:
     """Create the online state for one market without fitting future data."""
     config = config.copy()
+    if config["distribution"] not in ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS:
+        raise ValueError(
+            "Adaptive merit-order distribution must be one of "
+            f"{ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS}"
+        )
     if config.get("use_holiday_feature"):
         if not config["holiday_dates"]:
             raise ValueError("The holiday feature requires at least one holiday date")
@@ -933,12 +954,9 @@ def initialize_adaptive_merit_order_model(market_id, forecast_inputs, config) ->
         ),
         "residual_mean_model": None,
         "residual_scale_model": None,
+        "residual_quantile_model": None,
         "initial_inputs": [],
         "initial_residuals": [],
-        "johnson_su_standardised_errors": [],
-        "johnson_su_shape_a": 0.0,
-        "johnson_su_log_shape_b": th.log(th.tensor(5.0)).item(),
-        "johnson_su_shape": None,
         "residual_by_product": {},
         "price_by_product": {},
         "residual_history": [],
@@ -950,12 +968,18 @@ def initialize_adaptive_merit_order_model(market_id, forecast_inputs, config) ->
     }
 
 
-def initialize_adaptive_merit_order_correction(index, units, market) -> dict:
+def initialize_adaptive_merit_order_correction(
+    index, units, market, settings=None
+) -> dict:
     """Initialize the adaptive model for one market with built-in defaults."""
     units = tuple(units)
     if not units:
         raise ValueError("Adaptive merit-order forecasts require loaded market units")
-    config = ADAPTIVE_MERIT_ORDER_SETTINGS.copy()
+    settings = settings or {}
+    unknown = set(settings) - set(ADAPTIVE_MERIT_ORDER_SETTINGS)
+    if unknown:
+        raise ValueError(f"Unknown adaptive merit-order settings: {sorted(unknown)}")
+    config = ADAPTIVE_MERIT_ORDER_SETTINGS | settings
     return {
         "markets": {
             market.market_id: initialize_adaptive_merit_order_model(
@@ -1069,24 +1093,21 @@ def issue_adaptive_merit_order_correction(
             "price_q10": None,
             "price_q50": corrected_mean,
             "price_q90": None,
+            "uncertainty_model": model["config"]["distribution"],
             "training_status": status,
             "training_sample_count": len(model["residual_history"]),
         }
         if residual_std is not None:
             if (
-                model["config"]["distribution"] == "johnson_su"
-                and model["johnson_su_shape"] is not None
+                model["config"]["distribution"] == "nonlinear_quantile"
+                and model["residual_quantile_model"] is not None
             ):
-                shape_a, shape_b = model["johnson_su_shape"]
-                issued["price_q10"] = johnson_su_residual_quantile(
-                    corrected_mean, residual_std, shape_a, shape_b, 0.1
+                error_quantiles = predict_nonlinear_quantiles(
+                    model["residual_quantile_model"], scale_vector
                 )
-                issued["price_q50"] = johnson_su_residual_quantile(
-                    corrected_mean, residual_std, shape_a, shape_b, 0.5
-                )
-                issued["price_q90"] = johnson_su_residual_quantile(
-                    corrected_mean, residual_std, shape_a, shape_b, 0.9
-                )
+                issued["price_q10"] = corrected_mean + error_quantiles[0].item()
+                issued["price_q50"] = corrected_mean + error_quantiles[1].item()
+                issued["price_q90"] = corrected_mean + error_quantiles[2].item()
             else:
                 issued["price_q10"] = gaussian_residual_quantile(
                     corrected_mean, residual_std, 0.1
@@ -1218,23 +1239,19 @@ def fit_initial_adaptive_merit_order_models(model: dict) -> None:
             break
         previous_parameters = parameters.clone()
 
-    if model["config"]["distribution"] == "johnson_su":
-        initial_standard_deviations = th.exp(
-            th.clamp(
-                predict_online_regularized_regression(
-                    model["residual_scale_model"], scale_matrix
-                ),
-                min=th.log(th.tensor(config["sigma_floor"], dtype=th.float64)),
-                max=th.log(th.tensor(1e6, dtype=th.float64)),
-            )
+    if model["config"]["distribution"] == "nonlinear_quantile":
+        model["residual_quantile_model"] = initialize_nonlinear_quantile_model(
+            scale_matrix.shape[1], config
         )
-        errors = residuals - predict_online_regularized_regression(
+        residual_errors = residuals - predict_online_regularized_regression(
             model["residual_mean_model"], residual_mean_matrix
         )
-        model["johnson_su_standardised_errors"] = (
-            errors / initial_standard_deviations
-        ).tolist()
-        fit_johnson_su_shape(model)
+        add_nonlinear_quantile_observations(
+            model["residual_quantile_model"],
+            scale_matrix,
+            residual_errors,
+            config["quantile_initial_iterations"],
+        )
 
 
 def update_adaptive_merit_order_correction(state, market_id, market_meta) -> list[dict]:
@@ -1251,6 +1268,8 @@ def update_adaptive_merit_order_correction(state, market_id, market_meta) -> lis
         )
 
     outcomes = []
+    quantile_features = []
+    quantile_targets = []
     for row in rows:
         product_start = row["product_start"]
         price = row["price"]
@@ -1313,11 +1332,9 @@ def update_adaptive_merit_order_correction(state, market_id, market_meta) -> lis
             scale_vector = transform_adaptive_merit_order_features(
                 model["residual_scale_features"], pending["inputs"]
             )
-        if model["config"]["distribution"] == "johnson_su":
-            model["johnson_su_standardised_errors"].append(
-                post_forecast_residual / issued["residual_std_forecast"]
-            )
-            fit_johnson_su_shape(model)
+        if model["config"]["distribution"] == "nonlinear_quantile":
+            quantile_features.append(scale_vector)
+            quantile_targets.append(post_forecast_residual)
         # Freeze the pre-outcome statistics. IRLS may reconsider the current
         # working weights repeatedly, but the clearing result is committed once.
         residual_mean_model = model["residual_mean_model"]
@@ -1387,123 +1404,14 @@ def update_adaptive_merit_order_correction(state, market_id, market_meta) -> lis
             ):
                 break
             previous_parameters = parameters.clone()
+    if quantile_targets:
+        add_nonlinear_quantile_observations(
+            model["residual_quantile_model"],
+            quantile_features,
+            quantile_targets,
+            model["config"]["quantile_update_iterations"],
+        )
     return outcomes
-
-
-def evaluate_adaptive_merit_order_forecasts(records) -> dict[str, pd.DataFrame]:
-    """Compare merit order, past bias, and adaptive correction."""
-    frame = (
-        records.copy() if isinstance(records, pd.DataFrame) else pd.DataFrame(records)
-    )
-    if frame.empty:
-        raise ValueError(
-            "At least one adaptive merit-order forecast record is required"
-        )
-    frame["issue_time"] = pd.to_datetime(frame["issue_time"])
-    frame["product_start"] = pd.to_datetime(frame["product_start"])
-    frame = frame.sort_values(["issue_time", "product_start"]).reset_index(drop=True)
-    frame["realised_residual"] = (
-        frame["realised_price"] - frame["merit_order_price_forecast"]
-    )
-    residual_sum = 0.0
-    residual_count = 0
-    frame["historical_bias"] = 0.0
-    for _, rows in frame.groupby("issue_time", sort=True).groups.items():
-        frame.loc[rows, "historical_bias"] = (
-            residual_sum / residual_count if residual_count else 0
-        )
-        residuals = frame.loc[rows, "realised_residual"].dropna()
-        residual_sum += residuals.sum()
-        residual_count += residuals.count()
-    frame["constant_historical_bias_forecast"] = (
-        frame["merit_order_price_forecast"] + frame["historical_bias"]
-    )
-    frame["delivery_hour"] = frame["product_start"].dt.hour
-
-    methods = {
-        "merit_order_only": "merit_order_price_forecast",
-        "constant_historical_bias": "constant_historical_bias_forecast",
-        "adaptive_merit_order_correction": "corrected_price_mean_forecast",
-    }
-
-    def metric_rows(group):
-        result = []
-        for method, column in methods.items():
-            error = group[column] - group["realised_price"]
-            row = {
-                "method": method,
-                "samples": error.notna().sum(),
-                "mae": error.abs().mean(),
-                "rmse": error.pow(2).mean() ** 0.5,
-                "central_80_coverage": float("nan"),
-                "central_80_average_width": float("nan"),
-                "pinball_q10": float("nan"),
-                "pinball_q50": float("nan"),
-                "pinball_q90": float("nan"),
-            }
-            if method == "adaptive_merit_order_correction":
-                interval = group["price_q10"].notna() & group["price_q90"].notna()
-                if interval.any():
-                    row["central_80_coverage"] = (
-                        (
-                            group.loc[interval, "realised_price"]
-                            >= group.loc[interval, "price_q10"]
-                        )
-                        & (
-                            group.loc[interval, "realised_price"]
-                            <= group.loc[interval, "price_q90"]
-                        )
-                    ).mean()
-                    row["central_80_average_width"] = (
-                        group.loc[interval, "price_q90"]
-                        - group.loc[interval, "price_q10"]
-                    ).mean()
-                for label, probability in (
-                    ("q10", 0.1),
-                    ("q50", 0.5),
-                    ("q90", 0.9),
-                ):
-                    valid = group[f"price_{label}"].notna()
-                    error_q = (
-                        group.loc[valid, "realised_price"]
-                        - group.loc[valid, f"price_{label}"]
-                    )
-                    row[f"pinball_{label}"] = (
-                        pd.concat(
-                            (
-                                probability * error_q,
-                                (probability - 1) * error_q,
-                            ),
-                            axis=1,
-                        )
-                        .max(axis=1)
-                        .mean()
-                    )
-            result.append(row)
-        return result
-
-    by_hour = []
-    for hour, group in frame.groupby("delivery_hour"):
-        rows = metric_rows(group)
-        for row in rows:
-            row["delivery_hour"] = hour
-        by_hour.extend(rows)
-    sample_columns = [
-        "issue_time",
-        "product_start",
-        "merit_order_price_forecast",
-        "constant_historical_bias_forecast",
-        "corrected_price_mean_forecast",
-        "price_q10",
-        "price_q90",
-        "realised_price",
-        "realised_residual",
-    ]
-    return {
-        "summary": pd.DataFrame(metric_rows(frame)),
-        "by_delivery_hour": pd.DataFrame(by_hour),
-        "samples": frame[sample_columns].head(10),
-    }
 
 
 def extract_buses_and_lines(market_configs: list[MarketConfig]):

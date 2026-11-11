@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 from assume.common.base import BaseStrategy, LearningStrategy
 from assume.strategies.advanced_orders import (

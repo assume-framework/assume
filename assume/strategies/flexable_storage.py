@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 from datetime import timedelta
 
@@ -62,7 +62,7 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
         # =============================================================================
         # save a theoretic SOC to calculate the ramping
         start = product_tuples[0][0]
-        theoretic_SOC = unit.outputs["soc"].at[start]
+        theoretic_SOC = unit.get_soc(start)
         previous_power = unit.get_output_before(start)
 
         bids = []
@@ -226,6 +226,7 @@ class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
 
     Attributes:
         foresight (datetime.timedelta): Foresight for the average price calculation.
+        reference_market (str): The market whose price forecast is used to calculate the specific revenue.
 
     Args:
         *args: Additional arguments.
@@ -237,6 +238,8 @@ class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
 
         # check if kwargs contains crm_foresight argument
         self.foresight = parse_duration(kwargs.get("crm_foresight", "4h"))
+        # market used as reference for the specific revenue calculation
+        self.reference_market = kwargs.get("reference_market", "EOM")
 
     def calculate_bids(
         self,
@@ -265,7 +268,7 @@ class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
         end = product_tuples[-1][1]
 
         previous_power = unit.get_output_before(start)
-        theoretic_SOC = unit.outputs["soc"].at[start]
+        theoretic_SOC = unit.get_soc(start)
 
         _, max_power_discharge_values = unit.calculate_min_max_discharge(
             start, end, soc=theoretic_SOC
@@ -298,7 +301,7 @@ class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
                 marginal_cost=marginal_cost,
                 t=start,
                 foresight=self.foresight,
-                price_forecast=unit.forecaster.price[market_config.market_id],
+                price_forecast=unit.forecaster.price[self.reference_market],
             )
 
             # if specific revenue is positive, bid specific_revenue
@@ -401,7 +404,7 @@ class StorageCapacityHeuristicBalancingNegStrategy(MinMaxChargeStrategy):
 
         previous_power = unit.get_output_before(start)
 
-        theoretic_SOC = unit.outputs["soc"].at[start]
+        theoretic_SOC = unit.get_soc(start)
 
         _, max_power_charge_values = unit.calculate_min_max_charge(start, end)
 
@@ -502,7 +505,7 @@ def get_specific_revenue(unit, marginal_cost, t, foresight, price_forecast):
     """
 
     possible_revenue = 0
-    soc = unit.outputs["soc"][t]
+    soc = unit.get_soc(t)
     theoretic_SOC = soc
 
     if t + foresight > price_forecast.index[-1]:

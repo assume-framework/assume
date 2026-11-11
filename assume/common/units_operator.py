@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import logging
 from collections import defaultdict
@@ -112,6 +112,8 @@ class UnitsOperator(Role):
         self.id = self.context.aid
         if self.forecaster:
             self.forecaster.unit_operator_id = self.id
+        if self.forecaster:
+            self.forecaster.unit_operator_id = self.id
 
         for market in self.available_markets:
             if self.participate(market):
@@ -152,6 +154,8 @@ class UnitsOperator(Role):
             unit (BaseUnit): The unit to be added.
         """
         self.units[unit.id] = unit
+        if self.forecaster and hasattr(self.forecaster, "adaptive_forecast"):
+            unit.forecaster.adaptive_forecast = self.forecaster.adaptive_forecast
 
     def participate(self, market: MarketConfig) -> bool:
         """
@@ -225,6 +229,10 @@ class UnitsOperator(Role):
         marketconfig = self.registered_markets.get(opening["market_id"])
         if (
             self.forecaster
+            and getattr(
+                self.forecaster, "adaptive_merit_order_correction_enabled", False
+            )
+            is True
             and marketconfig
             and marketconfig.product_type == "energy"
             and opening["products"]
@@ -254,7 +262,14 @@ class UnitsOperator(Role):
             order["market_id"] = content["market_id"]
 
         marketconfig = self.registered_markets[content["market_id"]]
-        if self.forecaster and marketconfig.product_type == "energy":
+        if (
+            self.forecaster
+            and getattr(
+                self.forecaster, "adaptive_merit_order_correction_enabled", False
+            )
+            is True
+            and marketconfig.product_type == "energy"
+        ):
             clearing_prices = {}
             for order in accepted_orders:
                 accepted_price = order.get("accepted_price")
@@ -422,18 +437,21 @@ class UnitsOperator(Role):
             tuple[list[tuple[datetime, float, str, str]], list[dict]]: market_dispatch and unit_dispatch dataframes
         """
         now = timestamp2datetime(self.context.current_timestamp)
-        # add one second to exclude the first time stamp, because it is already executed in the last step
-        start = timestamp2datetime(last + 1)
+        last = timestamp2datetime(last)
 
         market_dispatch = aggregate_step_amount(
             orderbook=self.valid_orders[product_type],
-            begin=timestamp2datetime(last),
+            begin=last,
             end=now,
             groupby=["market_id", "unit_id"],
         )
 
         unit_dispatch = []
         for unit_id, unit in self.units.items():
+            # the step at last was already executed in the previous call
+            start = unit.index.align_up(last)
+            if start == last:
+                start += unit.index.freq
             current_dispatch = unit.execute_current_dispatch(start, now)
             end = now
             dispatch = {"power": current_dispatch}

@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import pandas as pd
 import pytest
@@ -717,6 +717,49 @@ def test_electricity_price_signal_flexibility(steam_plant_with_price_signal_flex
     print(f"Low price avg: {low_price_avg:.2f}, High price avg: {high_price_avg:.2f}")
     # Should use more power when price is low than when it's high
     assert low_price_avg >= high_price_avg - 1e-3
+
+
+def test_rolling_horizon_honours_per_timestep_thermal_demand():
+    """Per-timestep thermal demand remains the alternative to an absolute target."""
+    n = 6
+    index = pd.date_range("2023-01-01", periods=n, freq="h")
+    per_timestep_demand = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    plant = SteamPlant(
+        id="test_rolling_steam_per_timestep",
+        unit_operator="test_operator",
+        objective="min_variable_cost",
+        flexibility_measure="cost_based_load_shift",
+        bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
+        components={
+            "heat_pump": {
+                "max_power": 100,
+                "min_power": 0,
+                "cop": 1,
+                "ramp_up": 100,
+                "ramp_down": 100,
+            }
+        },
+        forecaster=SteamgenerationForecaster(
+            index=index,
+            demand=0,
+            electricity_price=[50.0] * n,
+            fuel_prices={},
+            thermal_demand=per_timestep_demand,
+        ),
+        demand=0,
+        dsm_optimisation_config={
+            "horizon_mode": "rolling_horizon",
+            "look_ahead_horizon": "4h",
+            "commit_horizon": "2h",
+            "rolling_step": "2h",
+        },
+    )
+    plant.setup_model(presolve=True)
+
+    for timestamp in pd.date_range("2023-01-01", periods=n // 2, freq="2h"):
+        plant._check_and_reoptimize_rolling_window(timestamp)
+
+    assert plant._rh_full_horizon_production == pytest.approx(per_timestep_demand)
 
 
 if __name__ == "__main__":

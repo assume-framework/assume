@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 from datetime import timedelta
 
@@ -185,6 +185,35 @@ def test_calculate_multi_bids(base_unit, mock_market_config):
         base_unit.execute_current_dispatch(index[0], index[2])
         == base_unit.outputs["energy"][index[0] : index[2]]
     ).all()
+
+
+def test_calculate_generation_cost_unaligned_start(base_unit):
+    # the units operator passes start = last dispatch + 1 s, which is not on the index grid
+    index = base_unit.index
+    calculated = []
+
+    def marginal_cost(t, power):
+        calculated.append(t)
+        return 10
+
+    base_unit.calculate_marginal_cost = marginal_cost
+    base_unit.outputs["energy"].loc[index[0] : index[3]] = 1
+
+    base_unit.calculate_generation_cost(
+        index[1] + timedelta(seconds=1), index[3], "energy"
+    )
+
+    # only the steps after the last dispatch are calculated
+    assert calculated == [index[2], index[3]]
+    assert base_unit.outputs["energy_generation_costs"][index[1]] == 0
+    assert base_unit.outputs["energy_generation_costs"][index[2]] == 10
+
+    # a start before the index is clamped to the first step
+    calculated.clear()
+    base_unit.calculate_generation_cost(
+        index[0] - timedelta(hours=1), index[1], "energy"
+    )
+    assert calculated == [index[0], index[1]]
 
 
 def test_clear_empty_bids(base_unit, mock_market_config):

@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
-import os
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -12,7 +12,7 @@ from sqlalchemy import create_engine
 
 from assume.common.outputs import WriteOutput
 
-os.makedirs("./examples/local_db", exist_ok=True)
+Path("./examples/local_db").mkdir(parents=True, exist_ok=True)
 DB_URI = "sqlite:///./examples/local_db/test_outputs.db"
 
 

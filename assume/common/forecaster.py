@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 from __future__ import annotations
 
 import logging
@@ -21,6 +21,13 @@ ForecastIndex: TypeAlias = FastIndex | pd.DatetimeIndex | pd.Series
 ForecastSeries: TypeAlias = FastSeries | list | float | pd.Series
 
 log = logging.getLogger(__name__)
+
+
+class AdaptiveForecast:
+    """Adaptive market-price forecasts issued during the simulation."""
+
+    def __init__(self):
+        self.price: dict[str, FastSeries] = {}
 
 
 def _ensure_not_none(
@@ -811,19 +818,19 @@ class CementForecaster(DsmUnitForecaster):
         self,
         index: ForecastIndex,
         fuel_prices: dict[str, ForecastSeries],
-        market_prices: dict[str, ForecastSeries] = None,
-        residual_load: dict[str, ForecastSeries] = None,
+        market_prices: dict[str, ForecastSeries] | None = None,
+        residual_load: dict[str, ForecastSeries] | None = None,
         availability: ForecastSeries = 1,
         forecast_algorithms: dict[str, str] = {},
-        forecast_registries: dict[str, dict] = None,
+        forecast_registries: dict[str, dict] | None = None,
         congestion_signal: ForecastSeries = 0.0,
         renewable_utilisation_signal: ForecastSeries = 0.0,
-        electricity_price: ForecastSeries = None,
-        electricity_price_flex: ForecastSeries = None,
-        clinker_demand: ForecastSeries = None,
-        normalized_load_profile: ForecastSeries = None,
+        electricity_price: ForecastSeries | None = None,
+        electricity_price_flex: ForecastSeries | None = None,
+        clinker_demand: ForecastSeries | None = None,
+        normalized_load_profile: ForecastSeries | None = None,
         thermal_storage_schedule: ForecastSeries = 0,
-        availability_profiles: dict[str, ForecastSeries] = None,
+        availability_profiles: dict[str, ForecastSeries] | None = None,
     ):
         super().__init__(
             index=index,
@@ -1046,9 +1053,10 @@ class BuildingForecaster(DsmUnitForecaster):
             forecaster["building_1_electric_vehicle_1_availability_profile"]
             forecaster["building_1_electric_vehicle_1_range"]
         """
-        if hasattr(self, key):
+        try:
             return getattr(self, key)
-        raise KeyError(f"Forecast '{key}' not found in BuildingForecaster.")
+        except AttributeError:
+            raise KeyError(f"Forecast '{key}' not found in BuildingForecaster.")
 
     def get_price(self, fuel: str) -> FastSeries:
         if fuel not in self.fuel_prices:
@@ -1131,11 +1139,13 @@ class ExchangeForecaster(UnitForecaster):
     """Forecaster for exchange (import/export) units.
 
     Provides price, residual load, and availability forecasts (see :class:`UnitForecaster`)
-    plus import and export volume timeseries.
+    plus import and export volume and price timeseries.
 
     Attributes:
         volume_import (ForecastSeries): Forecasted import volume.
         volume_export (ForecastSeries): Forecasted export volume.
+        price_import (ForecastSeries | None): Import price timeseries. If None, the unit falls back to its scalar ``price_import``.
+        price_export (ForecastSeries | None): Export price timeseries. If None, the unit falls back to its scalar ``price_export``.
     """
 
     def __init__(
@@ -1145,6 +1155,8 @@ class ExchangeForecaster(UnitForecaster):
         forecast_registries: dict[str, dict] = None,
         volume_import: ForecastSeries = 0,
         volume_export: ForecastSeries = 0,
+        price_import: ForecastSeries | None = None,
+        price_export: ForecastSeries | None = None,
         residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
         market_prices: dict[str, ForecastSeries] = None,
@@ -1159,6 +1171,12 @@ class ExchangeForecaster(UnitForecaster):
         )
         self.volume_import = self._to_series(volume_import)
         self.volume_export = self._to_series(volume_export)
+        self.price_import = (
+            self._to_series(price_import) if price_import is not None else None
+        )
+        self.price_export = (
+            self._to_series(price_export) if price_export is not None else None
+        )
 
 
 class UnitsOperatorForecaster(UnitForecaster):
@@ -1193,6 +1211,9 @@ class UnitsOperatorForecaster(UnitForecaster):
             residual_load=residual_load,
         )
         self.adaptive_merit_order_state: dict = {"markets": {}}
+        self.adaptive_merit_order_settings: dict = {}
+        self.adaptive_merit_order_correction_enabled = False
+        self.adaptive_forecast = AdaptiveForecast()
         self._adaptive_merit_order_units: tuple[BaseUnit, ...] = ()
         self._adaptive_merit_order_markets: dict[str, MarketConfig] = {}
         self.unit_operator_id = "operator"
@@ -1222,6 +1243,45 @@ class UnitsOperatorForecaster(UnitForecaster):
             market.market_id: market for market in market_configs
         }
 
+    def enable_adaptive_merit_order_correction(self, **settings) -> None:
+        """Enable adaptive merit-order correction with Gaussian uncertainty."""
+        self.set_adaptive_merit_order_uncertainty_model("gaussian", **settings)
+
+    def set_adaptive_merit_order_uncertainty_model(
+        self, uncertainty_model: str, **settings
+    ) -> None:
+        """Enable adaptive correction and select its uncertainty model.
+
+        Supported distributions are ``gaussian`` (the default) and
+        ``nonlinear_quantile``. Additional keyword settings can tune the
+        selected method without adding simulation YAML configuration. Calling
+        this before simulation start also enables the UnitsOperator lifecycle.
+        """
+        if self.adaptive_merit_order_state["markets"]:
+            raise RuntimeError(
+                "The adaptive uncertainty model cannot change after forecasts "
+                "have been issued"
+            )
+        from assume.common.forecast_algorithms import (
+            ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS,
+            ADAPTIVE_MERIT_ORDER_SETTINGS,
+        )
+
+        if uncertainty_model not in ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS:
+            raise ValueError(
+                "Adaptive merit-order distribution must be one of "
+                f"{ADAPTIVE_MERIT_ORDER_DISTRIBUTIONS}"
+            )
+        unknown = set(settings) - set(ADAPTIVE_MERIT_ORDER_SETTINGS)
+        if unknown:
+            raise ValueError(
+                f"Unknown adaptive merit-order settings: {sorted(unknown)}"
+            )
+        self.adaptive_merit_order_settings = settings | {
+            "distribution": uncertainty_model
+        }
+        self.adaptive_merit_order_correction_enabled = True
+
     def get_adaptive_merit_order_forecast(
         self,
         market_id: str,
@@ -1243,7 +1303,10 @@ class UnitsOperatorForecaster(UnitForecaster):
 
             self.adaptive_merit_order_state["markets"].update(
                 initialize_adaptive_merit_order_correction(
-                    self.index, self._adaptive_merit_order_units, market
+                    self.index,
+                    self._adaptive_merit_order_units,
+                    market,
+                    self.adaptive_merit_order_settings,
                 )["markets"]
             )
 
@@ -1272,13 +1335,23 @@ class UnitsOperatorForecaster(UnitForecaster):
             issue_adaptive_merit_order_correction,
         )
 
-        return issue_adaptive_merit_order_correction(
+        forecasts = issue_adaptive_merit_order_correction(
             self.adaptive_merit_order_state,
             self.unit_operator_id,
             market_id,
             issue_time,
             list(products.values()),
         )
+        price = self.adaptive_forecast.price.setdefault(
+            market_id,
+            FastSeries(index=self.index, value=float("nan"), name=market_id),
+        )
+        for forecast in forecasts:
+            if forecast["product_start"] in self.index:
+                price[forecast["product_start"]] = forecast[
+                    "corrected_price_mean_forecast"
+                ]
+        return forecasts
 
     def update_adaptive_merit_order_forecast(
         self, market_id: str, market_meta: list[dict]

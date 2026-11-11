@@ -1,6 +1,6 @@
 .. SPDX-FileCopyrightText: ASSUME Developers
 ..
-.. SPDX-License-Identifier: AGPL-3.0-or-later
+.. SPDX-License-Identifier: MIT
 
 ##############
 Unit Forecasts
@@ -26,7 +26,7 @@ Unit Type                     Forecaster Class                          Addition
 Power Plants                  ``PowerplantForecaster``                  ``fuel_prices``
 Storage Units                 ``UnitForecaster``                        *(base only)*
 Demand Units                  ``DemandForecaster``                      ``demand``
-Exchange Units                ``ExchangeForecaster``                    ``volume_import``, ``volume_export``
+Exchange Units                ``ExchangeForecaster``                    ``volume_import``, ``volume_export``, ``price_import``, ``price_export`` (optional)
 DSM Units                     ``DsmUnitForecaster``                     ``congestion_signal``, ``renewable_utilisation_signal``, ``electricity_price``
 Steelplant Units              ``SteelplantForecaster``                  DSM attrs + ``fuel_prices``
 Cement Plant Units            ``CementForecaster``                      DSM attrs + ``fuel_prices``, ``clinker_demand``, ``normalized_load_profile``, ``electricity_price_flex``, ``thermal_storage_schedule``, ``availability_profiles``
@@ -35,6 +35,13 @@ Building Units                ``BuildingForecaster``                    DSM attr
 Hydrogen Units                ``HydrogenForecaster``                    DSM attrs + ``hydrogen_demand``, ``seasonal_storage_schedule``
 Custom Units (CSV import)     ``CustomUnitForecaster``                  *(arbitrary keyword attributes)*
 ============================= ========================================= ===========================================
+
+.. note::
+   Forecast series passed to a forecaster as :class:`~assume.common.fast_pandas.FastSeries` are used as-is,
+   while any other type (``pd.Series``, list, scalar) is copied into a new array per forecaster.
+   For data that is identical for many units, such as fuel prices, create the ``FastSeries`` once and pass the
+   same objects to every forecaster to avoid one copy per unit. The CSV loader does this for ``fuel_prices``.
+   Shared series must not be modified in place, as the change would affect all units.
 
 .. note::
    Unit operators can also own a forecaster, :class:`~assume.common.forecaster.UnitsOperatorForecaster`,
@@ -89,6 +96,10 @@ The optional adaptive merit-order correction is a stateful shadow
 forecast driven by market openings and clearings. It does not replace the
 static ``price`` series used by bidding strategies.
 
+The optional adaptive merit-order correction is a stateful shadow
+forecast driven by market openings and clearings. It does not replace the
+static ``price`` series used by bidding strategies.
+
 ***********************************
 Configuration
 ***********************************
@@ -118,9 +129,40 @@ Specify which algorithms to use in the ``forecast_algorithms`` section of your s
 Adaptive merit-order correction
 ===============================
 
-The adaptive correction is requested directly from an operator forecaster. It
+The adaptive correction is an opt-in feature of an operator forecaster. It
 does not require a YAML setting and does not replace the existing ``price``
-series used by bidding strategies:
+series used by bidding strategies. Before starting the simulation, enable it:
+
+.. code-block:: python
+
+    forecaster.enable_adaptive_merit_order_correction()
+
+This creates the separate ``adaptive_forecast.price`` signal. It is populated
+only for products whose forecast has been issued at a market opening:
+
+.. code-block:: python
+
+    from datetime import timedelta
+
+    one_hour_price = forecaster.adaptive_forecast.price["EOM"][delivery_time]
+    next_24_hours = forecaster.adaptive_forecast.price["EOM"][
+        delivery_time : delivery_time + timedelta(hours=23)
+    ]
+
+The existing merit-order signal remains ``forecaster.price["EOM"]``. To use
+the nonlinear quantile uncertainty plug-in instead of the Gaussian default,
+call ``set_adaptive_merit_order_uncertainty_model("nonlinear_quantile")``
+before the first forecast is issued.
+
+Each unit managed by that operator receives a reference to the same adaptive
+signal. A custom unit strategy can therefore use the issued price directly:
+
+.. code-block:: python
+
+    price = unit.forecaster.adaptive_forecast.price["EOM"][delivery_time]
+
+The explicit forecast method remains available for experiments and manual
+evaluation:
 
 .. code-block:: python
 
@@ -138,21 +180,23 @@ one immutable forecast row per product in that delivery window.
 For every selected energy product, the operator forecaster first calculates
 the existing merit-order forecast :math:`P^{MO}`. After clearing it observes
 the day-ahead price :math:`P^{DA}` and learns the residual
-:math:`r=P^{DA}-P^{MO}`. A separate Elastic-Net model learns residual location,
-while a second model learns log scale. The corrected mean is
-:math:`P^{MO}+\hat{r}`; q10, q50, and q90 use a Gaussian residual distribution.
+:math:`r=P^{DA}-P^{MO}`. Separate distributional equations learn residual
+location and log scale using online coordinate descent, LASSO (L1) feature
+selection, and L2 coefficient stabilisation. The corrected mean is
+:math:`P^{MO}+\hat{r}`; the default q10, q50, and q90 use a Gaussian residual
+distribution. ``nonlinear_quantile`` can be selected with the same method
+before the first forecast is issued.
 Feature matrices, discounted sufficient statistics, coordinate descent, and
 Gaussian inverse-CDF calculations use ``torch.float64`` tensors on CPU by
 default. The double precision is intentional because online discounted
 statistics are updated repeatedly over long simulations.
 
 The default features are merit-order price, separate capacity-weighted wind
-and solar availability factors, forecast residual load, previous-day
-same-hour realised residual and price, cyclic hour and weekday terms, and a
-weekend indicator. General generator availability is deliberately excluded.
-The initial implementation uses built-in settings: 168 training samples,
-``0.995`` forgetting, Gaussian residuals, and a ``0.01`` minimum standard
-deviation.
+and solar availability factors, forecast residual load, previous-day same-hour
+realised price, and cyclic weekday terms. General generator availability is
+deliberately excluded. The initial implementation uses built-in settings: 504
+training samples (21 daily 24-hour auctions), ``0.995`` forgetting, Gaussian
+residuals, and a ``0.01`` minimum standard deviation.
 
 Information timing and statuses
 --------------------------------
@@ -171,11 +215,7 @@ Finalised rows are written to ``adaptive_merit_order_forecast`` and contain the 
 and delivery timestamps, operator and market identifiers, immutable
 ``forecast_id``, merit-order and corrected forecasts, residual location and
 scale, q10/q50/q90, realised price and residual, frozen post-forecast error,
-sample count, and status. The helper
-:func:`~assume.common.forecast_algorithms.evaluate_adaptive_merit_order_forecasts`
-reports MAE, RMSE, pinball loss, central-80% coverage and width overall and by
-delivery hour for merit order, expanding historical mean bias, and adaptive
-correction.
+sample count, and status.
 
 Only non-spatial energy markets with one scalar price per product are
 supported. The correction state belongs to each unit operator; bids, clearing,

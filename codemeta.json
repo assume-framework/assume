@@ -38,7 +38,7 @@
   "dateCreated": "2024-11-13",
   "description": "ASSUME - Agent-based Simulation for Studying and Understanding Market Evolution",
   "keywords": "agent-based, energy market, simulation, reinforcement learning, bidding",
-  "license": "https://spdx.org/licenses/AGPL-3.0-or-later.html",
+  "license": "https://spdx.org/licenses/MIT.html",
   "name": "ASSUME",
   "version": "v0.5.5"
 }

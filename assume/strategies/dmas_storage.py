@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 from datetime import datetime, timedelta
 
@@ -151,7 +151,7 @@ class StorageEnergyOptimizationDmasStrategy(MinMaxChargeStrategy):
         )
 
         self.model.vol_con = pyo.ConstraintList()
-        v0 = unit.outputs["soc"].at[start] * unit.capacity
+        v0 = unit.get_soc(start) * unit.capacity
 
         for t in time_range:
             if t == 0:
