@@ -50,6 +50,9 @@ Overview of Example Simulations
    * - small_with_zonal_clearing‡
      - example_01d
      - Implements zonal market clearing.
+   * - small_with_portfolio_strategy‡
+     - example_01i
+     - Showcases how to define one of our portfolio strategies.
    * - small_with_directional_zonal_clearing‡
      - example_01j
      - Demonstrates complex clearing with directional transfer capacities between zones.
