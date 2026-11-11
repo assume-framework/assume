@@ -673,7 +673,10 @@ def test_powerplant_start_up_costs(power_plant_1):
     restart = datetime(2022, 1, 1, 2)
     running = datetime(2022, 1, 1, 3)
     assert generation_costs.at[restart] > 0
-    assert total_costs.at[restart] == generation_costs.at[restart] + 1000
+    assert (
+        total_costs.at[restart]
+        == generation_costs.at[restart] + power_plant_1.cold_start_cost
+    )
     assert total_costs.at[running] == generation_costs.at[running]
 
 
