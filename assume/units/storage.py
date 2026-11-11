@@ -416,7 +416,7 @@ class Storage(SupportsMinMaxCharge):
         # Feasibility guard for redispatch. The redispatch clearing limits the
         # cumulative redispatch energy with ``add_redispatch_soc_constraints``, so the
         # SOC clip in the base implementation should never have to cut an accepted
-        # redispatch volume. If it does, the guarantee was broken - say so loudly.
+        # redispatch volume.
         if (
             orderbook
             and marketconfig.product_type == "energy"
