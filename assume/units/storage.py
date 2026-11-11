@@ -515,7 +515,7 @@ class Storage(SupportsMinMaxCharge):
         # restrict according to min_SOC
 
         max_soc_discharge = self.calculate_soc_max_discharge(soc)
-        power_discharge = min(power_discharge, max_soc_discharge)
+        power_discharge = min(power_discharge, max_soc_discharge - current_power)
         if power_discharge < min_power_discharge:
             power_discharge = 0
 
@@ -551,7 +551,7 @@ class Storage(SupportsMinMaxCharge):
         # restrict charging according to max_SOC
         max_soc_charge = self.calculate_soc_max_charge(soc)
 
-        power_charge = max(power_charge, max_soc_charge)
+        power_charge = max(power_charge, max_soc_charge - current_power)
         if power_charge > min_power_charge:
             power_charge = 0
 

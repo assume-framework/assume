@@ -189,19 +189,19 @@ def test_soc_limit_covers_the_current_power(storage_unit):
     assert max_power_charge[0] == pytest.approx(-50 / 0.9 + 30)
 
 
-# def test_ramp_soc_limit_covers_the_current_power(storage_unit):
-#    """
-#    The ramp checks limit the power on top of the current power, so the SoC
-#    limit covers the current power as well. The ramps allow 30 MW on top here.
-#    """
-#    # 50 MWh stored back 47.5 MW of discharge, 30 MW of them are already sold
-#    assert storage_unit.calculate_ramp_discharge(0.05, 0, 100, 30) == pytest.approx(
-#        47.5 - 30
-#    )
-#    # 50 MWh of room take 55.6 MW of charging, 30 MW of them are already bought
-#    assert storage_unit.calculate_ramp_charge(0.95, 0, -100, -30) == pytest.approx(
-#        -50 / 0.9 + 30
-#    )
+def test_ramp_soc_limit_covers_the_current_power(storage_unit):
+    """
+    The ramp checks limit the power on top of the current power, so the SoC
+    limit covers the current power as well. The ramps allow 30 MW on top here.
+    """
+    # 50 MWh stored back 47.5 MW of discharge, 30 MW of them are already sold
+    assert storage_unit.calculate_ramp_discharge(0.05, 0, 100, 30) == pytest.approx(
+        47.5 - 30
+    )
+    # 50 MWh of room take 55.6 MW of charging, 30 MW of them are already bought
+    assert storage_unit.calculate_ramp_charge(0.95, 0, -100, -30) == pytest.approx(
+        -50 / 0.9 + 30
+    )
 
 
 def test_storage_feedback(storage_unit, mock_market_config):
