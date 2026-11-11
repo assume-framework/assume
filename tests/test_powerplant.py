@@ -221,7 +221,8 @@ def test_powerplant_ramping(power_plant_1):
     assert max_power[0] == 1000
 
     op_time = power_plant_1.get_operation_time(start)
-    assert op_time == 3
+    # the unit is assumed to be off before the start of the simulation
+    assert op_time == -3
 
     min_cost = power_plant_1.calculate_marginal_cost(start, min_power[0])
     max_cost = power_plant_1.calculate_marginal_cost(start, max_power[0])
@@ -665,7 +666,7 @@ def test_powerplant_start_up_costs(power_plant_1):
     # no start at the first step, as units are running at the start,
     # a start after the stop, and none while running
     starting_costs = power_plant_1.outputs["starting_costs"]
-    assert list(starting_costs.loc[start:end]) == [0, 0, 1000, 0]
+    assert list(starting_costs.loc[start:end]) == [1000, 0, 1000, 0]
 
     # total costs are the generation costs plus the start-up costs
     generation_costs = power_plant_1.outputs["energy_generation_costs"]

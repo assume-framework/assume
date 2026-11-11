@@ -67,7 +67,7 @@ class Storage(SupportsMinMaxCharge):
         min_power_discharge: float = 0.0,
         min_soc: float = 0.0,
         max_soc: float = 1.0,
-        initial_soc: float | None = 0.0,
+        initial_soc: float | None = 0.5,
         soc_tick: float = 0.01,
         efficiency_charge: float = 1,
         efficiency_discharge: float = 1,

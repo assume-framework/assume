@@ -65,11 +65,12 @@ def test_flexable_eom(mock_market_config, power_plant):
     assert bids[1]["price"] == 40
     assert bids[1]["volume"] == 200
 
-    # CHP with ramping restrictions, but without start-up
+    # CHP with ramping restrictions, still a start-up (hour 0 is assumed off),
+    # so the heat discount of calculate_EOM_price_if_on does not apply
     power_plant.outputs["heat"][start] = 300
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert len(bids) == 2
-    assert math.isclose(bids[0]["price"], (40 - 10 / 0.9))
+    assert bids[0]["price"] == 40
     assert bids[0]["volume"] == 300
     assert bids[1]["price"] == 40
     assert bids[1]["volume"] == 100
