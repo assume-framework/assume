@@ -558,7 +558,7 @@ def test_broken_timestamps():
     # in general, we expect timestamps to be unix-epoch timestamps
     unix_start = datetime(1970, 1, 1)
 
-    unix_epoch_start = datetime.fromtimestamp(0)
+    unix_epoch_start = datetime.fromtimestamp(0)  # tz-ok: shows the local time pitfall
     true_unix_epoch_start = unix_start
     # the local UTC offset at the epoch itself - offsets change over time
     # (e.g. Pacific/Chatham was UTC+12:45 in 1970 but UTC+13:45 in January 2020)
@@ -573,13 +573,13 @@ def test_broken_timestamps():
     assert 0 == calendar.timegm(unix_start.utctimetuple())
 
     # pandas fromtimestamp has this problem too:
-    assert offset + unix_start == pd.Timestamp.fromtimestamp(0)
+    assert offset + unix_start == pd.Timestamp.fromtimestamp(0)  # tz-ok
 
     # though this can work
     assert unix_start == pd.Timestamp(0)
 
     # the other way works with pandas
-    assert pd.Timestamp(unix_start).timestamp() == 0
+    assert pd.Timestamp(unix_start).timestamp() == 0  # tz-ok: pandas uses UTC
 
 
 def test_timestamp2datetime():
