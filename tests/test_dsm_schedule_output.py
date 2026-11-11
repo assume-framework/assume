@@ -10,6 +10,8 @@ import pandas as pd
 import pytest
 
 from assume.common.outputs import WriteOutput
+from assume.common.units_operator import UnitsOperator
+from assume.common.utils import datetime2timestamp
 
 from .test_steel_plant import create_steel_plant, dsm_components  # noqa: F401
 
@@ -167,3 +169,66 @@ def test_dsm_specs_are_written_to_csv(plant, tmp_path):
     assert set(df.columns) == {"parameter", "simulation", "technology", "value"}
     assert (df.index == plant.id).all()
     assert {"electrolyser", "dri_plant", "eaf"} <= set(df["technology"])
+
+
+class _OutputContextStub:
+    """Collects the messages write_actual_dispatch sends to the output agent."""
+
+    def __init__(self, now: datetime):
+        self.current_timestamp = datetime2timestamp(now)
+        self.data = {"output_agent_addr": "output_agent"}
+        self.sent: list[dict] = []
+
+    def schedule_instant_message(self, receiver_addr, content):
+        self.sent.append(content)
+
+
+def _operator_with(units, now: datetime) -> UnitsOperator:
+    operator = UnitsOperator(available_markets=[])
+    operator._context = _OutputContextStub(now)
+    for i, unit in enumerate(units):
+        operator.units[f"unit_{i}"] = unit
+    return operator
+
+
+def _sent_types(operator):
+    return [message["type"] for message in operator.context.sent]
+
+
+def test_dsm_specs_are_sent_exactly_once(plant):
+    operator = _operator_with([plant], now=plant.index[1])
+    operator.write_actual_dispatch("energy")
+
+    assert _sent_types(operator).count("dsm_specs") == 1
+    assert operator.sent_dsm_specs
+
+    operator.context.current_timestamp = datetime2timestamp(plant.index[2])
+    operator.write_actual_dispatch("energy")
+    assert _sent_types(operator).count("dsm_specs") == 1
+
+
+def test_dsm_specs_not_retried_without_dsm_units(plant):
+    # a non-DSM unit has no get_component_specs; use a bare object stand-in
+    operator = _operator_with([], now=plant.index[1])
+    operator.write_actual_dispatch("energy")
+
+    assert "dsm_specs" not in _sent_types(operator)
+    # nothing can ever provide specs, so the operator must stop looking
+    assert operator.sent_dsm_specs
+
+
+def test_dsm_specs_retried_until_available(plant):
+    # simulate a DSM unit whose baseline solve has not run yet
+    plant._component_specs = []
+    operator = _operator_with([plant], now=plant.index[1])
+    operator.write_actual_dispatch("energy")
+
+    assert "dsm_specs" not in _sent_types(operator)
+    assert not operator.sent_dsm_specs
+
+    # once the specs are captured, the next export sends them
+    plant.determine_optimal_operation_without_flex()
+    operator.context.current_timestamp = datetime2timestamp(plant.index[2])
+    operator.write_actual_dispatch("energy")
+    assert _sent_types(operator).count("dsm_specs") == 1
+    assert operator.sent_dsm_specs

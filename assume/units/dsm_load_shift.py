@@ -1838,7 +1838,9 @@ class DSMFlex:
         values = {}
         for technology, block in instance.dsm_blocks.items():
             for var in block.component_objects(pyo.Var, descend_into=False):
-                if not var.is_indexed() or len(var) < n_steps:
+                # variables not indexed by the model's time steps (scalars or
+                # differently indexed sets) are no schedules and cannot be read per step
+                if var.index_set() is not instance.time_steps:
                     continue
                 if next(iter(var.values())).is_binary():
                     continue

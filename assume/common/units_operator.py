@@ -472,11 +472,14 @@ class UnitsOperator(Role):
                 )
 
             if not self.sent_dsm_specs:
-                self.sent_dsm_specs = True
-                dsm_specs = []
-                for unit in self.units.values():
-                    if hasattr(unit, "get_component_specs"):
-                        dsm_specs.extend(unit.get_component_specs())
+                dsm_units = [
+                    unit
+                    for unit in self.units.values()
+                    if hasattr(unit, "get_component_specs")
+                ]
+                dsm_specs = [
+                    spec for unit in dsm_units for spec in unit.get_component_specs()
+                ]
                 if dsm_specs:
                     self.context.schedule_instant_message(
                         receiver_addr=db_addr,
@@ -486,6 +489,11 @@ class UnitsOperator(Role):
                             "data": dsm_specs,
                         },
                     )
+                # mark as sent once the specs went out, or stop looking when no
+                # unit can ever provide any; only retry while a DSM unit exists
+                # whose specs are not captured yet
+                if dsm_specs or not dsm_units:
+                    self.sent_dsm_specs = True
 
             dsm_schedule = self.get_dsm_schedule(self.last_sent_dsm_schedule)
             self.last_sent_dsm_schedule = self.context.current_timestamp
