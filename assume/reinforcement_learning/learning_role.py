@@ -22,6 +22,7 @@ from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
 from assume.reinforcement_learning.learning_utils import (
     linear_schedule_func,
+    resolve_device,
     transform_buffer_data,
 )
 from assume.reinforcement_learning.tensorboard_logger import TensorBoardLogger
@@ -58,15 +59,7 @@ class Learning(Role):
         self.critics = {}
         self.target_critics = {}
 
-        device = "cpu"
-        if self.learning_config:
-            if "cuda" in self.learning_config.device and th.cuda.is_available():
-                device = self.learning_config.device
-            elif (
-                "mps" in self.learning_config.device and th.backends.mps.is_available()
-            ):
-                device = self.learning_config.device
-        self.device = th.device(device)
+        self.device = resolve_device(self.learning_config.device or "cpu")
 
         # future: add option to choose between float16 and float32
         # float_type = learning_config.float_type
@@ -382,6 +375,14 @@ class Learning(Role):
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
+        # Strategies are recreated each episode with the initial noise_dt, so apply the
+        # decay of the episode start instead of waiting for the first policy update
+        noise_decay = self.calc_noise_from_progress(
+            self.get_progress_remaining(timestamp=self.start)
+        )
+        for strategy in self.rl_strats.values():
+            strategy.action_noise.update_noise_decay(noise_decay)
+
         # Disable initial exploration if initial experience collection is complete
         if (
             self.episodes_done
@@ -428,13 +429,17 @@ class Learning(Role):
             else:
                 strategy.collect_initial_experience_mode = False
 
-    def get_progress_remaining(self) -> float:
+    def get_progress_remaining(self, timestamp: float | None = None) -> float:
         """
         Get the remaining learning progress from the simulation run.
 
+        Args:
+            timestamp (float, optional): The timestamp to get the progress for. Defaults to the current simulation time.
         """
+        if timestamp is None:
+            timestamp = self.context.current_timestamp
         total_duration = self.end - self.start
-        elapsed_duration = self.context.current_timestamp - self.start
+        elapsed_duration = timestamp - self.start
 
         learning_episodes = (
             self.learning_config.training_episodes
@@ -491,13 +496,14 @@ class Learning(Role):
             self.learning_config.continue_learning is True
             and actors_and_critics is None
         ):
-            directory = self.learning_config.trained_policies_load_path
-            if directory and Path(directory).is_dir():
+            load_path = self.learning_config.trained_policies_load_path
+            directory = Path(load_path) if load_path else None
+            if directory and directory.is_dir():
                 logger.info(f"Loading pretrained policies from {directory}!")
                 self.rl_algorithm.load_params(directory)
             else:
                 raise FileNotFoundError(
-                    f"Directory {directory} does not exist! Cannot load pretrained policies from trained_policies_load_path!"
+                    f"Directory {load_path} does not exist! Cannot load pretrained policies from trained_policies_load_path!"
                 )
 
     def compare_and_save_policies(self, metrics: dict) -> bool:
@@ -522,75 +528,92 @@ class Learning(Role):
         """
         if not metrics:
             logger.error("tried to save policies but did not get any metrics")
-            return
-        # if the current values are a new max in one of the metrics - we store them in the default folder
+            return False
 
-        # add current reward to list of all rewards
+        # the first metric is the default one: it decides which policies are saved
+        # and, as avg_rewards tracks only a single metric, also the early stopping
+        default_metric = next(iter(metrics))
+        improved = {}
+
         for metric, value in metrics.items():
+            # add current value to list of all values
             self.rl_eval[metric].append(value)
 
             # check if the current value is the best value
-            if self.rl_eval[metric][-1] > self.max_eval[metric]:
-                self.max_eval[metric] = self.rl_eval[metric][-1]
-
-                # use first metric as default
-                if metric == list(metrics.keys())[0]:
-                    # store the best for our current metric in its folder
-                    self.rl_algorithm.save_params(
-                        directory=f"{self.learning_config.trained_policies_save_path}/{metric}_eval_policies"
-                    )
-
-                    logger.info(
-                        f"New best policy saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
-                    )
+            improved[metric] = value > self.max_eval[metric]
+            if improved[metric]:
+                self.max_eval[metric] = value
             else:
                 logger.info(
                     f"Current policy not better than best policy, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
                 )
 
-            # if we do not see any improvement in the last x evaluation runs we stop the training
-            if len(self.rl_eval[metric]) >= self.learning_config.early_stopping_steps:
-                self.avg_rewards.append(
-                    sum(
-                        self.rl_eval[metric][
-                            -self.learning_config.early_stopping_steps :
-                        ]
-                    )
-                    / self.learning_config.early_stopping_steps
-                )
+        # if the current value is a new max in the default metric - we store the policies in its folder
+        if improved[default_metric]:
+            self.rl_algorithm.save_params(
+                directory=f"{self.learning_config.trained_policies_save_path}/{default_metric}_eval_policies"
+            )
+            logger.info(
+                f"New best policy saved, episode: {self.eval_episodes_done + 1}, metric={default_metric}, value={metrics[default_metric]:.2f}"
+            )
+        return self._early_stopping_triggered(default_metric)
 
-                if len(self.avg_rewards) >= self.learning_config.early_stopping_steps:
-                    recent_rewards = self.avg_rewards[
-                        -self.learning_config.early_stopping_steps :
-                    ]
-                    min_reward = min(recent_rewards)
-                    max_reward = max(recent_rewards)
+    def _early_stopping_triggered(self, metric: str) -> bool:
+        """
+        Check whether the evaluation of the given metric has stopped improving.
 
-                    # Avoid division by zero or unexpected behavior with negative values
-                    denominator = max(
-                        abs(min_reward), 1e-8
-                    )  # Use small value to avoid zero-division
+        Appends the rolling average over the last ``early_stopping_steps`` evaluations to
+        ``avg_rewards``. Training is stopped once the relative change of these averages
+        over the last ``early_stopping_steps`` entries is below ``early_stopping_threshold``.
+        In that case the current policies are saved in the ``last_policies`` folder.
 
-                    avg_change = abs((max_reward - min_reward) / denominator)
+        Args:
+            metric (str): The metric whose evaluation history is checked.
 
-                    if avg_change < self.learning_config.early_stopping_threshold:
-                        logger.info(
-                            f"Stopping training as no improvement above {self.learning_config.early_stopping_threshold * 100}% in last {self.learning_config.early_stopping_steps} evaluations for {metric}"
-                        )
-                        if (
-                            self.learning_config.learning_rate_schedule
-                            or self.learning_config.action_noise_schedule
-                        ) is not None:
-                            logger.info(
-                                f"Learning rate schedule ({self.learning_config.learning_rate_schedule}) or action noise schedule ({self.learning_config.action_noise_schedule}) were scheduled to decay, further learning improvement can be possible. End value of schedule may not have been reached."
-                            )
-
-                        self.rl_algorithm.save_params(
-                            directory=f"{self.learning_config.trained_policies_save_path}/last_policies"
-                        )
-
-                        return True
+        Returns:
+            bool: True if the early stopping criteria is triggered.
+        """
+        steps = self.learning_config.early_stopping_steps
+        if steps is None:
+            # Early stopping is disabled
             return False
+
+        # if we do not see any improvement in the last x evaluation runs we stop the training
+        if len(self.rl_eval[metric]) < steps:
+            return False
+
+        self.avg_rewards.append(sum(self.rl_eval[metric][-steps:]) / steps)
+
+        if len(self.avg_rewards) < steps:
+            return False
+
+        recent_rewards = self.avg_rewards[-steps:]
+        min_reward = min(recent_rewards)
+        max_reward = max(recent_rewards)
+
+        # Avoid division by zero or unexpected behavior with negative values
+        denominator = max(abs(min_reward), 1e-8)
+        avg_change = abs((max_reward - min_reward) / denominator)
+
+        if avg_change >= self.learning_config.early_stopping_threshold:
+            return False
+
+        logger.info(
+            f"Stopping training as no improvement above {self.learning_config.early_stopping_threshold * 100}% in last {steps} evaluations for {metric}"
+        )
+        if (
+            self.learning_config.learning_rate_schedule is not None
+            or self.learning_config.action_noise_schedule is not None
+        ):
+            logger.info(
+                f"Learning rate schedule ({self.learning_config.learning_rate_schedule}) or action noise schedule ({self.learning_config.action_noise_schedule}) were scheduled to decay, further learning improvement can be possible. End value of schedule may not have been reached."
+            )
+
+        self.rl_algorithm.save_params(
+            directory=f"{self.learning_config.trained_policies_save_path}/last_policies"
+        )
+
+        return True
 
     def init_logging(
         self,

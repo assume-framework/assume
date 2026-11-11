@@ -137,7 +137,9 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 self.model.time_steps,
                 initialize={
                     t: value
-                    for t, value in enumerate(self.forecaster.get_price("natural_gas"))
+                    for t, value in enumerate(
+                        self._values_for_model(self.forecaster.get_price("natural_gas"))
+                    )
                 },
             )
 
@@ -146,14 +148,19 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 self.model.time_steps,
                 initialize={
                     t: value
-                    for t, value in enumerate(self.forecaster.get_price("hydrogen"))
+                    for t, value in enumerate(
+                        self._values_for_model(self.forecaster.get_price("hydrogen"))
+                    )
                 },
             )
 
         self.model.absolute_demand = pyo.Param(initialize=self.demand)
         self.model.thermal_demand = pyo.Param(
             self.model.time_steps,
-            initialize={t: value for t, value in enumerate(self.thermal_demand)},
+            initialize={
+                t: value
+                for t, value in enumerate(self._values_for_model(self.thermal_demand))
+            },
         )
 
     def define_variables(self):
@@ -172,7 +179,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
 
     def initialize_process_sequence(self):
         # Per-time-step constraint (default)
-        if not self.forecaster.demand or self.forecaster.demand == 0:
+        if not self.demand:
 
             @self.model.Constraint(self.model.time_steps)
             def direct_heat_balance(m, t):
@@ -219,7 +226,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             """
             Ensures the thermal output meets the absolute demand.
             """
-            if not self.forecaster.demand or self.forecaster.demand == 0:
+            if not self.demand:
                 return pyo.Constraint.Skip
             else:
                 return (

@@ -114,7 +114,10 @@ def calculate_sum_demand(
 
 
 def calculate_exchange_volume(exchange_units: list[Exchange]):
-    """Returns summed exchange volume at every timestep (imports - exports)"""
+    """Returns summed exchange volume at every timestep (exports - imports)
+
+    Imports are supply and reduce the demand, exports are demand and increase it.
+    """
     sum_demand = 0
 
     # get exchanges if exchange_units are available
@@ -127,8 +130,8 @@ def calculate_exchange_volume(exchange_units: list[Exchange]):
         sum_exports = abs(
             np.array([unit.forecaster.volume_export for unit in exchange_units])
         ).sum(axis=0)
-        # add imports and exports to the sum_demand
-        sum_demand += sum_imports - sum_exports
+        # imports reduce and exports increase the sum_demand
+        sum_demand += sum_exports - sum_imports
 
     return sum_demand
 
@@ -357,6 +360,8 @@ def calculate_naive_price_elastic(
                     continue
             elif bid["volume"] == 0:
                 continue
+            for field in config.additional_fields:
+                bid.setdefault(field, None)
             cleaned_orderbook.append(bid)
 
         mps = get_available_products(

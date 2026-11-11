@@ -626,12 +626,12 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         # Consideration of start-up costs, divided evenly between upward and downward regulation events.
         if (
             unit.outputs[product_type].at[start] != 0
-            and unit.outputs[product_type].at[start - unit.index.freq] == 0
+            and unit.get_output_before(start, product_type) == 0
         ):
             operational_cost += unit.hot_start_cost / 2
         elif (
             unit.outputs[product_type].at[start] == 0
-            and unit.outputs[product_type].at[start - unit.index.freq] != 0
+            and unit.get_output_before(start, product_type) != 0
         ):
             operational_cost += unit.hot_start_cost / 2
 
@@ -890,7 +890,7 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         the agent's action selection.
         """
         # get the current soc and energy cost value
-        soc = unit.outputs["soc"].at[start]
+        soc = unit.get_soc(start)
         cost_stored_energy_scaled = (
             unit.outputs["cost_stored_energy"].at[start] / self.max_bid_price
         )
@@ -1048,8 +1048,8 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         order_profit = accepted_price * accepted_volume * duration_hours
         order_cost = abs(marginal_cost * accepted_volume * duration_hours)
 
-        current_soc = unit.outputs["soc"].at[start]
-        next_soc = unit.outputs["soc"].at[next_time]
+        current_soc = unit.get_soc(start)
+        next_soc = unit.get_soc(next_time)
 
         # Calculate and clip the energy cost for the start time
         # cost_stored_energy = average volume-weighted procurement costs of the currently stored energy
@@ -1265,12 +1265,12 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
         # Consideration of start-up costs, divided evenly between upward and downward regulation events.
         if (
             unit.outputs[product_type].at[start] != 0
-            and unit.outputs[product_type].at[start - unit.index.freq] == 0
+            and unit.get_output_before(start, product_type) == 0
         ):
             operational_cost += unit.hot_start_cost / 2
         elif (
             unit.outputs[product_type].at[start] == 0
-            and unit.outputs[product_type].at[start - unit.index.freq] != 0
+            and unit.get_output_before(start, product_type) != 0
         ):
             operational_cost += unit.hot_start_cost / 2
 

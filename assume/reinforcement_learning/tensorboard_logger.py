@@ -4,6 +4,7 @@
 
 import logging
 import os
+from pathlib import Path
 
 import pandas as pd
 from sqlalchemy import create_engine
@@ -128,7 +129,7 @@ class TensorBoardLogger:
 
         if self.writer is None:
             self.writer = SummaryWriter(
-                log_dir=os.path.join("tensorboard", self.simulation_id)
+                log_dir=str(Path("tensorboard") / self.simulation_id)
             )
 
         mode = "02_train" if not self.evaluation_mode else "01_eval"

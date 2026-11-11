@@ -26,7 +26,7 @@ Unit Type                     Forecaster Class                          Addition
 Power Plants                  ``PowerplantForecaster``                  ``fuel_prices``
 Storage Units                 ``UnitForecaster``                        *(base only)*
 Demand Units                  ``DemandForecaster``                      ``demand``
-Exchange Units                ``ExchangeForecaster``                    ``volume_import``, ``volume_export``
+Exchange Units                ``ExchangeForecaster``                    ``volume_import``, ``volume_export``, ``price_import``, ``price_export`` (optional)
 DSM Units                     ``DsmUnitForecaster``                     ``congestion_signal``, ``renewable_utilisation_signal``, ``electricity_price``
 Steelplant Units              ``SteelplantForecaster``                  DSM attrs + ``fuel_prices``
 Cement Plant Units            ``CementForecaster``                      DSM attrs + ``fuel_prices``, ``clinker_demand``, ``normalized_load_profile``, ``electricity_price_flex``, ``thermal_storage_schedule``, ``availability_profiles``
@@ -35,6 +35,13 @@ Building Units                ``BuildingForecaster``                    DSM attr
 Hydrogen Units                ``HydrogenForecaster``                    DSM attrs + ``hydrogen_demand``, ``seasonal_storage_schedule``
 Custom Units (CSV import)     ``CustomUnitForecaster``                  *(arbitrary keyword attributes)*
 ============================= ========================================= ===========================================
+
+.. note::
+   Forecast series passed to a forecaster as :class:`~assume.common.fast_pandas.FastSeries` are used as-is,
+   while any other type (``pd.Series``, list, scalar) is copied into a new array per forecaster.
+   For data that is identical for many units, such as fuel prices, create the ``FastSeries`` once and pass the
+   same objects to every forecaster to avoid one copy per unit. The CSV loader does this for ``fuel_prices``.
+   Shared series must not be modified in place, as the change would affect all units.
 
 .. note::
    Unit operators can also own a forecaster, :class:`~assume.common.forecaster.UnitsOperatorForecaster`,

@@ -1131,11 +1131,13 @@ class ExchangeForecaster(UnitForecaster):
     """Forecaster for exchange (import/export) units.
 
     Provides price, residual load, and availability forecasts (see :class:`UnitForecaster`)
-    plus import and export volume timeseries.
+    plus import and export volume and price timeseries.
 
     Attributes:
         volume_import (ForecastSeries): Forecasted import volume.
         volume_export (ForecastSeries): Forecasted export volume.
+        price_import (ForecastSeries | None): Import price timeseries. If None, the unit falls back to its scalar ``price_import``.
+        price_export (ForecastSeries | None): Export price timeseries. If None, the unit falls back to its scalar ``price_export``.
     """
 
     def __init__(
@@ -1145,6 +1147,8 @@ class ExchangeForecaster(UnitForecaster):
         forecast_registries: dict[str, dict] = None,
         volume_import: ForecastSeries = 0,
         volume_export: ForecastSeries = 0,
+        price_import: ForecastSeries | None = None,
+        price_export: ForecastSeries | None = None,
         residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
         market_prices: dict[str, ForecastSeries] = None,
@@ -1159,6 +1163,12 @@ class ExchangeForecaster(UnitForecaster):
         )
         self.volume_import = self._to_series(volume_import)
         self.volume_export = self._to_series(volume_export)
+        self.price_import = (
+            self._to_series(price_import) if price_import is not None else None
+        )
+        self.price_export = (
+            self._to_series(price_export) if price_export is not None else None
+        )
 
 
 class UnitsOperatorForecaster(UnitForecaster):

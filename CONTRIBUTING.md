@@ -37,9 +37,11 @@ git clone https://github.com/assume-framework/assume.git
 cd assume
 ```
 
-2. Install the package in editable mode:
+2. Install the package in editable mode.
+   Without a GPU, install the CPU-only torch first, otherwise the `learning` extra pulls the multi-GB CUDA build on Linux:
 
 ```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install -e ".[all]"
 ```
 

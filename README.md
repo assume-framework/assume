@@ -72,8 +72,16 @@ pip install assume-framework
 pip install 'assume-framework[learning]'
 ```
 
-Please keep in mind that the above installation method will install the PyTorch package without CUDA support.
-If you want to make use of your GPU with CUDA cores, please install PyTorch with GPU support separately as described [here](https://pytorch.org/get-started/locally/).
+The `learning` extra depends on a generic `torch` and leaves the choice of build to you.
+On Linux, the default wheel from PyPI is the CUDA build, which pulls in several GB of `nvidia-*` packages.
+If you do not have a GPU, install the CPU-only build first, then the extra (pip keeps the already installed torch):
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install 'assume-framework[learning]'
+```
+
+If you want to make use of your GPU with CUDA cores, install PyTorch with GPU support as described [here](https://pytorch.org/get-started/locally/).
 
 We also include **network-based market clearing algorithms** such as for the re-dispatch, zonal clearing with NTCs and nodal market clearing, which all require the PyPSA library.
 To install the package with these capabilities, use:
@@ -197,7 +205,7 @@ For additional CLI options, run `assume -h`.
 
 ## Contributors and Funding
 
-The project is developed by a collaborative team of researchers from INATECH at the University of Freiburg, IISM at Karlsruhe Institute of Technology, Fraunhofer Institute for Systems and Innovation Research, Fraunhofer Institution for Energy Infrastructures and Geothermal Energy, and FH Aachen - University of Applied Sciences. Each contributor brings valuable expertise in electricity market modeling, deep reinforcement learning, demand side flexibility, and infrastructure modeling.
+The project is developed by a collaborative team of researchers from INATECH at the University of Freiburg, WIN at Karlsruhe Institute of Technology, Fraunhofer Institute for Systems and Innovation Research (ISI), Fraunhofer Institution for Energy Infrastructures and Geothermal Energy, and FH Aachen - University of Applied Sciences. Each contributor brings valuable expertise in electricity market modeling, deep reinforcement learning, demand side flexibility, and infrastructure modeling.
 
 ASSUME is funded by the Federal Ministry for Economic Affairs and Climate Action (BMWK).
 We are grateful for their support in making this project possible.

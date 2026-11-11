@@ -182,17 +182,18 @@ class BaseUnit:
         self, start: datetime, end: datetime, product_type: str
     ) -> None:
         """
-        Calculates the generation cost for a specific product type within the given time range,
-        but only if the end is the last index in the time series.
+        Calculates the generation cost for a specific product type within the given time range.
+
+        Like label-based slicing in pandas, both start and end are inclusive.
+        A start between two index steps is rounded up to the next step.
 
         Args:
-            start (datetime.datetime): The start time for the calculation.
-            end (datetime.datetime): The end time for the calculation.
+            start (datetime.datetime): The start time for the calculation (inclusive).
+            end (datetime.datetime): The end time for the calculation (inclusive).
             product_type (str): The type of product for which the generation cost is to be calculated.
         """
 
-        if start not in self.index:
-            start = self.index[0]
+        start = max(start, self.index[0])
 
         # Adjusted code for accessing product data and mapping over the index
         product_data = self.outputs[product_type].loc[start:end]
@@ -501,6 +502,9 @@ class SupportsMinMaxCharge(BaseUnit):
             if not isinstance(strategy, MinMaxChargeStrategy):
                 raise ValueError(f"strategy {strategy} is not a MinMaxChargeStrategy!")
 
+        # outputs["soc"] is only valid up to here (inclusive), see ensure_soc
+        self._soc_valid_until = self.index[0]
+
     def calculate_min_max_charge(
         self, start: datetime, end: datetime, soc: float = None
     ) -> tuple[np.ndarray, np.ndarray]:
@@ -627,58 +631,131 @@ class SupportsMinMaxCharge(BaseUnit):
             power_charge = min(power_charge, minimum_required - current_power, 0)
         return power_charge
 
+    def calculate_feasible_power(self, current_power: float, soc: float) -> float:
+        """
+        Clips a planned power to the power limits and to what ``soc`` can back.
+
+        Args:
+            current_power (float): The planned power, negative when charging.
+            soc (float): The state of charge the power would run from.
+
+        Returns:
+            float: The power the unit can actually run at.
+        """
+        # adjust power to constraints of the unit
+        if current_power > self.max_power_discharge:
+            current_power = self.max_power_discharge
+        elif current_power < self.max_power_charge:
+            current_power = self.max_power_charge
+        elif (
+            self.min_power_discharge > current_power > self.min_power_charge
+            and current_power != 0
+        ):
+            current_power = 0
+
+        # restrict according to what the SOC can back
+        if current_power > 0:
+            current_power = min(current_power, self.calculate_soc_max_discharge(soc))
+        elif current_power < 0:
+            current_power = max(current_power, self.calculate_soc_max_charge(soc))
+        return current_power
+
+    def calculate_delta_soc(self, current_power: float) -> float:
+        """
+        The change in state of charge caused by running at ``current_power``.
+
+        Args:
+            current_power (float): A feasible power, negative when charging.
+
+        Returns:
+            float: The change in state of charge.
+        """
+        time_delta = self.index.freq / timedelta(hours=1)
+        if current_power > 0:
+            return (
+                -current_power * time_delta / self.efficiency_discharge
+            ) / self.capacity
+        if current_power < 0:
+            return (
+                -current_power * time_delta * self.efficiency_charge
+            ) / self.capacity
+        return 0.0
+
+    def ensure_soc(self, until: datetime) -> None:
+        """
+        Propagates the state of charge from the frontier up to ``until``.
+
+        Each step moves the SOC by the feasible power, not by the plan in
+        ``outputs["energy"]``, which is left untouched until delivery.
+
+        Args:
+            until (datetime.datetime): The point in time the SOC is needed for.
+        """
+        last = self.index[-1]
+        until = min(self.index.align_up(until), last)
+        if until <= self._soc_valid_until:
+            return
+
+        for t in self.index[self._soc_valid_until : until - self.index.freq]:
+            soc = self.outputs["soc"].at[t]
+            current_power = self.calculate_feasible_power(
+                self.outputs["energy"].at[t], soc
+            )
+            self.outputs["soc"].at[t + self.index.freq] = (
+                soc + self.calculate_delta_soc(current_power)
+            )
+
+        self._soc_valid_until = until
+
+    def set_soc(self, t: datetime, soc: float) -> None:
+        """
+        Sets a known state of charge at ``t``, invalidating everything after it.
+
+        Args:
+            t (datetime.datetime): The time to set the SOC at.
+            soc (float): The state of charge (between 0 and 1).
+        """
+        t = self.index.align_up(t)
+        # propagate up to t first, so the range before it is valid
+        self.ensure_soc(t)
+        self.outputs["soc"].at[t] = soc
+        self._soc_valid_until = t
+
+    def get_soc(self, t: datetime) -> float:
+        """
+        Returns the state of charge at the beginning of ``t``, propagating it
+        there if needed.
+
+        Prefer this over ``outputs["soc"]``, which is only up to date until
+        the last propagation.
+
+        Args:
+            t (datetime.datetime): The time to read the SOC at.
+
+        Returns:
+            float: The state of charge at ``t``.
+        """
+        self.ensure_soc(t)
+        return self.outputs["soc"].at[t]
+
     def set_dispatch_plan(
         self, marketconfig: MarketConfig, orderbook: Orderbook
     ) -> None:
-        """Updates the SOC for storage units."""
+        """
+        Adds the accepted volumes and invalidates the SOC from the earliest one on.
+
+        An empty orderbook - e.g. after ``remove_empty_bids`` - and capacity
+        products do not move the SOC and invalidate nothing.
+        """
         super().set_dispatch_plan(marketconfig, orderbook)
 
-        if not orderbook:
+        if marketconfig.product_type != "energy" or not orderbook:
             return
 
-        # also update the SOC when setting the dispatch plan
-        start = min(order["start_time"] for order in orderbook)
-        end = max(order["end_time"] for order in orderbook)
-        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-        end_excl = end - self.index.freq
-        time_delta = self.index.freq / timedelta(hours=1)
-
-        for t in self.index[start:end_excl]:
-            next_t = t + self.index.freq
-            # continue if it is the last time step
-            if next_t not in self.index:
-                continue
-            current_power = self.outputs["energy"].at[t]
-
-            # calculate the change in state of charge
-            delta_soc = 0
-            soc = self.outputs["soc"].at[t]
-
-            # discharging
-            if current_power > 0:
-                max_soc_discharge = self.calculate_soc_max_discharge(soc)
-
-                if current_power > max_soc_discharge:
-                    current_power = max_soc_discharge
-
-                delta_soc = (
-                    -current_power * time_delta / self.efficiency_discharge
-                ) / self.capacity
-
-            # charging
-            elif current_power < 0:
-                max_soc_charge = self.calculate_soc_max_charge(soc)
-
-                if current_power < max_soc_charge:
-                    current_power = max_soc_charge
-
-                delta_soc = (
-                    -current_power * time_delta * self.efficiency_charge
-                ) / self.capacity
-
-            # update the values of the state of charge and the energy
-            self.outputs["soc"].at[next_t] = soc + delta_soc
-            self.outputs["energy"].at[t] = current_power
+        earliest = min(order["start_time"] for order in orderbook)
+        self._soc_valid_until = min(
+            self._soc_valid_until, self.index.align_up(earliest)
+        )
 
 
 class BaseStrategy:
@@ -801,10 +878,10 @@ class LearningConfig:
             decay is available, which linearly decreases the learning rate over time. Default is None (constant learning rate).
         early_stopping_steps (int | None): The number of validation steps over which the moving average reward
             is calculated for early stopping. If the reward doesn't change by early_stopping_threshold over
-            this many steps, training stops. If None, defaults to training_episodes / validation_episodes_interval + 1.
+            this many steps, training stops. If None, early stopping is disabled. Default is None.
         early_stopping_threshold (float): The minimum improvement in moving average reward required to avoid
             early stopping. If the reward improvement is less than this threshold over early_stopping_steps,
-            training is terminated early. Default is 0.05.
+            training is terminated early. Default is 0.05. Only available if early_stopping_steps is set.
 
         algorithm (str): Specifies which reinforcement learning algorithm to use. Currently, only "matd3"
             (Multi-Agent Twin Delayed Deep Deterministic Policy Gradient) is implemented. Default is "matd3".
@@ -816,14 +893,17 @@ class LearningConfig:
             "mlp" (Multi-Layer Perceptron) and "lstm" (Long Short-Term Memory). Default is "mlp".
         policy_delay (int): The frequency (in gradient steps) at which the actor policy is updated.
             TD3 updates the critic more frequently than the actor to stabilize training. Default is 2.
-        noise_sigma (float): The standard deviation of the Ornstein-Uhlenbeck or Gaussian noise distribution
-            used to generate exploration noise added to actions. Default is 0.1.
-        noise_scale (int): The scale factor multiplied by the noise drawn from the distribution.
-            Larger values increase exploration. Default is 1.
-        noise_dt (int): The time step parameter for the Ornstein-Uhlenbeck process, which determines how
-            quickly the noise decays over time. Used for noise scheduling. Default is 1.
+        noise_sigma (float): Standard deviation of the Gaussian exploration noise added to the actor's actions.
+            The effective noise std is noise_sigma * noise_scale * noise_dt. Default is 0.1.
+        noise_scale (float): Constant factor multiplied onto the sampled noise. Larger values increase exploration.
+            Default is 1.
+        noise_dt (float): Noise multiplier that is subject to the action noise schedule. With
+            action_noise_schedule="linear" it decays linearly from noise_dt to 0 over the training episodes;
+            with None it stays constant at noise_dt.
+            Default is 1.
         action_noise_schedule (str | None): Which action noise decay schedule to use. Currently only "linear"
-            decay is available, which linearly decreases exploration noise over training. Default is "linear".
+            is available, which linearly decreases noise_dt (and with it the exploration noise) to 0 over training.
+            Default is None (constant exploration noise).
         tau (float): The soft update coefficient for updating target networks. Controls how slowly target
             networks track the main networks. Smaller values mean slower updates. Default is 0.005.
         target_policy_noise (float): The standard deviation of noise added to target policy actions during
@@ -869,12 +949,6 @@ class LearningConfig:
     target_noise_clip: float = 0.5
 
     def __post_init__(self):
-        """Calculate defaults that depend on other fields and validate inputs."""
-        if self.early_stopping_steps is None:
-            self.early_stopping_steps = int(
-                self.training_episodes / self.validation_episodes_interval + 1
-            )
-
         # if we do not have initial experience collected we will get an error as no samples are available on the
         # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
         if self.episodes_collecting_initial_experience < 1:

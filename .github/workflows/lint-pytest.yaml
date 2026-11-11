@@ -62,7 +62,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.12", "3.14"]
+        python-version: ["3.11", "3.12", "3.14"]
 
     steps:
     - uses: actions/checkout@v7.0.0
@@ -86,10 +86,13 @@ jobs:
     needs: [changes, pre-commit]
     if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
+    env:
+      # run tests outside of UTC to catch naive datetimes being interpreted as local time
+      TZ: Europe/Berlin
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.12", "3.14"]
+        python-version: ["3.11", "3.12", "3.14"]
 
     steps:
     - uses: actions/checkout@v7.0.0
@@ -105,7 +108,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        python -m pip install -e .[test]
+        python -m pip install -e .[test,entsoe]
 
     - name: Test with pytest & integration tests
       run: |
@@ -121,6 +124,8 @@ jobs:
 
     - name: Install torch dependencies
       run: |
+        # CPU-only wheel first: the default PyPI wheel on Linux bundles CUDA (~5 GB) and CI has no GPU
+        python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
         python -m pip install -e .[learning]
 
     - name: Test pytest with torch & integration tests
