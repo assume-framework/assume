@@ -12,6 +12,8 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+0.7.0 - (11th November 2026)
+=========================
 
 **License:**
   - **ASSUME is now licensed under the MIT License** instead of the GNU Affero General Public License v3.0 (AGPL-3.0-or-later). The SPDX headers, the package metadata and the documentation have been updated accordingly. The code of conduct, which is adapted from the Contributor Covenant, is licensed under CC-BY-4.0.
@@ -34,6 +36,7 @@ Upcoming Release
   - **Market timing visualization**: Added ``assume.common.market_timing`` to show when markets open, when bids can be submitted, when they are cleared and which periods they deliver, as a mermaid gantt diagram (``market_timing_to_mermaid``) or rendered in the terminal (``render_market_timing``). The timing is also checked for common mistakes: a market cleared after its delivery starts, a market opening at the same time another market is cleared for an overlapping delivery period (so those results are not available to its bidders yet) and overlapping openings of the same market. See ``examples/market_timing.py`` for an example. Adds the dependency ``termaid``.
   - **Market timing CLI and validation**: The new command ``assume-market <config.yaml> --case-study <case>`` shows the market timing of a study case and its timing issues before running a simulation. The same checks are part of the setup validation of the ``World``: a market cleared after its delivery starts raises a ``ValueError``, the other timing issues raise warnings. The ``dam_with_complex_clearing`` cases of example_01a and example_01i were cleared after their delivery started and now use an ``opening_duration`` of 1h.
   - **Time-varying exchange prices**: Exchange units can now use import and export price timeseries, given as ``<unit_id>_price_import`` and ``<unit_id>_price_export`` columns in ``exchanges_df.csv``. They are passed through the ``ExchangeForecaster`` and override the scalar ``price_import``/``price_export`` from ``exchange_units.csv``. If no timeseries is given, the scalar prices are used as before and a warning is logged.
+  - **ENTSO-E loader**: Allows to initialize a country-level scenario from the ENTSO-E Transparency Platform.
 
 **Improvements:**
   - **Rolling-horizon optimisation for DSM units**: Rolling-horizon operation is available for ``Building``, ``SteelPlant``, ``CementPlant``, ``HydrogenPlant``, and ``SteamPlant``. Hydrogen and steam plants use per-timestep hydrogen and thermal-demand forecasts; Steam-plant thermal-demand and boiler fuel-price profiles are aligned to each optimisation window. See :doc:`demand_side_agent` for configuration and demand-profile details.
