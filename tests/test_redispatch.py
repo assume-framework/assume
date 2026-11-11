@@ -605,6 +605,11 @@ def test_redispatch_with_storage(
             "max_power": 500.0,  # SoC-aware discharge bound (positive)
             "p_nom": STORAGE_P_NOM,
             "price": 20.0,
+            # plenty of stored energy and room: only the power limits bind here
+            "energy_discharge_headroom": 1000.0,
+            "energy_charge_headroom": 1000.0,
+            "efficiency_charge": 1.0,
+            "efficiency_discharge": 1.0,
             "node": "S",
         },
     ]
@@ -633,3 +638,162 @@ def test_redispatch_with_storage(
     assert (
         abs(flows_df.loc[0, "line_N_S"]) <= storage_lines.loc["line_N_S", "s_nom"] + eps
     )
+
+
+def test_redispatch_storage_energy_limit(simple_redispatch_market_config):
+    """
+    The storage may not deliver more redispatch energy over the horizon than it
+    holds. Every hour needs 200 MW of upward redispatch in the south, the storage
+    offers 500 MW per hour but holds only 300 MWh, so it must stop at 300 MWh and
+    the expensive southern generator has to cover the rest.
+    """
+    n_hours = 4
+    energy_available = 300.0  # MWh above min_soc
+
+    market_config = simple_redispatch_market_config
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), n_hours, timedelta(hours=1))
+    ]
+    market_config.param_dict["grid_data"] = {
+        "buses": nodes,
+        "lines": storage_lines,
+        "generators": pd.DataFrame(
+            {
+                "name": ["gen_N", "gen_S"],
+                "node": ["N", "S"],
+                "marginal_cost": [10.0, 100.0],
+                "max_power": [1000.0, 1000.0],
+            }
+        ).set_index("name"),
+        "loads": storage_demand,
+        "storage_units": storage_units_df.assign(
+            efficiency_charge=1.0, efficiency_discharge=1.0
+        ),
+    }
+
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(market_config.market_products, next_opening)
+
+    orderbook = []
+    for start, end, _ in products:
+        common = {"start_time": start, "end_time": end, "only_hours": None}
+        orderbook += [
+            {
+                **common,
+                "unit_id": "gen_N",
+                "bid_id": f"gen_N_{start}",
+                "volume": 300.0,
+                "min_power": 0.0,
+                "max_power": 1000.0,
+                "p_nom": 1000.0,
+                "price": 10.0,
+                "node": "N",
+            },
+            {
+                **common,
+                "unit_id": "gen_S",
+                "bid_id": f"gen_S_{start}",
+                "volume": 0.0,
+                "min_power": 0.0,
+                "max_power": 1000.0,
+                "p_nom": 1000.0,
+                "price": 100.0,
+                "node": "S",
+            },
+            {
+                **common,
+                "unit_id": "dem_S",
+                "bid_id": f"dem_S_{start}",
+                "volume": -300.0,
+                "min_power": 0.0,
+                "max_power": -1000.0,
+                "p_nom": 1000.0,
+                "price": 3000.0,
+                "node": "S",
+            },
+            {
+                **common,
+                "unit_id": "storage_S",
+                "bid_id": f"storage_S_{start}",
+                "volume": 0.0,
+                "min_power": -500.0,
+                "max_power": 500.0,
+                "p_nom": STORAGE_P_NOM,
+                "price": 20.0,
+                # idle baseline -> head-room stays constant over the horizon
+                "energy_discharge_headroom": energy_available,
+                "energy_charge_headroom": 1000.0,
+                "efficiency_charge": 1.0,
+                "efficiency_discharge": 1.0,
+                "node": "S",
+            },
+        ]
+
+    rmr = RedispatchMarketRole(market_config)
+    accepted_orders, _, _, _ = rmr.clear(orderbook, products)
+
+    volume = {}
+    for o in accepted_orders:
+        volume[o["unit_id"]] = volume.get(o["unit_id"], 0.0) + o["accepted_volume"]
+
+    # without the energy constraint the cheap storage would deliver 4 x 200 MWh
+    assert volume["storage_S"] == pytest.approx(energy_available, abs=1e-1)
+    assert volume["gen_S"] == pytest.approx(
+        n_hours * 200.0 - energy_available, abs=1e-1
+    )
+    assert volume["gen_N"] == pytest.approx(-n_hours * 200.0, abs=1e-1)
+
+
+def test_redispatch_storage_without_headroom_is_blocked(
+    simple_redispatch_market_config, grid_data_with_storage, caplog
+):
+    """A storage bid without energy headroom must not be redispatched at all."""
+    market_config = simple_redispatch_market_config
+    market_config.param_dict["grid_data"] = grid_data_with_storage
+
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(market_config.market_products, next_opening)
+    common = {"start_time": products[0][0], "end_time": products[0][1]}
+    common["only_hours"] = None
+    orderbook = [
+        {
+            **common,
+            "unit_id": "gen_N",
+            "bid_id": "gen_N_1",
+            "volume": 300.0,
+            "min_power": 0.0,
+            "max_power": 1000.0,
+            "p_nom": 1000.0,
+            "price": 10.0,
+            "node": "N",
+        },
+        {
+            **common,
+            "unit_id": "dem_S",
+            "bid_id": "dem_S_1",
+            "volume": -300.0,
+            "min_power": 0.0,
+            "max_power": -1000.0,
+            "p_nom": 1000.0,
+            "price": 3000.0,
+            "node": "S",
+        },
+        {
+            **common,
+            "unit_id": "storage_S",
+            "bid_id": "storage_S_1",
+            "volume": 0.0,
+            "min_power": -500.0,
+            "max_power": 500.0,
+            "p_nom": STORAGE_P_NOM,
+            "price": 20.0,
+            "node": "S",
+        },
+    ]
+
+    rmr = RedispatchMarketRole(market_config)
+    with caplog.at_level("WARNING"):
+        accepted_orders, _, _, _ = rmr.clear(orderbook, products)
+
+    assert "redispatch is blocked" in caplog.text
+    assert "storage_S" not in {o["unit_id"] for o in accepted_orders}
