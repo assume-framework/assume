@@ -23,8 +23,8 @@ Throughout the code and this page, the same sign convention is used everywhere:
 - A power of ``0`` means the unit is idle.
 
 
-The usable energy content of the storage is tracked as a **state of charge (SOC)**, a value between 0 and 1 relative to the unit's ``capacity`` in MWh. The value is alaways defined for the beginning of an hour without the dispatch that happens in that ver hour. For example an SoC of 0.5 stored for the hour 22:00 means that at the beginning of the hour 22:00, the storage has 50% of its capacity available for discharge/charge. Every dispatch for products ranging from 22:00 to 23:00 will change the SoC for the next hour (23:00).
-The SoC is kept within ``min_soc`` and ``max_soc``. How far the unit can charge or discharge in the current step is additionally capped by how much energy is actually left in (or missing from) the storage -- this is computed by :meth:`~assume.units.storage.Storage.calculate_soc_max_charge` and :meth:`~assume.units.storage.Storage.calculate_soc_max_discharge`.
+The usable energy content of the storage is tracked as a **state of charge (SOC)**, a value between 0 and 1 relative to the unit's ``capacity`` in MWh. The SOC of a time step is the value at its beginning, before the dispatch of that step: an SOC of 0.5 at 22:00 means that half of the capacity is stored at 22:00, and the dispatch from 22:00 to 23:00 changes the SOC of 23:00.
+The SOC is kept within ``min_soc`` and ``max_soc``. How far the unit can charge or discharge in the current step is additionally capped by how much energy is actually left in (or missing from) the storage -- this is computed by :meth:`~assume.units.storage.Storage.calculate_soc_max_charge` and :meth:`~assume.units.storage.Storage.calculate_soc_max_discharge`.
 
 
 On top of the SOC-based limits, the unit has **ramping constraints** that limit how much the power
@@ -64,7 +64,7 @@ Ramping is evaluated by
 (building on the generic implementation in
 :class:`~assume.common.base.SupportsMinMaxCharge`). Both methods take ``previous_power``, ``requested_power`` and ``current_power`` and return the power level that is actually feasible given the ramping constraints.
 
-If the unit was charging in the previous step and now requests to discharge (or vice versa), the first question is always whether the unit can even ramp back through zero within one time step -- if ``previous_power`` cannot reach 0 given ``ramp_down_charge`` (or ``ramp_down_discharge``), the requested direction switch is infeasible and no power in that direction can be offered.
+If the unit was charging in the previous step and now requests to discharge (or vice versa), the first question is always whether the unit can even ramp back through zero within one time step -- if ``previous_power`` cannot reach 0 given ``ramp_down_charge`` (or ``ramp_down_discharge``), the requested direction switch is infeasible and no power in that direction can be offered. However, power already committed on another market counts towards this: with ``previous_power = -60`` and ``ramp_down_charge = -50`` the unit can charge a minimum of10 MW, so with ``current_power = -20`` a discharge bid of up to 10 MW is feasible (total -10 MW).
 
 If a switch through zero is feasible, there are two different ways to model what happens *within* that one time step, controlled by the ``simultaneous_charge_discharge_ramping`` flag:
 
@@ -108,7 +108,7 @@ Since ``current_power`` (power already committed on another market in the same t
 
 In the figure, "Reachable power" is the physical ramp limit from ``previous_power`` alone (``previous_power + ramp_up_discharge``), ignoring any other market. "Requested power" is what gets checked and returned for *this* market and it can sit *above* "Reachable power", because "Current power" (already committed, and charging here, so negative) is netted into the check. As long as ``current_power + feasible_bid`` stays at or below "Reachable power", the bid itself is allowed to be larger than what the ramp alone would suggest.
 
-Example: a unit with ``simultaneous_charge_discharge_ramping = True``, ``ramp_up_discharge = 40`` and a previous power of ``previous_power = 10`` MW already charges ``current_power = -20`` MW on another market. "Reachable power" is ``10 + 40 = 50`` MW. Even though a new market requests more than that (``requested_power_discharge = 90``), the unit can still offer 70 MW on it:
+Example: a unit with ``ramp_up_discharge = 40`` and a previous power of ``previous_power = 10`` MW already charges ``current_power = -20`` MW on another market. "Reachable power" is ``10 + 40 = 50`` MW. Even though a new market requests more than that (``requested_power_discharge = 90``), the unit can still offer 70 MW on it:
 
 .. code-block:: python
 
