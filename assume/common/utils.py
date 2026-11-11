@@ -432,11 +432,38 @@ def get_products_index(orderbook: Orderbook) -> pd.DatetimeIndex:
     return index_products
 
 
-def timestamp2datetime(timestamp: float):
+def timestamp2datetime(timestamp: float) -> datetime:
+    """
+    Convert a unix timestamp to a naive datetime in UTC.
+
+    ASSUME treats naive datetimes as UTC. Use this instead of
+    ``datetime.fromtimestamp`` without ``tz``, which returns the local time of
+    the machine and therefore differs between machines in different timezones.
+
+    Args:
+        timestamp (float): Seconds since 1970-01-01 00:00 UTC, e.g. the mango clock time.
+
+    Returns:
+        datetime: The naive datetime, to be read as UTC.
+    """
     return datetime.fromtimestamp(timestamp, tz=UTC).replace(tzinfo=None)
 
 
-def datetime2timestamp(datetime: datetime):
+def datetime2timestamp(datetime: datetime) -> int:
+    """
+    Convert a datetime to a unix timestamp, treating naive datetimes as UTC.
+
+    ASSUME treats naive datetimes as UTC. Use this instead of the
+    ``datetime.timestamp`` method, which treats naive datetimes as the local time
+    of the machine and therefore differs between machines in different timezones.
+    Timezone-aware datetimes are converted correctly as well.
+
+    Args:
+        datetime (datetime): The datetime to convert, naive datetimes are treated as UTC.
+
+    Returns:
+        int: Whole seconds since 1970-01-01 00:00 UTC, fractions of a second are dropped.
+    """
     return calendar.timegm(datetime.utctimetuple())
 
 
