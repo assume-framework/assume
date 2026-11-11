@@ -70,6 +70,8 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
             start, end = product[0], product[1]
 
             current_power = unit.outputs["energy"].at[start]
+            # ensures that potential additional commitment in this market is only in direction of already committed power in other market (=current_power)
+            # does not use full potential of ramping an multi-market bidding, is a simplification of this heuristic strategy in accordance with felxABLE methodology
             current_power_discharge = max(current_power, 0)
             current_power_charge = min(current_power, 0)
 
