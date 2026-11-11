@@ -11,7 +11,7 @@ from assume.common.utils import get_products_index, parse_duration
 
 class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
     """
-    A strategy that bids on the EOM-market.
+    A strategy that bids on the EOM-market. This strategy is based on the flexABLE methodology.
 
     Attributes:
         foresight (datetime.timedelta): The foresight of the unit.
@@ -181,7 +181,7 @@ class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
 
 class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
     """
-    A strategy that bids the energy_price or the capacity_price of the unit on the CRM (reserve market).
+    A strategy that bids the energy_price or the capacity_price of the unit on the CRM (reserve market). This strategy is based on the flexABLE methodology.
 
     Attributes:
         foresight (datetime.timedelta): The foresight of the unit.
@@ -299,7 +299,7 @@ class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
 
 class CapacityHeuristicBalancingNegStrategy(MinMaxStrategy):
     """
-    A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
+    A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market). This strategy is based on the flexABLE methodology.
 
     Attributes:
         foresight (datetime.timedelta): The foresight of the unit.
@@ -441,7 +441,10 @@ def calculate_EOM_price_if_off(
     if bid_quantity_inflex == 0:
         return 0
 
-    avg_operating_time = max(unit.avg_op_time, unit.min_operating_time)
+    # min_operating_time is in time steps, the markup is in €/MWh, so convert it to hours
+    avg_operating_time = max(unit.avg_op_time, unit.min_operating_time) * (
+        unit.index.freq / timedelta(hours=1)
+    )
     starting_cost = unit.get_starting_costs(op_time)
     # if we split starting_cost across av_operating_time
     # we are never adding the other parts of the cost to the following hours
@@ -498,9 +501,9 @@ def calculate_EOM_price_if_on(
     if unit.min_down_time == 0:
         price_reduction_restart = starting_cost / bid_quantity_inflex
     else:
-        price_reduction_restart = (
-            starting_cost / unit.min_down_time / bid_quantity_inflex
-        )
+        # min_down_time is in time steps, the reduction is in €/MWh, so convert it to hours
+        min_down_hours = unit.min_down_time * (unit.index.freq / timedelta(hours=1))
+        price_reduction_restart = starting_cost / min_down_hours / bid_quantity_inflex
 
     if unit.outputs["heat"].at[start] > 0:
         heat_gen_cost = (
