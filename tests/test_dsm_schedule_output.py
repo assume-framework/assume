@@ -24,7 +24,7 @@ def _by_key(dispatch):
 
 
 def test_baseline_dispatch_is_captured_per_technology(plant):
-    dispatch = _by_key(plant.get_component_dispatch(plant.index[0], plant.index[-1]))
+    dispatch = _by_key(plant.get_component_schedule(plant.index[0], plant.index[-1]))
 
     assert {"electrolyser", "dri_plant", "eaf", "unit"} == {
         tech for tech, _ in dispatch
@@ -63,7 +63,7 @@ def test_baseline_dispatch_is_captured_per_technology(plant):
 
 
 def test_dispatch_carries_variable_metadata(plant):
-    dispatch = _by_key(plant.get_component_dispatch(plant.index[0], plant.index[-1]))
+    dispatch = _by_key(plant.get_component_schedule(plant.index[0], plant.index[-1]))
 
     assert dispatch[("electrolyser", "power_in")]["carrier"] == "electricity"
     assert dispatch[("electrolyser", "power_in")]["direction"] == "in"
@@ -87,7 +87,7 @@ def test_component_specs_are_captured(plant):
 
 def test_flex_dispatch_is_added_after_flex_optimisation(plant):
     plant.determine_optimal_operation_with_flex()
-    dispatch = _by_key(plant.get_component_dispatch(plant.index[0], plant.index[-1]))
+    dispatch = _by_key(plant.get_component_schedule(plant.index[0], plant.index[-1]))
 
     # the load shift variables are only part of the flexible optimisation
     flex_only = {"load_shift_pos", "load_shift_neg"}
@@ -101,14 +101,14 @@ def test_flex_dispatch_is_added_after_flex_optimisation(plant):
 
 def test_dispatch_is_sliced_to_requested_window(plant):
     start, end = plant.index[4], plant.index[9]
-    entry = _by_key(plant.get_component_dispatch(start, end))[("eaf", "power_in")]
+    entry = _by_key(plant.get_component_schedule(start, end))[("eaf", "power_in")]
 
     assert len(entry["time"]) == len(entry["baseline"]) == 6
     assert entry["time"][0] == start
     assert entry["time"][-1] == end
 
 
-def test_dsm_dispatch_is_written_to_csv(plant, tmp_path):
+def test_dsm_schedule_is_written_to_csv(plant, tmp_path):
     plant.determine_optimal_operation_with_flex()
     output = WriteOutput(
         "test_sim",
@@ -120,14 +120,14 @@ def test_dsm_dispatch_is_written_to_csv(plant, tmp_path):
     output.handle_output_message(
         {
             "context": "write_results",
-            "type": "dsm_dispatch",
-            "data": plant.get_component_dispatch(plant.index[0], plant.index[-1]),
+            "type": "dsm_schedule",
+            "data": plant.get_component_schedule(plant.index[0], plant.index[-1]),
         },
         {"sender_id": None},
     )
     asyncio.run(output.store_dfs())
 
-    df = pd.read_csv(tmp_path / "test_sim" / "dsm_dispatch.csv", index_col="time")
+    df = pd.read_csv(tmp_path / "test_sim" / "dsm_schedule.csv", index_col="time")
     assert set(df.columns) == {
         "baseline",
         "carrier",

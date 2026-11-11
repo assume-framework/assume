@@ -68,8 +68,8 @@ class UnitsOperator(Role):
         self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
         self.last_sent_dispatch = defaultdict(lambda: 0)
-        # DSM component dispatch is not tied to a product type, so it is tracked separately
-        self.last_sent_dsm_dispatch = 0
+        # the DSM component schedule is not tied to a product type, so it is tracked separately
+        self.last_sent_dsm_schedule = 0
         # the static component specification of the DSM units is only sent once
         self.sent_dsm_specs = False
         self.forecaster = forecaster
@@ -409,23 +409,23 @@ class UnitsOperator(Role):
 
         return market_dispatch, unit_dispatch
 
-    def get_dsm_dispatch(self, last: int) -> list[dict]:
+    def get_dsm_schedule(self, last: int) -> list[dict]:
         """
-        Collects the per-technology dispatch of all DSM units since the last export.
+        Collects the planned per-technology schedule of all DSM units since the last export.
 
         Args:
-            last (int): The timestamp until which the DSM dispatch was already sent.
+            last (int): The timestamp until which the DSM schedule was already sent.
 
         Returns:
-            list[dict]: The dispatch per unit, technology and variable.
+            list[dict]: The schedule per unit, technology and variable.
         """
         now = timestamp2datetime(self.context.current_timestamp)
         start = timestamp2datetime(last + 1)
-        dsm_dispatch = []
+        dsm_schedule = []
         for unit in self.units.values():
-            if hasattr(unit, "get_component_dispatch"):
-                dsm_dispatch.extend(unit.get_component_dispatch(start, now))
-        return dsm_dispatch
+            if hasattr(unit, "get_component_schedule"):
+                dsm_schedule.extend(unit.get_component_schedule(start, now))
+        return dsm_schedule
 
     def write_actual_dispatch(self, product_type: str) -> None:
         """
@@ -487,15 +487,15 @@ class UnitsOperator(Role):
                         },
                     )
 
-            dsm_dispatch = self.get_dsm_dispatch(self.last_sent_dsm_dispatch)
-            self.last_sent_dsm_dispatch = self.context.current_timestamp
-            if dsm_dispatch:
+            dsm_schedule = self.get_dsm_schedule(self.last_sent_dsm_schedule)
+            self.last_sent_dsm_schedule = self.context.current_timestamp
+            if dsm_schedule:
                 self.context.schedule_instant_message(
                     receiver_addr=db_addr,
                     content={
                         "context": "write_results",
-                        "type": "dsm_dispatch",
-                        "data": dsm_dispatch,
+                        "type": "dsm_schedule",
+                        "data": dsm_schedule,
                     },
                 )
 

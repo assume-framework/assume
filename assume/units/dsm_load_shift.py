@@ -1500,7 +1500,7 @@ class DSMFlex:
                     instance, window_start, commit_end, saved_index
                 )
 
-            pending_component_values = self._component_dispatch_values(
+            pending_component_values = self._component_schedule_values(
                 instance, n_commit
             )
 
@@ -1523,9 +1523,9 @@ class DSMFlex:
                     "Could not update opt_power_requirement[%d]: %s", global_t, e
                 )
 
-        if not hasattr(self, "_component_dispatch"):
-            self._component_dispatch = {}
-        self._commit_component_dispatch(pending_component_values, window_start)
+        if not hasattr(self, "_component_schedule"):
+            self._component_schedule = {}
+        self._commit_component_schedule(pending_component_values, window_start)
 
         self._rh_optimized_until_step = commit_end
         logger.info(
@@ -1625,7 +1625,7 @@ class DSMFlex:
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
 
-        self._capture_component_dispatch(instance, "baseline")
+        self._capture_component_schedule(instance, "baseline")
 
     def determine_optimal_operation_with_flex(self):
         """
@@ -1716,7 +1716,7 @@ class DSMFlex:
             index=self.index, value=flex_variable_cost
         )
 
-        self._capture_component_dispatch(instance, "flex")
+        self._capture_component_schedule(instance, "flex")
 
     def switch_to_opt(self, instance):
         if hasattr(instance, "obj_rule_flex"):
@@ -1810,12 +1810,12 @@ class DSMFlex:
 
         return unit_dict
 
-    # DSM dispatch output (``dsm_dispatch`` / ``dsm_specs`` tables)
+    # DSM schedule output (``dsm_schedule`` / ``dsm_specs`` tables)
     @staticmethod
-    def _component_dispatch_values(instance, n_steps: int) -> dict[tuple, list]:
-        """Read the first *n_steps* values of every dispatch variable of *instance*.
+    def _component_schedule_values(instance, n_steps: int) -> dict[tuple, list]:
+        """Read the first *n_steps* values of every schedule variable of *instance*.
 
-        Dispatch variables are the non-binary variables indexed by time of each
+        Schedule variables are the non-binary variables indexed by time of each
         technology block (power, material and fuel flows, emissions, operating cost,
         storage levels, ...) and of the model itself (``total_power_input``,
         ``variable_cost``, the load shift variables, ...). The unit-level series are
@@ -1859,28 +1859,28 @@ class DSMFlex:
 
         return values
 
-    def _capture_component_dispatch(self, instance, mode: str) -> None:
+    def _capture_component_schedule(self, instance, mode: str) -> None:
         """Store the schedule of every component block of a solved full-horizon *instance*.
 
         Args:
             instance: The solved Pyomo instance holding ``dsm_blocks``.
             mode (str): ``"baseline"`` (optimal operation) or ``"flex"`` (flexible operation).
         """
-        if not hasattr(self, "_component_dispatch"):
-            self._component_dispatch = {}
+        if not hasattr(self, "_component_schedule"):
+            self._component_schedule = {}
 
-        for key, values in self._component_dispatch_values(
+        for key, values in self._component_schedule_values(
             instance, len(self.index)
         ).items():
-            self._component_dispatch.setdefault(key, {})[mode] = FastSeries(
+            self._component_schedule.setdefault(key, {})[mode] = FastSeries(
                 index=self.index, value=values
             )
 
         if mode == "baseline":
             self._capture_component_specs(instance)
 
-    def _dispatch_variable_meta(self, technology: str, variable: str) -> tuple:
-        """Metadata ``(carrier, direction, unit of measure)`` of a dispatch variable.
+    def _schedule_variable_meta(self, technology: str, variable: str) -> tuple:
+        """Metadata ``(carrier, direction, unit of measure)`` of a schedule variable.
 
         Component-class specific entries (storages share variable names across
         carriers) take precedence over the global registry; unknown variables get
@@ -1891,7 +1891,7 @@ class DSMFlex:
             class_meta = COMPONENT_VARIABLE_META.get(type(component).__name__, {})
             if variable in class_meta:
                 return class_meta[variable]
-        return DISPATCH_VARIABLE_META.get(variable, ("", "", ""))
+        return SCHEDULE_VARIABLE_META.get(variable, ("", "", ""))
 
     def _capture_component_specs(self, instance) -> None:
         """Store the technical specification of every component block of *instance*.
@@ -1937,20 +1937,20 @@ class DSMFlex:
         """
         return getattr(self, "_component_specs", [])
 
-    def _commit_component_dispatch(
+    def _commit_component_schedule(
         self, values: dict[tuple, list], window_start: int
     ) -> None:
         """Overwrite the baseline schedule with the steps committed by a rolling window."""
         for key, window_values in values.items():
-            series = self._component_dispatch.setdefault(key, {}).setdefault(
+            series = self._component_schedule.setdefault(key, {}).setdefault(
                 "baseline", FastSeries(index=self.index, value=float("nan"))
             )
             series.iloc[window_start : window_start + len(window_values)] = (
                 window_values
             )
 
-    def get_component_dispatch(self, start: datetime, end: datetime) -> list[dict]:
-        """Per-technology dispatch of the unit between *start* and *end* (inclusive).
+    def get_component_schedule(self, start: datetime, end: datetime) -> list[dict]:
+        """Per-technology planned schedule of the unit between *start* and *end* (inclusive).
 
         Returns:
             list[dict]: One entry per technology and variable with the keys ``unit``,
@@ -1962,9 +1962,9 @@ class DSMFlex:
         times = self.index.get_date_list(start, end)
         not_determined = FastSeries(index=self.index, value=float("nan"))
         for (technology, variable), modes in getattr(
-            self, "_component_dispatch", {}
+            self, "_component_schedule", {}
         ).items():
-            carrier, direction, unit_of_measure = self._dispatch_variable_meta(
+            carrier, direction, unit_of_measure = self._schedule_variable_meta(
                 technology, variable
             )
             entry = {
@@ -1990,12 +1990,12 @@ class DSMFlex:
 # ``total_power_input`` or ``variable_cost`` appear in the DSM dispatch output.
 UNIT_LEVEL_TECHNOLOGY = "unit"
 
-# Metadata of the dispatch variables written to the ``dsm_dispatch`` output:
+# Metadata of the schedule variables written to the ``dsm_schedule`` output:
 # variable name -> (carrier, direction, unit of measure). ``direction`` is one of
 # ``in`` (consumed by the technology), ``out`` (produced), ``state`` (storage
 # level), ``cost`` or ``price``. Variables that are not listed here are exported
 # with empty metadata.
-DISPATCH_VARIABLE_META = {
+SCHEDULE_VARIABLE_META = {
     # electricity
     "power_in": ("electricity", "in", "MW"),
     "aux_power": ("electricity", "in", "MW"),
