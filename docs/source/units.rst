@@ -20,7 +20,6 @@ Each unit type has specific characteristics that affect how the power system ope
 
 
 Operating state at the start of the simulation
-================================================
 
 No dispatch history exists before the simulation's first time step, so each unit type needs an assumption for its initial condition.
 
