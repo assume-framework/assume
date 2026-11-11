@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import pytest
 
+from assume.common.exceptions import ValidationError
 from assume.common.forecaster import PowerplantForecaster
 from assume.strategies.naive_strategies import EnergyNaiveStrategy
 from assume.units import PowerPlant
@@ -642,12 +643,12 @@ def test_initialising_invalid_powerplants():
         d["min_power"] = 20
         PowerPlant(**d)
     with pytest.raises(
-        ValueError, match="min_operating_time=-10 must be > 0 for unit id"
+        ValueError, match="min_operating_time=-10 must be >= 0 for unit id"
     ):
         d = param_dict.copy()
         d["min_operating_time"] = -10
         PowerPlant(**d)
-    with pytest.raises(ValueError, match="min_down_time=-10 must be > 0 for unit id"):
+    with pytest.raises(ValueError, match="min_down_time=-10 must be >= 0 for unit id"):
         d = param_dict.copy()
         d["min_down_time"] = -10
         PowerPlant(**d)
@@ -832,6 +833,31 @@ def test_min_down_time_in_quarter_hourly_ramping():
     op_time = pp.get_operation_time(pp.index[6])
     assert op_time == -4
     assert pp.calculate_ramp(op_time, 0, 200, current_power=0) == 200
+
+
+@pytest.mark.parametrize(
+    "kwargs, field",
+    [
+        ({"min_operating_time": -1}, "min_operating_time"),
+        ({"min_down_time": -1}, "min_down_time"),
+        ({"downtime_hot_start": -1}, "downtime_hot_start"),
+        ({"downtime_warm_start": -1}, "downtime_warm_start"),
+        # the warm start threshold must not be below the hot start threshold
+        ({"downtime_hot_start": 4, "downtime_warm_start": 2}, "downtime_warm_start"),
+    ],
+)
+def test_invalid_operating_times(kwargs, field):
+    with pytest.raises(ValidationError) as exc:
+        _make_start_cost_plant(**kwargs)
+    assert exc.value.field == field
+
+
+def test_warm_start_threshold_zero_skips_warm_starts():
+    """A warm start threshold of 0 is valid next to a hot start threshold and means
+    there is no warm start tier: after the hot start threshold, starts are cold."""
+    pp = _make_start_cost_plant(downtime_hot_start=2, downtime_warm_start=0)
+    assert pp.get_starting_costs(-2) == pp.hot_start_cost
+    assert pp.get_starting_costs(-3) == pp.cold_start_cost
 
 
 if __name__ == "__main__":

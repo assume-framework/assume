@@ -151,18 +151,37 @@ class PowerPlant(SupportsMinMax):
 
         if min_operating_time < 0:
             raise ValidationError(
-                message=f"{min_operating_time=} must be > 0 for unit {self.id}",
+                message=f"{min_operating_time=} must be >= 0 for unit {self.id}",
                 id=self.id,
                 field="min_operating_time",
             )
         self.min_operating_time = math.ceil(min_operating_time * hours_to_steps)
         if min_down_time < 0:
             raise ValidationError(
-                message=f"{min_down_time=} must be > 0 for unit {self.id}",
+                message=f"{min_down_time=} must be >= 0 for unit {self.id}",
                 id=self.id,
                 field="min_down_time",
             )
         self.min_down_time = math.ceil(min_down_time * hours_to_steps)
+        if downtime_hot_start < 0:
+            raise ValidationError(
+                message=f"{downtime_hot_start=} must be >= 0 for unit {self.id}",
+                id=self.id,
+                field="downtime_hot_start",
+            )
+        if downtime_warm_start < 0:
+            raise ValidationError(
+                message=f"{downtime_warm_start=} must be >= 0 for unit {self.id}",
+                id=self.id,
+                field="downtime_warm_start",
+            )
+        # a warm start threshold of 0 means there is no warm start tier
+        if 0 < downtime_warm_start < downtime_hot_start:
+            raise ValidationError(
+                message=f"{downtime_warm_start=} must be >= {downtime_hot_start=} for unit {self.id}, or 0 to skip warm starts",
+                id=self.id,
+                field="downtime_warm_start",
+            )
         self.downtime_hot_start = math.floor(downtime_hot_start * hours_to_steps)
         self.downtime_warm_start = math.floor(downtime_warm_start * hours_to_steps)
 

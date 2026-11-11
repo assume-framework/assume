@@ -323,7 +323,7 @@ class BaseUnit:
         Returns the costs if start-up is planned.
 
         Args:
-            op_time: Operation time in hours running from get_operation_time.
+            op_time: Operation time in time steps running from get_operation_time.
 
         Returns:
             Start-up costs.
