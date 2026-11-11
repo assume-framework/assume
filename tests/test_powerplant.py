@@ -750,8 +750,14 @@ def test_start_costs_tier_by_downtime(off_steps, cost):
     series = _start_costs(pp, off_steps)
 
     restart = 3 + off_steps
+    # The plant already runs in the first time step. Before the index the unit is
+    # assumed to be off for longer than every start tier, so the first step is always booked as a cold start.
+    # The total therefore has to be exactly that cold start plus the restart, which
+    # also makes sure no other step books start-up costs.
+    # pp.cold_start_cost is already scaled by max_power.
+    assert series[0] == pp.cold_start_cost
     assert series[restart] == cost * pp.max_power
-    assert sum(series) == cost * pp.max_power
+    assert sum(series) == pp.cold_start_cost + cost * pp.max_power
 
 
 def test_operation_time_is_not_capped_by_min_times():
@@ -792,7 +798,8 @@ def test_start_costs_in_quarter_hourly_simulation():
     for off_steps, cost in [(6, 10), (8, 10), (12, 20), (16, 20), (17, 30), (40, 30)]:
         pp = _make_start_cost_plant(freq="15min", periods=80)
         series = _start_costs(pp, off_steps)
-        assert sum(series) == cost * pp.max_power, off_steps
+        assert series[0] == pp.cold_start_cost, off_steps
+        assert sum(series) == pp.cold_start_cost + cost * pp.max_power, off_steps
         assert series[3 + off_steps] == cost * pp.max_power, off_steps
 
 
