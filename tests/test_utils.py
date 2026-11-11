@@ -13,7 +13,6 @@ import numpy as np
 import pandas as pd
 import pytest
 from dateutil import rrule as rr
-from dateutil.tz import tzlocal
 from mango import ExternalClock
 from mango.util.scheduling import RecurrentScheduledTask
 
@@ -561,8 +560,9 @@ def test_broken_timestamps():
 
     unix_epoch_start = datetime.fromtimestamp(0)
     true_unix_epoch_start = unix_start
-    # offset = tzlocal().utcoffset(datetime.fromtimestamp(0))
-    offset = tzlocal().utcoffset(datetime(2020, 1, 1))
+    # the local UTC offset at the epoch itself - offsets change over time
+    # (e.g. Pacific/Chatham was UTC+12:45 in 1970 but UTC+13:45 in January 2020)
+    offset = datetime.fromtimestamp(0, tz=UTC).astimezone().utcoffset()
     # this should be 1970-01-01-00-00 but it isn't (when run in CET locale)
     # so we always have this offset
     assert true_unix_epoch_start + offset == unix_epoch_start
