@@ -349,107 +349,95 @@ class Storage(SupportsMinMaxCharge):
         self, marketconfig: MarketConfig, orderbook: Orderbook
     ) -> None:
         """
-        Records the committed (pre-SoC-clip) energy schedule, then delegates to the
-        base implementation.
+        Adds the accepted volumes (see ``SupportsMinMaxCharge.set_dispatch_plan``)
+        and, for redispatch, checks that the accepted volumes can be delivered.
 
-        ``SupportsMinMaxCharge.set_dispatch_plan`` first accumulates the accepted
-        volumes into ``outputs["energy"]`` and then clips them down to what the state
-        of charge actually allows, overwriting the committed values. Markets that
-        balance against the *market-committed* dispatch need that pre-clip schedule:
-        in redispatch the generators were dispatched against the unclipped storage
-        volume, so if storage reported only the clipped value the network would not
-        balance and the optimiser would ramp real generation to close the gap.
+        ``outputs["energy"]`` keeps the committed plan until delivery, so the
+        redispatch clearing balances the grid against exactly that plan. The
+        redispatch bids, however, measure the room for up/down redispatch from what
+        the storage can actually run of that plan. So before a redispatch result is
+        added, the plan of those time steps is set to what the storage can run;
+        otherwise a change on top of an infeasible plan (e.g. "+8 MW" on a planned
+        charge of 10 MW that a full storage cannot do) would get lost.
 
-        The committed schedule is therefore mirrored into
-        ``outputs["energy_committed"]`` here - before the clip runs - by repeating the
-        same accumulation the base implementation performs. Only the energy product is
-        mirrored; capacity products do not feed the redispatch baseline.
+        The clearing limits the cumulative redispatch energy with
+        :meth:`add_redispatch_soc_constraints`, so the accepted redispatch volume
+        should then always be deliverable. If it is not, the guarantee was broken -
+        say so loudly.
 
         Args:
             marketconfig (MarketConfig): The market configuration.
             orderbook (Orderbook): The orderbook.
         """
-        if orderbook and marketconfig.product_type == "energy":
-            start = min(order["start_time"] for order in orderbook)
-            end_excl = max(order["end_time"] for order in orderbook) - self.index.freq
-
-            # seed with the energy already booked (i.e. after the previous clip) ...
-            self.outputs["energy_committed"].loc[start:end_excl] = self.outputs[
-                "energy"
-            ].loc[start:end_excl]
-
-            # ... then add this clearing's accepted volumes, exactly as BaseUnit does
-            for order in orderbook:
-                order_end_excl = order["end_time"] - self.index.freq
-                accepted_volume = order["accepted_volume"]
-                if isinstance(accepted_volume, dict):
-                    accepted_volume = list(accepted_volume.values())
-                self.outputs["energy_committed"].loc[
-                    order["start_time"] : order_end_excl
-                ] += accepted_volume
-
-        super().set_dispatch_plan(marketconfig, orderbook)
-
-        # Feasibility guard for redispatch. The redispatch clearing limits the
-        # cumulative redispatch energy with ``add_redispatch_soc_constraints``, so the
-        # SOC clip in the base implementation should never have to cut an accepted
-        # redispatch volume.
-        if (
+        check = (
             orderbook
             and marketconfig.product_type == "energy"
             and getattr(marketconfig, "market_mechanism", None) == "redispatch"
-        ):
-            committed = self.outputs["energy_committed"].loc[start:end_excl]
-            executed = self.outputs["energy"].loc[start:end_excl]
-            curtailed = np.abs(np.asarray(committed) - np.asarray(executed))
-            if curtailed.max(initial=0.0) > EPS:
+        )
+        if check:
+            start = min(order["start_time"] for order in orderbook)
+            end = max(order["end_time"] for order in orderbook)
+            _, runnable_before = self.calculate_soc_path(start, end)
+            # redispatch changes what the storage can run, not the infeasible rest
+            for t, power in runnable_before.items():
+                self.outputs["energy"].at[t] = power
+
+        super().set_dispatch_plan(marketconfig, orderbook)
+
+        if check:
+            _, runnable_after = self.calculate_soc_path(start, end)
+            accepted = dict.fromkeys(runnable_after, 0.0)
+            for order in orderbook:
+                accepted[order["start_time"]] += order["accepted_volume"]
+            curtailed = sum(
+                abs(accepted[t] - (runnable_after[t] - runnable_before[t]))
+                for t in runnable_after
+            )
+            if curtailed > EPS:
                 logger.warning(
                     "Storage %s: accepted redispatch is not SOC-feasible, %.3f MWh "
-                    "were curtailed between %s and %s.",
+                    "can not be delivered between %s and %s.",
                     self.id,
-                    float(curtailed.sum() * (self.index.freq / timedelta(hours=1))),
+                    curtailed * (self.index.freq / timedelta(hours=1)),
                     start,
-                    end_excl,
+                    end,
                 )
 
-    def calculate_soc_path(self, start: datetime, end: datetime) -> dict:
+    def calculate_soc_path(self, start: datetime, end: datetime) -> tuple[dict, dict]:
         """
-        Calculates the state of charge at every time step between ``start`` and
-        ``end`` (both included) if the unit follows its current schedule
-        ``outputs["energy"]``.
+        Calculates what the storage can actually run of its current plan
+        ``outputs["energy"]`` between ``start`` and ``end``, and the resulting
+        state of charge.
 
-        The path starts at the stored SOC at ``start`` and is advanced with the same
-        rules as :meth:`execute_current_dispatch`, i.e. the schedule is clipped to the
-        SOC limits. Time steps that no market has cleared yet have a schedule of 0, so
-        the storage is assumed idle there. This makes the path valid also for hours
-        beyond the last day-ahead clearing (e.g. overlapping redispatch windows).
+        The path starts at :meth:`get_soc` and uses the same rules as the delivery
+        (``calculate_feasible_power`` and ``calculate_delta_soc``), so it equals
+        the SOC the storage will have if nothing else changes. Time steps without a
+        plan (e.g. beyond the last day-ahead clearing or the simulation end) count
+        as idle.
 
         Args:
-            start (datetime.datetime): First time step of the path.
-            end (datetime.datetime): Last time step of the path (included).
+            start (datetime.datetime): First time step.
+            end (datetime.datetime): End of the last time step.
 
         Returns:
-            dict: Mapping of time step to SOC (between 0 and 1).
+            tuple[dict, dict]: SOC (between 0 and 1) at every time step from
+            ``start`` to ``end`` (both included), and the power (MW) the storage
+            can run at in every time step from ``start`` to ``end`` (excluded).
         """
-        time_delta = self.index.freq / timedelta(hours=1)
-        soc = self.outputs["soc"].at[start]
-        path = {start: soc}
+        soc = self.get_soc(start)
+        soc_path, runnable = {start: soc}, {}
 
         t = start
         while t < end:
-            power = self.outputs["energy"].at[t] if t in self.index else 0.0
-            if power > 0:
-                power = min(power, self.calculate_soc_max_discharge(soc))
-                soc -= power * time_delta / self.efficiency_discharge / self.capacity
-            elif power < 0:
-                power = max(power, self.calculate_soc_max_charge(soc))
-                soc -= power * time_delta * self.efficiency_charge / self.capacity
+            planned = self.outputs["energy"].at[t] if t in self.index else 0.0
+            runnable[t] = self.calculate_feasible_power(planned, soc)
+            soc += self.calculate_delta_soc(runnable[t])
             # guard against floating point drift outside the SOC limits
             soc = min(max(soc, self.min_soc), self.max_soc)
             t = t + self.index.freq
-            path[t] = soc
+            soc_path[t] = soc
 
-        return path
+        return soc_path, runnable
 
     def calculate_redispatch_power_bounds(
         self, start: datetime, soc: float

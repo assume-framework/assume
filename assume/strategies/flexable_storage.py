@@ -288,7 +288,9 @@ class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
         # SOC path along the current (day-ahead) schedule for the whole redispatch
         # window, computed by the storage itself. It respects the SOC limits and treats
         # hours without a cleared schedule as idle.
-        soc_path = unit.calculate_soc_path(product_tuples[0][0], product_tuples[-1][1])
+        soc_path, runnable = unit.calculate_soc_path(
+            product_tuples[0][0], product_tuples[-1][1]
+        )
 
         # static nameplate power span; guarantees the fixed baseline d/p_nom stays
         # within [-1, 1] and the per-unit up/down potential does not clip early
@@ -308,10 +310,9 @@ class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
         for product in product_tuples:
             start, end = product[0], product[1]
 
-            # Committed (pre-SoC-clip) dispatch (+ discharge, - charge). The redispatch
-            # balances against the volume the energy market cleared and the generators
-            # were dispatched for. energy_committed is recorded in set_dispatch_plan.
-            current_power = unit.outputs["energy_committed"].at[start]
+            # Committed plan (+ discharge, - charge): the grid balances against the
+            # volume the energy market cleared and the generators were dispatched for.
+            current_power = unit.outputs["energy"].at[start]
 
             # Absolute power range at the SOC at the start of this product (SOC limits
             # applied to the absolute power, CRM reservations kept free).
@@ -320,11 +321,11 @@ class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
             )
 
             # The clearing computes up = max_power - volume and down = volume -
-            # min_power with volume = the committed dispatch. What is physically
-            # possible is measured from the schedule the unit actually follows
-            # (outputs["energy"], equal to the committed one unless the DA schedule
-            # was infeasible), so the bounds are shifted accordingly.
-            executed_power = unit.outputs["energy"].at[start]
+            # min_power with volume = the committed plan. What is physically
+            # possible is measured from what the storage can actually run of that
+            # plan (equal to the plan unless the DA schedule was infeasible), so
+            # the bounds are shifted accordingly.
+            executed_power = runnable[start]
             max_power_discharge = current_power + (max_power_abs - executed_power)
             max_power_charge = current_power + (min_power_abs - executed_power)
 
