@@ -97,6 +97,7 @@ Upcoming Release
   - **Fix stale storage SoC after time steps without orders** (#562, #884): Time steps without orders - e.g. after ``remove_empty_bids`` - no longer keep the initial SoC. Storages propagate their SoC on demand from what they can actually run at, so read it through ``get_soc``. ``outputs['energy']`` keeps the committed plan until delivery.
   - **Fix recurrent tasks shifted by the local timezone**: Since ``mango-agents`` 2.3.0, recurrence rules with naive datetimes are interpreted in the local time of the machine, while ASSUME treats naive datetimes as UTC. On machines not running in UTC, the periodic output storage, the learning buffer updates and the contract executions therefore ran shifted by the UTC offset, e.g. the last hour of each learning episode never reached the replay buffer. These rules are now created UTC-aware with the new ``utc_rrule`` helper and ``mango-agents >=2.3.0`` is required.
   - **Fix swapped storage efficiencies in the unit export**: ``efficiency_charge`` and ``efficiency_discharge`` were written to ``storage_meta`` under each other's names.
+  - **Fix action noise decay at the start of each episode**: Learning strategies are recreated every episode with the initial ``noise_dt``, which was only decayed at the first policy update. The first ``train_freq`` window of every episode therefore used the full noise. The decayed noise is now set when the episode is loaded.
 
 0.6.0 - (18th March 2026)
 =========================
