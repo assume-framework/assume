@@ -653,6 +653,34 @@ def test_initialising_invalid_powerplants():
         PowerPlant(**d)
 
 
+def test_powerplant_start_up_costs(power_plant_1):
+    power_plant_1.cold_start_cost = 1000
+
+    start = datetime(2022, 1, 1, 0)
+    end = datetime(2022, 1, 1, 3)
+
+    # running, off, running again, running
+    power_plant_1.outputs["energy"].loc[start:end] = [500, 0, 500, 500]
+    power_plant_1.calculate_costs(start, end)
+
+    # no start at the first step, as units are running at the start,
+    # a start after the stop, and none while running
+    starting_costs = power_plant_1.outputs["starting_costs"]
+    assert list(starting_costs.loc[start:end]) == [0, 0, 1000, 0]
+
+    # total costs are the generation costs plus the start-up costs
+    generation_costs = power_plant_1.outputs["energy_generation_costs"]
+    total_costs = power_plant_1.outputs["total_costs"]
+    restart = datetime(2022, 1, 1, 2)
+    running = datetime(2022, 1, 1, 3)
+    assert generation_costs.at[restart] > 0
+    assert (
+        total_costs.at[restart]
+        == generation_costs.at[restart] + power_plant_1.cold_start_cost
+    )
+    assert total_costs.at[running] == generation_costs.at[running]
+
+
 if __name__ == "__main__":
     # run pytest and enable prints
     pytest.main(["-s", __file__])
