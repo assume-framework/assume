@@ -221,7 +221,8 @@ def test_powerplant_ramping(power_plant_1):
     assert max_power[0] == 1000
 
     op_time = power_plant_1.get_operation_time(start)
-    assert op_time == 3
+    # the unit is assumed to be off before the start of the simulation
+    assert op_time == -3
 
     min_cost = power_plant_1.calculate_marginal_cost(start, min_power[0])
     max_cost = power_plant_1.calculate_marginal_cost(start, max_power[0])

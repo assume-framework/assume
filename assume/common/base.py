@@ -231,7 +231,7 @@ class BaseUnit:
         """
         Returns output before the given datetime.
 
-        If the datetime is before the start of the index, 0 is returned.
+        If the datetime is before the start of the index and thereby before the start of the simulation, 0 is returned.
 
         Args:
             dt: The datetime.
@@ -241,6 +241,7 @@ class BaseUnit:
             The output before the given datetime.
         """
         if dt - self.index.freq < self.index[0]:
+            # before start of index: the unit is assumed to be off
             return 0
         else:
             return self.outputs[product_type].at[dt - self.index.freq]
@@ -318,6 +319,8 @@ class SupportsMinMax(BaseUnit):
     emission_factor: float
     min_operating_time: int = 0
     min_down_time: int = 0
+    downtime_hot_start: float = 0
+    downtime_warm_start: float = 0
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -408,9 +411,19 @@ class SupportsMinMax(BaseUnit):
         begin = max(start - self.index.freq * max_time, self.index[0])
         end = start - self.index.freq
 
+        # add consistent behavior at beginning of simulation
         if start <= self.index[0]:
-            # before start of index
-            return max_time
+            # the unit is assumed to be off, consistent with get_output_before returning 0 for the same range
+            # exceeds min_down_time and every start tier, so a start in the first time step is never blocked and is always booked as a cold start.
+            initial_downtime = (
+                max(
+                    self.min_down_time,
+                    self.downtime_hot_start,
+                    self.downtime_warm_start,
+                )
+                + 1
+            )
+            return -initial_downtime
 
         # Check energy output in the defined time window, reversed for most recent state
         arr = (self.outputs["energy"].loc[begin:end] > 0)[::-1]
