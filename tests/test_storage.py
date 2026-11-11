@@ -874,7 +874,7 @@ def test_calculate_soc_path_follows_schedule_and_clips(small_storage):
     # charge 8 MW, then 8 MW again (only 2 MWh of room left), then discharge 5 MW
     s.outputs["energy"].loc[t[0] : t[2]] = [-8, -8, 5]
 
-    path = s.calculate_soc_path(t[0], t[4])
+    path, _ = s.calculate_soc_path(t[0], t[4])
 
     assert [round(path[x] * s.capacity, 6) for x in t[:5]] == [10, 18, 20, 15, 15]
 
@@ -884,7 +884,7 @@ def test_calculate_soc_path_beyond_index_treats_storage_as_idle(small_storage):
     t = s.index
     s.outputs["energy"].at[t[5]] = 4  # last time step in the index
 
-    path = s.calculate_soc_path(t[5], t[5] + 2 * s.index.freq)
+    path, _ = s.calculate_soc_path(t[5], t[5] + 2 * s.index.freq)
 
     assert path[t[5] + s.index.freq] * s.capacity == pytest.approx(6)
     assert path[t[5] + 2 * s.index.freq] * s.capacity == pytest.approx(6)
@@ -946,7 +946,9 @@ def test_set_dispatch_plan_warns_if_redispatch_is_not_soc_feasible(
         s.set_dispatch_plan(config, [order])
 
     assert "not SOC-feasible" in caplog.text
-    assert s.outputs["energy"].at[t[0]] == pytest.approx(10)
+    # only the 10 MWh that are stored can actually run
+    _, runnable = s.calculate_soc_path(t[0], t[1])
+    assert runnable[t[0]] == pytest.approx(10)
 
 
 def test_as_dict_keeps_efficiencies_in_place(small_storage):
@@ -1054,9 +1056,51 @@ def test_soc_follows_da_plus_redispatch():
         }
 
     storage.set_dispatch_plan(eom, [order(50)])  # only the accepted volume counts
-    assert storage.outputs["soc"].at[t1] * 100 == pytest.approx(50)
+    assert storage.get_soc(t1) * 100 == pytest.approx(50)
     storage.set_dispatch_plan(redispatch, [order(20)])
     storage.execute_current_dispatch(t0, t0)
 
     assert storage.outputs["energy"].at[t0] == pytest.approx(70)
-    assert storage.outputs["soc"].at[t1] * 100 == pytest.approx(30)
+    assert storage.get_soc(t1) * 100 == pytest.approx(30)
+
+
+def test_redispatch_on_top_of_infeasible_plan_is_delivered(small_storage, caplog):
+    """
+    A full storage has a DA plan to charge 10 MW, which it cannot do (it runs 0 MW).
+    Redispatch bounds are measured from what it can run, so "+8 MW" means discharge
+    8 MW. That must be what is delivered - not -10 + 8 = -2 MW, which a full
+    storage would again run as 0 MW.
+    """
+    from assume.common.market_objects import MarketConfig, MarketProduct
+
+    s = small_storage
+    t = s.index
+    s.set_soc(t[0], 1.0)
+    product = [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))]
+    eom = MarketConfig(market_id="EOM", product_type="energy", market_products=product)
+    redispatch = MarketConfig(
+        market_id="redispatch",
+        product_type="energy",
+        market_mechanism="redispatch",
+        market_products=product,
+    )
+
+    def order(volume):
+        return {
+            "start_time": t[0],
+            "end_time": t[1],
+            "accepted_volume": volume,
+            "accepted_price": 50,
+        }
+
+    s.set_dispatch_plan(eom, [order(-10)])
+    _, runnable = s.calculate_soc_path(t[0], t[1])
+    assert runnable[t[0]] == pytest.approx(0)  # full: the planned charge cannot run
+
+    with caplog.at_level("WARNING"):
+        s.set_dispatch_plan(redispatch, [order(8)])
+    s.execute_current_dispatch(t[0], t[0])
+
+    assert "not SOC-feasible" not in caplog.text
+    assert s.outputs["energy"].at[t[0]] == pytest.approx(8)
+    assert s.get_soc(t[1]) * s.capacity == pytest.approx(20 - 8)
