@@ -19,6 +19,7 @@ from mango.util.clock import ExternalClock
 from assume.common.forecaster import DemandForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
+from assume.common.utils import datetime2timestamp
 from assume.markets.base_market import MarketRole
 from assume.markets.clearing_algorithms.contracts import (
     PayAsBidContractRole,
@@ -126,7 +127,7 @@ async def test_concurrent_contract_settlement():
         ],
     )
 
-    clock = ExternalClock(start.timestamp())
+    clock = ExternalClock(datetime2timestamp(start))
     container = create_ec_container(
         addr="world", connection_type="external_connection", clock=clock
     )
@@ -192,7 +193,7 @@ async def test_concurrent_contract_settlement():
         eom_role.results.append({"time": t, "price": 50})
 
     # the clock is advanced by one week - the contracts are settled weekly
-    clock.set_time((start + timedelta(days=8)).timestamp())
+    clock.set_time(datetime2timestamp(start + timedelta(days=8)))
 
     contract_ppa = make_contract("PPA", "seller1", "demand1")
     contract_cfd = make_contract("CFD", "seller2", "demand1")
@@ -231,8 +232,8 @@ async def test_concurrent_contract_settlement():
                 break
             await asyncio.sleep(0.01)
 
-    # evaluation window is [begin, end-1h] -> 167 hourly values
-    hours = 167
+    # settled window is [evaluation_begin, evaluation_end], both inclusive -> 7 * 24 = 168 hourly values
+    hours = 168
     # PPA: generation of seller1 * contract price
     expected_ppa = 100 * 4.5 * hours
     # CFD: (contract price - market price) * generation of seller2
