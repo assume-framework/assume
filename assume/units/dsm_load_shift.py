@@ -1415,6 +1415,7 @@ class DSMFlex:
                     pass
 
         _pending_opr_updates: dict = {}
+        pending_component_values: dict = {}
         window_production = 0.0
 
         try:
@@ -1499,6 +1500,10 @@ class DSMFlex:
                     instance, window_start, commit_end, saved_index
                 )
 
+            pending_component_values = self._component_dispatch_values(
+                instance, n_commit
+            )
+
             self._update_init_states(instance, n_commit - 1, init_states)
 
         finally:
@@ -1517,6 +1522,10 @@ class DSMFlex:
                 logger.debug(
                     "Could not update opt_power_requirement[%d]: %s", global_t, e
                 )
+
+        if not hasattr(self, "_component_dispatch"):
+            self._component_dispatch = {}
+        self._commit_component_dispatch(pending_component_values, window_start)
 
         self._rh_optimized_until_step = commit_end
         logger.info(
@@ -1616,6 +1625,8 @@ class DSMFlex:
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
 
+        self._capture_component_dispatch(instance, "baseline")
+
     def determine_optimal_operation_with_flex(self):
         """
         Determines the optimal operation of the steel plant without considering flexibility.
@@ -1704,6 +1715,8 @@ class DSMFlex:
         self.flex_variable_cost_series = FastSeries(
             index=self.index, value=flex_variable_cost
         )
+
+        self._capture_component_dispatch(instance, "flex")
 
     def switch_to_opt(self, instance):
         if hasattr(instance, "obj_rule_flex"):
@@ -1796,3 +1809,262 @@ class DSMFlex:
         )
 
         return unit_dict
+
+    # DSM dispatch output (``dsm_dispatch`` / ``dsm_specs`` tables)
+    @staticmethod
+    def _component_dispatch_values(instance, n_steps: int) -> dict[tuple, list]:
+        """Read the first *n_steps* values of every dispatch variable of *instance*.
+
+        Dispatch variables are the non-binary variables indexed by time of each
+        technology block (power, material and fuel flows, emissions, operating cost,
+        storage levels, ...) and of the model itself (``total_power_input``,
+        ``variable_cost``, the load shift variables, ...). The unit-level series are
+        stored under the pseudo technology :data:`UNIT_LEVEL_TECHNOLOGY`, together
+        with the electricity price the solve used (the flexibility measure
+        ``electricity_price_signal`` replaces it between the baseline and the
+        flexible solve, so it cannot be read from the forecaster afterwards).
+
+        Returns:
+            dict: ``{(technology, variable): [value per step]}``, NaN where a variable
+            has no value. ``+ 0.0`` turns solver noise like ``-0.0`` into ``0.0``.
+        """
+
+        def read_values(var):
+            return [
+                float("nan") if var[t].value is None else var[t].value + 0.0
+                for t in range(n_steps)
+            ]
+
+        values = {}
+        for technology, block in instance.dsm_blocks.items():
+            for var in block.component_objects(pyo.Var, descend_into=False):
+                if not var.is_indexed() or len(var) < n_steps:
+                    continue
+                if next(iter(var.values())).is_binary():
+                    continue
+                values[(technology, var.local_name)] = read_values(var)
+
+        for var in instance.component_objects(pyo.Var, descend_into=False):
+            if var.index_set() is not instance.time_steps:
+                continue
+            if next(iter(var.values())).is_binary():
+                continue
+            values[(UNIT_LEVEL_TECHNOLOGY, var.local_name)] = read_values(var)
+
+        price = getattr(instance, "electricity_price", None)
+        if price is not None and price.index_set() is instance.time_steps:
+            values[(UNIT_LEVEL_TECHNOLOGY, "electricity_price")] = [
+                pyo.value(price[t]) for t in range(n_steps)
+            ]
+
+        return values
+
+    def _capture_component_dispatch(self, instance, mode: str) -> None:
+        """Store the schedule of every component block of a solved full-horizon *instance*.
+
+        Args:
+            instance: The solved Pyomo instance holding ``dsm_blocks``.
+            mode (str): ``"baseline"`` (optimal operation) or ``"flex"`` (flexible operation).
+        """
+        if not hasattr(self, "_component_dispatch"):
+            self._component_dispatch = {}
+
+        for key, values in self._component_dispatch_values(
+            instance, len(self.index)
+        ).items():
+            self._component_dispatch.setdefault(key, {})[mode] = FastSeries(
+                index=self.index, value=values
+            )
+
+        if mode == "baseline":
+            self._capture_component_specs(instance)
+
+    def _dispatch_variable_meta(self, technology: str, variable: str) -> tuple:
+        """Metadata ``(carrier, direction, unit of measure)`` of a dispatch variable.
+
+        Component-class specific entries (storages share variable names across
+        carriers) take precedence over the global registry; unknown variables get
+        empty metadata.
+        """
+        if technology != UNIT_LEVEL_TECHNOLOGY:
+            component = self.components.get(technology)
+            class_meta = COMPONENT_VARIABLE_META.get(type(component).__name__, {})
+            if variable in class_meta:
+                return class_meta[variable]
+        return DISPATCH_VARIABLE_META.get(variable, ("", "", ""))
+
+    def _capture_component_specs(self, instance) -> None:
+        """Store the technical specification of every component block of *instance*.
+
+        The specification covers all scalar Pyomo parameters of each technology block
+        (capacities, efficiencies, power limits, ...) plus the component class name.
+        """
+        specs = []
+        for technology, block in instance.dsm_blocks.items():
+            component = self.components.get(technology)
+            specs.append(
+                {
+                    "unit": self.id,
+                    "technology": technology,
+                    "parameter": "component_class",
+                    "value": type(component).__name__,
+                }
+            )
+            for param in block.component_objects(pyo.Param, descend_into=False):
+                if param.is_indexed():
+                    continue
+                try:
+                    value = pyo.value(param)
+                except (ValueError, TypeError):
+                    continue
+                specs.append(
+                    {
+                        "unit": self.id,
+                        "technology": technology,
+                        "parameter": param.local_name,
+                        "value": value,
+                    }
+                )
+        self._component_specs = specs
+
+    def get_component_specs(self) -> list[dict]:
+        """Technical specification of the unit's components for the output agent.
+
+        Returns:
+            list[dict]: One entry per technology and scalar parameter with the keys
+            ``unit``, ``technology``, ``parameter`` and ``value``. Empty as long as
+            no baseline optimisation ran.
+        """
+        return getattr(self, "_component_specs", [])
+
+    def _commit_component_dispatch(
+        self, values: dict[tuple, list], window_start: int
+    ) -> None:
+        """Overwrite the baseline schedule with the steps committed by a rolling window."""
+        for key, window_values in values.items():
+            series = self._component_dispatch.setdefault(key, {}).setdefault(
+                "baseline", FastSeries(index=self.index, value=float("nan"))
+            )
+            series.iloc[window_start : window_start + len(window_values)] = (
+                window_values
+            )
+
+    def get_component_dispatch(self, start: datetime, end: datetime) -> list[dict]:
+        """Per-technology dispatch of the unit between *start* and *end* (inclusive).
+
+        Returns:
+            list[dict]: One entry per technology and variable with the keys ``unit``,
+            ``technology``, ``variable``, ``carrier``, ``direction``,
+            ``unit_of_measure``, ``time`` and the arrays ``baseline`` and ``flex``.
+            ``flex`` is NaN as long as no flexible operation was determined.
+        """
+        dispatch = []
+        times = self.index.get_date_list(start, end)
+        not_determined = FastSeries(index=self.index, value=float("nan"))
+        for (technology, variable), modes in getattr(
+            self, "_component_dispatch", {}
+        ).items():
+            carrier, direction, unit_of_measure = self._dispatch_variable_meta(
+                technology, variable
+            )
+            entry = {
+                "unit": self.id,
+                "technology": technology,
+                "variable": variable,
+                "carrier": carrier,
+                "direction": direction,
+                "unit_of_measure": unit_of_measure,
+                "time": times,
+            }
+            for mode in ("baseline", "flex"):
+                entry[mode] = modes.get(mode, not_determined).loc[start:end]
+            dispatch.append(entry)
+        return dispatch
+
+
+# ----------------------------------------------------------------------
+# Metadata registries for the DSM dispatch output
+# ----------------------------------------------------------------------
+
+# Name of the pseudo technology under which unit-level (model) series such as
+# ``total_power_input`` or ``variable_cost`` appear in the DSM dispatch output.
+UNIT_LEVEL_TECHNOLOGY = "unit"
+
+# Metadata of the dispatch variables written to the ``dsm_dispatch`` output:
+# variable name -> (carrier, direction, unit of measure). ``direction`` is one of
+# ``in`` (consumed by the technology), ``out`` (produced), ``state`` (storage
+# level), ``cost`` or ``price``. Variables that are not listed here are exported
+# with empty metadata.
+DISPATCH_VARIABLE_META = {
+    # electricity
+    "power_in": ("electricity", "in", "MW"),
+    "aux_power": ("electricity", "in", "MW"),
+    "power": ("electricity", "out", "MW"),
+    "charge": ("electricity", "in", "MW"),
+    "discharge": ("electricity", "out", "MW"),
+    "usage": ("electricity", "out", "MW"),
+    "soc": ("electricity", "state", "MWh"),
+    "total_power_input": ("electricity", "in", "MW"),
+    "load_shift_pos": ("electricity", "in", "MW"),
+    "load_shift_neg": ("electricity", "out", "MW"),
+    "profile_dev_pos": ("electricity", "in", "MW"),
+    "profile_dev_neg": ("electricity", "out", "MW"),
+    # heat
+    "heat_out": ("heat", "out", "MW"),
+    "cumulative_thermal_output": ("heat", "out", "MWh"),
+    "external_heat_in": ("heat", "in", "MW"),
+    "effective_heat_in": ("heat", "in", "MW"),
+    # fuels
+    "natural_gas_in": ("natural_gas", "in", "MW"),
+    "coal_in": ("coal", "in", "MW"),
+    # aggregate of natural_gas_in + coal_in; do not add it to the fuel inputs again
+    "fossil_in": ("fossil", "in", "MW"),
+    "hydrogen_in": ("hydrogen", "in", "MW"),
+    "hydrogen_gas_in": ("hydrogen", "in", "MW"),
+    "hydrogen_out": ("hydrogen", "out", "MW"),
+    "cumulative_hydrogen_output": ("hydrogen", "out", "MWh"),
+    # materials
+    "iron_ore_in": ("iron_ore", "in", "t"),
+    "dri_input": ("dri", "in", "t"),
+    "dri_output": ("dri", "out", "t"),
+    "steel_output": ("steel", "out", "t"),
+    "lime_demand": ("lime", "in", "t"),
+    "material_input": ("material", "in", "t"),
+    "material_output": ("material", "out", "t"),
+    "raw_meal_out": ("material", "out", "t"),
+    "clinker_out": ("material", "out", "t"),
+    "clinker_rate": ("material", "out", "t"),
+    # emissions
+    "co2_emission": ("co2", "out", "t"),
+    "co2_process": ("co2", "out", "t"),
+    "co2_energy": ("co2", "out", "t"),
+    # costs and prices
+    "operating_cost": ("", "cost", "EUR"),
+    "variable_cost": ("", "cost", "EUR"),
+    "electricity_price": ("electricity", "price", "EUR/MWh"),
+}
+
+# Storage components share the variable names ``charge``, ``discharge`` and
+# ``soc`` across carriers, so their metadata depends on the component class.
+COMPONENT_VARIABLE_META = {
+    "ThermalStorage": {
+        "charge": ("heat", "in", "MW"),
+        "discharge": ("heat", "out", "MW"),
+        "soc": ("heat", "state", "MWh"),
+    },
+    "HydrogenBufferStorage": {
+        "charge": ("hydrogen", "in", "MW"),
+        "discharge": ("hydrogen", "out", "MW"),
+        "soc": ("hydrogen", "state", "MWh"),
+    },
+    "SeasonalHydrogenStorage": {
+        "charge": ("hydrogen", "in", "MW"),
+        "discharge": ("hydrogen", "out", "MW"),
+        "soc": ("hydrogen", "state", "MWh"),
+    },
+    "DRIStorage": {
+        "charge": ("dri", "in", "t"),
+        "discharge": ("dri", "out", "t"),
+        "soc": ("dri", "state", "t"),
+    },
+}

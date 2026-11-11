@@ -76,6 +76,14 @@ When the outputs are stored in CSV files, the data is organized in a similar str
      - Unit-level dispatch data.
      - simulation, unit, power, heat, soc, energy_generation_costs, starting_costs, energy_cashflow, total_costs
 
+   * - dsm_dispatch
+     - Dispatch per technology of the demand-side units (steel plant, cement plant, building, ...) in long format: one row per time step, unit, technology and variable. Only written if DSM units are part of the simulation. ``baseline`` is the optimal operation without flexibility; ``flex`` is the flexible operation and is empty as long as the unit did not determine it. Every non-binary variable of a technology block is reported, e.g. ``power_in``, material and fuel flows, ``co2_emission``, ``operating_cost`` or storage levels. Unit-level series (``total_power_input``, ``variable_cost``, the load shift variables and the ``electricity_price`` the solve used) are reported under the pseudo technology ``unit``. ``carrier`` (electricity, heat, hydrogen, natural_gas, steel, co2, ...), ``direction`` (``in``, ``out``, ``state``, ``cost`` or ``price``) and ``unit_of_measure`` classify each variable, e.g. for Sankey diagrams; note that the cement plant's ``fossil_in`` is the sum of ``natural_gas_in`` and ``coal_in`` and must not be added to those again. The schedule is the one planned by the unit and can differ from ``unit_dispatch`` if a bid is only partly accepted; join with ``market_orders`` and ``unit_dispatch`` on ``unit`` and time to compare planned and accepted market results.
+     - simulation, time, unit, technology, variable, carrier, direction, unit_of_measure, baseline, flex
+
+   * - dsm_specs
+     - Static technical specification of the demand-side units, one row per unit, technology and scalar parameter of the technology (rated powers, capacities, efficiencies, specific consumptions, ...) plus the component class name (``component_class``). Only written if DSM units are part of the simulation.
+     - simulation, unit, technology, parameter, value
+
    * - market_orders
      - Market order details.
      - simulation, market_id, node, bid_id, unit_id, parent_bid_id, bid_type, end_time, price, volume, accepted_price, accepted_volume, min_acceptance_ratio
