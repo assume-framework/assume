@@ -12,7 +12,7 @@ units) models a device that can both consume power from the grid (**charging**) 
 General Definitions
 -------------------
 
-This pages defines the parameterisation and explains how different limits change storage behavior.
+This page defines the parameterisation and explains how different limits change storage behavior.
 Throughout the code and this page, the same sign convention is used everywhere:
 
 - **Discharging power is positive.** It is bounded between ``min_power_discharge`` and
@@ -30,7 +30,7 @@ The SOC is kept within ``min_soc`` and ``max_soc``. How far the unit can charge 
 On top of the SOC-based limits, the unit has **ramping constraints** that limit how much the power
 output is allowed to change from one time step to the next:
 
-- ``ramp_up_discharge`` / ``ramp_down_discharge`` (both ``>= 0``): the maximum increase/decrease of   the discharging power per time step.
+- ``ramp_up_discharge`` / ``ramp_down_discharge`` (both ``>= 0``): the maximum increase/decrease of the discharging power per time step.
 - ``ramp_up_charge`` / ``ramp_down_charge`` (both ``<= 0``): the maximum increase/decrease of the charging power per time step (recall that charging power is negative, so "ramping up the charge"
   means becoming more negative).
 
@@ -44,7 +44,7 @@ Because a unit can be active on several markets in the same time step, every ram
 
 - **Previous power**: the power the unit was dispatched at in the *previous* time step (``previous_power``).
 - **Current power**: the power already committed/sold on *other* markets for the *same* time step (``current_power``).
-- **Requested power**: the bid being checked for a *new* market product (``requested_power_discharge``   / ``requested_power_charge``). This always answers the question "what do I want to offer on *this*   market right now?" -- it is a standalone power level for this one market, **not** a delta relative to ``current_power`` and **not** the combined total across all markets.
+- **Requested power**: the bid being checked for a *new* market product (``requested_power_discharge`` / ``requested_power_charge``). This always answers the question "what do I want to offer on *this* market right now?" -- it is a standalone power level for this one market, **not** a delta relative to ``current_power`` and **not** the combined total across all markets.
 
 .. image:: img/Storage_Definitions_Overview.webp
     :align: center
@@ -64,7 +64,7 @@ Ramping is evaluated by
 (building on the generic implementation in
 :class:`~assume.common.base.SupportsMinMaxCharge`). Both methods take ``previous_power``, ``requested_power`` and ``current_power`` and return the power level that is actually feasible given the ramping constraints.
 
-If the unit was charging in the previous step and now requests to discharge (or vice versa), the first question is always whether the unit can even ramp back through zero within one time step -- if ``previous_power`` cannot reach 0 given ``ramp_down_charge`` (or ``ramp_down_discharge``), the requested direction switch is infeasible and no power in that direction can be offered. However, power already committed on another market counts towards this: with ``previous_power = -60`` and ``ramp_down_charge = -50`` the unit can charge a minimum of10 MW, so with ``current_power = -20`` a discharge bid of up to 10 MW is feasible (total -10 MW).
+If the unit was charging in the previous step and now requests to discharge (or vice versa), the first question is always whether the unit can even ramp back through zero within one time step -- if ``previous_power`` cannot reach 0 given ``ramp_down_charge`` (or ``ramp_down_discharge``), the requested direction switch is infeasible and no power in that direction can be offered. However, power already committed on another market counts towards this: with ``previous_power = -60`` and ``ramp_down_charge = -50`` the unit can charge a minimum of 10 MW, so with ``current_power = -20`` a discharge bid of up to 10 MW is feasible (total -10 MW).
 
 If a switch through zero is feasible, there are two different ways to model what happens *within* that one time step, controlled by the ``simultaneous_charge_discharge_ramping`` flag:
 
@@ -93,7 +93,7 @@ The blue dashed line in the figure shows the (infeasible) outcome if ramping wer
 
 .. note::
 
-   Independent of ``simultaneous_charge_discharge_ramping``, the SOC-based limits    (:meth:`~assume.units.storage.Storage.calculate_soc_max_charge` /
+   Independent of ``simultaneous_charge_discharge_ramping``, the SOC-based limits (:meth:`~assume.units.storage.Storage.calculate_soc_max_charge` /
    :meth:`~assume.units.storage.Storage.calculate_soc_max_discharge`) are always applied *on top of* the ramping result, and ``min_power_charge`` / ``min_power_discharge`` can clip the result back to zero if the ramp- and SOC-feasible power falls below the minimum operating power.
 
 
@@ -119,3 +119,11 @@ Example: a unit with ``ramp_up_discharge = 40`` and a previous power of ``previo
     ) == 70
 
 The feasible discharge bid is 70 MW. This is the previous power plus the full ``ramp_up_discharge``, net of the ``current_power`` already committed elsewhere (``10 + 40 - (-20) = 70``), i.e. 20 MW above "Reachable power". Combined with the -20 MW charged on the other market, the resulting net output of 50 MW matches "Reachable power" exactly, as it must: that combined total is what is actually physically delivered and is the quantity the ramp constraint really limits.
+
+
+.. _storage-initial-state:
+
+Operating State at the Start of the Simulation
+----------------------------------------------
+
+Storage units do not track an operating time. Their initial condition is the explicit ``initial_soc`` parameter (default ``0.5``; with the CSV loader, an empty cell in an existing ``initial_soc`` column becomes ``0.0``), which is used as the state of charge of the first time step. As with power plants, ``get_output_before`` returns ``0`` for the first time step, so the first charge or discharge ramp is calculated from zero.
