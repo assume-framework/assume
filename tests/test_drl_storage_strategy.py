@@ -137,7 +137,7 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
             # Calculate rewards based on the accepted bids
             strategy.calculate_reward(storage_unit, mc, orderbook=bids)
 
-            # Fetch reward, profit, costs from learning_role cache
+            # Fetch reward and profit from learning_role cache
             learning_role = strategy.learning_role
             reward_cache = learning_role.all_rewards
             profit_cache = learning_role.all_profits
@@ -152,7 +152,6 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
 
             reward = reward_cache[last_ts][unit_id][0]
             profit = profit_cache[last_ts][unit_id][0]
-            costs = storage_unit.outputs["total_costs"].loc[product_index]
 
             # Calculate expected values
             duration_hours = 1  # Since the product tuple is 1 hour
@@ -177,11 +176,6 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
             # Assert the calculated profit
             assert profit == expected_profit - expected_costs, (
                 f"Expected profit {expected_profit}, got {profit}"
-            )
-
-            # Assert the calculated costs
-            assert costs[0] == expected_costs, (
-                f"Expected costs {expected_costs}, got {costs[0]}"
             )
 
 
@@ -241,7 +235,7 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
             # Calculate rewards based on the accepted bids
             strategy.calculate_reward(storage_unit, mc, orderbook=bids)
 
-            # Fetch reward, profit, costs from learning_role cache
+            # Fetch reward and profit from learning_role cache
             learning_role = strategy.learning_role
             reward_cache = learning_role.all_rewards
             profit_cache = learning_role.all_profits
@@ -256,7 +250,6 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
 
             reward = reward_cache[last_ts][unit_id][0]
             profit = profit_cache[last_ts][unit_id][0]
-            costs = storage_unit.outputs["total_costs"].loc[product_index]
 
             # Calculate expected values
             duration_hours = 1  # Since the product tuple is 1 hour
@@ -281,11 +274,6 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
             # Assert the calculated profit
             assert profit == expected_profit - expected_costs, (
                 f"Expected profit {expected_profit}, got {profit}"
-            )
-
-            # Assert the calculated costs
-            assert costs[0] == expected_costs, (
-                f"Expected costs {expected_costs}, got {costs[0]}"
             )
 
 

@@ -280,6 +280,13 @@ class Storage(SupportsMinMaxCharge):
         self.warm_start_cost = warm_start_cost * max_power_discharge
         self.cold_start_cost = cold_start_cost * max_power_discharge
 
+        if self.hot_start_cost or self.warm_start_cost or self.cold_start_cost:
+            logger.warning(
+                f"Unit {self.id} has starting costs defined, but storages do not "
+                "track operation time yet, so starting costs are currently always "
+                "neglected (get_starting_costs always returns 0)."
+            )
+
     def execute_current_dispatch(self, start: datetime, end: datetime) -> np.ndarray:
         """
         Executes the current dispatch of the unit based on the provided timestamps.
@@ -559,17 +566,21 @@ class Storage(SupportsMinMaxCharge):
 
     def get_starting_costs(self, op_time):
         """
-        Calculates the starting costs of the unit depending on how long it was shut down
+        Should calculate the starting costs of the storage depending on how long it
+        was shut down. Storages do not track operation time yet (see the warning in
+        ``__init__``), so ``op_time`` is never negative here and this always
+        returns 0.
 
         Args:
             op_time (float): The time the unit was shut down in hours.
 
         Returns:
-            float: The starting costs of the unit.
+            float: The starting costs of the unit, currently always 0.
         """
         if op_time > 0:
             # unit is running
             return 0
+
         if -op_time < self.downtime_hot_start:
             return self.hot_start_cost
         elif -op_time < self.downtime_warm_start:
