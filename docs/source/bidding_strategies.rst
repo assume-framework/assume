@@ -42,10 +42,13 @@ Naive                           Simple bidding strategies for participating in a
 Heuristic                       Basic methodology to form bids, based on participating in a market mechanism that follows the Merit Order principle. These strategies do not utilise
                                 forecasting or consider finer details such as the effects of changing a power plant's operational state (start-up costs etc.), so the bid volume is
                                 of the order of its maximum power capacity (given ramping constraints), and the bid price is set to the marginal cost.
-Optimization                    Methodology, based on the flexABLE methodology [`Qussous et al. 2022 <https://doi.org/10.3390/en15020494>`_], offers more refined strategising
+                                Methodology, based on the flexABLE methodology [`Qussous et al. 2022 <https://doi.org/10.3390/en15020494>`_], offers more refined strategising
                                 compared to the Naive methods. Applicable to power plant and storage units, it incorporates market dynamics to a greater degree by forecasting market
                                 prices, as well as accounting for operational history, potential power loss due to heat production, and the fact that a plant can make bids for
-                                multiple markets at the same time.
+                                multiple markets at the same time. In comparison to the original flexABLE methodology, it now forces bids according to feasible ramping constraints.
+Optimization                    Strategies that solve an optimization model of the unit to form bids. For DSM units (households, industry), the bid volume is
+                                the optimal power requirement of the unit and the bid price its marginal cost. For power plants and storages, the DMAS methodology
+                                optimizes the dispatch against a price forecast and derives bid prices from avoided costs. This requires a Pyomo-supported solver.
 Learning                        A :doc:`reinforcement learning <learning>` (RL) approach to formulating bids for an Energy-Only Market.
                                 Agents perform actions (choose bid price(s) and for storage a direction) informed by observations (including forecasted residual load, forecasted
                                 price, marginal cost). Bid volumes are fixed to the maximum possible volume. Based on the reward (profits) from accepted bids, agents learn to optimise
