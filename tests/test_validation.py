@@ -183,11 +183,24 @@ def test_missing_exchange_columns(scenario):
 
 
 def test_dry_run_reports_what_static_checks_cannot_know(scenario):
-    # statically fine, but the demand has a mixed sign which the loader rejects
-    edit_csv(scenario, "demand_units.csv", "1000000,0,", "-1,5,")
+    # a strategy which exists but does not fit the unit type is only found when the unit is built
+    edit_csv(
+        scenario,
+        "powerplant_units.csv",
+        "powerplant_energy_naive",
+        "storage_energy_heuristic_flexable",
+    )
     report = verify_scenario_folder(scenario, study_case="tiny")
     assert "cannot be loaded into ASSUME" in messages(report)
-    assert "min_power and max_power must both be" in messages(report)
+    assert "is not a MinMaxStrategy" in messages(report)
+
+
+def test_demand_with_mixed_power_signs(scenario):
+    # the loader rejects it, so the static stage reports it (once) for the unit
+    edit_csv(scenario, "demand_units.csv", "1000000,0,", "-1,5,")
+    report = verify_scenario_folder(scenario, study_case="tiny", dry_run=False)
+    assert messages(report).count("min_power and max_power must both be") == 1
+    assert "demand_EOM: min_power and max_power" in messages(report)
 
 
 def test_dry_run_does_not_write_into_scenario(scenario):
@@ -333,6 +346,34 @@ def test_csv_without_rows(scenario):
     (scenario / "powerplant_units.csv").write_text(header + "\n")
     report = verify_scenario_folder(scenario, study_case="tiny", dry_run=False)
     assert "powerplant_units.csv: contains no rows" in messages(report)
+
+
+def test_powerplant_rows_are_validated_with_the_model(scenario):
+    edit_df(
+        scenario,
+        "powerplant_units.csv",
+        lambda df: (
+            df.__setitem__("efficiency", [0.3, -0.5, 0.4, 0.6]),
+            df.__setitem__("min_power", [200.0, 200.0, 2000.0, 200.0]),
+        ),
+    )
+    report = verify_scenario_folder(scenario, study_case="tiny", dry_run=False)
+    errors = messages(report)
+    assert (
+        "Unit 2: efficiency=-0.5: Input should be greater than or equal to 0 (column 'efficiency')"
+        in errors
+    )
+    assert (
+        "Unit 3: min_power=2000.0 must be <= max_power=1000.0 (column 'min_power')"
+        in errors
+    )
+    assert "Unit 1" not in errors and "Unit 4" not in errors
+
+
+def test_powerplant_model_does_not_repeat_type_errors(scenario):
+    edit_csv(scenario, "powerplant_units.csv", "1000.0,200.0,0.3", "1000.0,200.0,high")
+    report = verify_scenario_folder(scenario, study_case="tiny", dry_run=False)
+    assert messages(report).count("efficiency") == 1
 
 
 def test_csv_bool_column(scenario):
@@ -500,3 +541,90 @@ def test_examples_pass_static_checks(example):
 def test_learning_examples_pass_static_checks(example):
     report = verify_scenario_folder(Path("examples/inputs") / example, dry_run=False)
     assert report.ok, messages(report)
+
+
+# -- parameter models of the other units -----------------------------------------------------
+@pytest.fixture
+def full_scenario(tmp_path) -> Path:
+    """A copy of example_03 which has storage, demand and exchange units."""
+    target = tmp_path / "scenario"
+    shutil.copytree(Path("examples/inputs/example_03"), target)
+    return target
+
+
+def test_storage_demand_and_exchange_rows_are_validated(full_scenario):
+    def break_storage(df):
+        df[["efficiency_charge", "min_soc", "max_soc"]] = df[
+            ["efficiency_charge", "min_soc", "max_soc"]
+        ].astype(float)
+        df.loc[df.index[0], "efficiency_charge"] = 1.5
+        df.loc[df.index[1], ["min_soc", "max_soc"]] = [0.9, 0.1]
+
+    def break_demand(df):
+        df["elasticity_model"] = ["isoelastic"] + [None] * (len(df) - 1)
+        df["num_bids"] = [3] + [None] * (len(df) - 1)
+
+    edit_df(full_scenario, "storage_units.csv", break_storage)
+    edit_df(full_scenario, "demand_units.csv", break_demand)
+    edit_df(
+        full_scenario,
+        "exchange_units.csv",
+        lambda df: df.__setitem__("price_import", ["high"] + [0] * (len(df) - 1)),
+    )
+    report = verify_scenario_folder(full_scenario, dry_run=False)
+    errors = messages(report)
+    storage = pd.read_csv(full_scenario / "storage_units.csv", index_col=0)
+    demand = pd.read_csv(full_scenario / "demand_units.csv", index_col=0)
+    exchange = pd.read_csv(full_scenario / "exchange_units.csv", index_col=0)
+    assert (
+        f"{storage.index[0]}: efficiency_charge=1.5: must be between 0 and 1 (column 'efficiency_charge')"
+        in errors
+    )
+    assert f"{storage.index[1]}: max_soc=0.1 must be >= min_soc=0.9" in errors
+    assert (
+        f"{demand.index[0]}: 'elasticity' parameter must be given and negative for isoelastic demand (column 'elasticity')"
+        in errors
+    )
+    assert (
+        f"column 'price_import' must be a number, got {exchange.index[0]}='high'"
+        in errors
+    )
+    # every problem is reported once, also the not-a-number cell which model and type check both see
+    assert errors.count("price_import") == 1
+    assert errors.count("efficiency_charge=1.5") == 1
+    assert errors.count("max_soc=0.1") == 1
+    assert errors.count("'elasticity' parameter") == 1
+    # kwargs-only parameters are known columns
+    assert "elasticity_model" not in messages(report, "warning")
+    assert "num_bids" not in messages(report, "warning")
+
+
+def test_storage_charge_power_sign_follows_the_loader(full_scenario):
+    # the loader negates the charge powers, so positive values in the csv are the convention
+    edit_df(
+        full_scenario,
+        "storage_units.csv",
+        lambda df: df.__setitem__("min_power_charge", [-1.0] + [30.0] * (len(df) - 1)),
+    )
+    report = verify_scenario_folder(full_scenario, dry_run=False)
+    errors = messages(report)
+    # every row ends with min_power_charge <= 0, and rows with |max| < |min| are the only invalid ones
+    storage = pd.read_csv(full_scenario / "storage_units.csv", index_col=0)
+    too_small = storage.index[
+        storage["max_power_charge"].abs() < storage["min_power_charge"].abs()
+    ]
+    assert len(too_small) > 0
+    for unit in too_small:
+        assert f"{unit}: max_power_charge=" in errors
+    assert errors.count("max_power_charge=") == len(too_small)
+
+
+def test_demand_power_sign_follows_the_loader(full_scenario):
+    # positive demand power is fine for the loader, as it negates both columns
+    edit_df(
+        full_scenario,
+        "demand_units.csv",
+        lambda df: df.__setitem__("max_power", [5.0] * len(df)),
+    )
+    report = verify_scenario_folder(full_scenario, dry_run=False)
+    assert "demand_units.csv" not in messages(report)

@@ -225,3 +225,17 @@ def test_exchange_scalar_prices_in_as_dict(exchange_unit):
     unit_dict = exchange_unit.as_dict()
     assert unit_dict["price_import"] == 10.0
     assert unit_dict["price_export"] == 2000.0
+
+
+def test_exchange_prices_are_validated_by_params(full_forecast):
+    exchange = Exchange(
+        id="test_unit",
+        unit_operator="test_operator",
+        bidding_strategies={"EOM": ExchangeEnergyNaiveStrategy()},
+        forecaster=full_forecast,
+        price_import=float("nan"),
+    )
+    # empty values fall back to the defaults of Exchange.Params
+    assert exchange.as_dict()["price_import"] == 0.0
+    assert exchange.as_dict()["price_export"] == 2999.0
+    assert set(Exchange.Params.model_fields) == {"price_import", "price_export"}

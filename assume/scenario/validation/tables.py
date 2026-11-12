@@ -18,8 +18,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
+import pydantic
 
+from assume.common.unit_params import UnitParams, describe_errors
 from assume.common.utils import load_index_file
+from assume.scenario.unit_rows import (
+    MIXED_DEMAND_SIGNS,
+    mixed_demand_signs,
+    prepare_unit_rows,
+)
 from assume.scenario.validation.config import StudyCase
 from assume.scenario.validation.folder import ScenarioFolder
 from assume.scenario.validation.schema import (
@@ -194,11 +201,21 @@ class UnitTable(BiddingTable):
         super().__init__(folder, case, key, path, df)
         unit_class = self.folder.registry.unit_types[UNIT_FILES[self.key]]
         self.signature = UnitSignature.of(unit_class)
+        # optional pydantic model of the unit's parameters, see assume.common.unit_params
+        self.params: type[UnitParams] | None = getattr(unit_class, "Params", None)
+        if self.params is not None:
+            # parameters which are only read from **kwargs are columns too
+            for name in self.params.model_fields:
+                self.signature.accepted.setdefault(name, None)
+        self._reported: set[str] = (
+            set()
+        )  # columns with a problem which is already reported
 
     def check_columns(self) -> None:
         for column in self.signature.required:
             if column not in self.df.columns:
                 self.log.error(f"missing required column '{column}'")
+                self._reported.add(column)
         for column in self.df.columns:
             if self.is_free_form(str(column)):
                 continue
@@ -208,6 +225,43 @@ class UnitTable(BiddingTable):
                 )
             else:
                 self._check_column_type(column, self.signature.accepted[column])
+        if self.params is not None:
+            self._check_params(self.params)
+
+    def _check_params(self, params: type[UnitParams]) -> None:
+        """
+        Validate every row with the parameter model of the unit class.
+
+        The rows are validated in the form the loader hands them to the unit: with the sign
+        conventions of :func:`~assume.scenario.unit_rows.prepare_unit_rows` applied and empty
+        cells replaced by 0 (``fillna(0)`` in ``read_units``). Problems of columns which are
+        already reported (missing, or not a number / bool) are skipped to not report them twice.
+        """
+        df = self.df
+        for column in self._reported & set(df.columns):
+            df = df.assign(**{column: pd.to_numeric(df[column], errors="coerce")})
+        if self.key == "demand_units" and {"min_power", "max_power"} <= set(df.columns):
+            mixed = mixed_demand_signs(df)
+            for unit in df.index[mixed]:
+                self.log.error(f"{unit}: {MIXED_DEMAND_SIGNS}")
+            df = df[
+                ~mixed
+            ]  # the loader stops at these rows, nothing else is known about them
+        df = prepare_unit_rows(self.key, df)
+        columns = [c for c in df.columns if c in params.model_fields]
+        for unit, row in df[columns].fillna(0).iterrows():
+            try:
+                params(**row.to_dict())
+            except pydantic.ValidationError as e:
+                for column, problem in describe_errors(e):
+                    if column in self._reported or any(
+                        f"{reported}=" in problem for reported in self._reported
+                    ):
+                        continue
+                    self.log.error(f"{unit}: {problem} (column '{column}')")
+            except ArithmeticError as e:
+                # e.g. a linear demand without any power: the unit raises it as well
+                self.log.error(f"{unit}: {type(e).__name__}: {e}")
 
     def _check_column_type(self, column: str, annotation: Annotation) -> None:
         series = self.df[column].dropna()
@@ -223,6 +277,7 @@ class UnitTable(BiddingTable):
         else:
             return
         if len(bad):
+            self._reported.add(column)
             shown = listed(f"{unit}={value!r}" for unit, value in bad.items())
             self.log.error(f"column '{column}' must be {expected}, got {shown}")
 

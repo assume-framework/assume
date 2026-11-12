@@ -6,6 +6,18 @@
 from assume.common.base import BaseUnit
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import ExchangeForecaster
+from assume.common.unit_params import (
+    NumberOrSeries,
+    UnitParams,
+    validate_params,
+)
+
+
+class ExchangeParams(UnitParams):
+    """The scalar prices of an :class:`Exchange`, which have no range restrictions."""
+
+    price_import: NumberOrSeries = 0.0
+    price_export: NumberOrSeries = 2999.0
 
 
 class Exchange(BaseUnit):
@@ -25,6 +37,8 @@ class Exchange(BaseUnit):
     Methods
     -------
     """
+
+    Params = ExchangeParams
 
     def __init__(
         self,
@@ -54,6 +68,13 @@ class Exchange(BaseUnit):
                 f"forecaster must be of type {ExchangeForecaster.__name__}"
             )
 
+        params = validate_params(
+            self.Params,
+            self.id,
+            price_import=price_import,
+            price_export=price_export,
+        )
+
         # import is positive
         self.volume_import = abs(forecaster.volume_import)
         # export is negative
@@ -63,12 +84,12 @@ class Exchange(BaseUnit):
         self.price_import = (
             forecaster.price_import
             if forecaster.price_import is not None
-            else FastSeries(index=self.index, value=price_import)
+            else FastSeries(index=self.index, value=params.price_import)
         )
         self.price_export = (
             forecaster.price_export
             if forecaster.price_export is not None
-            else FastSeries(index=self.index, value=price_export)
+            else FastSeries(index=self.index, value=params.price_export)
         )
 
     def as_dict(self) -> dict:

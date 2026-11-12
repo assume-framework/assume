@@ -40,6 +40,11 @@ from assume.common.utils import (
     normalize_availability,
     set_random_seed,
 )
+from assume.scenario.unit_rows import (
+    MIXED_DEMAND_SIGNS,
+    mixed_demand_signs,
+    prepare_unit_rows,
+)
 from assume.strategies import BaseStrategy
 from assume.world import World
 
@@ -664,20 +669,12 @@ def load_config_and_create_forecaster(
     if powerplant_units is None or demand_units is None:
         raise ValueError("No power plant or no demand units were provided!")
 
-    if ((demand_units["min_power"] < 0) & (demand_units["max_power"] > 0)).any() or (
-        (demand_units["min_power"] > 0) & (demand_units["max_power"] < 0)
-    ).any():
-        raise ValueError(
-            "min_power and max_power must both be either negative or positive"
-        )
-    demand_units["min_power"] = -abs(demand_units["min_power"])
-    demand_units["max_power"] = -abs(demand_units["max_power"])
+    if mixed_demand_signs(demand_units).any():
+        raise ValueError(MIXED_DEMAND_SIGNS)
+    demand_units = prepare_unit_rows("demand_units", demand_units)
 
     if storage_units is not None:
-        if "max_power_charge" in storage_units.columns:
-            storage_units["max_power_charge"] = -abs(storage_units["max_power_charge"])
-        if "min_power_charge" in storage_units.columns:
-            storage_units["min_power_charge"] = -abs(storage_units["min_power_charge"])
+        storage_units = prepare_unit_rows("storage_units", storage_units)
         if "capacity" not in storage_units.columns:
             raise ValueError("No capacity column provided for storage units!")
 
