@@ -120,12 +120,11 @@ def test_redispatch_storage(mock_market_config, storage):
     assert bids[0]["min_power"] > storage.max_power_charge
 
 
-def test_redispatch_storage_uses_committed_not_clipped(mock_market_config, storage):
+def test_redispatch_storage_baseline_is_runnable_power(mock_market_config, storage):
     """
-    The redispatch base must be the market-committed plan, not what the SoC lets the
-    storage actually run. The generators were dispatched against the committed
-    volume, so the redispatch network only balances (supply == demand, no spurious
-    net up/down) when storage reports that same committed volume.
+    The redispatch baseline (grid injection) is what the storage can actually run of
+    its DA plan, not the committed plan. Otherwise the grid model would compute line
+    flows with an injection that never happens.
     """
     start = datetime(2023, 7, 1)
     end = datetime(2023, 7, 1, 1)
@@ -144,9 +143,10 @@ def test_redispatch_storage_uses_committed_not_clipped(mock_market_config, stora
         storage, mock_market_config, product_tuples=product_tuples
     )
 
-    # the redispatch base is the committed -60, NOT the runnable -40
-    assert bids[0]["volume"] == pytest.approx(-60)
-    # after charging 40 MW the storage is full: no room for more charging
+    # the grid baseline is the runnable -40, NOT the committed -60
+    assert bids[0]["volume"] == pytest.approx(-40)
+    # no further charging possible: the storage is full after this hour
+    assert bids[0]["min_power"] == pytest.approx(-40)
     assert bids[0]["energy_charge_headroom"] == pytest.approx(0, abs=1e-6)
 
 
@@ -506,3 +506,42 @@ if __name__ == "__main__":
     import pytest
 
     pytest.main(["-s", __file__])
+
+
+@pytest.mark.parametrize(
+    "market_prices, expected_price",
+    [
+        # no EOM forecast: use the redispatch market's own forecast
+        ({"redispatch": 60.0}, 60.0),
+        # neither EOM nor the own market: use any available forecast
+        ({"other_market": 70.0}, 70.0),
+    ],
+)
+def test_redispatch_storage_price_forecast_fallback(market_prices, expected_price):
+    from assume.common.market_objects import MarketConfig, MarketProduct
+
+    index = pd.date_range("2023-07-01", periods=4, freq="h")
+    unit = Storage(
+        id="battery",
+        unit_operator="op",
+        technology="battery",
+        bidding_strategies={},
+        forecaster=UnitForecaster(index, availability=1, market_prices=market_prices),
+        max_power_charge=-10,
+        max_power_discharge=10,
+        capacity=40,
+        efficiency_charge=0.8,
+        efficiency_discharge=0.5,
+        initial_soc=0.5,
+    )
+    config = MarketConfig(
+        market_id="redispatch",
+        product_type="energy",
+        market_mechanism="redispatch",
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+    )
+    bids = StorageEnergyHeuristicRedispatchStrategy().calculate_bids(
+        unit, config, product_tuples=[(index[0], index[1], None)]
+    )
+    # flat forecast: price = forecast / (eta_charge * eta_discharge)
+    assert bids[0]["price"] == pytest.approx(expected_price / (0.8 * 0.5))
