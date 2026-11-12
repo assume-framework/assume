@@ -13,7 +13,7 @@ from assume.common.utils import parse_duration
 
 class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
     """
-    The strategy is based on the storage strategy in flexABLE.
+    The strategy is analogue to the storage strategy in flexABLE.
 
     If the current price forecast is higher than the average price forecast for a given foresight,
     the unit will discharge.
@@ -54,7 +54,7 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
             Orderbook: Bids containing start_time, end_time, only_hours, price, volume.
 
         Note:
-            The strategy is based on flexABLE
+            The strategy is analogue to flexABLE
         """
 
         # =============================================================================
@@ -70,8 +70,6 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
             start, end = product[0], product[1]
 
             current_power = unit.outputs["energy"].at[start]
-            # ensures that potential additional commitment in this market is only in direction of already committed power in other market (=current_power)
-            # does not use full potential of ramping in multi-market bidding, is a simplification of this heuristic strategy in accordance with flexABLE methodology
             current_power_discharge = max(current_power, 0)
             current_power_charge = min(current_power, 0)
 
@@ -132,24 +130,13 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
 
             # if price is higher than average price, discharge
             # if price is lower than average price, charge
-            if price_forecast[start] >= average_price:
-                # favor discharge:
-                if max_power_discharge != 0:
-                    price = average_price / unit.efficiency_discharge
-                    bid_quantity = max_power_discharge
-                else:
-                    # might be that we must charge, due to technical constraints
-                    price = average_price * unit.efficiency_charge
-                    bid_quantity = min_power_charge
+            # if price forecast favors discharge, but max discharge is zero, set a bid for charging
+            if price_forecast[start] >= average_price and max_power_discharge:
+                price = average_price / unit.efficiency_discharge
+                bid_quantity = max_power_discharge
             else:
-                # favor charge
-                if max_power_charge != 0:
-                    price = average_price * unit.efficiency_charge
-                    bid_quantity = max_power_charge
-                else:
-                    # might be that we must discharge, due to technical constraints
-                    price = average_price / unit.efficiency_discharge
-                    bid_quantity = min_power_discharge
+                price = average_price * unit.efficiency_charge
+                bid_quantity = max_power_charge
 
             bids.append(
                 {
@@ -192,6 +179,43 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
 
         return bids
 
+    def calculate_reward(
+        self,
+        unit: SupportsMinMaxCharge,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ):
+        """
+        Calculates the reward (costs and profit).
+
+        The profit is defined by the cashflow minus the costs.
+
+        Args:
+            unit (SupportsMinMaxCharge): The unit to calculate reward for.
+            marketconfig (MarketConfig): The market configuration.
+            orderbook (Orderbook): The orderbook.
+        """
+        product_type = marketconfig.product_type
+
+        for order in orderbook:
+            start = order["start_time"]
+            # end includes the end of the last product, to get the last products' start time we deduct the frequency once
+            end_excl = order["end_time"] - unit.index.freq
+
+            # Extract outputs and costs in one step
+            outputs = unit.outputs[product_type].loc[start:end_excl]
+            costs = np.where(
+                outputs != 0,
+                np.abs(outputs)
+                * np.array([unit.calculate_marginal_cost(start, x) for x in outputs]),
+                0,
+            )
+
+            unit.outputs["profit"].loc[start:end_excl] = (
+                unit.outputs[f"{product_type}_cashflow"].loc[start:end_excl] - costs
+            )
+            unit.outputs["total_costs"].loc[start:end_excl] = costs
+
 
 class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
     """
@@ -206,8 +230,11 @@ class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
 
     For every product the strategy submits:
 
-    - ``volume``: the currently cleared (signed) dispatch (``+`` discharge,
-      ``-`` charge) around which redispatch is applied.
+    - ``volume``: the grid baseline around which redispatch is applied - what the
+      storage can actually run of its cleared (signed) dispatch (``+`` discharge,
+      ``-`` charge). It equals the cleared dispatch unless that is not
+      SOC-feasible; then the grid model sees the real injection and the shortfall
+      is covered by other units.
     - ``max_power`` / ``min_power``: the **state-of-charge aware** discharge
       (``>= 0``) and charge (``<= 0``) bounds, so a near-empty battery offers
       little additional discharge and a near-full one little additional charge.
@@ -286,24 +313,18 @@ class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
         for product in product_tuples:
             start, end = product[0], product[1]
 
-            # Committed plan (+ discharge, - charge): the grid balances against the
-            # volume the energy market cleared and the generators were dispatched for.
-            current_power = unit.outputs["energy"].at[start]
+            # Grid baseline (+ discharge, - charge): what the storage can actually run
+            # of its DA plan. Equal to the plan unless the DA schedule is infeasible;
+            # then the grid model sees the real injection, and the shortfall against
+            # the plan is covered by other units instead of being hidden.
+            current_power = runnable[start]
 
             # Absolute power range at the SOC at the start of this product (SOC limits
-            # applied to the absolute power, CRM reservations kept free).
-            min_power_abs, max_power_abs = unit.calculate_redispatch_power_bounds(
-                start, soc_path[start]
+            # applied to the absolute power, CRM reservations kept free). The clearing
+            # derives up = max_power - volume and down = volume - min_power from it.
+            max_power_charge, max_power_discharge = (
+                unit.calculate_redispatch_power_bounds(start, soc_path[start])
             )
-
-            # The clearing computes up = max_power - volume and down = volume -
-            # min_power with volume = the committed plan. What is physically
-            # possible is measured from what the storage can actually run of that
-            # plan (equal to the plan unless the DA schedule was infeasible), so
-            # the bounds are shifted accordingly.
-            executed_power = runnable[start]
-            max_power_discharge = current_power + (max_power_abs - executed_power)
-            max_power_charge = current_power + (min_power_abs - executed_power)
 
             # Energy head-room at the END of this product along the SOC path. The
             # clearing uses it to bound the CUMULATIVE redispatch energy, see
@@ -349,7 +370,7 @@ class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
 
 class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
     """
-    The strategy is based on the storage strategy in flexABLE.
+    The strategy is analogue to the storage strategy in flexABLE.
 
     The strategy bids the energy_price for the energy_pos product if the specific revenue is positive.
     Otherwise, the strategy bids the capacity_price for the capacity_pos product.
@@ -657,22 +678,15 @@ def get_specific_revenue(unit, marginal_cost, t, foresight, price_forecast):
         theoretic_power_discharge = unit.calculate_ramp_discharge(
             theoretic_SOC,
             previous_power=previous_power,
-            requested_power_discharge=max_power_discharge,
+            power_discharge=max_power_discharge,
         )
         possible_revenue += (market_price - marginal_cost) * theoretic_power_discharge
-        theoretic_SOC -= (
-            theoretic_power_discharge
-            * unit.index.freq
-            / timedelta(hours=1)
-            / unit.efficiency_discharge
-        ) / unit.capacity
+        theoretic_SOC -= theoretic_power_discharge
         previous_power = theoretic_power_discharge
 
     if soc != theoretic_SOC:
-        possible_revenue = possible_revenue / (
-            (soc - theoretic_SOC) * unit.efficiency_discharge * unit.capacity
-        )
+        possible_revenue = possible_revenue / (soc - theoretic_SOC)
     else:
-        possible_revenue = possible_revenue / unit.capacity
+        possible_revenue = possible_revenue / unit.max_soc
 
     return possible_revenue
