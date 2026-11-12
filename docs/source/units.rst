@@ -31,3 +31,5 @@ The initial conditions of units can significantly influence the simulation resul
 .. include:: storages.rst
 
 .. include:: demand_side_agent.rst
+
+.. include:: sector_coupling.rst

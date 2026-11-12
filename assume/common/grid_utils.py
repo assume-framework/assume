@@ -123,6 +123,95 @@ def add_redispatch_loads(
         )
 
 
+def add_redispatch_flexible_loads(
+    network: pypsa.Network,
+    flexible_loads: pd.DataFrame,
+) -> None:
+    """
+    Add flexible electrical consumers to the redispatch network.
+    Each flexible consumer is represented by:
+
+    """
+    if flexible_loads.empty:
+        return
+
+    required_columns = {"node", "p_nom"}
+    missing_columns = required_columns - set(flexible_loads.columns)
+
+    if missing_columns:
+        raise ValueError(
+            "Flexible redispatch loads are missing required "
+            f"columns: {sorted(missing_columns)}"
+        )
+
+    flexible_loads = flexible_loads.copy()
+
+    flexible_loads["p_nom"] = flexible_loads["p_nom"].astype(float).abs()
+
+    if (flexible_loads["p_nom"] <= 0).any():
+        invalid = flexible_loads.index[flexible_loads["p_nom"] <= 0].tolist()
+
+        raise ValueError(
+            f"Flexible redispatch loads require p_nom > 0. Invalid units: {invalid}"
+        )
+    zeros = pd.DataFrame(
+        0.0,
+        index=network.snapshots,
+        columns=flexible_loads.index,
+    )
+
+    # 1. Physical electricity consumption
+    missing_loads = flexible_loads.index.difference(network.loads.index)
+
+    if len(missing_loads) > 0:
+        network.add(
+            "Load",
+            name=missing_loads,
+            bus=flexible_loads.loc[missing_loads, "node"],
+            p_set=zeros[missing_loads],
+        )
+
+    # 2. Upward redispatch
+    # Reducing consumption is electrically equivalent to positive generation.
+    up_names = pd.Index([f"{unit_id}_up" for unit_id in flexible_loads.index])
+    existing_up = pd.Index(network.generators.index).intersection(up_names)
+
+    if len(existing_up) > 0:
+        raise ValueError(f"Redispatch assets already exist: {existing_up.tolist()}")
+
+    network.add(
+        "Generator",
+        name=flexible_loads.index,
+        suffix="_up",
+        bus=flexible_loads["node"],
+        p_nom=flexible_loads["p_nom"],
+        p_min_pu=zeros,
+        p_max_pu=zeros,
+        marginal_cost=zeros,
+        sign=1,
+    )
+
+    # 3. Downward redispatch
+    # Increasing consumption is electrically equivalent to negative generation.
+    down_names = pd.Index([f"{unit_id}_down" for unit_id in flexible_loads.index])
+    existing_down = pd.Index(network.generators.index).intersection(down_names)
+
+    if len(existing_down) > 0:
+        raise ValueError(f"Redispatch assets already exist: {existing_down.tolist()}")
+
+    network.add(
+        "Generator",
+        name=flexible_loads.index,
+        suffix="_down",
+        bus=flexible_loads["node"],
+        p_nom=flexible_loads["p_nom"],
+        p_min_pu=zeros,
+        p_max_pu=zeros,
+        marginal_cost=zeros,
+        sign=-1,
+    )
+
+
 def read_pypsa_grid(
     network: pypsa.Network,
     grid_dict: dict[str, pd.DataFrame],

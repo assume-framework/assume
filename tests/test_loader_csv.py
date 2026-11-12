@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 
 from assume.scenario.loader_csv import (
+    build_flexible_loads,
     get_unit_forecast_algorithms,
     load_config_and_create_forecaster,
     setup_world,
@@ -144,11 +145,7 @@ def test_get_unit_forecast_algorithms():
     }
     powerplant_dict_copy = powerplant_dict.copy()
 
-    config_dict = {
-        "test": "other",
-        "test4": "other2",
-        "test5": "other3",
-    }
+    config_dict = {"test": "other", "test4": "other2", "test5": "other3"}
     config_dict_copy = config_dict.copy()
 
     expected_output = {
@@ -194,6 +191,81 @@ def test_forecast_interface__save_forecasts():
         saved_forecasts["residual_load_naive_forecast_EOM"]
         == expected_load["load_forecast"]
     ).all()
+
+
+def test_build_flexible_loads_derives_electrical_p_nom_from_components():
+    """
+    build_flexible_loads() derives the grid-facing nominal electrical
+    capacity from directly electricity-consuming components.
+    """
+    dsm_units = {
+        "sector_coupled_system": pd.DataFrame(
+            {
+                "node": ["N", "E", "S"],
+                "components": [
+                    {
+                        "heat_pump": {"max_power": 2.0},
+                        "boiler_gas": {"max_power": 5.0, "fuel_type": "natural_gas"},
+                        "thermal_storage": {"capacity": 8.0},
+                    },
+                    {
+                        "heat_pump": {"max_power": 3.0},
+                        "boiler_gas": {"max_power": 7.0, "fuel_type": "natural_gas"},
+                    },
+                    {"electrolyser": {"max_power": 8.0}},
+                ],
+            },
+            index=["hs_north", "hs_east", "h2_south"],
+        )
+    }
+
+    flexible_loads = build_flexible_loads(dsm_units)
+
+    assert set(flexible_loads.index) == {"hs_north", "hs_east", "h2_south"}
+    assert flexible_loads.loc["hs_north", "node"] == "N"
+    assert flexible_loads.loc["hs_north", "p_nom"] == 2.0
+    assert flexible_loads.loc["hs_east", "node"] == "E"
+    assert flexible_loads.loc["hs_east", "p_nom"] == 3.0
+    assert flexible_loads.loc["h2_south", "node"] == "S"
+    assert flexible_loads.loc["h2_south", "p_nom"] == 8.0
+    assert (flexible_loads["unit_type"] == "sector_coupled_system").all()
+
+
+def test_build_flexible_loads_excludes_non_electrical_dsm_units():
+    """
+    A DSM parent without a directly electricity-consuming component
+    must not create a redispatch flexible-load asset.
+    """
+    dsm_units = {
+        "sector_coupled_system": pd.DataFrame(
+            {
+                "node": ["N", "S"],
+                "components": [
+                    {
+                        "heat_pump": {"max_power": 8.0},
+                        "thermal_storage": {"capacity": 20.0},
+                    },
+                    {
+                        "boiler_gas": {"max_power": 8.0, "fuel_type": "natural_gas"},
+                        "thermal_storage": {"capacity": 20.0},
+                    },
+                ],
+            },
+            index=["heat_with_hp", "thermal_only"],
+        )
+    }
+
+    flexible_loads = build_flexible_loads(dsm_units)
+
+    assert "heat_with_hp" in flexible_loads.index
+    assert flexible_loads.loc["heat_with_hp", "p_nom"] == 8.0
+    assert "thermal_only" not in flexible_loads.index
+
+
+def test_build_flexible_loads_handles_empty_dsm_input():
+    flexible_loads = build_flexible_loads({})
+    assert flexible_loads.empty
+    assert {"node", "p_nom"}.issubset(flexible_loads.columns)
 
 
 if __name__ == "__main__":

@@ -412,6 +412,213 @@ class Boiler:
         return model_block
 
 
+class CHP:
+    """
+    A combined heat and power (CHP) unit with a fixed power-to-heat ratio.
+
+    One fuel is converted into electricity and heat in fixed proportions
+    (back-pressure operation):
+
+        power_out[t] = electrical_efficiency * fuel_in[t]
+        heat_out[t]  = thermal_efficiency * fuel_in[t]
+
+    As for the fuel cell, capacity, minimum load and ramp limits refer to the
+    electrical output [MW_el]; fuel input [MW_fuel] follows from the efficiency.
+
+    Args:
+        time_steps (list[int]): A list of time steps over which the CHP operates.
+        max_power (float): Maximum electrical output [MW_el].
+        electrical_efficiency (float): Electricity output per unit fuel input (> 0).
+        thermal_efficiency (float): Useful heat output per unit fuel input. The two
+            efficiencies must not sum to more than 1.
+        fuel_type (str, optional):
+            'natural_gas' or 'hydrogen_gas'. Natural-gas fuel cost is read
+            from ``model.natural_gas_price``. Hydrogen is assumed to be supplied
+            through the internal SectorCoupledSystem hydrogen balance and therefore
+            does not require an external hydrogen price.
+            Defaults to 'natural_gas'.
+        min_power (float, optional): Minimum electrical output while operating [MW_el].
+            Defaults to 0.0.
+        ramp_up (float, optional): Maximum increase in electrical output per time step.
+            Defaults to `max_power`.
+        ramp_down (float, optional): Maximum decrease in electrical output per time step.
+            Defaults to `max_power`.
+        min_operating_steps (int, optional): Minimum number of consecutive operating
+            steps after start-up. Defaults to 0.
+        min_down_steps (int, optional): Minimum number of consecutive off steps after
+            shutdown. Defaults to 0.
+        initial_operational_status (int, optional): Initial on/off status (0 or 1).
+            Defaults to 1.
+        additional_cost (float, optional): Non-fuel variable cost per MWh_el generated.
+            Defaults to 0.0.
+        availability_profile (pd.Series | None, optional): Per-time-step availability
+            factor in [0, 1] applied to `max_power`. Defaults to None.
+    """
+
+    _SUPPORTED_FUELS = {
+        "natural_gas",
+        "hydrogen_gas",
+    }
+
+    def __init__(
+        self,
+        time_steps: list[int],
+        max_power: float,
+        electrical_efficiency: float,
+        thermal_efficiency: float,
+        fuel_type: str = "natural_gas",
+        min_power: float = 0.0,
+        ramp_up: float | None = None,
+        ramp_down: float | None = None,
+        min_operating_steps: int = 0,
+        min_down_steps: int = 0,
+        initial_operational_status: int = 1,
+        additional_cost: float = 0.0,
+        availability_profile=None,
+        **kwargs,
+    ):
+        super().__init__()
+
+        fuel_type = str(fuel_type).lower()
+
+        if fuel_type not in self._SUPPORTED_FUELS:
+            raise ValueError(
+                f"Unsupported fuel_type {fuel_type!r} for CHP. "
+                "Choose 'natural_gas' or 'hydrogen_gas'."
+            )
+
+        if max_power <= 0:
+            raise ValueError("CHP max_power must be > 0.")
+        if not 0 <= min_power <= max_power:
+            raise ValueError("CHP min_power must be in [0, max_power].")
+        if electrical_efficiency <= 0 or thermal_efficiency < 0:
+            raise ValueError(
+                "CHP electrical_efficiency must be > 0 and thermal_efficiency >= 0."
+            )
+        if electrical_efficiency + thermal_efficiency > 1 + 1e-9:
+            raise ValueError("CHP efficiencies must sum to at most 1.")
+        if min_operating_steps < 0 or min_down_steps < 0:
+            raise ValueError("CHP minimum operating/down steps must be >= 0.")
+        if initial_operational_status not in (0, 1):
+            raise ValueError("CHP initial_operational_status must be 0 or 1.")
+
+        self.time_steps = time_steps
+        self.max_power = float(max_power)
+        self.min_power = float(min_power)
+        self.electrical_efficiency = float(electrical_efficiency)
+        self.thermal_efficiency = float(thermal_efficiency)
+        self.fuel_type = fuel_type
+        self.ramp_up = self.max_power if ramp_up is None else float(ramp_up)
+        self.ramp_down = self.max_power if ramp_down is None else float(ramp_down)
+        self.min_operating_steps = int(min_operating_steps)
+        self.min_down_steps = int(min_down_steps)
+        self.initial_operational_status = int(initial_operational_status)
+        self.additional_cost = float(additional_cost)
+        self.availability_profile = sanitize_availability_profile(
+            availability_profile, "CHP"
+        )
+        self.kwargs = kwargs
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+        """Add the CHP equations and operating constraints to ``model_block``."""
+
+        if self.fuel_type == "natural_gas" and not hasattr(model, "natural_gas_price"):
+            raise ValueError("Natural-gas CHP requires model.natural_gas_price.")
+
+        # Define parameters
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.min_power = pyo.Param(initialize=self.min_power)
+        model_block.electrical_efficiency = pyo.Param(
+            initialize=self.electrical_efficiency
+        )
+        model_block.thermal_efficiency = pyo.Param(initialize=self.thermal_efficiency)
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
+        model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
+        model_block.initial_operational_status = pyo.Param(
+            initialize=self.initial_operational_status
+        )
+        model_block.additional_cost = pyo.Param(initialize=self.additional_cost)
+
+        # Define physical decision variables.
+        # Carrier-specific fuel inputs are exposed below as Expressions.
+        model_block.power_out = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, self.max_power),
+        )
+        model_block.fuel_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.heat_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.operating_cost = pyo.Var(self.time_steps, within=pyo.Reals)
+
+        # Fixed-ratio conversion
+        @model_block.Constraint(self.time_steps)
+        def electrical_output_constraint(b, t):
+            return b.power_out[t] == b.fuel_in[t] * b.electrical_efficiency
+
+        @model_block.Constraint(self.time_steps)
+        def thermal_output_constraint(b, t):
+            return b.heat_out[t] == b.fuel_in[t] * b.thermal_efficiency
+
+        # Carrier inputs for the parent system's balances (zero for the unused fuel)
+        uses_gas = self.fuel_type == "natural_gas"
+
+        @model_block.Expression(self.time_steps)
+        def natural_gas_in(b, t):
+            return b.fuel_in[t] if uses_gas else 0.0
+
+        @model_block.Expression(self.time_steps)
+        def hydrogen_in(b, t):
+            return 0.0 if uses_gas else b.fuel_in[t]
+
+        # Operating cost: fuel plus non-fuel variable cost
+        @model_block.Constraint(self.time_steps)
+        def operating_cost_constraint_rule(b, t):
+            if self.fuel_type == "natural_gas":
+                fuel_cost = b.fuel_in[t] * model.natural_gas_price[t]
+            elif self.fuel_type == "hydrogen_gas":
+                # Hydrogen comes from the internal H2 carrier balance.
+                # Its production cost is already represented upstream.
+                fuel_cost = 0.0
+            else:
+                raise ValueError(f"Unsupported CHP fuel_type {self.fuel_type!r}.")
+
+            return b.operating_cost[t] == fuel_cost + b.power_out[t] * b.additional_cost
+
+        if self.availability_profile is not None:
+
+            @model_block.Constraint(self.time_steps)
+            def availability_constraint(b, t):
+                availability = availability_at(self.availability_profile, t)
+                return b.power_out[t] <= availability * b.max_power
+
+        add_ramping_constraints(
+            model_block=model_block,
+            time_steps=self.time_steps,
+            ramped=model_block.power_out,
+        )
+
+        # On/off status is only needed for a minimum load or minimum up/down times
+        # longer than one step (same rule as HeatPump, Electrolyser and FuelCell).
+        if (
+            self.min_operating_steps > 1
+            or self.min_down_steps > 1
+            or self.min_power > 0
+        ):
+            add_min_up_down_time_constraints(
+                model_block=model_block,
+                time_steps=self.time_steps,
+                quantity="power_out",
+                min_quantity="min_power",
+                max_quantity="max_power",
+            )
+
+        return model_block
+
+
 class GenericStorage:
     """
     A class to represent a generic storage unit (e.g., battery) in an energy system model.
@@ -1010,6 +1217,132 @@ class Electrolyser:
             add_min_up_down_time_constraints(
                 model_block=model_block,
                 time_steps=self.time_steps,
+            )
+
+        return model_block
+
+
+class FuelCell:
+    """
+    A generic hydrogen fuel-cell component that converts hydrogen into electricity.
+
+    The component uses hydrogen as its input carrier and produces electrical power.
+    ``max_power`` and ``min_power`` refer to electrical output in MW_el. Hydrogen
+    input is represented in energy-equivalent MW_H2 and linked through the electrical
+    efficiency.
+
+    Args:
+        max_power (float): Maximum electrical output of the fuel cell [MW_el].
+        efficiency (float): Electrical conversion efficiency, i.e. power_out / hydrogen_in.
+        time_steps (list[int]): Optimisation time steps.
+        min_power (float, optional): Minimum electrical output while operating [MW_el].
+            Defaults to 0.0.
+        ramp_up (float, optional): Maximum increase in electrical output per time step.
+            Defaults to ``max_power``.
+        ramp_down (float, optional): Maximum decrease in electrical output per time step.
+            Defaults to ``max_power``.
+        min_operating_steps (int, optional): Minimum number of consecutive operating
+            steps after start-up. Defaults to 0.
+        min_down_steps (int, optional): Minimum number of consecutive off steps after
+            shutdown. Defaults to 0.
+        initial_operational_status (int, optional): Initial on/off status. Defaults to 1.
+        variable_cost (float, optional): Additional variable operating cost per MWh_el
+            generated. Defaults to 0.0. This should represent only incremental fuel-cell
+            O&M or other non-hydrogen costs; the energy cost of internally produced
+            hydrogen is already accounted for upstream by the electrolyser.
+    """
+
+    def __init__(
+        self,
+        max_power: float,
+        efficiency: float,
+        time_steps: list[int],
+        min_power: float = 0.0,
+        ramp_up: float | None = None,
+        ramp_down: float | None = None,
+        min_operating_steps: int = 0,
+        min_down_steps: int = 0,
+        initial_operational_status: int = 1,
+        variable_cost: float = 0.0,
+        **kwargs,
+    ):
+        super().__init__()
+
+        if max_power < 0:
+            raise ValueError("FuelCell max_power must be non-negative.")
+        if min_power < 0:
+            raise ValueError("FuelCell min_power must be non-negative.")
+        if min_power > max_power:
+            raise ValueError("FuelCell min_power cannot exceed max_power.")
+        if not 0 < efficiency <= 1:
+            raise ValueError("FuelCell efficiency must be in the interval (0, 1].")
+
+        self.max_power = max_power
+        self.min_power = min_power
+        self.efficiency = efficiency
+        self.time_steps = time_steps
+        self.ramp_up = max_power if ramp_up is None else ramp_up
+        self.ramp_down = max_power if ramp_down is None else ramp_down
+        self.min_operating_steps = int(min_operating_steps)
+        self.min_down_steps = int(min_down_steps)
+        self.initial_operational_status = initial_operational_status
+        self.variable_cost = variable_cost
+        self.kwargs = kwargs
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+        """Add the fuel-cell equations and operating constraints to ``model_block``."""
+
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.min_power = pyo.Param(initialize=self.min_power)
+        model_block.efficiency = pyo.Param(initialize=self.efficiency)
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
+        model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
+        model_block.initial_operational_status = pyo.Param(
+            initialize=self.initial_operational_status
+        )
+        model_block.variable_cost = pyo.Param(initialize=self.variable_cost)
+
+        # ``power_out`` is electrical generation exported by the fuel cell.
+        # ``hydrogen_in`` is the corresponding hydrogen-energy input.
+        model_block.power_out = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, model_block.max_power),
+        )
+        model_block.hydrogen_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.operating_cost = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+
+        @model_block.Constraint(self.time_steps)
+        def conversion_efficiency_constraint(b, t):
+            return b.power_out[t] == b.hydrogen_in[t] * b.efficiency
+
+        @model_block.Constraint(self.time_steps)
+        def operating_cost_constraint_rule(b, t):
+            return b.operating_cost[t] == b.power_out[t] * b.variable_cost
+
+        add_ramping_constraints(
+            model_block=model_block,
+            time_steps=self.time_steps,
+            ramped=model_block.power_out,
+        )
+
+        if (
+            self.min_operating_steps > 1
+            or self.min_down_steps > 1
+            or self.min_power > 0
+        ):
+            add_min_up_down_time_constraints(
+                model_block=model_block,
+                time_steps=self.time_steps,
+                quantity="power_out",
+                min_quantity="min_power",
+                max_quantity="max_power",
             )
 
         return model_block
@@ -2746,6 +3079,7 @@ class Kiln(ThermalProcessStage):
 # Mapping of component type identifiers to their respective classes
 demand_side_technologies: dict = {
     "electrolyser": Electrolyser,
+    "fuel_cell": FuelCell,
     "hydrogen_buffer_storage": HydrogenBufferStorage,
     "hydrogen_seasonal_storage": SeasonalHydrogenStorage,
     "dri_plant": DRIPlant,
@@ -2753,6 +3087,7 @@ demand_side_technologies: dict = {
     "eaf": ElectricArcFurnace,
     "heat_pump": HeatPump,
     "boiler": Boiler,
+    "chp": CHP,
     "electric_vehicle": ElectricVehicle,
     "charging_station": ChargingStation,
     "generic_storage": GenericStorage,
