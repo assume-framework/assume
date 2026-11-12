@@ -96,6 +96,82 @@ def add_redispatch_generators(
     )
 
 
+def add_redispatch_storages(
+    network: pypsa.Network,
+    storages: pd.DataFrame,
+) -> None:
+    """
+    Adds the given storage units for redispatch.
+
+    Storage is a special case: unlike a power plant it can be pushed both ways
+    around its cleared dispatch (discharge more / charge less as well as charge
+    more / discharge less). It is therefore modelled - analogous to
+    :func:`add_redispatch_generators` - as a fixed-dispatch generator plus an
+    upward and a downward redispatch generator, but with a **bidirectional**
+    baseline (the fixed dispatch may be negative, i.e. charging).
+
+    The nominal power is the full power span
+    ``max_power_discharge - max_power_charge`` (``max_power_charge`` is negative,
+    so this adds). This keeps the fixed baseline within ``[-1, 1]`` per unit and
+    ensures the up/down redispatch potential does not clip prematurely.
+
+    The per-bus backup generators added by :func:`add_redispatch_generators`
+    already cover the storage buses, so no additional backups are added here.
+
+    Args:
+        network (pypsa.Network): the pypsa network to which the storages are added
+        storages (pandas.DataFrame): the storage units dataframe
+    """
+    zeros = pd.DataFrame(
+        np.zeros((len(network.snapshots), len(storages.index))),
+        index=network.snapshots,
+        columns=storages.index,
+    )
+
+    # full power span used as nominal power for the storage redispatch generators
+    p_nom = storages["max_power_discharge"] - storages["max_power_charge"]
+
+    # add storages and their cleared (bidirectional) dispatch as Generator.
+    # The actual fixed dispatch is set later in redispatch.py by
+    # p_min_pu=p_max_pu=cleared_dispatch/p_nom, allowing a negative (charging) baseline.
+    network.add(
+        "Generator",
+        name=storages.index,
+        bus=storages["node"],  # bus to which the storage is connected to
+        p_nom=p_nom,
+        p_set=zeros,
+        p_min_pu=zeros,
+        p_max_pu=zeros,
+        sign=1,
+    )
+
+    # add upward redispatch generators (discharge more / charge less)
+    network.add(
+        "Generator",
+        name=storages.index,
+        suffix="_up",
+        bus=storages["node"],
+        p_nom=p_nom,
+        p_min_pu=zeros,
+        p_max_pu=zeros + 1,
+        marginal_cost=zeros,
+        sign=1,
+    )
+
+    # add downward redispatch generators (charge more / discharge less)
+    network.add(
+        "Generator",
+        name=storages.index,
+        suffix="_down",
+        bus=storages["node"],
+        p_nom=p_nom,
+        p_min_pu=zeros,
+        p_max_pu=zeros + 1,
+        marginal_cost=zeros,
+        sign=-1,
+    )
+
+
 def add_redispatch_loads(
     network: pypsa.Network,
     loads: pd.DataFrame,
