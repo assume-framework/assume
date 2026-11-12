@@ -34,11 +34,11 @@
   "identifier": "https://doi.org/10.5281/zenodo.8088760",
   "codeRepository": "https://github.com/assume-framework/assume/",
   "datePublished": "2024-11-15",
-  "dateModified": "2025-11-12",
+  "dateModified": "2026-11-11",
   "dateCreated": "2024-11-13",
   "description": "ASSUME - Agent-based Simulation for Studying and Understanding Market Evolution",
   "keywords": "agent-based, energy market, simulation, reinforcement learning, bidding",
   "license": "https://spdx.org/licenses/MIT.html",
   "name": "ASSUME",
-  "version": "v0.5.5"
+  "version": "v0.7.0"
 }
