@@ -4,8 +4,6 @@
 
 from datetime import datetime, timedelta
 
-import numpy as np
-
 from assume.common.base import MinMaxStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index, parse_duration
@@ -13,7 +11,7 @@ from assume.common.utils import get_products_index, parse_duration
 
 class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
     """
-    A strategy that bids on the EOM-market.
+    A strategy that bids on the EOM-market. This strategy is based on the flexABLE methodology.
 
     Attributes:
         foresight (datetime.timedelta): The foresight of the unit.
@@ -167,84 +165,23 @@ class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
         orderbook: Orderbook,
     ):
         """
-        Calculates and writes the reward (costs and profit).
+        Previously calculated and wrote the costs and profits to the unit's output.
+        Now only updates the average operation time of the unit, until fully refactored, see #853.
 
         Args:
             unit (SupportsMinMax): A unit that the unit operator manages.
             marketconfig (MarketConfig): A market configuration.
             orderbook (Orderbook): An orderbook with accepted and rejected orders for the unit.
-
-        Note:
-            The reward is calculated as the profit minus the opportunity cost,
-            which is the loss of income we have because we are not running at full power.
-            The regret is the opportunity cost.
-            Because the regret_scale is set to 0 the reward equals the profit.
-            The profit is the income we have from the accepted bids.
-            The total costs are the running costs and the start-up costs.
-
         """
-        product_type = marketconfig.product_type
         products_index = get_products_index(orderbook)
-
-        # Initialize intermediate results as numpy arrays for better performance
-        profit = np.zeros(len(products_index))
-        costs = np.zeros(len(products_index))
-
-        # Map products_index to their positions for faster updates
-        index_map = {time: i for i, time in enumerate(products_index)}
-
-        for order in orderbook:
-            start = order["start_time"]
-            end_excl = order["end_time"] - unit.index.freq
-
-            order_times = unit.index[start:end_excl]
-            accepted_volume = order.get("accepted_volume", 0)
-            accepted_price = order.get("accepted_price", 0)
-
-            for start in order_times:
-                idx = index_map.get(start)
-
-                marginal_cost = unit.calculate_marginal_cost(
-                    start, unit.outputs[product_type].at[start]
-                )
-
-                if isinstance(accepted_volume, dict):
-                    accepted_volume = accepted_volume.get(start, 0)
-                else:
-                    accepted_volume = accepted_volume
-
-                if isinstance(accepted_price, dict):
-                    accepted_price = accepted_price.get(start, 0)
-                else:
-                    accepted_price = accepted_price
-
-                profit[idx] += accepted_price * accepted_volume
-
-        # consideration of start-up costs
-        for i, start in enumerate(products_index):
-            op_time = unit.get_operation_time(start)
-
-            output = unit.outputs[product_type].at[start]
-            marginal_cost = unit.calculate_marginal_cost(start, output)
-            costs[i] += marginal_cost * output
-
-            if output != 0 and op_time < 0:
-                start_up_cost = unit.get_starting_costs(op_time)
-                costs[i] += start_up_cost
-
-        profit -= costs
-
-        # store results in unit outputs which are written to database by unit operator
-        unit.outputs["profit"].loc[products_index] = profit
-        unit.outputs["total_costs"].loc[products_index] = costs
-
-        # update average operation time
-        update_avg_op_time(unit, product_type, products_index[0], products_index[-1])
+        update_avg_op_time(
+            unit, marketconfig.product_type, products_index[0], products_index[-1]
+        )
 
 
 class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
     """
-    A strategy that bids the energy_price or the capacity_price of the unit on the CRM (reserve market).
+    A strategy that bids the energy_price or the capacity_price of the unit on the CRM (reserve market). This strategy is based on the flexABLE methodology.
 
     Attributes:
         foresight (datetime.timedelta): The foresight of the unit.
@@ -362,7 +299,7 @@ class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
 
 class CapacityHeuristicBalancingNegStrategy(MinMaxStrategy):
     """
-    A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
+    A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market). This strategy is based on the flexABLE methodology.
 
     Attributes:
         foresight (datetime.timedelta): The foresight of the unit.
@@ -504,7 +441,10 @@ def calculate_EOM_price_if_off(
     if bid_quantity_inflex == 0:
         return 0
 
-    avg_operating_time = max(unit.avg_op_time, unit.min_operating_time)
+    # min_operating_time is in time steps, the markup is in €/MWh, so convert it to hours
+    avg_operating_time = max(unit.avg_op_time, unit.min_operating_time) * (
+        unit.index.freq / timedelta(hours=1)
+    )
     starting_cost = unit.get_starting_costs(op_time)
     # if we split starting_cost across av_operating_time
     # we are never adding the other parts of the cost to the following hours
@@ -561,9 +501,9 @@ def calculate_EOM_price_if_on(
     if unit.min_down_time == 0:
         price_reduction_restart = starting_cost / bid_quantity_inflex
     else:
-        price_reduction_restart = (
-            starting_cost / unit.min_down_time / bid_quantity_inflex
-        )
+        # min_down_time is in time steps, the reduction is in €/MWh, so convert it to hours
+        min_down_hours = unit.min_down_time * (unit.index.freq / timedelta(hours=1))
+        price_reduction_restart = starting_cost / min_down_hours / bid_quantity_inflex
 
     if unit.outputs["heat"].at[start] > 0:
         heat_gen_cost = (

@@ -432,26 +432,76 @@ def get_products_index(orderbook: Orderbook) -> pd.DatetimeIndex:
     return index_products
 
 
-def timestamp2datetime(timestamp: float):
+def timestamp2datetime(timestamp: float) -> datetime:
+    """
+    Convert a unix timestamp to a naive datetime in UTC.
+
+    ASSUME treats naive datetimes as UTC. Use this instead of
+    ``datetime.fromtimestamp`` without ``tz``, which returns the local time of
+    the machine and therefore differs between machines in different timezones.
+
+    Args:
+        timestamp (float): Seconds since 1970-01-01 00:00 UTC, e.g. the mango clock time.
+
+    Returns:
+        datetime: The naive datetime, to be read as UTC.
+    """
     return datetime.fromtimestamp(timestamp, tz=UTC).replace(tzinfo=None)
 
 
-def datetime2timestamp(datetime: datetime):
+def datetime2timestamp(datetime: datetime) -> int:
+    """
+    Convert a datetime to a unix timestamp, treating naive datetimes as UTC.
+
+    ASSUME treats naive datetimes as UTC. Use this instead of the
+    ``datetime.timestamp`` method, which treats naive datetimes as the local time
+    of the machine and therefore differs between machines in different timezones.
+    Timezone-aware datetimes are converted correctly as well.
+
+    Args:
+        datetime (datetime): The datetime to convert, naive datetimes are treated as UTC.
+
+    Returns:
+        int: Whole seconds since 1970-01-01 00:00 UTC, fractions of a second are dropped.
+    """
     return calendar.timegm(datetime.utctimetuple())
+
+
+def utc_rrule(freq: int, dtstart: datetime, until: datetime, **kwargs) -> rr.rrule:
+    """
+    Create a recurrence rule for scheduling recurrent tasks with mango.
+
+    ASSUME treats naive datetimes as UTC (see datetime2timestamp), while mango
+    interprets a recurrence rule with a naive dtstart in the local time of the
+    machine. The rule is therefore created with UTC-aware dtstart and until, so
+    that recurrent tasks run at the same simulation time on every machine.
+
+    Args:
+        freq (int): The rrule frequency, e.g. rr.HOURLY.
+        dtstart (datetime): The start of the recurrence, naive datetimes are treated as UTC.
+        until (datetime): The end of the recurrence, naive datetimes are treated as UTC.
+        **kwargs: Further arguments passed to rr.rrule.
+
+    Returns:
+        rr.rrule: The UTC-aware recurrence rule.
+    """
+
+    def to_utc(dt: datetime) -> datetime:
+        return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
+
+    return rr.rrule(
+        freq=freq,
+        dtstart=to_utc(dtstart),
+        until=to_utc(until),
+        cache=True,
+        **kwargs,
+    )
 
 
 def create_rrule(start, end, freq):
     freq, interval = convert_to_rrule_freq(freq)
 
-    recurrency_rule = rr.rrule(
-        freq=freq,
-        interval=interval,
-        dtstart=start,
-        until=end,
-        cache=True,
-    )
-
-    return recurrency_rule
+    return utc_rrule(freq=freq, dtstart=start, until=end, interval=interval)
 
 
 def convert_to_rrule_freq(string: str) -> tuple[int, int]:

@@ -3,12 +3,14 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+import math
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 import numpy as np
 
+from assume.common.exceptions import ValidationError
 from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecaster import UnitForecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
@@ -182,17 +184,18 @@ class BaseUnit:
         self, start: datetime, end: datetime, product_type: str
     ) -> None:
         """
-        Calculates the generation cost for a specific product type within the given time range,
-        but only if the end is the last index in the time series.
+        Calculates the generation cost for a specific product type within the given time range.
+
+        Like label-based slicing in pandas, both start and end are inclusive.
+        A start between two index steps is rounded up to the next step.
 
         Args:
-            start (datetime.datetime): The start time for the calculation.
-            end (datetime.datetime): The end time for the calculation.
+            start (datetime.datetime): The start time for the calculation (inclusive).
+            end (datetime.datetime): The end time for the calculation (inclusive).
             product_type (str): The type of product for which the generation cost is to be calculated.
         """
 
-        if start not in self.index:
-            start = self.index[0]
+        start = max(start, self.index[0])
 
         # Adjusted code for accessing product data and mapping over the index
         product_data = self.outputs[product_type].loc[start:end]
@@ -204,6 +207,30 @@ class BaseUnit:
         generation_costs = np.abs(marginal_costs * product_data)
         self.outputs[f"{product_type}_generation_costs"].loc[start:end] = (
             generation_costs
+        )
+
+    def calculate_costs(self, start: datetime, end: datetime) -> None:
+        """
+        Calculates the generation, start-up and total costs of the executed dispatch.
+
+        Args:
+            start (datetime.datetime): The start time for the calculation.
+            end (datetime.datetime): The end time for the calculation.
+        """
+        self.calculate_generation_cost(start, end, "energy")
+
+        start = max(start, self.index[0])
+        for t in self.index[start:end]:
+            starting_cost = 0.0
+            if self.outputs["energy"].at[t] != 0 and self.get_output_before(t) == 0:
+                op_time = self.get_operation_time(t)
+                if op_time < 0:
+                    starting_cost = self.get_starting_costs(op_time)
+            self.outputs["starting_costs"].at[t] = starting_cost
+
+        self.outputs["total_costs"].loc[start:end] = (
+            self.outputs["energy_generation_costs"].loc[start:end]
+            + self.outputs["starting_costs"].loc[start:end]
         )
 
     def execute_current_dispatch(
@@ -230,7 +257,7 @@ class BaseUnit:
         """
         Returns output before the given datetime.
 
-        If the datetime is before the start of the index, 0 is returned.
+        If the datetime is before the start of the index and thereby before the start of the simulation, 0 is returned.
 
         Args:
             dt: The datetime.
@@ -240,6 +267,7 @@ class BaseUnit:
             The output before the given datetime.
         """
         if dt - self.index.freq < self.index[0]:
+            # before start of index: the unit is assumed to be off
             return 0
         else:
             return self.outputs[product_type].at[dt - self.index.freq]
@@ -295,11 +323,24 @@ class BaseUnit:
         Returns the costs if start-up is planned.
 
         Args:
-            op_time: Operation time in hours running from get_operation_time.
+            op_time: Operation time in time steps running from get_operation_time.
 
         Returns:
             Start-up costs.
         """
+        return 0
+
+    def get_operation_time(self, start: datetime) -> int:
+        """
+        Returns the time the unit is operating (positive) or shut down (negative).
+
+        Args:
+            start (datetime.datetime): The start time.
+
+        Returns:
+            int: The operation time as a positive integer if operating, or negative if shut down.
+        """
+        # no operation tracking if not overwritten, so units like storages book no start-up costs yet
         return 0
 
 
@@ -315,8 +356,16 @@ class SupportsMinMax(BaseUnit):
     ramp_up: float = None
     efficiency: float
     emission_factor: float
+    # in whole time steps of the index, converted from hours by the unit:
+    # minimum times are rounded up, as they are "at least" values, and
+    # downtime thresholds are rounded down, as they are "up to" values
     min_operating_time: int = 0
     min_down_time: int = 0
+    downtime_hot_start: int = 0
+    downtime_warm_start: int = 0
+    hot_start_cost: float = 0
+    warm_start_cost: float = 0
+    cold_start_cost: float = 0
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -392,9 +441,34 @@ class SupportsMinMax(BaseUnit):
             )
         return power
 
+    def get_max_lookback_op_time(self) -> int:
+        """
+        Returns the number of time steps the operation time looks back.
+
+        The window covers the longest of the minimum operating time, the minimum down
+        time and the hot and warm start thresholds, plus one step for the thresholds. This
+        way a downtime longer than the warm start threshold can be told apart from a
+        warm start and is charged as a cold start.
+
+        Returns:
+            int: The lookback window in time steps.
+        """
+        return math.ceil(
+            max(
+                self.min_operating_time,
+                self.min_down_time,
+                self.downtime_hot_start + 1,
+                self.downtime_warm_start + 1,
+                1,
+            )
+        )
+
     def get_operation_time(self, start: datetime) -> int:
         """
-        Returns the time the unit is operating (positive) or shut down (negative).
+        Returns the time in simulation time steps the unit is operating (positive) or shut down (negative).
+
+        The operation time is limited by the lookback window of
+        :meth:`get_max_lookback_op_time`.
 
         Args:
             start (datetime.datetime): The start time.
@@ -402,14 +476,23 @@ class SupportsMinMax(BaseUnit):
         Returns:
             int: The operation time as a positive integer if operating, or negative if shut down.
         """
-        # Set the time window based on max of min operating/down time
-        max_time = max(self.min_operating_time, self.min_down_time, 1)
+        max_time = self.get_max_lookback_op_time()
         begin = max(start - self.index.freq * max_time, self.index[0])
         end = start - self.index.freq
 
+        # add consistent behavior at beginning of simulation
         if start <= self.index[0]:
-            # before start of index
-            return max_time
+            # the unit is assumed to be off, consistent with get_output_before returning 0 for the same range
+            # exceeds min_down_time and every start tier, so a start in the first time step is never blocked and is always booked as a cold start.
+            initial_downtime = (
+                max(
+                    self.min_down_time,
+                    self.downtime_hot_start,
+                    self.downtime_warm_start,
+                )
+                + 1
+            )
+            return -initial_downtime
 
         # Check energy output in the defined time window, reversed for most recent state
         arr = (self.outputs["energy"].loc[begin:end] > 0)[::-1]
@@ -490,6 +573,7 @@ class SupportsMinMaxCharge(BaseUnit):
     # negative
     ramp_down_charge: float | None
     # ramp_down_charge is negative
+    simultaneous_charge_discharge_ramping: bool
     capacity: float
     efficiency_charge: float
     efficiency_discharge: float
@@ -500,6 +584,9 @@ class SupportsMinMaxCharge(BaseUnit):
         for strategy in bidding_strategies.values():
             if not isinstance(strategy, MinMaxChargeStrategy):
                 raise ValueError(f"strategy {strategy} is not a MinMaxChargeStrategy!")
+
+        # outputs["soc"] is only valid up to here (inclusive), see ensure_soc
+        self._soc_valid_until = self.index[0]
 
     def calculate_min_max_charge(
         self, start: datetime, end: datetime, soc: float = None
@@ -534,92 +621,289 @@ class SupportsMinMaxCharge(BaseUnit):
     def calculate_ramp_discharge(
         self,
         previous_power: float,
-        power_discharge: float,
+        requested_power_discharge: float,
         current_power: float = 0,
     ) -> float:
         """
         Adjusts the discharging power to the ramping constraints.
-        Given previous_power in the step before, we want to offer power_discharge (positive) to some market,
+        Given previous_power in the step before, we want to offer requested_power_discharge (positive or zero) to some market,
         while we already sold current_power on some other market.
 
-        power_discharge is a power delta to our current output, this function checks if this amount is still feasible to sell.
+        requested_power_discharge is a power level, not a change relative to another power level. Its sign indicates direction.
+        This function checks if this amount is still feasible to sell.
+
+        This function has two different behaviors, depending on the simultaneous_charge_discharge_ramping attribute of the unit, which incorporates different definitions of the ramping constraints:
+        - If simultaneous_charge_discharge_ramping is True, the unit can ramp ramp_up_discharge + ramp_down_charge (or ramp_up_charge + ramp_down_discharge) in one time step. This technically necessitates that the charging ramp down takes place simultaneously with the discharging ramp up, which is physically only possible for separate turbines/pumps.
+        - If simultaneous_charge_discharge_ramping is False, the unit cannot ramp charging and discharging at the same time, leading to a division of the ramping constraints.
 
         Args:
             previous_power (float): The previous power output of the unit.
-            power_discharge (float): The discharging power output of the unit.
+            requested_power_discharge (float): The requested discharging power output of the unit (positive or zero).
             current_power (float, optional): The current power output of the unit already sold on another market. Defaults to 0.
 
         Returns:
-            float: The discharging power adjusted to the ramping constraints.
+            float: The feasible discharging power adjusted by current power commitments and limited by ramping constraints.
         """
-        # previously charging -800 MW wants to go to 200 MW - but must first check if charging is even possible
-        # - 800 MW to 0 with charge ramp down and then 200 MW with discharge ramp up
-        # if storage was charging before we need to check if we can ramp back to zero
+        if requested_power_discharge < 0:
+            raise ValidationError(
+                message=f"{requested_power_discharge=} must be positive or zero for unit {self.id}",
+                id=self.id,
+                field="requested_power_discharge",
+            )
+        # 1. Can we switch to direction of requested power?
+        # previously charging (previous_power < 0) wants to go to discharging (requested_power_discharge > 0) - but must first check if switching to discharging in one time step is even possible
+        # if storage was charging before we need to check if we can ramp back to zero, this holds independent of the simultaneous_charge_discharge_ramping attribute
         if (
-            previous_power < 0  # charging
-            and self.calculate_ramp_charge(previous_power, 0, current_power) < 0
+            previous_power < 0
+            and self.ramp_down_charge is not None
+            and previous_power - self.ramp_down_charge - current_power < 0
+            # current_power is included here, for multi-market settings.
+            # example (previous_power = -60, ramp_down_charge = -50, so the least reachable charging is −10):
+            # current_power	    Discharge bid	Total
+            # −20	            10	            −10     --> "discharge" bid as in "charging less"
+            # −10	            0	            −10
+            # --> selling energy from market1 on market2 is the expected behavior in multi-market settings.
         ):
             # if we can not ramp back to 0, we can not discharge anything
-            return self.calculate_ramp_charge(previous_power, 0, current_power)
+            return 0
 
-        # as we can ramp the charging to 0, we can assume that the previous_power = 0
+        # A true sign switch is handled by the net-ramp calculation below (cases with ramp_down_charge < previous_power).
+        # If the previous charging power cannot reach zero, constrain this bid to keep the unavoidable residual charging power in the total output.
+        # Only afterwards can the code treat the previous_power as 0 for the remaining ramp calculations.
+        if (
+            previous_power < 0
+            and self.ramp_down_charge is not None
+            and previous_power < self.ramp_down_charge
+        ):
+            requested_power_discharge = min(
+                requested_power_discharge,
+                previous_power - self.ramp_down_charge - current_power,
+            )
+
+        # 2. How do we switch to requested power?
+        # 2.1 Allow for simultaneous charge and discharge ramping, if the unit is capable of this
+
+        if self.simultaneous_charge_discharge_ramping:
+            # disregard a max_net_ramping per timestep. If the unit wants to switch signs within one step, allow this
+            # we can e.g. ramp_down_discharge from 50 to 0 and ramp_up_charge from 0 to -60 in one timestep
+
+            # as we can ramp the charging to 0, we can assume that previous power = 0
+            previous_power = max(previous_power, 0)
+
+            # limit the highest possible discharge
+            adjusted_power_discharge = min(
+                requested_power_discharge, self.max_power_discharge - current_power
+            )
+            if self.ramp_up_discharge is not None:
+                # limit to the ramp
+                # what I had + how much I could - what I already sold
+                ramp_limited_discharge = max(
+                    previous_power + self.ramp_up_discharge - current_power, 0
+                )
+                adjusted_power_discharge = min(
+                    adjusted_power_discharge, ramp_limited_discharge
+                )
+
+            # restrict only if ramping defined
+            if self.ramp_down_discharge is not None:
+                # what I had - ramp down = minimum_required
+                minimum_required = previous_power - self.ramp_down_discharge
+                # as I already provide current_power, need to at least offer minimum_required - current_power
+                adjusted_power_discharge = max(
+                    adjusted_power_discharge, minimum_required - current_power, 0
+                )
+            return adjusted_power_discharge
+
+        # 2.2 No simultaneous charge and discharge
+        # If simultaneous_charge_discharge_ramping is False, we are more restrictive, but sign switches are still allowed.
+        # We need to check the net ramping to avoid units can ramp ~2x single ramp limits
+        remaining_net_ramp = None
+        if (
+            previous_power < 0
+            and self.ramp_down_charge is not None
+            and previous_power - self.ramp_down_charge - current_power >= 0
+            and self.ramp_up_discharge is not None
+        ):
+            # if we can ramp back to 0, we can discharge, but need to check the net ramping to avoid units can ramp ~2x single ramp limits
+            # net_ramp is the average of the ramp down and ramp up, as we can not ramp down and up within the same timestep
+            # could also be weighted average
+            net_ramp = (abs(self.ramp_down_charge) + self.ramp_up_discharge) / 2
+            utilized_net_ramp = abs(previous_power)  # positive
+            remaining_net_ramp = (
+                (net_ramp - utilized_net_ramp)
+                if (self.ramp_down_charge < previous_power)
+                else 0
+            )
+
+        # if we were discharging before, keep previous_power
+        # if we were charging before, set 0 and utilize the net_ramp to limit the discharging
         previous_power = max(previous_power, 0)
 
         # limit the highest possible discharge
-        power_discharge = min(power_discharge, self.max_power_discharge - current_power)
+        adjusted_power_discharge = min(
+            requested_power_discharge, self.max_power_discharge - current_power
+        )
         if self.ramp_up_discharge is not None:
-            # limit to the ramp
-            # what I had + how much I could - what I already sold
-            ramp_limited_discharge = max(
-                previous_power + self.ramp_up_discharge - current_power, 0
+            if remaining_net_ramp is None:  # no sign switch
+                # what I had + how much I could - what I already sold
+                ramp_limited_discharge = max(
+                    previous_power + self.ramp_up_discharge - current_power, 0
+                )
+            else:  # sign switch, limit the discharging to the remaining net ramp
+                ramp_limited_discharge = max(
+                    previous_power + remaining_net_ramp - current_power, 0
+                )
+            adjusted_power_discharge = min(
+                adjusted_power_discharge, ramp_limited_discharge
             )
-            power_discharge = min(power_discharge, ramp_limited_discharge)
 
         # restrict only if ramping defined
-        if self.ramp_down_discharge is not None and power_discharge != 0:
+        if self.ramp_down_discharge is not None:
             # what I had - ramp down = minimum_required
             minimum_required = previous_power - self.ramp_down_discharge
             # as I already provide current_power, need to at least offer minimum_required - current_power
-            power_discharge = max(power_discharge, minimum_required - current_power, 0)
-        return power_discharge
+            adjusted_power_discharge = max(
+                adjusted_power_discharge, minimum_required - current_power, 0
+            )
+        return adjusted_power_discharge
 
     def calculate_ramp_charge(
         self,
         previous_power: float,
-        power_charge: float,
+        requested_power_charge: float,
         current_power: float = 0,
     ) -> float:
         """
         Adjusts the charging power to the ramping constraints.
+        Given previous_power in the step before, we want to offer requested_power_charge (negative or zero) to some market,
+        while we already sold current_power on some other market.
+
+        requested_power_charge is a power level, not a change relative to another power level. Its sign indicates direction.
+        This function checks if this amount is still feasible to buy.
+
+        This function has two different behaviors, depending on the simultaneous_charge_discharge_ramping attribute of the unit, which incorporates different definitions of the ramping constraints:
+        - If simultaneous_charge_discharge_ramping is True, the unit can ramp ramp_up_discharge + ramp_down_charge (or ramp_up_charge + ramp_down_discharge) in one time step. This technically necessitates that the charging ramp down takes place simultaneously with the discharging ramp up, which is physically only possible for separate turbines/pumps.
+        - If simultaneous_charge_discharge_ramping is False, the unit cannot ramp charging and discharging at the same time, leading to a division of the ramping constraints.
 
         Args:
             previous_power (float): The previous power output of the unit.
-            power_charge (float): The charging power output of the unit.
-            current_power (float, optional): The current power output of the unit. Defaults to 0.
+            requested_power_charge (float): The requested charging power of the unit (negative or zero).
+            current_power (float, optional): The power we already sold on some other market. Defaults to 0.
 
         Returns:
-            float: The charging power adjusted to the ramping constraints.
+            float: The feasible charging power adjusted by current power commitments and limited by ramping constraints.
         """
-
+        if requested_power_charge > 0:
+            raise ValidationError(
+                message=f"{requested_power_charge=} must be negative or zero for unit {self.id}",
+                id=self.id,
+                field="requested_power_charge",
+            )
+        # 1. Can we switch to direction of requested power?
+        # previously discharging (previous_power > 0) wants to go to charging (requested_power_charge < 0) - but must first check if switching to charging in one time step is even possible
+        # if storage was discharging before we need to check if we can ramp back to zero, this holds independent of the simultaneous_charge_discharge_ramping attribute
         if (
             previous_power > 0
-            and self.calculate_ramp_discharge(previous_power, 0, current_power) > 0
+            and self.ramp_down_discharge is not None
+            and previous_power - self.ramp_down_discharge - current_power > 0
+            # current_power is included here, for multi-market settings.
+            # example (previous_power = 60, ramp_down_discharge = 50, so the least reachable discharging is 10):
+            # current_power	    Charging bid	Total
+            # 20	            -10	            10     --> "charge" bid as in "discharging less"
+            # 10	            0	            10
+            # --> buying energy from market1 on market2 is the expected behavior in multi-market settings.
         ):
             # if we can not ramp back to 0, we can not charge anything
-            return self.calculate_ramp_discharge(previous_power, 0, current_power)
-        # as we can ramp the charging to 0, we can assume that the previous_power = 0
+            return 0
+
+        # A true sign switch is handled by the net-ramp calculation below (cases with ramp_down_discharge > previous_power).
+        # If the previous discharging power cannot reach zero, constrain this bid to keep the unavoidable residual discharging power in the total output.
+        # Only afterwards can the code treat the previous_power as 0 for the remaining ramp calculations.
+        if (
+            previous_power > 0
+            and self.ramp_down_discharge is not None
+            and previous_power > self.ramp_down_discharge
+        ):
+            requested_power_charge = max(
+                requested_power_charge,
+                previous_power - self.ramp_down_discharge - current_power,
+            )
+
+        # 2. How do we switch to requested power?
+        # 2.1 Allow for simultaneous charge and discharge ramping, if the unit is capable of this
+        if self.simultaneous_charge_discharge_ramping:
+            # disregard a max_net_ramping per timestep. If the unit wants to switch signs within one step, allow this
+            # we can e.g. ramp_down_discharge from 50 to 0 and ramp_up_charge from 0 to -60 in one timestep
+
+            # as we can ramp the discharging to 0, we can assume that the previous_power = 0
+            previous_power = min(previous_power, 0)
+
+            # limit the highest possible charge
+            power_charge = max(
+                requested_power_charge, self.max_power_charge - current_power
+            )
+            if self.ramp_up_charge is not None:
+                # what I had + how much I could - what I already sold
+                ramp_limited_charge = min(
+                    previous_power + self.ramp_up_charge - current_power, 0
+                )
+                power_charge = max(power_charge, ramp_limited_charge)
+            # restrict only if ramping defined
+            if self.ramp_down_charge is not None:
+                # what I had - ramp down = minimum_required
+                minimum_required = previous_power - self.ramp_down_charge
+                # as I already provide current_power, need to at least offer minimum_required - current_power
+                power_charge = min(power_charge, minimum_required - current_power, 0)
+            return power_charge
+
+        # 2.2 No simultaneous charge and discharge
+        # If simultaneous_charge_discharge_ramping is False, we are more restrictive, but sign switches are still allowed.
+        # We need to check the net ramping to avoid units can ramp ~2x single ramp limits
+        remaining_net_ramp = None
+        if (
+            previous_power > 0
+            and self.ramp_down_discharge is not None
+            and previous_power - self.ramp_down_discharge - current_power
+            <= 0  # sign switch
+            and self.ramp_up_charge is not None
+        ):
+            # if we can ramp back to 0, we can charge, but need to check the net ramping to avoid units can ramp ~2x single ramp limits
+            # net_ramp is the average of the ramp down and ramp up, as we can not ramp down and up within the same timestep
+            # could also be weighted average
+            net_ramp = (self.ramp_down_discharge + abs(self.ramp_up_charge)) / 2
+            utilized_net_ramp = previous_power  # positive
+            remaining_net_ramp = (
+                (net_ramp - utilized_net_ramp)
+                if (self.ramp_down_discharge > previous_power)
+                else 0
+            )
+
+        # if we were charging before, keep previous_power
+        # if we were discharging before, set previous_power to 0 and utilize the net_ramp to limit the charging
+        original_previous_power = previous_power
         previous_power = min(previous_power, 0)
 
         # limit the highest possible charge
-        power_charge = max(power_charge, self.max_power_charge - current_power)
+        power_charge = max(
+            requested_power_charge, self.max_power_charge - current_power
+        )
         if self.ramp_up_charge is not None:
-            # what I had + how much I could - what I already sold
-            ramp_limited_charge = min(
-                previous_power + self.ramp_up_charge - current_power, 0
-            )
+            if remaining_net_ramp is None:  # no sign switch
+                # what I had + how much I could - what I already sold
+                ramp_limited_charge = min(
+                    previous_power + self.ramp_up_charge - current_power, 0
+                )
+            else:  # sign switch, limit the charging to the remaining net ramp
+                ramp_limited_charge = min(
+                    previous_power - remaining_net_ramp - current_power, 0
+                )
             power_charge = max(power_charge, ramp_limited_charge)
+
+        previous_power = (
+            original_previous_power  # restore previous_power for the next calculation
+        )
         # restrict only if ramping defined
-        if self.ramp_down_charge is not None and power_charge != 0:
+        if self.ramp_down_charge is not None:
             # what I had - ramp down = minimum_required
             minimum_required = previous_power - self.ramp_down_charge
             # as I already provide current_power,
@@ -627,58 +911,131 @@ class SupportsMinMaxCharge(BaseUnit):
             power_charge = min(power_charge, minimum_required - current_power, 0)
         return power_charge
 
+    def calculate_feasible_power(self, current_power: float, soc: float) -> float:
+        """
+        Clips a planned power to the power limits and to what ``soc`` can back.
+
+        Args:
+            current_power (float): The planned power, negative when charging.
+            soc (float): The state of charge the power would run from.
+
+        Returns:
+            float: The power the unit can actually run at.
+        """
+        # adjust power to constraints of the unit
+        if current_power > self.max_power_discharge:
+            current_power = self.max_power_discharge
+        elif current_power < self.max_power_charge:
+            current_power = self.max_power_charge
+        elif (
+            self.min_power_discharge > current_power > self.min_power_charge
+            and current_power != 0
+        ):
+            current_power = 0
+
+        # restrict according to what the SOC can back
+        if current_power > 0:
+            current_power = min(current_power, self.calculate_soc_max_discharge(soc))
+        elif current_power < 0:
+            current_power = max(current_power, self.calculate_soc_max_charge(soc))
+        return current_power
+
+    def calculate_delta_soc(self, current_power: float) -> float:
+        """
+        The change in state of charge caused by running at ``current_power``.
+
+        Args:
+            current_power (float): A feasible power, negative when charging.
+
+        Returns:
+            float: The change in state of charge.
+        """
+        time_delta = self.index.freq / timedelta(hours=1)
+        if current_power > 0:
+            return (
+                -current_power * time_delta / self.efficiency_discharge
+            ) / self.capacity
+        if current_power < 0:
+            return (
+                -current_power * time_delta * self.efficiency_charge
+            ) / self.capacity
+        return 0.0
+
+    def ensure_soc(self, until: datetime) -> None:
+        """
+        Propagates the state of charge from the frontier up to ``until``.
+
+        Each step moves the SOC by the feasible power, not by the plan in
+        ``outputs["energy"]``, which is left untouched until delivery.
+
+        Args:
+            until (datetime.datetime): The point in time the SOC is needed for.
+        """
+        last = self.index[-1]
+        until = min(self.index.align_up(until), last)
+        if until <= self._soc_valid_until:
+            return
+
+        for t in self.index[self._soc_valid_until : until - self.index.freq]:
+            soc = self.outputs["soc"].at[t]
+            current_power = self.calculate_feasible_power(
+                self.outputs["energy"].at[t], soc
+            )
+            self.outputs["soc"].at[t + self.index.freq] = (
+                soc + self.calculate_delta_soc(current_power)
+            )
+
+        self._soc_valid_until = until
+
+    def set_soc(self, t: datetime, soc: float) -> None:
+        """
+        Sets a known state of charge at ``t``, invalidating everything after it.
+
+        Args:
+            t (datetime.datetime): The time to set the SOC at.
+            soc (float): The state of charge (between 0 and 1).
+        """
+        t = self.index.align_up(t)
+        # propagate up to t first, so the range before it is valid
+        self.ensure_soc(t)
+        self.outputs["soc"].at[t] = soc
+        self._soc_valid_until = t
+
+    def get_soc(self, t: datetime) -> float:
+        """
+        Returns the state of charge at the beginning of ``t``, propagating it
+        there if needed.
+
+        Prefer this over ``outputs["soc"]``, which is only up to date until
+        the last propagation.
+
+        Args:
+            t (datetime.datetime): The time to read the SOC at.
+
+        Returns:
+            float: The state of charge at ``t``.
+        """
+        self.ensure_soc(t)
+        return self.outputs["soc"].at[t]
+
     def set_dispatch_plan(
         self, marketconfig: MarketConfig, orderbook: Orderbook
     ) -> None:
-        """Updates the SOC for storage units."""
+        """
+        Adds the accepted volumes and invalidates the SOC from the earliest one on.
+
+        An empty orderbook - e.g. after ``remove_empty_bids`` - and capacity
+        products do not move the SOC and invalidate nothing.
+        """
         super().set_dispatch_plan(marketconfig, orderbook)
 
-        if not orderbook:
+        if marketconfig.product_type != "energy" or not orderbook:
             return
 
-        # also update the SOC when setting the dispatch plan
-        start = min(order["start_time"] for order in orderbook)
-        end = max(order["end_time"] for order in orderbook)
-        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-        end_excl = end - self.index.freq
-        time_delta = self.index.freq / timedelta(hours=1)
-
-        for t in self.index[start:end_excl]:
-            next_t = t + self.index.freq
-            # continue if it is the last time step
-            if next_t not in self.index:
-                continue
-            current_power = self.outputs["energy"].at[t]
-
-            # calculate the change in state of charge
-            delta_soc = 0
-            soc = self.outputs["soc"].at[t]
-
-            # discharging
-            if current_power > 0:
-                max_soc_discharge = self.calculate_soc_max_discharge(soc)
-
-                if current_power > max_soc_discharge:
-                    current_power = max_soc_discharge
-
-                delta_soc = (
-                    -current_power * time_delta / self.efficiency_discharge
-                ) / self.capacity
-
-            # charging
-            elif current_power < 0:
-                max_soc_charge = self.calculate_soc_max_charge(soc)
-
-                if current_power < max_soc_charge:
-                    current_power = max_soc_charge
-
-                delta_soc = (
-                    -current_power * time_delta * self.efficiency_charge
-                ) / self.capacity
-
-            # update the values of the state of charge and the energy
-            self.outputs["soc"].at[next_t] = soc + delta_soc
-            self.outputs["energy"].at[t] = current_power
+        earliest = min(order["start_time"] for order in orderbook)
+        self._soc_valid_until = min(
+            self._soc_valid_until, self.index.align_up(earliest)
+        )
 
 
 class BaseStrategy:

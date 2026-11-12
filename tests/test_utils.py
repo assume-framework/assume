@@ -2,7 +2,9 @@
 #
 # SPDX-License-Identifier: MIT
 
+import asyncio
 import calendar
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -11,7 +13,8 @@ import numpy as np
 import pandas as pd
 import pytest
 from dateutil import rrule as rr
-from dateutil.tz import tzlocal
+from mango import ExternalClock
+from mango.util.scheduling import RecurrentScheduledTask
 
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
@@ -30,6 +33,7 @@ from assume.common.utils import (
     set_random_seed,
     sum_line_capacities,
     timestamp2datetime,
+    utc_rrule,
     visualize_orderbook,
 )
 from assume.scenario.loader_csv import make_market_config
@@ -48,6 +52,45 @@ def test_convert_rrule():
     freq, interval = convert_to_rrule_freq("99d")
     assert freq == rr.DAILY
     assert interval == 99
+
+
+@pytest.fixture
+def non_utc_timezone(monkeypatch):
+    # time.tzset is not available on Windows, the machine timezone is used there
+    if not hasattr(time, "tzset"):
+        yield
+        return
+    monkeypatch.setenv("TZ", "CET-1")
+    time.tzset()
+    yield
+    monkeypatch.undo()
+    time.tzset()
+
+
+async def test_utc_rrule_recurrent_task_timing(non_utc_timezone):
+    # mango interprets naive recurrence rules in local time, which shifts
+    # recurrent tasks on machines not running in UTC
+    start = datetime(2019, 1, 1)
+    end = datetime(2019, 1, 2)
+    clock = ExternalClock(datetime2timestamp(start) - 1)
+    fired = []
+
+    async def task():
+        fired.append(timestamp2datetime(clock.time))
+
+    recurrency_rule = utc_rrule(freq=rr.HOURLY, interval=24, dtstart=start, until=end)
+    assert recurrency_rule[0] == start.replace(tzinfo=UTC)
+
+    scheduled_task = RecurrentScheduledTask(task, recurrency_rule, clock=clock)
+    runner = asyncio.create_task(scheduled_task.run())
+    await asyncio.sleep(0)  # let the task read the clock before it advances
+    for hour in range(25):
+        clock.set_time(datetime2timestamp(start + timedelta(hours=hour)))
+        for _ in range(5):
+            await asyncio.sleep(0)
+    runner.cancel()
+
+    assert fired == [start, end]
 
 
 def test_reproducability_with_seed():
@@ -515,10 +558,11 @@ def test_broken_timestamps():
     # in general, we expect timestamps to be unix-epoch timestamps
     unix_start = datetime(1970, 1, 1)
 
-    unix_epoch_start = datetime.fromtimestamp(0)
+    unix_epoch_start = datetime.fromtimestamp(0)  # tz-ok: shows the local time pitfall
     true_unix_epoch_start = unix_start
-    # offset = tzlocal().utcoffset(datetime.fromtimestamp(0))
-    offset = tzlocal().utcoffset(datetime(2020, 1, 1))
+    # the local UTC offset at the epoch itself - offsets change over time
+    # (e.g. Pacific/Chatham was UTC+12:45 in 1970 but UTC+13:45 in January 2020)
+    offset = datetime.fromtimestamp(0, tz=UTC).astimezone().utcoffset()
     # this should be 1970-01-01-00-00 but it isn't (when run in CET locale)
     # so we always have this offset
     assert true_unix_epoch_start + offset == unix_epoch_start
@@ -529,13 +573,13 @@ def test_broken_timestamps():
     assert 0 == calendar.timegm(unix_start.utctimetuple())
 
     # pandas fromtimestamp has this problem too:
-    assert offset + unix_start == pd.Timestamp.fromtimestamp(0)
+    assert offset + unix_start == pd.Timestamp.fromtimestamp(0)  # tz-ok
 
     # though this can work
     assert unix_start == pd.Timestamp(0)
 
     # the other way works with pandas
-    assert pd.Timestamp(unix_start).timestamp() == 0
+    assert pd.Timestamp(unix_start).timestamp() == 0  # tz-ok: pandas uses UTC
 
 
 def test_timestamp2datetime():

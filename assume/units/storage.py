@@ -32,7 +32,7 @@ class Storage(SupportsMinMaxCharge):
         capacity (float): The capacity of the storage unit in MWh.
         max_soc (float): The maximum state of charge of the storage unit as a fraction (typically 1).
         min_soc (float): The minimum state of charge of the storage unit as a fraction (typically 0).
-        initial_soc (float): The initial state of charge of the storage unit as a fraction (between 0 and 1).
+        initial_soc (float): The state of charge at the beginning of the first time step as a fraction (between 0 and 1).
         efficiency_charge (float): The efficiency of the storage unit while charging.
         efficiency_discharge (float): The efficiency of the storage unit while discharging.
         additional_cost_charge (float, optional): Additional costs associated with power consumption, in EUR/MWh. Defaults to 0.
@@ -41,6 +41,7 @@ class Storage(SupportsMinMaxCharge):
         ramp_down_charge (float): The ramp down rate of charging the storage unit in MW/15 minutes (negative value).
         ramp_up_discharge (float): The ramp up rate of discharging the storage unit in MW/15 minutes.
         ramp_down_discharge (float): The ramp down rate of discharging the storage unit in MW/15 minutes.
+        simultaneous_charge_discharge_ramping (bool): Defines if ramping limits can be used on both sides simultaneously. Defaults to False.
         hot_start_cost (float): The hot start cost of the storage unit in €/MW.
         warm_start_cost (float): The warm start cost of the storage unit in €/MW.
         cold_start_cost (float): The cold start cost of the storage unit in €/MW.
@@ -67,7 +68,7 @@ class Storage(SupportsMinMaxCharge):
         min_power_discharge: float = 0.0,
         min_soc: float = 0.0,
         max_soc: float = 1.0,
-        initial_soc: float | None = 0.0,
+        initial_soc: float | None = 0.5,
         soc_tick: float = 0.01,
         efficiency_charge: float = 1,
         efficiency_discharge: float = 1,
@@ -77,6 +78,7 @@ class Storage(SupportsMinMaxCharge):
         ramp_down_charge: float | None = None,
         ramp_up_discharge: float | None = None,
         ramp_down_discharge: float | None = None,
+        simultaneous_charge_discharge_ramping: bool = False,
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
@@ -95,6 +97,7 @@ class Storage(SupportsMinMaxCharge):
             bidding_strategies=bidding_strategies,
             forecaster=forecaster,
             node=node,
+            simultaneous_charge_discharge_ramping=simultaneous_charge_discharge_ramping,
             location=location,
             **kwargs,
         )
@@ -236,6 +239,9 @@ class Storage(SupportsMinMaxCharge):
         self.ramp_down_charge = ramp_down_charge
         self.ramp_up_discharge = ramp_up_discharge
         self.ramp_down_discharge = ramp_down_discharge
+        self.simultaneous_charge_discharge_ramping = (
+            simultaneous_charge_discharge_ramping
+        )
 
         # How long the storage unit has to be in operation before it can be shut down.
         if min_operating_time < 0:
@@ -274,12 +280,19 @@ class Storage(SupportsMinMaxCharge):
         self.warm_start_cost = warm_start_cost * max_power_discharge
         self.cold_start_cost = cold_start_cost * max_power_discharge
 
+        if self.hot_start_cost or self.warm_start_cost or self.cold_start_cost:
+            logger.warning(
+                f"Unit {self.id} has starting costs defined, but storages do not "
+                "track operation time yet, so starting costs are currently always "
+                "neglected (get_starting_costs always returns 0)."
+            )
+
     def execute_current_dispatch(self, start: datetime, end: datetime) -> np.ndarray:
         """
         Executes the current dispatch of the unit based on the provided timestamps.
 
-        The dispatch is only executed, if it is in the constraints given by the unit.
-        Returns the volume of the unit within the given time range.
+        The committed plan in ``outputs["energy"]`` is clipped to what the unit
+        can run at, and the SOC is derived from the result.
 
         Args:
             start (datetime.datetime): The start time of the dispatch.
@@ -288,54 +301,31 @@ class Storage(SupportsMinMaxCharge):
         Returns:
             np.ndarray: The volume of the unit within the given time range.
         """
-        start = max(start, self.index[0])
-        time_delta = self.index.freq / timedelta(hours=1)
+        last = self.index[-1]
+        start = self.index.align_up(max(start, self.index[0]))
+        if start > last:
+            # nothing left to execute, the returned range is empty
+            return self.outputs["energy"].loc[start:end]
 
+        # the SOC has to be valid at `start`, everything after it is replaced
+        self.ensure_soc(start)
+        self._soc_valid_until = start
+
+        last_executed = None
         for t in self.index[start:end]:
-            current_power = self.outputs["energy"].at[t]
-
-            # adjust power to constraints of the unit
-            if current_power > self.max_power_discharge:
-                current_power = self.max_power_discharge
-            elif current_power < self.max_power_charge:
-                current_power = self.max_power_charge
-            elif (
-                self.min_power_discharge > current_power > self.min_power_charge
-                and current_power != 0
-            ):
-                current_power = 0
-
-            # calculate the change in state of charge
-            delta_soc = 0
+            last_executed = t
             soc = self.outputs["soc"].at[t]
-
-            # discharging
-            if current_power > 0:
-                max_soc_discharge = self.calculate_soc_max_discharge(soc)
-
-                if current_power > max_soc_discharge:
-                    current_power = max_soc_discharge
-
-                delta_soc = (
-                    -current_power * time_delta / self.efficiency_discharge
-                ) / self.capacity
-
-            # charging
-            elif current_power < 0:
-                max_soc_charge = self.calculate_soc_max_charge(soc)
-
-                if current_power < max_soc_charge:
-                    current_power = max_soc_charge
-
-                delta_soc = (
-                    -current_power * time_delta * self.efficiency_charge
-                ) / self.capacity
-
-            # update the values of the state of charge and the energy
-            next_freq = t + self.index.freq
-            if next_freq in self.index:
-                self.outputs["soc"].at[next_freq] = soc + delta_soc
+            current_power = self.calculate_feasible_power(
+                self.outputs["energy"].at[t], soc
+            )
             self.outputs["energy"].at[t] = current_power
+            if t != last:
+                self.outputs["soc"].at[t + self.index.freq] = (
+                    soc + self.calculate_delta_soc(current_power)
+                )
+
+        if last_executed is not None:
+            self._soc_valid_until = min(last_executed + self.index.freq, last)
 
         return self.outputs["energy"].loc[start:end]
 
@@ -427,26 +417,32 @@ class Storage(SupportsMinMaxCharge):
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
 
-        base_load = self.outputs["energy"].loc[start:end_excl]
+        # consider already made commitments on other markets and reserved capacities
+        current_power = self.outputs["energy"].loc[start:end_excl]
         capacity_pos = self.outputs["capacity_pos"].loc[start:end_excl]
         capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
 
-        min_power_charge = self.min_power_charge - (base_load + capacity_pos)
+        min_power_charge = self.min_power_charge - (current_power + capacity_pos)
         min_power_charge = min_power_charge.clip(max=0)
 
-        max_power_charge = self.max_power_charge - (base_load + capacity_neg)
+        max_power_charge = self.max_power_charge - (current_power + capacity_neg)
+
+        # restrict charging according to max_soc, which also covers the current power and reserved capacity
+        if soc is None:
+            # soc at beginning of the hour without commitment of current power or capacity
+            soc = self.get_soc(start)
+        max_soc_charge = self.calculate_soc_max_charge(soc)
+        max_power_charge = max_power_charge.clip(
+            min=np.minimum(max_soc_charge - (current_power + capacity_neg), 0)
+        )
+
+        # check feasibility of min and max power charge, needs to be last to ensure soc clipping does not violate this
         max_power_charge = np.where(
             max_power_charge <= min_power_charge, max_power_charge, 0
         )
         min_power_charge = np.where(
             min_power_charge >= max_power_charge, min_power_charge, 0
         )
-
-        # restrict charging according to max_soc
-        if soc is None:
-            soc = self.outputs["soc"].at[start]
-        max_soc_charge = self.calculate_soc_max_charge(soc)
-        max_power_charge = max_power_charge.clip(min=max_soc_charge)
 
         return min_power_charge, max_power_charge
 
@@ -469,30 +465,31 @@ class Storage(SupportsMinMaxCharge):
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
 
-        base_load = self.outputs["energy"].loc[start:end_excl]
+        current_power = self.outputs["energy"].loc[start:end_excl]
         capacity_pos = self.outputs["capacity_pos"].loc[start:end_excl]
         capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
 
-        min_power_discharge = self.min_power_discharge - (base_load + capacity_neg)
+        min_power_discharge = self.min_power_discharge - (current_power + capacity_neg)
         min_power_discharge = min_power_discharge.clip(min=0)
 
-        max_power_discharge = self.max_power_discharge - (base_load + capacity_pos)
+        max_power_discharge = self.max_power_discharge - (current_power + capacity_pos)
 
-        # Adjust max_power_discharge using np.where
+        # restrict according to min_soc, which also covers the current power and reserved capacity
+        if soc is None:
+            soc = self.get_soc(start)
+        max_soc_discharge = self.calculate_soc_max_discharge(soc)
+        max_power_discharge = max_power_discharge.clip(
+            max=np.maximum(max_soc_discharge - (current_power + capacity_pos), 0)
+        )
+
+        # check feasibility of min and max power discharge, needs to be last to ensure soc clipping does not violate this
         max_power_discharge = np.where(
             max_power_discharge >= min_power_discharge, max_power_discharge, 0
         )
 
-        # Adjust min_power_discharge using np.where
         min_power_discharge = np.where(
-            min_power_discharge < max_power_discharge, min_power_discharge, 0
+            min_power_discharge <= max_power_discharge, min_power_discharge, 0
         )
-
-        # restrict according to min_soc
-        if soc is None:
-            soc = self.outputs["soc"].at[start]
-        max_soc_discharge = self.calculate_soc_max_discharge(soc)
-        max_power_discharge = max_power_discharge.clip(max=max_soc_discharge)
 
         return min_power_discharge, max_power_discharge
 
@@ -500,7 +497,7 @@ class Storage(SupportsMinMaxCharge):
         self,
         soc: float,
         previous_power: float,
-        power_discharge: float,
+        requested_power_discharge: float,
         current_power: float = 0,
         min_power_discharge: float = 0,
     ) -> float:
@@ -510,7 +507,7 @@ class Storage(SupportsMinMaxCharge):
         Args:
             soc (float): The current state of charge (between 0 and 1).
             previous_power (float): The previous power output of the unit.
-            power_discharge (float): The discharging power output of the unit.
+            requested_power_discharge (float): The requested discharging power of the unit (positive or zero).
             current_power (float, optional): The current power output of the unit. Defaults to 0.
             min_power_discharge (float, optional): The minimum discharging power output of the unit. Defaults to 0.
 
@@ -519,13 +516,13 @@ class Storage(SupportsMinMaxCharge):
         """
         power_discharge = super().calculate_ramp_discharge(
             previous_power,
-            power_discharge,
+            requested_power_discharge,
             current_power,
         )
         # restrict according to min_SOC
 
         max_soc_discharge = self.calculate_soc_max_discharge(soc)
-        power_discharge = min(power_discharge, max_soc_discharge)
+        power_discharge = min(power_discharge, max_soc_discharge - current_power)
         if power_discharge < min_power_discharge:
             power_discharge = 0
 
@@ -535,7 +532,7 @@ class Storage(SupportsMinMaxCharge):
         self,
         soc: float,
         previous_power: float,
-        power_charge: float,
+        requested_power_charge: float,
         current_power: float = 0,
         min_power_charge: float = 0,
     ) -> float:
@@ -545,7 +542,7 @@ class Storage(SupportsMinMaxCharge):
         Args:
             soc (float): The current state of charge (between 0 and 1).
             previous_power (float): The previous power output of the unit.
-            power_charge (float): The charging power output of the unit.
+            requested_power_charge (float): The requested charging power of the unit (negative or zero).
             current_power (float, optional): The current power output of the unit. Defaults to 0.
             min_power_charge (float, optional): The minimum charging power output of the unit. Defaults to 0.
 
@@ -554,14 +551,14 @@ class Storage(SupportsMinMaxCharge):
         """
         power_charge = super().calculate_ramp_charge(
             previous_power,
-            power_charge,
+            requested_power_charge,
             current_power,
         )
 
         # restrict charging according to max_SOC
         max_soc_charge = self.calculate_soc_max_charge(soc)
 
-        power_charge = max(power_charge, max_soc_charge)
+        power_charge = max(power_charge, max_soc_charge - current_power)
         if power_charge > min_power_charge:
             power_charge = 0
 
@@ -569,17 +566,21 @@ class Storage(SupportsMinMaxCharge):
 
     def get_starting_costs(self, op_time):
         """
-        Calculates the starting costs of the unit depending on how long it was shut down
+        Should calculate the starting costs of the storage depending on how long it
+        was shut down. Storages do not track operation time yet (see the warning in
+        ``__init__``), so ``op_time`` is never negative here and this always
+        returns 0.
 
         Args:
             op_time (float): The time the unit was shut down in hours.
 
         Returns:
-            float: The starting costs of the unit.
+            float: The starting costs of the unit, currently always 0.
         """
         if op_time > 0:
             # unit is running
             return 0
+
         if -op_time < self.downtime_hot_start:
             return self.hot_start_cost
         elif -op_time < self.downtime_warm_start:
@@ -604,8 +605,8 @@ class Storage(SupportsMinMaxCharge):
                 "max_power_discharge": self.max_power_discharge,
                 "min_power_charge": self.min_power_charge,
                 "min_power_discharge": self.min_power_discharge,
-                "efficiency_charge": self.efficiency_discharge,
-                "efficiency_discharge": self.efficiency_charge,
+                "efficiency_charge": self.efficiency_charge,
+                "efficiency_discharge": self.efficiency_discharge,
                 "unit_type": "storage",
             }
         )

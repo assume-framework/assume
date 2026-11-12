@@ -51,7 +51,8 @@ class PayAsClearRole(MarketRole):
     ) -> tuple[Orderbook, Orderbook, list[dict]]:
         """
         Performs electricity market clearing using a pay-as-clear mechanism. This means that the clearing price is the
-        highest price that is still accepted. The clearing price is the same for all accepted orders.
+        highest supply price that is still accepted. Only during supply scarcity, the last accepted demand order sets the price.
+        The clearing price is the same for all accepted orders.
 
         Args:
             orderbook (Orderbook): the orders to be cleared as an orderbook
@@ -92,10 +93,14 @@ class PayAsClearRole(MarketRole):
             # the following algorithm is inspired by one bar for generation and one for demand
             # add generation for currents demand price, until it matches demand
             # generation above it has to be sold for the lower price (or not at all)
+            supply_exhausted = False
+            supply_scarcity = False
             for demand_order in demand_orders:
                 if not supply_orders:
                     # if no more generation - continue
                     # reject left over demand at the end
+                    if supply_exhausted and accepted_demand_orders:
+                        supply_scarcity = True
                     continue
 
                 # assert dem_vol == gen_vol
@@ -126,6 +131,9 @@ class PayAsClearRole(MarketRole):
                     # gen < dem
                     # generation is not enough - accept partially
                     demand_order["accepted_volume"] = demand_order["volume"] - diff
+                    # set the supply_scarcity flag if the demand order is partially accepted
+                    # this avoids the edge case of a not accepted demand order setting the price
+                    supply_scarcity = demand_order["accepted_volume"] != 0
                 elif diff > 0:
                     # generation left over - accept generation bid partially
                     supply_order = accepted_supply_orders[-1]
@@ -141,6 +149,8 @@ class PayAsClearRole(MarketRole):
                 else:
                     demand_order["accepted_volume"] = demand_order["volume"]
 
+                # supply is exhausted, if the current demand order was fully matched (diff==0) and there are no more supply orders left
+                supply_exhausted = diff == 0 and not supply_orders
                 if demand_order["accepted_volume"]:
                     accepted_demand_orders.append(demand_order)
 
@@ -154,11 +164,17 @@ class PayAsClearRole(MarketRole):
                 ):
                     rejected_product_orders.append(order)
 
-            # set clearing price - merit order - uniform pricing
+            # Set the clearing price using the marginal accepted order. In
+            # scarcity, the last accepted demand order sets the price (but never below the last accepted supply order).
             if accepted_supply_orders:
                 clear_price = float(
                     max(map(itemgetter("price"), accepted_supply_orders))
                 )
+                if supply_scarcity and accepted_demand_orders:
+                    clear_price = max(
+                        clear_price,
+                        float(accepted_demand_orders[-1]["price"]),
+                    )
             else:
                 clear_price = 0
 

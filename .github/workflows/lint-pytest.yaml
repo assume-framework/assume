@@ -86,6 +86,11 @@ jobs:
     needs: [changes, pre-commit]
     if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
+    env:
+      # run tests in an unusual timezone (UTC+13:45) to catch naive datetimes being
+      # interpreted as local time - no developer works in it, so tests can not be
+      # tuned to it by accident, and the 45 minutes misalign every hourly value
+      TZ: Pacific/Chatham
     strategy:
       fail-fast: false
       matrix:
@@ -105,7 +110,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        python -m pip install -e .[test]
+        python -m pip install -e .[test,entsoe]
 
     - name: Test with pytest & integration tests
       run: |
