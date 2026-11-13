@@ -8,13 +8,63 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 
 import numpy as np
+from pydantic import Field, model_validator
 
 from assume.common.base import MinMaxStrategy, SupportsMinMax
 from assume.common.exceptions import ValidationError
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import PowerplantForecaster
+from assume.common.unit_params import (
+    FieldValueError,
+    Number,
+    UnitParams,
+    validate_params,
+)
 
 logger = logging.getLogger(__name__)
+
+
+class PowerPlantParams(UnitParams):
+    """The numeric and typed parameters of a :class:`PowerPlant`, with their ranges."""
+
+    max_power: Number = Field(ge=0)
+    min_power: Number = Field(default=0.0, ge=0)
+    efficiency: Number = Field(default=1.0, ge=0)
+    additional_cost: Number = 0.0
+    partial_load_eff: bool = False
+    # a blank csv cell arrives as the number 0 (fillna(0) in the loader), which always worked
+    fuel_type: str | Number = "others"
+    emission_factor: Number = Field(default=0.0, ge=0)
+    ramp_up: Number | None = None
+    ramp_down: Number | None = None
+    hot_start_cost: Number = 0
+    warm_start_cost: Number = 0
+    cold_start_cost: Number = 0
+    min_operating_time: Number = Field(default=1, ge=0)  # hours
+    min_down_time: Number = Field(default=1, ge=0)  # hours
+    downtime_hot_start: Number = Field(default=0, ge=0)  # hours
+    downtime_warm_start: Number = Field(default=0, ge=0)  # hours
+    max_heat_extraction: Number = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def _check_power_range(self):
+        if self.min_power > self.max_power:
+            raise FieldValueError(
+                "min_power",
+                f"min_power={self.min_power!r} must be <= max_power={self.max_power!r}",
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _check_start_tiers(self):
+        # a warm start threshold of 0 means there is no warm start tier
+        if 0 < self.downtime_warm_start < self.downtime_hot_start:
+            raise FieldValueError(
+                "downtime_warm_start",
+                f"downtime_warm_start={self.downtime_warm_start!r} must be >= "
+                f"downtime_hot_start={self.downtime_hot_start!r}, or 0 to skip warm starts",
+            )
+        return self
 
 
 class PowerPlant(SupportsMinMax):
@@ -48,6 +98,8 @@ class PowerPlant(SupportsMinMax):
         node (str, optional): The identifier of the electrical bus or network node to which the power plant is connected. Defaults to "node0".
         **kwargs (dict, optional): Additional keyword arguments to be passed to the base class. Defaults to {}.
     """
+
+    Params = PowerPlantParams
 
     def __init__(
         self,
@@ -93,97 +145,38 @@ class PowerPlant(SupportsMinMax):
                 f"forecaster must be of type {PowerplantForecaster.__name__}"
             )
 
-        if min_power < 0:
-            raise ValidationError(
-                message=f"{min_power=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="min_power",
-            )
-        if max_power < 0:
-            raise ValidationError(
-                message=f"{max_power=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="max_power",
-            )
-        if min_power > max_power:
-            raise ValidationError(
-                message=f"{min_power=} must be <= {max_power=} for unit {self.id}",
-                id=self.id,
-                field="min_power",
-            )
-        if efficiency < 0:
-            raise ValidationError(
-                message=f"{efficiency=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="efficiency",
-            )
-        if emission_factor < 0:
-            raise ValidationError(
-                message=f"{emission_factor=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="emission_factor",
-            )
-        if max_heat_extraction < 0:
-            raise ValidationError(
-                message=f"{max_heat_extraction=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="max_heat_extraction",
-            )
-        self.max_power = max_power
-        self.min_power = min_power
-        self.efficiency = efficiency
-        self.additional_cost = additional_cost
-        self.partial_load_eff = partial_load_eff
-        self.fuel_type = fuel_type
-        self.emission_factor = emission_factor
-        self.max_heat_extraction = max_heat_extraction
-        self.hot_start_cost = hot_start_cost * max_power
-        self.warm_start_cost = warm_start_cost * max_power
-        self.cold_start_cost = cold_start_cost * max_power
+        # every constructor argument that is a field of Params is validated there
+        given = locals()
+        params = validate_params(
+            self.Params,
+            self.id,
+            **{name: given[name] for name in self.Params.model_fields},
+        )
+        self.max_power = params.max_power
+        self.min_power = params.min_power
+        self.efficiency = params.efficiency
+        self.additional_cost = params.additional_cost
+        self.partial_load_eff = params.partial_load_eff
+        self.fuel_type = params.fuel_type
+        self.emission_factor = params.emission_factor
+        self.max_heat_extraction = params.max_heat_extraction
+        self.hot_start_cost = params.hot_start_cost * params.max_power
+        self.warm_start_cost = params.warm_start_cost * params.max_power
+        self.cold_start_cost = params.cold_start_cost * params.max_power
 
         # check ramping enabled
-        self.ramp_down = None if ramp_down == 0 else ramp_down
-        self.ramp_up = None if ramp_up == 0 else ramp_up
+        self.ramp_down = None if params.ramp_down == 0 else params.ramp_down
+        self.ramp_up = None if params.ramp_up == 0 else params.ramp_up
 
         # the times are given in hours, but handled in whole time steps of the index.
         # Minimum times are rounded up, start thresholds are rounded down.
         hours_to_steps = timedelta(hours=1) / self.index.freq
-
-        if min_operating_time < 0:
-            raise ValidationError(
-                message=f"{min_operating_time=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="min_operating_time",
-            )
-        self.min_operating_time = math.ceil(min_operating_time * hours_to_steps)
-        if min_down_time < 0:
-            raise ValidationError(
-                message=f"{min_down_time=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="min_down_time",
-            )
-        self.min_down_time = math.ceil(min_down_time * hours_to_steps)
-        if downtime_hot_start < 0:
-            raise ValidationError(
-                message=f"{downtime_hot_start=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="downtime_hot_start",
-            )
-        if downtime_warm_start < 0:
-            raise ValidationError(
-                message=f"{downtime_warm_start=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="downtime_warm_start",
-            )
-        # a warm start threshold of 0 means there is no warm start tier
-        if 0 < downtime_warm_start < downtime_hot_start:
-            raise ValidationError(
-                message=f"{downtime_warm_start=} must be >= {downtime_hot_start=} for unit {self.id}, or 0 to skip warm starts",
-                id=self.id,
-                field="downtime_warm_start",
-            )
-        self.downtime_hot_start = math.floor(downtime_hot_start * hours_to_steps)
-        self.downtime_warm_start = math.floor(downtime_warm_start * hours_to_steps)
+        self.min_operating_time = math.ceil(params.min_operating_time * hours_to_steps)
+        self.min_down_time = math.ceil(params.min_down_time * hours_to_steps)
+        self.downtime_hot_start = math.floor(params.downtime_hot_start * hours_to_steps)
+        self.downtime_warm_start = math.floor(
+            params.downtime_warm_start * hours_to_steps
+        )
 
         self.marginal_cost = self.calc_simple_marginal_cost()
 

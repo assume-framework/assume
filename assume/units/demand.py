@@ -3,13 +3,94 @@
 # SPDX-License-Identifier: MIT
 
 from datetime import datetime
+from typing import Any
 
 import numpy as np
+from pydantic import ValidationInfo, field_validator, model_validator
 
 from assume.common.base import SupportsMinMax
-from assume.common.exceptions import ValidationError
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import DemandForecaster
+from assume.common.unit_params import (
+    FieldValueError,
+    Number,
+    UnitParams,
+    validate_params,
+)
+
+
+class DemandParams(UnitParams):
+    """
+    The numeric and typed parameters of a :class:`Demand`, with their ranges.
+
+    The elastic demand parameters are no named arguments of the constructor, they arrive as
+    keyword arguments. ``max_price`` defaults to ``price``.
+    """
+
+    max_power: Number
+    min_power: Number
+    price: Number = 3000.0
+    max_price: Number | None = None
+    elasticity: Number = 0
+    elasticity_model: str | Number = 0
+    num_bids: int = 0
+
+    @field_validator("max_power", "min_power")
+    @classmethod
+    def _not_positive(cls, value: Number, info: ValidationInfo) -> Number:
+        # the message says "< 0" although 0 is allowed, as it always did
+        if value > 0:
+            raise FieldValueError(
+                info.field_name, f"{info.field_name} must be <= 0 but is {value}"
+            )
+        return value
+
+    @field_validator("num_bids", mode="before")
+    @classmethod
+    def _truncate_num_bids(cls, value: Any) -> Any:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return value  # reported as "must be a number"
+
+    @model_validator(mode="after")
+    def _check_power_range(self):
+        if self.max_power > self.min_power:
+            raise FieldValueError(
+                "max_power",
+                f"max_power={self.max_power!r} must be <= min_power={self.min_power!r}",
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _check_elastic_demand(self):
+        if self.max_price is None:
+            self.max_price = self.price
+        if self.elasticity_model == 0:
+            return self
+        if self.elasticity_model not in ("linear", "isoelastic"):
+            raise FieldValueError(
+                "elasticity_model",
+                f"Invalid elasticity_model '{self.elasticity_model}'. Choose 'linear' or 'isoelastic'.",
+            )
+        # the message says ">= 1" although 1 is rejected, as it always did
+        if self.num_bids <= 1:
+            raise FieldValueError(
+                "num_bids", "'num_bids' parameter must be > 1 for elastic demand"
+            )
+        if self.elasticity_model == "isoelastic" and self.elasticity >= 0.0:
+            raise FieldValueError(
+                "elasticity",
+                "'elasticity' parameter must be given and negative for isoelastic demand",
+            )
+        if self.elasticity_model == "linear":
+            max_power = max(abs(self.min_power), abs(self.max_power))
+            if max_power == 0 or (self.max_price / max_power <= 0.0):
+                raise FieldValueError(
+                    "max_price",
+                    "Invalid slope of demand curve. Slope must be negative for linear demand. Set 'max_price' positive.",
+                )
+        return self
 
 
 class Demand(SupportsMinMax):
@@ -29,6 +110,8 @@ class Demand(SupportsMinMax):
         location (tuple[float, float]): Geographical location.
         elasticity, elasticity_model, max_price, num_bids: Optional parameters for elastic demand modeling.
     """
+
+    Params = DemandParams
 
     def __init__(
         self,
@@ -58,59 +141,25 @@ class Demand(SupportsMinMax):
         if not isinstance(forecaster, DemandForecaster):
             raise ValueError(f"forecaster must be of type {DemandForecaster.__name__}")
 
-        if max_power > 0:
-            raise ValidationError(
-                message=f"max_power must be < 0 but is {max_power} for unit {self.id}",
-                id=self.id,
-                field="max_power",
-            )
-        if min_power > 0:
-            raise ValidationError(
-                f"min_power must be < 0 but is {min_power} for unit {self.id}",
-                id=self.id,
-                field="min_power",
-            )
-        if max_power > min_power:
-            raise ValidationError(
-                message=f"{max_power=} must be <= {min_power=} for unit {self.id}",
-                id=self.id,
-                field="max_power",
-            )
+        params = validate_params(
+            self.Params,
+            self.id,
+            max_power=max_power,
+            min_power=min_power,
+            price=price,
+            **kwargs,
+        )
 
-        self.max_power = max_power
-        self.min_power = min_power
+        self.max_power = params.max_power
+        self.min_power = params.min_power
 
-        self.price = FastSeries(index=self.index, value=price)
+        self.price = FastSeries(index=self.index, value=params.price)
 
         # Elastic demand parameters
-        self.max_price = kwargs.get("max_price", price)
-        self.elasticity = kwargs.get("elasticity", 0)
-        self.elasticity_model = kwargs.get("elasticity_model", 0)
-        self.num_bids = int(kwargs.get("num_bids", 0))
-
-        # Validate elastic configuration if elasticity_model is provided
-        if self.elasticity_model != 0:
-            if self.elasticity_model not in ("linear", "isoelastic"):
-                raise ValueError(
-                    f"Invalid elasticity_model '{self.elasticity_model}' at unit {self.id}. Choose 'linear' or 'isoelastic'."
-                )
-            if self.num_bids is not None and self.num_bids <= 1:
-                raise ValueError(
-                    f"'num_bids' parameter must be >= 1 for elastic demand at unit {self.id}"
-                )
-            if self.elasticity_model == "isoelastic":
-                if self.elasticity >= 0.0:
-                    raise ValueError(
-                        f"'elasticity' parameter must be given and negative for isoelastic demand at unit {self.id}."
-                    )
-            if self.elasticity_model == "linear":
-                if (
-                    -(self.max_price / max(abs(self.min_power), abs(self.max_power)))
-                    >= 0.0
-                ):
-                    raise ValueError(
-                        f"Invalid slope of demand curve at unit {self.id}. Slope must be negative for linear demand. Set 'max_price' positive."
-                    )
+        self.max_price = params.max_price
+        self.elasticity = params.elasticity
+        self.elasticity_model = params.elasticity_model
+        self.num_bids = params.num_bids
 
     def execute_current_dispatch(
         self,

@@ -44,6 +44,7 @@ dependencies = [
     "xarray",
     "highspy",
     "termaid >=0.10.0",
+    "pydantic >=2",
 ]
 
 [project.optional-dependencies]

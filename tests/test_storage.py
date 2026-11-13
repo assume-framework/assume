@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import pytest
 
+from assume.common.exceptions import ValidationError
 from assume.common.forecaster import UnitForecaster
 from assume.strategies.flexable_storage import StorageEnergyHeuristicFlexableStrategy
 from assume.units import Storage
@@ -730,13 +731,15 @@ def test_initialising_invalid_storages():
         "capacity": 0.0,
     }
     with pytest.raises(
-        ValueError, match="max_power_charge=10 must be <= 0 for unit id"
+        ValueError,
+        match="max_power_charge=10: Input should be less than or equal to 0 for unit id",
     ):
         d = param_dict.copy()
         d["max_power_charge"] = 10
         Storage(**d)
     with pytest.raises(
-        ValueError, match="min_power_charge=10 must be <= 0 for unit id"
+        ValueError,
+        match="min_power_charge=10: Input should be less than or equal to 0 for unit id",
     ):
         d = param_dict.copy()
         d["min_power_charge"] = 10
@@ -750,13 +753,15 @@ def test_initialising_invalid_storages():
         d["min_power_charge"] = -20
         Storage(**d)
     with pytest.raises(
-        ValueError, match="max_power_discharge=-10 must be >= 0 for unit id"
+        ValueError,
+        match="max_power_discharge=-10: Input should be greater than or equal to 0 for unit id",
     ):
         d = param_dict.copy()
         d["max_power_discharge"] = -10
         Storage(**d)
     with pytest.raises(
-        ValueError, match="min_power_discharge=-10 must be >= 0 for unit id"
+        ValueError,
+        match="min_power_discharge=-10: Input should be greater than or equal to 0 for unit id",
     ):
         d = param_dict.copy()
         d["min_power_discharge"] = -10
@@ -770,57 +775,70 @@ def test_initialising_invalid_storages():
         d["min_power_discharge"] = 20
         Storage(**d)
     with pytest.raises(
-        ValueError, match="efficiency_charge=1.1 must be between 0 and 1 for unit id"
+        ValueError, match="efficiency_charge=1.1: must be between 0 and 1 for unit id"
     ):
         d = param_dict.copy()
         d["efficiency_charge"] = 1.1
         Storage(**d)
     with pytest.raises(
-        ValueError, match="efficiency_discharge=1.1 must be between 0 and 1 for unit id"
+        ValueError,
+        match="efficiency_discharge=1.1: must be between 0 and 1 for unit id",
     ):
         d = param_dict.copy()
         d["efficiency_discharge"] = 1.1
         Storage(**d)
-    with pytest.raises(ValueError, match="ramp_up_charge=10 must be <= 0 for unit id"):
+    with pytest.raises(
+        ValueError,
+        match="ramp_up_charge=10: Input should be less than or equal to 0 for unit id",
+    ):
         d = param_dict.copy()
         d["ramp_up_charge"] = 10
         Storage(**d)
     with pytest.raises(
-        ValueError, match="ramp_down_charge=10 must be <= 0 for unit id"
+        ValueError,
+        match="ramp_down_charge=10: Input should be less than or equal to 0 for unit id",
     ):
         d = param_dict.copy()
         d["ramp_down_charge"] = 10
         Storage(**d)
     with pytest.raises(
-        ValueError, match="ramp_up_discharge=-10 must be >= 0 for unit id"
+        ValueError,
+        match="ramp_up_discharge=-10: Input should be greater than or equal to 0 for unit id",
     ):
         d = param_dict.copy()
         d["ramp_up_discharge"] = -10
         Storage(**d)
     with pytest.raises(
-        ValueError, match="ramp_down_discharge=-10 must be >= 0 for unit id"
+        ValueError,
+        match="ramp_down_discharge=-10: Input should be greater than or equal to 0 for unit id",
     ):
         d = param_dict.copy()
         d["ramp_down_discharge"] = -10
         Storage(**d)
     with pytest.raises(
-        ValueError, match="min_operating_time=-10 must be >= 0 for unit id"
+        ValueError,
+        match="min_operating_time=-10: Input should be greater than or equal to 0 for unit id",
     ):
         d = param_dict.copy()
         d["min_operating_time"] = -10
         Storage(**d)
-    with pytest.raises(ValueError, match="min_down_time=-10 must be >= 0 for unit id"):
+    with pytest.raises(
+        ValueError,
+        match="min_down_time=-10: Input should be greater than or equal to 0 for unit id",
+    ):
         d = param_dict.copy()
         d["min_down_time"] = -10
         Storage(**d)
     with pytest.raises(
-        ValueError, match="downtime_hot_start=-10 must be >= 0 for unit id"
+        ValueError,
+        match="downtime_hot_start=-10: Input should be greater than or equal to 0 for unit id",
     ):
         d = param_dict.copy()
         d["downtime_hot_start"] = -10
         Storage(**d)
     with pytest.raises(
-        ValueError, match="downtime_warm_start=-10 must be >= 0 for unit id"
+        ValueError,
+        match="downtime_warm_start=-10: Input should be greater than or equal to 0 for unit id",
     ):
         d = param_dict.copy()
         d["downtime_warm_start"] = -10
@@ -1041,6 +1059,63 @@ def test_ensure_soc_clips_the_last_time_step(mock_market_config, storage_unit):
     assert storage_unit.execute_current_dispatch(t3, t3)[0] == (
         storage_unit.max_power_discharge
     )
+
+
+def _storage_kwargs(**overrides):
+    index = pd.date_range(
+        start=datetime(2023, 7, 1), end=datetime(2023, 7, 2), freq="1h"
+    )
+    return {
+        "id": "st_test",
+        "unit_operator": "operator",
+        "technology": "technology",
+        "bidding_strategies": {},
+        "forecaster": UnitForecaster(index=index),
+        "max_power_charge": -10,
+        "max_power_discharge": 10,
+        "capacity": 100,
+    } | overrides
+
+
+def test_invalid_storage_reports_all_violations():
+    with pytest.raises(ValidationError) as exc:
+        Storage(**_storage_kwargs(capacity=-1, efficiency_charge=1.5, ramp_up_charge=3))
+    assert exc.value.id == "st_test"
+    assert exc.value.field == "capacity"
+    message = str(exc.value)
+    assert (
+        "capacity=-1: Input should be greater than or equal to 0 for unit st_test"
+        in message
+    )
+    assert "efficiency_charge=1.5: must be between 0 and 1 for unit st_test" in message
+    assert (
+        "ramp_up_charge=3: Input should be less than or equal to 0 for unit st_test"
+        in message
+    )
+
+
+@pytest.mark.parametrize(
+    "kwargs, field",
+    [
+        ({"min_soc": 0.8, "max_soc": 0.2}, "max_soc"),
+        ({"max_power_charge": -10, "min_power_charge": -20}, "max_power_charge"),
+        ({"max_power_discharge": 10, "min_power_discharge": 20}, "max_power_discharge"),
+        ({"initial_soc": 1.5}, "initial_soc"),
+    ],
+)
+def test_invalid_storage_cross_field_rules(kwargs, field):
+    with pytest.raises(ValidationError) as exc:
+        Storage(**_storage_kwargs(**kwargs))
+    assert exc.value.field == field
+
+
+def test_storage_empty_values_use_defaults():
+    st = Storage(**_storage_kwargs(initial_soc=None, min_soc=float("nan")))
+    assert st.initial_soc == 0.5
+    assert st.min_soc == 0.0
+    assert st.downtime_warm_start == 48
+    # starting costs are scaled by the discharge power
+    assert Storage(**_storage_kwargs(hot_start_cost=2)).hot_start_cost == 20
 
 
 if __name__ == "__main__":

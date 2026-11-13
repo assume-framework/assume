@@ -7,14 +7,77 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 
 import numpy as np
+from pydantic import Field, model_validator
 
 from assume.common.base import SupportsMinMaxCharge
-from assume.common.exceptions import ValidationError
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import UnitForecaster
+from assume.common.unit_params import (
+    FieldValueError,
+    Number,
+    UnitInterval,
+    UnitParams,
+    validate_params,
+)
 
 logger = logging.getLogger(__name__)
 EPS = 1e-4
+
+
+class StorageParams(UnitParams):
+    """The numeric and typed parameters of a :class:`Storage`, with their ranges."""
+
+    capacity: Number = Field(ge=0)
+    min_soc: UnitInterval = 0.0
+    max_soc: UnitInterval = 1.0
+    initial_soc: UnitInterval = 0.5
+    soc_tick: Number = Field(default=0.01, ge=0)
+    # charging is negative: powers and ramps are <= 0, the discharge side is >= 0
+    max_power_charge: Number = Field(le=0)
+    min_power_charge: Number = Field(default=0.0, le=0)
+    max_power_discharge: Number = Field(ge=0)
+    min_power_discharge: Number = Field(default=0.0, ge=0)
+    efficiency_charge: UnitInterval = 1
+    efficiency_discharge: UnitInterval = 1
+    additional_cost_charge: Number = 0.0
+    additional_cost_discharge: Number = 0.0
+    ramp_up_charge: Number | None = Field(default=None, le=0)
+    ramp_down_charge: Number | None = Field(default=None, le=0)
+    ramp_up_discharge: Number | None = Field(default=None, ge=0)
+    ramp_down_discharge: Number | None = Field(default=None, ge=0)
+    simultaneous_charge_discharge_ramping: bool = False
+    hot_start_cost: Number = 0
+    warm_start_cost: Number = 0
+    cold_start_cost: Number = 0
+    min_operating_time: Number = Field(default=0, ge=0)  # hours
+    min_down_time: Number = Field(default=0, ge=0)  # hours
+    downtime_hot_start: Number = Field(default=8, ge=0)  # hours
+    downtime_warm_start: Number = Field(default=48, ge=0)  # hours
+
+    @model_validator(mode="after")
+    def _check_soc_range(self):
+        if self.max_soc < self.min_soc:
+            raise FieldValueError(
+                "max_soc",
+                f"max_soc={self.max_soc!r} must be >= min_soc={self.min_soc!r}",
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _check_power_ranges(self):
+        if self.max_power_charge > self.min_power_charge:
+            raise FieldValueError(
+                "max_power_charge",
+                f"max_power_charge={self.max_power_charge!r} must be <= "
+                f"min_power_charge={self.min_power_charge!r}",
+            )
+        if self.max_power_discharge < self.min_power_discharge:
+            raise FieldValueError(
+                "max_power_discharge",
+                f"max_power_discharge={self.max_power_discharge!r} must be >= "
+                f"min_power_discharge={self.min_power_discharge!r}",
+            )
+        return self
 
 
 class Storage(SupportsMinMaxCharge):
@@ -53,6 +116,8 @@ class Storage(SupportsMinMaxCharge):
         bidding_startegy (str): In case the unit is active it has to be defined which bidding strategy should be used
 
     """
+
+    Params = StorageParams
 
     def __init__(
         self,
@@ -101,184 +166,79 @@ class Storage(SupportsMinMaxCharge):
             location=location,
             **kwargs,
         )
-        if capacity < 0:
-            raise ValidationError(
-                message=f"{capacity=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="",
-            )
-        if not 0 <= min_soc <= 1:
-            raise ValidationError(
-                message=f"{min_soc=} must be between 0 and 1 for unit {self.id}",
-                id=self.id,
-                field="",
-            )
-        if not 0 <= max_soc <= 1:
-            raise ValidationError(
-                message=f"{max_soc=} must be between 0 and 1 for unit {self.id}",
-                id=self.id,
-                field="",
-            )
-        if max_soc < min_soc:
-            raise ValidationError(
-                message=f"{max_soc=} must be >= {min_soc=} for unit {self.id}",
-                id=self.id,
-                field="",
-            )
-        self.capacity = capacity
-        self.max_soc = max_soc
-        self.min_soc = min_soc
-        if initial_soc is None:
-            initial_soc = 0.5
-        if not 0 <= initial_soc <= 1:
-            raise ValidationError(
-                f"{initial_soc=} must be between 0 and 1 for unit {self.id}",
-                id=self.id,
-                field="initial_soc",
-            )
-        self.initial_soc = initial_soc
+        params = validate_params(
+            self.Params,
+            self.id,
+            capacity=capacity,
+            max_power_charge=max_power_charge,
+            max_power_discharge=max_power_discharge,
+            min_power_charge=min_power_charge,
+            min_power_discharge=min_power_discharge,
+            min_soc=min_soc,
+            max_soc=max_soc,
+            initial_soc=initial_soc,
+            soc_tick=soc_tick,
+            efficiency_charge=efficiency_charge,
+            efficiency_discharge=efficiency_discharge,
+            additional_cost_charge=additional_cost_charge,
+            additional_cost_discharge=additional_cost_discharge,
+            ramp_up_charge=ramp_up_charge,
+            ramp_down_charge=ramp_down_charge,
+            ramp_up_discharge=ramp_up_discharge,
+            ramp_down_discharge=ramp_down_discharge,
+            simultaneous_charge_discharge_ramping=simultaneous_charge_discharge_ramping,
+            hot_start_cost=hot_start_cost,
+            warm_start_cost=warm_start_cost,
+            cold_start_cost=cold_start_cost,
+            min_operating_time=min_operating_time,
+            min_down_time=min_down_time,
+            downtime_hot_start=downtime_hot_start,
+            downtime_warm_start=downtime_warm_start,
+        )
+        self.capacity = params.capacity
+        self.max_soc = params.max_soc
+        self.min_soc = params.min_soc
+        self.initial_soc = params.initial_soc
 
-        if max_power_charge > 0:
-            raise ValidationError(
-                message=f"{max_power_charge=} must be <= 0 for unit {self.id}",
-                id=self.id,
-                field="max_power_charge",
-            )
-        if min_power_charge > 0:
-            raise ValidationError(
-                message=f"{min_power_charge=} must be <= 0 for unit {self.id}",
-                id=self.id,
-                field="min_power_charge",
-            )
-        if max_power_charge > min_power_charge:
-            raise ValidationError(
-                f"{max_power_charge=} must be <= {min_power_charge=} for unit {self.id}",
-                id=self.id,
-                field="max_power_charge",
-            )
-        if max_power_discharge < 0:
-            raise ValidationError(
-                message=f"{max_power_discharge=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="max_power_discharge",
-            )
-        if min_power_discharge < 0:
-            raise ValidationError(
-                message=f"{min_power_discharge=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="min_power_discharge",
-            )
-        if max_power_discharge < min_power_discharge:
-            raise ValueError(
-                f"{max_power_discharge=} must be >= {min_power_discharge=} for unit {self.id}"
-            )
-        self.max_power_charge = max_power_charge
-        self.min_power_charge = min_power_charge
-        self.max_power_discharge = max_power_discharge
-        self.min_power_discharge = min_power_discharge
+        self.max_power_charge = params.max_power_charge
+        self.min_power_charge = params.min_power_charge
+        self.max_power_discharge = params.max_power_discharge
+        self.min_power_discharge = params.min_power_discharge
 
         self.outputs["soc"] = FastSeries(value=self.initial_soc, index=self.index)
         self.outputs["cost_stored_energy"] = FastSeries(value=0.0, index=self.index)
 
-        if soc_tick < 0:
-            raise ValidationError(
-                message=f"{soc_tick=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="soc_tick",
-            )
-        self.soc_tick = soc_tick
+        self.soc_tick = params.soc_tick
 
-        if not 0 <= efficiency_charge <= 1:
-            raise ValidationError(
-                f"{efficiency_charge=} must be between 0 and 1 for unit {self.id}",
-                id=self.id,
-                field="efficiency_charge",
-            )
-        if not 0 <= efficiency_discharge <= 1:
-            raise ValidationError(
-                f"{efficiency_discharge=} must be between 0 and 1 for unit {self.id}",
-                id=self.id,
-                field="efficiency_discharge",
-            )
         # The efficiency of the storage unit while charging.
-        self.efficiency_charge = efficiency_charge
-        self.efficiency_discharge = efficiency_discharge
+        self.efficiency_charge = params.efficiency_charge
+        self.efficiency_discharge = params.efficiency_discharge
 
         # The variable costs to charge/discharge the storage unit.
-        self.additional_cost_charge = additional_cost_charge
-        self.additional_cost_discharge = additional_cost_discharge
+        self.additional_cost_charge = params.additional_cost_charge
+        self.additional_cost_discharge = params.additional_cost_discharge
 
         # The ramp up/down rate of charging/discharging the storage unit.
-        # if ramp_up_charge == 0, the ramp_up_charge is set to enable ramping between full charge and discharge power
-        # else the ramp_up_charge is set to the negative value of the ramp_up_charge
-        if ramp_up_charge is not None and ramp_up_charge > 0:
-            raise ValidationError(
-                message=f"{ramp_up_charge=} must be <= 0 for unit {self.id}",
-                id=self.id,
-                field="ramp_up_charge",
-            )
-        if ramp_down_charge is not None and ramp_down_charge > 0:
-            raise ValidationError(
-                message=f"{ramp_down_charge=} must be <= 0 for unit {self.id}",
-                id=self.id,
-                field="ramp_down_charge",
-            )
-        if ramp_up_discharge is not None and ramp_up_discharge < 0:
-            raise ValidationError(
-                message=f"{ramp_up_discharge=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="ramp_up_discharge",
-            )
-        if ramp_down_discharge is not None and ramp_down_discharge < 0:
-            raise ValidationError(
-                message=f"{ramp_down_discharge=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="ramp_down_discharge",
-            )
-        self.ramp_up_charge = ramp_up_charge
-        self.ramp_down_charge = ramp_down_charge
-        self.ramp_up_discharge = ramp_up_discharge
-        self.ramp_down_discharge = ramp_down_discharge
+        self.ramp_up_charge = params.ramp_up_charge
+        self.ramp_down_charge = params.ramp_down_charge
+        self.ramp_up_discharge = params.ramp_up_discharge
+        self.ramp_down_discharge = params.ramp_down_discharge
         self.simultaneous_charge_discharge_ramping = (
-            simultaneous_charge_discharge_ramping
+            params.simultaneous_charge_discharge_ramping
         )
 
         # How long the storage unit has to be in operation before it can be shut down.
-        if min_operating_time < 0:
-            raise ValidationError(
-                message=f"{min_operating_time=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="min_operating_time",
-            )
-        self.min_operating_time = min_operating_time
+        self.min_operating_time = params.min_operating_time
         # How long the storage unit has to be shut down before it can be started.
-        if min_down_time < 0:
-            raise ValidationError(
-                message=f"{min_down_time=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="min_down_time",
-            )
-        self.min_down_time = min_down_time
+        self.min_down_time = params.min_down_time
         # The downtime before hot start of the storage unit.
-        if downtime_hot_start < 0:
-            raise ValidationError(
-                message=f"{downtime_hot_start=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="downtime_hot_start",
-            )
-        self.downtime_hot_start = downtime_hot_start
+        self.downtime_hot_start = params.downtime_hot_start
         # The downtime before warm start of the storage unit.
-        if downtime_warm_start < 0:
-            raise ValidationError(
-                message=f"{downtime_warm_start=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="downtime_warm_start",
-            )
-        self.downtime_warm_start = downtime_warm_start
+        self.downtime_warm_start = params.downtime_warm_start
 
-        self.hot_start_cost = hot_start_cost * max_power_discharge
-        self.warm_start_cost = warm_start_cost * max_power_discharge
-        self.cold_start_cost = cold_start_cost * max_power_discharge
+        self.hot_start_cost = params.hot_start_cost * params.max_power_discharge
+        self.warm_start_cost = params.warm_start_cost * params.max_power_discharge
+        self.cold_start_cost = params.cold_start_cost * params.max_power_discharge
 
         if self.hot_start_cost or self.warm_start_cost or self.cold_start_cost:
             logger.warning(

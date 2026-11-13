@@ -4,10 +4,12 @@
 
 from datetime import datetime, timedelta
 
+import numpy as np
 import pandas as pd
 import pytest
 
 from assume.common.exceptions import ValidationError
+from assume.common.fast_pandas import FastIndex
 from assume.common.forecaster import PowerplantForecaster
 from assume.strategies.naive_strategies import EnergyNaiveStrategy
 from assume.units import PowerPlant
@@ -627,11 +629,17 @@ def test_initialising_invalid_powerplants():
         "forecaster": PowerplantForecaster(index=index),
         "max_power": 0.0,
     }
-    with pytest.raises(ValueError, match="max_power=-10 must be >= 0 for unit id"):
+    with pytest.raises(
+        ValueError,
+        match="max_power=-10: Input should be greater than or equal to 0 for unit id",
+    ):
         d = param_dict.copy()
         d["max_power"] = -10
         PowerPlant(**d)
-    with pytest.raises(ValueError, match="min_power=-10 must be >= 0 for unit id"):
+    with pytest.raises(
+        ValueError,
+        match="min_power=-10: Input should be greater than or equal to 0 for unit id",
+    ):
         d = param_dict.copy()
         d["min_power"] = -10
         PowerPlant(**d)
@@ -643,12 +651,16 @@ def test_initialising_invalid_powerplants():
         d["min_power"] = 20
         PowerPlant(**d)
     with pytest.raises(
-        ValueError, match="min_operating_time=-10 must be >= 0 for unit id"
+        ValueError,
+        match="min_operating_time=-10: Input should be greater than or equal to 0 for unit id",
     ):
         d = param_dict.copy()
         d["min_operating_time"] = -10
         PowerPlant(**d)
-    with pytest.raises(ValueError, match="min_down_time=-10 must be >= 0 for unit id"):
+    with pytest.raises(
+        ValueError,
+        match="min_down_time=-10: Input should be greater than or equal to 0 for unit id",
+    ):
         d = param_dict.copy()
         d["min_down_time"] = -10
         PowerPlant(**d)
@@ -865,6 +877,49 @@ def test_warm_start_threshold_zero_skips_warm_starts():
     pp = _make_start_cost_plant(downtime_hot_start=2, downtime_warm_start=0)
     assert pp.get_starting_costs(-2) == pp.hot_start_cost
     assert pp.get_starting_costs(-3) == pp.cold_start_cost
+
+
+def _plant_kwargs(**overrides):
+    index = FastIndex(start=datetime(2023, 7, 1), end=datetime(2023, 7, 2), freq="1h")
+    return {
+        "id": "pp_test",
+        "unit_operator": "operator",
+        "technology": "technology",
+        "bidding_strategies": {},
+        "forecaster": PowerplantForecaster(index=index),
+        "max_power": 100.0,
+    } | overrides
+
+
+def test_invalid_powerplant_reports_all_violations():
+    with pytest.raises(ValidationError) as exc:
+        PowerPlant(**_plant_kwargs(efficiency=-0.5, emission_factor=-1))
+    assert exc.value.id == "pp_test"
+    assert exc.value.field == "efficiency"
+    message = str(exc.value)
+    assert (
+        "efficiency=-0.5: Input should be greater than or equal to 0 for unit pp_test"
+        in message
+    )
+    assert (
+        "emission_factor=-1: Input should be greater than or equal to 0 for unit pp_test"
+        in message
+    )
+
+
+def test_powerplant_params_empty_values_use_defaults():
+    pp = PowerPlant(
+        **_plant_kwargs(efficiency=float("nan"), min_power=None, fuel_type=None)
+    )
+    assert pp.efficiency == 1.0
+    assert pp.min_power == 0.0
+    assert pp.fuel_type == "others"
+    assert PowerPlant.Params(max_power=5, efficiency=np.nan).efficiency == 1.0
+
+
+def test_powerplant_accepts_blank_fuel_type_from_csv():
+    # the loader turns blank csv cells into 0, which has always been accepted
+    assert PowerPlant(**_plant_kwargs(fuel_type=0.0)).fuel_type == 0.0
 
 
 if __name__ == "__main__":
