@@ -70,8 +70,6 @@ class UnitsOperator(Role):
         self.last_sent_dispatch = defaultdict(lambda: 0)
         # the DSM component schedule is not tied to a product type, so it is tracked separately
         self.last_sent_dsm_schedule = 0
-        # the static component specification of the DSM units is only sent once
-        self.sent_dsm_specs = False
         self.forecaster = forecaster
 
         self.portfolio_strategies = portfolio_strategies
@@ -140,6 +138,24 @@ class UnitsOperator(Role):
                 }
                 await self.context.send_message(
                     content=message,
+                    receiver_addr=db_addr,
+                )
+
+            # the component specification of the DSM units is static as well, but
+            # it holds one row per component parameter instead of one per unit
+            dsm_specs = [
+                spec
+                for unit in self.units.values()
+                if hasattr(unit, "get_component_specs")
+                for spec in unit.get_component_specs()
+            ]
+            if dsm_specs:
+                await self.context.send_message(
+                    content={
+                        "context": "write_results",
+                        "type": "dsm_specs",
+                        "data": dsm_specs,
+                    },
                     receiver_addr=db_addr,
                 )
 
@@ -470,30 +486,6 @@ class UnitsOperator(Role):
                         "data": unit_dispatch,
                     },
                 )
-
-            if not self.sent_dsm_specs:
-                dsm_units = [
-                    unit
-                    for unit in self.units.values()
-                    if hasattr(unit, "get_component_specs")
-                ]
-                dsm_specs = [
-                    spec for unit in dsm_units for spec in unit.get_component_specs()
-                ]
-                if dsm_specs:
-                    self.context.schedule_instant_message(
-                        receiver_addr=db_addr,
-                        content={
-                            "context": "write_results",
-                            "type": "dsm_specs",
-                            "data": dsm_specs,
-                        },
-                    )
-                # mark as sent once the specs went out, or stop looking when no
-                # unit can ever provide any; only retry while a DSM unit exists
-                # whose specs are not captured yet
-                if dsm_specs or not dsm_units:
-                    self.sent_dsm_specs = True
 
             dsm_schedule = self.get_dsm_schedule(self.last_sent_dsm_schedule)
             self.last_sent_dsm_schedule = self.context.current_timestamp

@@ -77,11 +77,11 @@ When the outputs are stored in CSV files, the data is organized in a similar str
      - simulation, unit, power, heat, soc, energy_generation_costs, starting_costs, energy_cashflow, total_costs
 
    * - dsm_schedule
-     - Planned operating schedule per technology of the demand-side units (steel plant, cement plant, building, ...) in long format: one row per time step, unit, technology and variable. Only written if DSM units are part of the simulation. This is the schedule the unit's own optimisation determined, **not** the realised dispatch after market clearing: if a bid is only partly accepted, the realised plant-level operation is in ``unit_dispatch`` and the bid and accepted volumes per market are in ``market_orders``; join on the unit id and time to compare planned and accepted operation. ``baseline`` is the optimal operation without flexibility; ``flex`` is the flexible operation and is empty as long as the unit did not determine it (e.g. in rolling-horizon runs, where the committed windows are written to ``baseline``). Every non-binary variable of a technology block is reported, e.g. ``power_in``, material and fuel flows, ``co2_emission``, ``operating_cost`` or storage levels. Unit-level series (``total_power_input``, ``variable_cost``, the load shift variables and the ``electricity_price`` the solve used) are reported under the pseudo technology ``unit``. ``carrier`` (electricity, heat, hydrogen, natural_gas, steel, co2, ...), ``direction`` (``in``, ``out``, ``state``, ``cost`` or ``price``) and ``unit_of_measure`` classify each variable, e.g. for Sankey diagrams; note that the cement plant's ``fossil_in`` is the sum of ``natural_gas_in`` and ``coal_in`` and must not be added to those again.
+     - Planned operating schedule per technology of the demand-side units, in long format. See :ref:`dsm-output-tables`.
      - simulation, time, unit, technology, variable, carrier, direction, unit_of_measure, baseline, flex
 
    * - dsm_specs
-     - Static technical specification of the demand-side units, one row per unit, technology and scalar parameter of the technology (rated powers, capacities, efficiencies, specific consumptions, ...) plus the component class name (``component_class``). Only written if DSM units are part of the simulation.
+     - Technical specification of the demand-side units per technology. See :ref:`dsm-output-tables`.
      - simulation, unit, technology, parameter, value
 
    * - market_orders
@@ -106,6 +106,53 @@ When the outputs are stored in CSV files, the data is organized in a similar str
 
 .. note::
   The columns for all unit_meta like `power_plant_meta` and `storage_meta` are not listed here. Their structure is dictated by the ``as_dict`` method in the respective unit classes.
+
+.. _dsm-output-tables:
+
+DSM Output Tables
+=================
+
+The tables ``dsm_schedule`` and ``dsm_specs`` are written whenever demand-side units
+(steel plant, cement plant, hydrogen plant, steam plant, building) are part of the
+simulation.
+
+Planned schedule and realised dispatch
+--------------------------------------
+
+``dsm_schedule`` holds the schedule the unit's own optimisation determined, **not** the
+realised dispatch after market clearing. If a bid is only partly accepted, the realised
+plant-level operation is in ``unit_dispatch``, and the bid and accepted volumes per
+market are in ``market_orders``. Join them on the unit id and the time to compare planned
+and accepted operation.
+
+``baseline`` is the optimal operation without flexibility, ``flex`` the flexible
+operation. ``flex`` stays empty as long as the unit did not determine it, for example in
+rolling-horizon runs, where the committed windows are written to ``baseline``.
+
+Reported variables
+------------------
+
+Every non-binary variable of a technology block is reported, e.g. ``power_in``, material
+and fuel flows, ``co2_emission``, ``operating_cost`` or storage levels. The series of the
+unit itself (``total_power_input``, ``variable_cost``, the load shift variables and the
+``electricity_price`` the solve used) are reported under the pseudo technology ``unit``.
+
+Each variable is classified by ``carrier`` (electricity, heat, hydrogen, natural_gas,
+steel, co2, ...), ``direction`` (``in``, ``out``, ``state``, ``cost`` or ``price``) and
+``unit_of_measure``, so that flows can be aggregated per energy carrier, e.g. for Sankey
+diagrams.
+
+.. warning::
+  The cement plant's ``fossil_in`` is the sum of ``natural_gas_in`` and ``coal_in``.
+  Do not add it to those two again when aggregating fuel inputs.
+
+Technical specification
+-----------------------
+
+``dsm_specs`` holds one row per unit, technology and scalar parameter of that technology
+(rated powers, capacities, efficiencies, specific consumptions, ...), plus the name of
+the component class as ``component_class``. It is sent once at the start of the
+simulation, together with the other unit meta data.
 
 DatabaseMaintenance Class
 ==========================

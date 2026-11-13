@@ -172,15 +172,25 @@ def test_dsm_specs_are_written_to_csv(plant, tmp_path):
 
 
 class _OutputContextStub:
-    """Collects the messages write_actual_dispatch sends to the output agent."""
+    """Collects the messages the units operator sends to the output agent."""
 
     def __init__(self, now: datetime):
         self.current_timestamp = datetime2timestamp(now)
         self.data = {"output_agent_addr": "output_agent"}
         self.sent: list[dict] = []
 
+    async def send_message(self, content, receiver_addr):
+        self.sent.append(content)
+
     def schedule_instant_message(self, receiver_addr, content):
         self.sent.append(content)
+
+
+class _PlainUnit:
+    """A unit without component specs, e.g. a demand or power plant."""
+
+    def as_dict(self) -> dict:
+        return {"id": "plain", "unit_type": "demand"}
 
 
 def _operator_with(units, now: datetime) -> UnitsOperator:
@@ -195,40 +205,26 @@ def _sent_types(operator):
     return [message["type"] for message in operator.context.sent]
 
 
-def test_dsm_specs_are_sent_exactly_once(plant):
+def test_dsm_specs_are_sent_with_the_unit_meta_data(plant):
     operator = _operator_with([plant], now=plant.index[1])
-    operator.write_actual_dispatch("energy")
+    asyncio.run(operator.store_units())
 
     assert _sent_types(operator).count("dsm_specs") == 1
-    assert operator.sent_dsm_specs
-
-    operator.context.current_timestamp = datetime2timestamp(plant.index[2])
-    operator.write_actual_dispatch("energy")
-    assert _sent_types(operator).count("dsm_specs") == 1
+    specs = next(m for m in operator.context.sent if m["type"] == "dsm_specs")
+    assert specs["data"] == plant.get_component_specs()
 
 
-def test_dsm_specs_not_retried_without_dsm_units(plant):
-    # a non-DSM unit has no get_component_specs; use a bare object stand-in
-    operator = _operator_with([], now=plant.index[1])
-    operator.write_actual_dispatch("energy")
+def test_dsm_specs_are_not_sent_without_dsm_units():
+    operator = _operator_with([_PlainUnit()], now=datetime(2023, 1, 1))
+    asyncio.run(operator.store_units())
 
     assert "dsm_specs" not in _sent_types(operator)
-    # nothing can ever provide specs, so the operator must stop looking
-    assert operator.sent_dsm_specs
 
 
-def test_dsm_specs_retried_until_available(plant):
-    # simulate a DSM unit whose baseline solve has not run yet
-    plant._component_specs = []
+def test_dsm_specs_are_not_sent_again_on_every_dispatch(plant):
+    """The specs are static, so they must not be exported with each dispatch."""
     operator = _operator_with([plant], now=plant.index[1])
     operator.write_actual_dispatch("energy")
 
     assert "dsm_specs" not in _sent_types(operator)
-    assert not operator.sent_dsm_specs
-
-    # once the specs are captured, the next export sends them
-    plant.determine_optimal_operation_without_flex()
-    operator.context.current_timestamp = datetime2timestamp(plant.index[2])
-    operator.write_actual_dispatch("energy")
-    assert _sent_types(operator).count("dsm_specs") == 1
-    assert operator.sent_dsm_specs
+    assert "dsm_schedule" in _sent_types(operator)
