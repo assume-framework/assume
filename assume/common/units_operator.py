@@ -68,6 +68,8 @@ class UnitsOperator(Role):
         self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
         self.last_sent_dispatch = defaultdict(lambda: 0)
+        # the DSM component schedule is not tied to a product type, so it is tracked separately
+        self.last_sent_dsm_schedule = 0
         self.forecaster = forecaster
 
         self.portfolio_strategies = portfolio_strategies
@@ -136,6 +138,24 @@ class UnitsOperator(Role):
                 }
                 await self.context.send_message(
                     content=message,
+                    receiver_addr=db_addr,
+                )
+
+            # the component specification of the DSM units is static as well, but
+            # it holds one row per component parameter instead of one per unit
+            dsm_specs = [
+                spec
+                for unit in self.units.values()
+                if hasattr(unit, "get_component_specs")
+                for spec in unit.get_component_specs()
+            ]
+            if dsm_specs:
+                await self.context.send_message(
+                    content={
+                        "context": "write_results",
+                        "type": "dsm_specs",
+                        "data": dsm_specs,
+                    },
                     receiver_addr=db_addr,
                 )
 
@@ -405,6 +425,24 @@ class UnitsOperator(Role):
 
         return market_dispatch, unit_dispatch
 
+    def get_dsm_schedule(self, last: int) -> list[dict]:
+        """
+        Collects the planned per-technology schedule of all DSM units since the last export.
+
+        Args:
+            last (int): The timestamp until which the DSM schedule was already sent.
+
+        Returns:
+            list[dict]: The schedule per unit, technology and variable.
+        """
+        now = timestamp2datetime(self.context.current_timestamp)
+        start = timestamp2datetime(last + 1)
+        dsm_schedule = []
+        for unit in self.units.values():
+            if hasattr(unit, "get_component_schedule"):
+                dsm_schedule.extend(unit.get_component_schedule(start, now))
+        return dsm_schedule
+
     def write_actual_dispatch(self, product_type: str) -> None:
         """
         Sends the actual aggregated dispatch curve to the output agent.
@@ -446,6 +484,18 @@ class UnitsOperator(Role):
                         "context": "write_results",
                         "type": "unit_dispatch",
                         "data": unit_dispatch,
+                    },
+                )
+
+            dsm_schedule = self.get_dsm_schedule(self.last_sent_dsm_schedule)
+            self.last_sent_dsm_schedule = self.context.current_timestamp
+            if dsm_schedule:
+                self.context.schedule_instant_message(
+                    receiver_addr=db_addr,
+                    content={
+                        "context": "write_results",
+                        "type": "dsm_schedule",
+                        "data": dsm_schedule,
                     },
                 )
 

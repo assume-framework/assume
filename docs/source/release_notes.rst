@@ -12,6 +12,9 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**New Features:**
+  - **Planned schedule per technology for DSM units**: The output agent writes a new table ``dsm_schedule`` (``dsm_schedule.csv`` for CSV exports) with the planned baseline and flexible operating schedule of every technology of each demand-side unit, e.g. the electrolyser, DRI plant and EAF of a steel plant, plus the unit-level series (total power input, variable cost, load shift, solve-time electricity price). Each variable is classified by energy/material carrier, direction and unit of measure. A second table ``dsm_specs`` holds the static technical specification of each technology.
+
 0.7.0 - (11th November 2026)
 =========================
 
