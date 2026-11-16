@@ -542,3 +542,54 @@ def test_sector_coupled_redispatch_strategy_uses_historical_committed_window(
     )
     assert bid["min_power"] <= bid["volume"] + 1e-8
     assert bid["volume"] <= bid["max_power"] + 1e-8
+
+
+def test_accepted_redispatch_is_carried_into_next_window(sector_heat_rh):
+    """
+    Accepted redispatch in Window 0 changes the storage level at its end, so
+    Window 1 must start from that level instead of the DA plan's level.
+    """
+    from assume.common.market_objects import MarketConfig
+
+    unit = sector_heat_rh
+    eom_strategy = SectorCoupledEnergyNaiveStrategy()
+    rd_strategy = SectorCoupledRedispatchNaiveStrategy()
+
+    eom_strategy.calculate_bids(
+        unit=unit, market_config=None, product_tuples=[_product(unit.index[0])]
+    )
+    da_soc_end = unit._rh_init_states["thermal_storage"]["soc"]
+
+    products = [_product(unit.index[0]), _product(unit.index[1])]
+    bids = rd_strategy.calculate_bids(
+        unit=unit, market_config=None, product_tuples=products
+    )
+
+    # Accept the full offered reduction of consumption in both hours.
+    orderbook = []
+    for bid in bids:
+        order = dict(bid)
+        order["accepted_volume"] = bid["max_power"] - bid["volume"]
+        order["accepted_price"] = bid["price"]
+        orderbook.append(order)
+    assert sum(order["accepted_volume"] for order in orderbook) > 1e-6
+
+    unit.set_dispatch_plan(
+        MarketConfig(market_id="redispatch", market_mechanism="redispatch"), orderbook
+    )
+
+    # Less consumption in hours 0 and 1 leaves less heat in the storage.
+    rd_soc_end = unit._rh_init_states["thermal_storage"]["soc"]
+    assert rd_soc_end < da_soc_end - 1e-6
+
+    for order in orderbook:
+        start = order["start_time"]
+        assert unit.da_power.at[start] == pytest.approx(
+            -(order["volume"] + order["accepted_volume"]), abs=1e-6
+        )
+
+    # The next window solves from the new storage level.
+    eom_strategy.calculate_bids(
+        unit=unit, market_config=None, product_tuples=[_product(unit.index[2])]
+    )
+    assert unit._rh_optimized_until_step == 4

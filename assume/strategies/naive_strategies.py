@@ -339,10 +339,18 @@ class SectorCoupledRedispatchNaiveStrategy(MinMaxStrategy):
 
         unit.prepare_market_state()
 
+        # All products are cleared together, so offer only what the unit can
+        # deliver in all of them at the same time.
+        bounds = unit.get_joint_redispatch_power_bounds(
+            [start for start, _, _ in product_tuples]
+        )
+
         bids = []
 
         for start, end, only_hours in product_tuples:
-            positions = unit.get_redispatch_market_positions(start)
+            positions = unit.get_redispatch_market_positions(
+                start, bounds=bounds[start]
+            )
 
             base_consumption = float(unit.da_power.at[start])
             price = unit.calculate_marginal_cost(

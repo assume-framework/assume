@@ -569,3 +569,174 @@ def test_heat_hydrogen_h2_chp_couples_heat_hydrogen_and_electricity(time_index):
 
 if __name__ == "__main__":
     pytest.main(["-s", __file__])
+
+
+# Joint redispatch bounds and following accepted redispatch
+
+
+def _make_storage_heat_system():
+    """
+    Heat pump (COP 1) plus a full 2 MWh thermal storage, 2 MW heat demand.
+
+    The DA plan runs the heat pump at 2 MW in all four hours. Each single hour
+    could drop to 0 MW by emptying the storage, but two hours together can only
+    drop to 1 MW each, because the storage holds 2 MWh and must be refilled.
+    """
+    index = pd.date_range("2023-01-01", periods=4, freq="h")
+    forecaster = SectorCoupledForecaster(
+        index=index,
+        carrier_demands={"heat": _series(2.0, index)},
+        fuel_prices={"natural gas": _series(50.0, index)},
+        market_prices={"EOM": pd.Series([10.0, 11.0, 12.0, 13.0], index=index)},
+    )
+    components = {
+        "heat_pump": {
+            "max_power": 4.0,
+            "min_power": 0.0,
+            "cop": 1.0,
+            "ramp_up": 4.0,
+            "ramp_down": 4.0,
+        },
+        "thermal_storage": {
+            "storage_type": "short-term",
+            "capacity": 2.0,
+            "min_soc": 0.0,
+            "max_soc": 1.0,
+            "max_power_charge": 4.0,
+            "max_power_discharge": 4.0,
+            "efficiency_charge": 1.0,
+            "efficiency_discharge": 1.0,
+            "initial_soc": 1.0,
+            "ramp_up": 4.0,
+            "ramp_down": 4.0,
+            "storage_loss_rate": 0.0,
+        },
+    }
+    unit = _make_sector_system(forecaster, components)
+    unit.setup_model(presolve=True)
+    unit.prepare_market_state()
+    return unit
+
+
+def _can_deliver(unit, consumption):
+    """Solve the unit with its consumption fixed in the given hours."""
+    starts = sorted(consumption)
+    instance, _, offset = unit._redispatch_instance(starts[0])
+    for start in starts:
+        t = unit._index_position(start) - offset
+        instance.total_power_input[t].fix(consumption[start])
+    results = pyo.SolverFactory(USE_SOLVER).solve(instance, load_solutions=False)
+    return results.solver.termination_condition == pyo.TerminationCondition.optimal
+
+
+def test_single_hour_bounds_overstate_joint_flexibility():
+    unit = _make_storage_heat_system()
+    starts = list(unit.index[:2])
+
+    single = {start: unit.get_redispatch_power_bounds(start) for start in starts}
+    for start in starts:
+        assert single[start][0] == pytest.approx(0.0, abs=TOL)
+
+    # Using the single-hour minimum in both hours is not deliverable.
+    assert not _can_deliver(unit, {start: single[start][0] for start in starts})
+
+
+def test_joint_redispatch_bounds_hold_for_all_hours_together():
+    unit = _make_storage_heat_system()
+    starts = list(unit.index[:2])
+
+    bounds = unit.get_joint_redispatch_power_bounds(starts)
+
+    for start in starts:
+        min_consumption, max_consumption = bounds[start]
+        assert min_consumption == pytest.approx(1.0, abs=1e-4)
+        # The storage is full, so the heat pump cannot consume more.
+        assert max_consumption == pytest.approx(2.0, abs=TOL)
+
+    assert _can_deliver(unit, {start: bounds[start][0] for start in starts})
+    # Mixed choices inside the bounds are deliverable as well.
+    assert _can_deliver(unit, {starts[0]: bounds[starts[0]][0], starts[1]: 2.0})
+
+
+def test_redispatch_strategy_offers_joint_bounds():
+    unit = _make_storage_heat_system()
+    starts = list(unit.index[:2])
+    products = [(start, start + pd.Timedelta(hours=1), None) for start in starts]
+
+    bids = SectorCoupledRedispatchNaiveStrategy().calculate_bids(
+        unit=unit, market_config=None, product_tuples=products
+    )
+
+    assert len(bids) == 2
+    for bid in bids:
+        assert bid["volume"] == pytest.approx(-2.0, abs=TOL)
+        # Market sign: less consumption is upward, up to -1 MW.
+        assert bid["max_power"] == pytest.approx(-1.0, abs=1e-4)
+        assert bid["min_power"] == pytest.approx(-2.0, abs=TOL)
+
+
+def _redispatch_config():
+    from assume.common.market_objects import MarketConfig
+
+    return MarketConfig(market_id="redispatch", market_mechanism="redispatch")
+
+
+def _redispatch_orderbook(unit, accepted):
+    return [
+        {
+            "start_time": start,
+            "end_time": start + pd.Timedelta(hours=1),
+            "only_hours": None,
+            "price": 0.0,
+            "volume": -float(unit.da_power.at[start]),
+            "accepted_volume": volume,
+            "accepted_price": 0.0,
+        }
+        for start, volume in accepted.items()
+    ]
+
+
+def test_accepted_redispatch_updates_the_reference():
+    unit = _make_storage_heat_system()
+    starts = list(unit.index[:2])
+
+    # Accept 1 MW less consumption in both hours.
+    unit.set_dispatch_plan(
+        _redispatch_config(), _redispatch_orderbook(unit, {s: 1.0 for s in starts})
+    )
+
+    assert list(unit.da_power.iloc[:2]) == pytest.approx([1.0, 1.0], abs=TOL)
+    # The storage gave its 2 MWh and is refilled in the later hours.
+    assert unit.da_power.iloc[2:].sum() == pytest.approx(6.0, abs=TOL)
+    soc = unit.da_component_state["thermal_storage"]["soc"]  # share of capacity
+    assert soc.iloc[1] == pytest.approx(0.0, abs=TOL)
+    assert soc.iloc[3] == pytest.approx(1.0, abs=TOL)
+
+
+def test_redispatch_that_cannot_be_followed_keeps_reference(caplog):
+    unit = _make_storage_heat_system()
+    starts = list(unit.index[:2])
+    before = unit.da_power.copy()
+
+    # 2 MW less in both hours would need 4 MWh from a 2 MWh storage.
+    with caplog.at_level("WARNING"):
+        unit.set_dispatch_plan(
+            _redispatch_config(), _redispatch_orderbook(unit, {s: 2.0 for s in starts})
+        )
+
+    assert "cannot follow the accepted redispatch" in caplog.text
+    pd.testing.assert_series_equal(unit.da_power, before)
+
+
+def test_eom_orders_do_not_change_the_reference():
+    from assume.common.market_objects import MarketConfig
+
+    unit = _make_storage_heat_system()
+    before = unit.da_power.copy()
+
+    unit.set_dispatch_plan(
+        MarketConfig(market_id="EOM"),
+        _redispatch_orderbook(unit, {unit.index[0]: -2.0}),
+    )
+
+    pd.testing.assert_series_equal(unit.da_power, before)

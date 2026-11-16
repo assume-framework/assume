@@ -1,4 +1,4 @@
-datetime,price_EOM,hs_north_heat,hs_east_heat,hs_west_heat
+datetime,price_EOM,heat_demand_north,heat_demand_east,heat_demand_west
 2023-01-01 00:00:00,10,4,6,8
 2023-01-01 01:00:00,10,4,6,8
 2023-01-01 02:00:00,10,4,6,8

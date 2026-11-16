@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import copy
+import logging
 from typing import Any
 
 import pandas as pd
@@ -13,6 +14,8 @@ from pyomo.opt import SolverStatus, TerminationCondition
 
 from assume.common.base import SupportsMinMax
 from assume.units.dsm_load_shift import DSMFlex
+
+logger = logging.getLogger(__name__)
 
 
 def _flows(variable, *prefixes):
@@ -1141,6 +1144,47 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
 
             instance.market_terminal_soc.add(block.soc[final_local] == terminal_soc)
 
+    def _reference_key(self, start) -> tuple:
+        """Identify the DA reference that ``start`` belongs to (for caching)."""
+        if self.horizon_mode == "rolling_horizon":
+            reference, _ = self._rolling_reference_for_start(start)
+            return (int(reference["window_start"]), int(reference["commit_end"]))
+        return ("full_horizon",)
+
+    def _redispatch_instance(self, start) -> tuple[pyo.ConcreteModel, int, int]:
+        """
+        Build a model around the DA reference with everything before ``start`` fixed.
+
+        Storages must return to their reference level at the end of the model.
+        Returns ``(instance, target_t, offset)``, where ``target_t`` is the model
+        step of ``start`` and ``offset`` converts a global step into a model step.
+        """
+        self.prepare_market_state()
+
+        if self.horizon_mode == "rolling_horizon":
+            reference, target_t = self._rolling_reference_for_start(start)
+
+            # Start from the exact Pyomo instance that generated the rolling DA
+            # trajectory.  Clone it so the stored reference is never mutated by
+            # redispatch-bound calculations.
+            instance = reference["instance"].clone()
+
+            self._fix_rolling_past_to_reference(instance, target_t, reference)
+            self._add_rolling_reference_terminal_soc(instance, reference)
+            offset = int(reference["window_start"])
+
+        else:
+            target_t = self._index_position(start)
+
+            instance = self.model.create_instance()
+            instance = self.switch_to_opt(instance)
+
+            self._fix_committed_past_to_reference(instance, target_t)
+            self._add_reference_terminal_soc(instance)
+            offset = 0
+
+        return instance, target_t, offset
+
     def _solve_redispatch_extreme(
         self, start, sense: str
     ) -> tuple[float, dict[str, dict[str, float]]]:
@@ -1150,39 +1194,11 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         self.prepare_market_state()
 
         cache = getattr(self, "_sector_redispatch_cache", {})
+        key = (start, sense, *self._reference_key(start))
+        if key in cache:
+            return cache[key]
 
-        if self.horizon_mode == "rolling_horizon":
-            reference, target_t = self._rolling_reference_for_start(start)
-
-            key = (
-                start,
-                sense,
-                int(reference["window_start"]),
-                int(reference["commit_end"]),
-            )
-            if key in cache:
-                return cache[key]
-
-            # Start from the exact Pyomo instance that generated the rolling DA
-            # trajectory.  Clone it so the stored reference is never mutated by
-            # redispatch-bound calculations.
-            instance = reference["instance"].clone()
-
-            self._fix_rolling_past_to_reference(instance, target_t, reference)
-            self._add_rolling_reference_terminal_soc(instance, reference)
-
-        else:
-            key = (start, sense)
-            if key in cache:
-                return cache[key]
-
-            target_t = self._index_position(start)
-
-            instance = self.model.create_instance()
-            instance = self.switch_to_opt(instance)
-
-            self._fix_committed_past_to_reference(instance, target_t)
-            self._add_reference_terminal_soc(instance)
+        instance, target_t, _ = self._redispatch_instance(start)
 
         # The RD bound introduces its own objective.  Deactivate whichever
         # optimization objective is active in the cloned/fresh reference model.
@@ -1266,6 +1282,235 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         return float(min_consumption), float(max_consumption)
 
     # Market positions
+    def _solve_ok(self, instance: pyo.ConcreteModel) -> tuple[bool, Any]:
+        """Solve ``instance``; return whether an optimal solution was found."""
+        try:
+            results = self.solver.solve(instance, options={}, tee=False)
+        except RuntimeError:
+            # Some solver interfaces raise instead of returning "infeasible".
+            return False, "infeasible"
+        ok = (
+            results.solver.status == SolverStatus.ok
+            and results.solver.termination_condition == TerminationCondition.optimal
+        )
+        return ok, results.solver.termination_condition
+
+    def get_joint_redispatch_power_bounds(
+        self,
+        starts,
+    ) -> dict[Any, tuple[float, float]]:
+        """
+        Return min/max consumption per hour that hold for all ``starts`` at once.
+
+        :meth:`get_redispatch_power_bounds` looks at one hour and lets all other
+        hours re-optimise around it. The redispatch market clears all products
+        together, so it may use the flexibility of every hour at the same time,
+        which the system cannot always deliver (e.g. an electrolyser switched
+        off in every hour empties the hydrogen storage).
+
+        Here every hour keeps the same share of its own room below and above the
+        DA consumption. The share is the largest one for which the system can
+        follow the reduced (or increased) consumption in all hours together,
+        with storages back at their reference level at the end of the model.
+        """
+        tolerance = self._component_market_tolerance
+        starts = sorted(starts)
+
+        base = {start: float(self.da_power.at[start]) for start in starts}
+        single = {start: self.get_redispatch_power_bounds(start) for start in starts}
+
+        # Hours of different rolling windows are checked separately.
+        groups: dict[tuple, list] = {}
+        for start in starts:
+            groups.setdefault(self._reference_key(start), []).append(start)
+
+        bounds = {}
+        for group in groups.values():
+            room_below = {s: max(0.0, base[s] - single[s][0]) for s in group}
+            room_above = {s: max(0.0, single[s][1] - base[s]) for s in group}
+
+            share_below = self._max_joint_share(group, base, room_below, -1.0)
+            share_above = self._max_joint_share(group, base, room_above, 1.0)
+
+            for s in group:
+                min_consumption = base[s] - share_below * room_below[s]
+                max_consumption = base[s] + share_above * room_above[s]
+                if abs(min_consumption) < tolerance:
+                    min_consumption = 0.0
+                if abs(max_consumption) < tolerance:
+                    max_consumption = 0.0
+                bounds[s] = (float(min_consumption), float(max_consumption))
+
+        return bounds
+
+    def _max_joint_share(
+        self,
+        starts: list,
+        base: dict,
+        room: dict,
+        direction: float,
+    ) -> float:
+        """
+        Largest share in [0, 1] of ``room`` the system can move in all hours at once.
+
+        ``direction`` is -1 for less consumption and +1 for more consumption.
+        """
+        tolerance = self._component_market_tolerance
+        if all(value <= tolerance for value in room.values()):
+            return 0.0
+
+        cache = getattr(self, "_sector_redispatch_cache", {})
+        key = ("joint", tuple(starts), direction, *self._reference_key(starts[0]))
+        if key in cache:
+            return cache[key]
+
+        instance, _, offset = self._redispatch_instance(starts[0])
+
+        for objective in instance.component_objects(pyo.Objective, active=True):
+            objective.deactivate()
+
+        instance.redispatch_share = pyo.Var(bounds=(0.0, 1.0))
+        instance.redispatch_share_constraints = pyo.ConstraintList()
+        for start in starts:
+            t = self._index_position(start) - offset
+            instance.redispatch_share_constraints.add(
+                instance.total_power_input[t]
+                == base[start] + direction * instance.redispatch_share * room[start]
+            )
+
+        instance.redispatch_share_objective = pyo.Objective(
+            expr=instance.redispatch_share, sense=pyo.maximize
+        )
+
+        ok, termination = self._solve_ok(instance)
+
+        if not ok:
+            logger.warning(
+                "Joint redispatch share of '%s' could not be solved (%s); "
+                "offering no redispatch flexibility in this direction.",
+                self.id,
+                termination,
+            )
+            share = 0.0
+        else:
+            # Small margin so the offered corner stays feasible after rounding.
+            share = max(0.0, float(pyo.value(instance.redispatch_share)) - 1e-6)
+
+        cache[key] = share
+        self._sector_redispatch_cache = cache
+        return share
+
+    def set_dispatch_plan(self, marketconfig, orderbook) -> None:
+        """
+        Add accepted volumes to the dispatch plan and follow accepted redispatch.
+
+        After a redispatch market, the system is re-optimised with its consumption
+        fixed to DA plus accepted redispatch, so storage levels (and the start of
+        the next rolling window) follow what is actually delivered.
+        """
+        super().set_dispatch_plan(marketconfig, orderbook)
+
+        if marketconfig.market_mechanism != "redispatch" or not orderbook:
+            return
+        if not hasattr(self, "da_power"):
+            return
+
+        consumption = {}
+        any_accepted = False
+        for order in orderbook:
+            start = order["start_time"]
+            accepted = float(order.get("accepted_volume") or 0.0)
+            # Positive accepted volume is upward redispatch, i.e. less consumption.
+            consumption[start] = float(self.da_power.at[start]) - accepted
+            if abs(accepted) > self._component_market_tolerance:
+                any_accepted = True
+
+        if any_accepted:
+            self._follow_redispatch(consumption)
+
+    def _follow_redispatch(self, consumption: dict) -> None:
+        """Re-solve the reference with ``consumption`` fixed and store the result."""
+        starts = sorted(consumption)
+        instance, _, offset = self._redispatch_instance(starts[0])
+
+        for start in starts:
+            t = self._index_position(start) - offset
+            instance.total_power_input[t].fix(consumption[start])
+
+        ok, termination = self._solve_ok(instance)
+
+        if not ok:
+            logger.warning(
+                "SectorCoupledSystem '%s' cannot follow the accepted redispatch "
+                "(%s); keeping the DA reference for its internal states.",
+                self.id,
+                termination,
+            )
+            return
+
+        if self.horizon_mode == "rolling_horizon":
+            self._update_rolling_reference(instance, starts)
+        else:
+            self._store_market_reference(instance)
+
+    def _update_rolling_reference(self, instance, starts: list) -> None:
+        """Store a re-solved rolling window and carry its end state forward."""
+        reference, _ = self._rolling_reference_for_start(starts[0])
+        window_start = int(reference["window_start"])
+        commit_end = int(reference["commit_end"])
+        n_commit = commit_end - window_start
+        window_index = reference["index"]
+
+        power = pd.Series(
+            [
+                float(pyo.value(instance.total_power_input[t]))
+                for t in instance.time_steps
+            ],
+            index=window_index,
+            dtype=float,
+        )
+        # Keep the original window model (it has no fixed hours); later solves
+        # fix the past to the updated trajectories stored here.
+        reference["power"] = power
+
+        committed_index = window_index[:n_commit]
+        self.da_power.loc[committed_index] = power.iloc[:n_commit].to_numpy()
+
+        for name, states in reference["component_state"].items():
+            block = instance.dsm_blocks[name]
+            for variable_name, series in states.items():
+                variable = getattr(block, variable_name, None)
+                if variable is None or not variable.is_indexed():
+                    continue
+                values = [float(pyo.value(variable[t])) for t in instance.time_steps]
+                states[variable_name] = pd.Series(
+                    values, index=window_index, dtype=float
+                )
+                target = self.da_component_state.get(name, {}).get(variable_name)
+                if isinstance(target, pd.Series):
+                    target.loc[committed_index] = values[:n_commit]
+
+        for local_t, timestamp in enumerate(committed_index):
+            try:
+                self.opt_power_requirement[timestamp] = float(power.iloc[local_t])
+            except (KeyError, IndexError, AttributeError, TypeError):
+                pass
+
+        # The next window starts from the end of this committed period. Only
+        # update the carried state if that next window has not been solved yet.
+        if getattr(self, "_rh_optimized_until_step", None) == commit_end:
+            if self._rh_init_states is None:
+                self._rh_init_states = self._collect_init_states()
+            self._update_init_states(instance, n_commit - 1, self._rh_init_states)
+        else:
+            logger.warning(
+                "Redispatch for '%s' arrived after the next rolling window was "
+                "solved; that window does not see the redispatch.",
+                self.id,
+            )
+
+        self._rebuild_market_reference_views()
+
     def get_component_eom_positions(
         self,
         start,
@@ -1567,14 +1812,24 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
     def get_redispatch_market_positions(
         self,
         start,
+        bounds: tuple[float, float] | None = None,
     ) -> list[dict[str, Any]]:
+        """
+        Return the redispatch position at ``start``.
+
+        ``bounds`` are min/max consumption, e.g. from
+        :meth:`get_joint_redispatch_power_bounds`. Without them, the single-hour
+        bounds are used.
+        """
         self.prepare_market_state()
 
         if self.market_representation == "component":
             return self.get_component_redispatch_positions(start)
 
         base = float(self.da_power.at[start])
-        min_consumption, max_consumption = self.get_redispatch_power_bounds(start)
+        if bounds is None:
+            bounds = self.get_redispatch_power_bounds(start)
+        min_consumption, max_consumption = bounds
 
         signed_volume = -base
         min_power = -max_consumption
