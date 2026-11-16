@@ -138,8 +138,6 @@ def make_sector_system(
         components=components,
         system_type="heat",
         objective="min_variable_cost",
-        flexibility_measure="cost_based_load_shift",
-        cost_tolerance=10,
         node="north",
     )
 

@@ -318,11 +318,18 @@ def load_dsm_units(path: str, config: dict, file_name: str) -> dict:
 
 def build_flexible_loads(dsm_units: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """
-    Build the static grid-facing representation of DSM units
-    that may participate in redispatch as flexible consumers.
+    Build the static grid-facing representation of sector-coupled systems
+    that participate in redispatch as flexible loads.
 
-    The nominal electrical capacity of each parent unit is derived
-    from its directly electricity-consuming components.
+    Only sector-coupled systems are included: their redispatch strategy offers
+    a physically feasible range (``min_power``/``max_power``). Other DSM units
+    (buildings, industry) bid without such a range and stay out of the grid
+    model's flexible loads, as before.
+
+    The nominal electrical capacity of each parent unit is the sum of its
+    electricity-consuming components (heat pumps, electrolysers, electric
+    boilers) and its electricity-generating components (CHPs, fuel cells),
+    so redispatch can use the whole range from full consumption to full export.
 
     Returns one row per physical DSM parent with:
         node
@@ -334,6 +341,8 @@ def build_flexible_loads(dsm_units: dict[str, pd.DataFrame]) -> pd.DataFrame:
         return pd.DataFrame(columns=["node", "p_nom", "unit_type"])
 
     for unit_type, units_df in dsm_units.items():
+        if unit_type != "sector_coupled_system":
+            continue
         if units_df is None or units_df.empty:
             continue
 
@@ -355,8 +364,12 @@ def build_flexible_loads(dsm_units: dict[str, pd.DataFrame]) -> pd.DataFrame:
                 if max_power <= 0.0:
                     continue
 
-                # max_power represents electrical input capacity.
-                if technology.startswith("heat_pump"):
+                # max_power is the electrical input (consumers) or the
+                # electrical output (generators) of the component.
+                if technology.startswith(("chp", "fuel_cell")):
+                    p_nom_elec += max_power
+
+                elif technology.startswith("heat_pump"):
                     p_nom_elec += max_power
 
                 elif technology.startswith("electrolyser"):
@@ -369,7 +382,7 @@ def build_flexible_loads(dsm_units: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
             flexible.loc[unit_id, "p_nom"] = p_nom_elec
 
-        # Keep only valid flexible electrical consumers
+        # Keep only units with an electrical connection
         flexible = flexible[flexible["node"].notna() & (flexible["p_nom"] > 0.0)]
         if flexible.empty:
             continue

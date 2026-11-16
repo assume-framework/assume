@@ -147,8 +147,6 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         primary_carrier: str | None = None,
         technology: str = "sector_coupled_system",
         objective: str = "min_variable_cost",
-        flexibility_measure: str = "cost_based_load_shift",
-        cost_tolerance: float = 10,
         node: str = "node0",
         location: tuple[float, float] = (0.0, 0.0),
         absolute_demands: dict[str, float] | None = None,
@@ -179,8 +177,11 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         self.primary_carrier = primary_carrier
         self.enforce_terminal_soc = enforce_terminal_soc
         self.objective = objective
-        self.flexibility_measure = flexibility_measure
-        self.cost_tolerance = cost_tolerance
+        # DSMFlex.setup_model() needs a flexibility measure, but this unit never
+        # uses DSMFlex's flexibility mode: every solve switches it off, and the
+        # redispatch flexibility comes from get_joint_redispatch_power_bounds().
+        self.flexibility_measure = "cost_based_load_shift"
+        self.cost_tolerance = 10
 
         self.absolute_demands = dict(absolute_demands or {})
         if demand and primary_carrier not in self.absolute_demands:

@@ -444,6 +444,69 @@ def test_direction_prices_decide_and_settle_redispatch(
     assert accepted["flex_S"]["accepted_price"] == pytest.approx(7.0)
 
 
+def test_flexible_load_without_range_stays_fixed(
+    simple_redispatch_market_config,
+    grid_data_dict_2_nodes_with_flexible_load,
+):
+    """
+    A DSM unit that bids only a volume (no min_power / max_power) is kept in
+    the grid at that volume: its consumption counts for the line flow, but it
+    is not redispatched.
+    """
+    mc = simple_redispatch_market_config
+    mc.param_dict["grid_data"] = grid_data_dict_2_nodes_with_flexible_load
+    mc.param_dict["log_flows"] = True
+
+    next_opening = mc.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(mc.market_products, next_opening)
+    product = products[0]
+
+    def order(unit_id, volume, price, node, **fields):
+        return {
+            "start_time": product[0],
+            "end_time": product[1],
+            "only_hours": product[2],
+            "unit_id": unit_id,
+            "bid_id": f"{unit_id}_bid",
+            "volume": volume,
+            "price": price,
+            "node": node,
+            **fields,
+        }
+
+    def ranged(unit_id, volume, min_power, max_power, price, node):
+        return order(
+            unit_id,
+            volume,
+            price,
+            node,
+            min_power=min_power,
+            max_power=max_power,
+            p_nom=1000.0,
+        )
+
+    orderbook = [
+        ranged("coal_N", 1000.0, 0.0, 1000.0, 10.0, "N"),
+        ranged("coal_S", 0.0, 0.0, 1000.0, 50.0, "S"),
+        ranged("gas_S", 0.0, 0.0, 1000.0, 100.0, "S"),
+        ranged("dem_S", -500.0, 0.0, -1000.0, 1000.0, "S"),
+        # Like DsmEnergyNaiveRedispatchStrategy: volume and price only.
+        order("flex_S", -500.0, 1.0, "S"),
+    ]
+
+    rmr = RedispatchMarketRole(mc)
+    accepted_orders, _, _, flows = rmr.clear(orderbook, products)
+    accepted = {o["unit_id"]: o["accepted_volume"] for o in accepted_orders}
+
+    # 1000 MW at S would need 1000 MW over the 500 MW line: coal_S takes over.
+    assert accepted["coal_N"] == pytest.approx(-500.0, abs=eps)
+    assert accepted["coal_S"] == pytest.approx(500.0, abs=eps)
+    assert accepted.get("flex_S", 0.0) == pytest.approx(0.0, abs=eps)
+
+    flows_df = pd.Series(flows).unstack()
+    assert flows_df.loc[0, "line_N_S"] == pytest.approx(500.0, abs=eps)
+
+
 flexible_loads_north = pd.DataFrame(
     {
         "name": ["flex_N"],

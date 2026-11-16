@@ -231,6 +231,36 @@ def test_build_flexible_loads_derives_electrical_p_nom_from_components():
     assert (flexible_loads["unit_type"] == "sector_coupled_system").all()
 
 
+def test_build_flexible_loads_counts_generating_components():
+    """
+    CHPs and fuel cells add their electrical output to p_nom, so redispatch can
+    use the whole range from full consumption to full export.
+    """
+    dsm_units = {
+        "sector_coupled_system": pd.DataFrame(
+            {
+                "node": ["N", "S"],
+                "components": [
+                    {
+                        "heat_pump": {"max_power": 1.5},
+                        "electrolyser": {"max_power": 6.0},
+                        "fuel_cell": {"max_power": 3.0},
+                        "chp": {"max_power": 4.0},
+                    },
+                    # A system that can only generate also gets a grid connection.
+                    {"chp": {"max_power": 2.0}},
+                ],
+            },
+            index=["scs_north", "chp_only"],
+        )
+    }
+
+    flexible_loads = build_flexible_loads(dsm_units)
+
+    assert flexible_loads.loc["scs_north", "p_nom"] == pytest.approx(14.5)
+    assert flexible_loads.loc["chp_only", "p_nom"] == pytest.approx(2.0)
+
+
 def test_build_flexible_loads_excludes_non_electrical_dsm_units():
     """
     A DSM parent without a directly electricity-consuming component
@@ -260,6 +290,31 @@ def test_build_flexible_loads_excludes_non_electrical_dsm_units():
     assert "heat_with_hp" in flexible_loads.index
     assert flexible_loads.loc["heat_with_hp", "p_nom"] == 8.0
     assert "thermal_only" not in flexible_loads.index
+
+
+def test_build_flexible_loads_includes_all_dsm_unit_types():
+    """
+    Every DSM unit with an electrical connection enters the redispatch grid
+    model, so its consumption is counted, whichever DSM class it is.
+    """
+    dsm_units = {
+        "building": pd.DataFrame(
+            {"node": ["N"], "components": [{"heat_pump": {"max_power": 5.0}}]},
+            index=["house"],
+        ),
+        "steel_plant": pd.DataFrame(
+            {"node": ["S"], "components": [{"electrolyser": {"max_power": 50.0}}]},
+            index=["steel"],
+        ),
+        "sector_coupled_system": pd.DataFrame(
+            {"node": ["N"], "components": [{"heat_pump": {"max_power": 2.0}}]},
+            index=["hs_north"],
+        ),
+    }
+
+    flexible_loads = build_flexible_loads(dsm_units)
+
+    assert set(flexible_loads.index) == {"house", "steel", "hs_north"}
 
 
 def test_build_flexible_loads_handles_empty_dsm_input():

@@ -219,9 +219,9 @@ System-level columns (read from the parent's rows):
 - ``bidding_EOM``, ``bidding_redispatch``: strategy registry keys
   (``sector_coupled_energy_optimization``,
   ``sector_coupled_energy_redispatch``).
-- ``objective`` (default ``min_variable_cost``),
-  ``flexibility_measure`` (default ``cost_based_load_shift``),
-  ``cost_tolerance`` (default 10).
+- ``objective`` (default ``min_variable_cost``). The DSM columns
+  ``flexibility_measure`` and ``cost_tolerance`` are not used: the redispatch
+  flexibility comes from the physical bounds described above.
 - ``enforce_terminal_soc``: ``TRUE``/``FALSE``.
 
 Component-level columns (per technology row):

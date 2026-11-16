@@ -120,8 +120,6 @@ def _make_sector_system(
         components=components,
         system_type="heat",
         objective="min_variable_cost",
-        flexibility_measure="cost_based_load_shift",
-        cost_tolerance=10,
         node=node,
     )
 
@@ -510,8 +508,6 @@ def test_heat_hydrogen_h2_chp_couples_heat_hydrogen_and_electricity(time_index):
         components=components,
         system_type="heat_hydrogen",
         objective="min_variable_cost",
-        flexibility_measure="cost_based_load_shift",
-        cost_tolerance=10,
         node="north",
     )
 
@@ -857,3 +853,27 @@ def test_export_hours_are_not_offered_for_free():
     room = bounds[starts[0]][1] - base
     assert price_down == pytest.approx(2 * 400.0 / room, abs=1e-3)
     assert price_down > 0
+
+
+def test_old_flexibility_columns_are_accepted_and_ignored():
+    """CSV files may still carry flexibility_measure / cost_tolerance."""
+    index = pd.date_range("2023-01-01", periods=4, freq="h")
+    forecaster = SectorCoupledForecaster(
+        index=index,
+        carrier_demands={"heat": _series(2.0, index)},
+        fuel_prices={"natural gas": _series(50.0, index)},
+        market_prices={"EOM": _series(10.0, index)},
+    )
+    unit = SectorCoupledSystem(
+        id="hs",
+        unit_operator="op",
+        bidding_strategies={},
+        forecaster=forecaster,
+        components={"heat_pump": {"max_power": 4.0, "min_power": 0.0, "cop": 1.0}},
+        system_type="heat",
+        node="north",
+        flexibility_measure="electricity_price_signal",
+        cost_tolerance=50,
+    )
+
+    assert unit.flexibility_measure == "cost_based_load_shift"
