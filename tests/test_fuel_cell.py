@@ -2,9 +2,6 @@
 #
 # SPDX-License-Identifier: MIT
 
-"""
-Tests for the FuelCell component.
-"""
 
 import pyomo.environ as pyo
 import pytest
