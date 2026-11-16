@@ -2,12 +2,6 @@
 #
 # SPDX-License-Identifier: MIT
 
-"""
-Tests for CHP and its integration into SectorCoupledSystem.
-
-Run:
-    pytest tests/test_chp.py -v
-"""
 
 import pandas as pd
 import pyomo.environ as pyo
