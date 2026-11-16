@@ -124,6 +124,16 @@ class RedispatchMarketRole(MarketRole):
         orderbook_df["accepted_volume"] = 0.0
         orderbook_df["accepted_price"] = 0.0
 
+        # Units may bid without a range (e.g. DSM units without min_power /
+        # max_power). They stay in the grid model at their volume but offer
+        # no redispatch.
+        for column in ["min_power", "max_power", "p_nom"]:
+            if column not in orderbook_df.columns:
+                orderbook_df[column] = np.nan
+        no_range = orderbook_df["min_power"].isna() | orderbook_df["max_power"].isna()
+        orderbook_df.loc[no_range, "min_power"] = orderbook_df.loc[no_range, "volume"]
+        orderbook_df.loc[no_range, "max_power"] = orderbook_df.loc[no_range, "volume"]
+
         # Now you can pivot the DataFrame
         volume_pivot = orderbook_df.pivot(
             index="start_time", columns="unit_id", values="volume"
