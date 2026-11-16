@@ -564,7 +564,7 @@ if __name__ == "__main__":
 # Joint redispatch bounds and following accepted redispatch
 
 
-def _make_storage_heat_system():
+def _make_storage_heat_system(heat_pump_max_power=4.0):
     """
     Heat pump (COP 1) plus a full 2 MWh thermal storage, 2 MW heat demand.
 
@@ -581,7 +581,7 @@ def _make_storage_heat_system():
     )
     components = {
         "heat_pump": {
-            "max_power": 4.0,
+            "max_power": heat_pump_max_power,
             "min_power": 0.0,
             "cop": 1.0,
             "ramp_up": 4.0,
@@ -648,6 +648,28 @@ def test_joint_redispatch_bounds_hold_for_all_hours_together():
     assert _can_deliver(unit, {starts[0]: bounds[starts[0]][0], starts[1]: 2.0})
 
 
+def test_single_hour_room_keeps_other_product_hours_at_da():
+    """
+    With a 3 MW heat pump, cutting hour 0 empties up to 2 MWh of storage that
+    must be refilled at 1 MW/h. If hours 1 and 2 keep their DA consumption
+    (the market moved hour 0 only), just hour 3 is left to refill: 1 MW room.
+    """
+    unit = _make_storage_heat_system(heat_pump_max_power=3.0)
+    products = tuple(unit.index[:3])
+
+    free_min, _ = unit.get_redispatch_power_bounds(unit.index[0])
+    fixed_min, _ = unit.get_redispatch_power_bounds(unit.index[0], products)
+
+    assert free_min == pytest.approx(0.0, abs=TOL)
+    assert fixed_min == pytest.approx(1.0, abs=TOL)
+
+    # Moving only hour 0 to the offered bound is deliverable.
+    bounds = unit.get_joint_redispatch_power_bounds(list(products))
+    alone = {start: float(unit.da_power.at[start]) for start in products}
+    alone[products[0]] = bounds[products[0]][0]
+    assert _can_deliver(unit, alone)
+
+
 def test_redispatch_strategy_offers_joint_bounds():
     unit = _make_storage_heat_system()
     starts = list(unit.index[:2])
@@ -659,6 +681,7 @@ def test_redispatch_strategy_offers_joint_bounds():
 
     assert len(bids) == 2
     for bid in bids:
+        assert bid["price"] == bid["price_up"] == pytest.approx(12.0, abs=1e-4)
         assert bid["volume"] == pytest.approx(-2.0, abs=TOL)
         # Market sign: less consumption is upward, up to -1 MW.
         assert bid["max_power"] == pytest.approx(-1.0, abs=1e-4)
@@ -730,3 +753,107 @@ def test_eom_orders_do_not_change_the_reference():
     )
 
     pd.testing.assert_series_equal(unit.da_power, before)
+
+
+# Electricity value and redispatch prices
+
+
+def _make_hydrogen_export_system(prices):
+    """Electrolyser + hydrogen storage + fuel cell, no hydrogen demand."""
+    index = pd.date_range("2023-01-01", periods=len(prices), freq="h")
+    forecaster = SectorCoupledForecaster(
+        index=index,
+        carrier_demands={"hydrogen": _series(0.0, index)},
+        fuel_prices={"natural gas": _series(50.0, index)},
+        market_prices={"EOM": pd.Series(prices, index=index, dtype=float)},
+    )
+    components = {
+        "electrolyser": {
+            "max_power": 4.0,
+            "min_power": 0.0,
+            "efficiency": 0.8,
+            "ramp_up": 4.0,
+            "ramp_down": 4.0,
+        },
+        "hydrogen_seasonal_storage": {
+            "storage_type": "short-term",
+            "capacity": 10.0,
+            "min_soc": 0.0,
+            "max_soc": 1.0,
+            "max_power_charge": 4.0,
+            "max_power_discharge": 4.0,
+            "efficiency_charge": 1.0,
+            "efficiency_discharge": 1.0,
+            "initial_soc": 0.0,
+            "storage_loss_rate": 0.0,
+        },
+        "fuel_cell": {"max_power": 2.0, "efficiency": 0.5},
+    }
+    unit = SectorCoupledSystem(
+        id="h2",
+        unit_operator="op",
+        bidding_strategies={},
+        forecaster=forecaster,
+        components=components,
+        system_type="hydrogen",
+        node="north",
+    )
+    unit.setup_model(presolve=True)
+    unit.prepare_market_state()
+    return unit
+
+
+def test_generated_electricity_is_valued_at_the_price():
+    """
+    Cheap hours first, expensive hours later: the system stores hydrogen and
+    exports through the fuel cell, because its cost is price x net exchange.
+    """
+    unit = _make_hydrogen_export_system([10.0, 10.0, 500.0, 500.0])
+
+    assert list(unit.da_power) == pytest.approx([4.0, 4.0, -1.2, -2.0], abs=TOL)
+
+    instance = unit._redispatch_instance(unit.index[0])[0]
+    unit._solve_ok(instance)
+    for t in instance.time_steps:
+        assert pyo.value(instance.variable_cost[t]) == pytest.approx(
+            pyo.value(instance.electricity_price[t] * instance.total_power_input[t]),
+            abs=1e-4,
+        )
+
+
+def test_redispatch_prices_come_from_the_unit_costs():
+    """
+    Cutting hour 0 means refilling the storage later. With hour 1 kept at DA,
+    the cheapest refill is hour 2 at 12 EUR/MWh. There is no room for more
+    consumption, so the down price is the hour's own price.
+    """
+    unit = _make_storage_heat_system()
+    starts = list(unit.index[:2])
+
+    bounds = unit.get_joint_redispatch_power_bounds(starts)
+    prices = unit.get_redispatch_prices(bounds)
+
+    assert prices[starts[0]] == pytest.approx((12.0, 10.0), abs=1e-4)
+    assert prices[starts[1]] == pytest.approx((12.0, 11.0), abs=1e-4)
+
+
+def test_export_hours_are_not_offered_for_free():
+    """
+    Exporting less at hour 2 keeps 4 MWh of hydrogen for hour 4 (400 EUR/MWh,
+    2 MWh of electricity). Averaged over the offered range, the unit pays
+    2 x 400 EUR per offered MWh.
+    """
+    unit = _make_hydrogen_export_system([10.0, 10.0, 500.0, 500.0, 400.0])
+    starts = list(unit.index[2:4])
+    base = float(unit.da_power.at[starts[0]])
+    assert base == pytest.approx(-2.0, abs=TOL)
+
+    bounds = unit.get_joint_redispatch_power_bounds(starts)
+    price_up, price_down = unit.get_redispatch_prices(bounds)[starts[0]]
+
+    # No room for more export (the hydrogen is used up): the hour's price.
+    assert bounds[starts[0]][0] == pytest.approx(base, abs=1e-4)
+    assert price_up == pytest.approx(500.0, abs=1e-4)
+    room = bounds[starts[0]][1] - base
+    assert price_down == pytest.approx(2 * 400.0 / room, abs=1e-3)
+    assert price_down > 0

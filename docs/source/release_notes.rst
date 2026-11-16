@@ -12,6 +12,25 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**New Features:**
+  - **Sector-coupled systems**: Added a ``SectorCoupledSystem`` DSM unit (``unit_type: sector_coupled_system``)
+    that combines heat and hydrogen components behind one grid node and one market position. Presets via
+    ``system_type``: ``heat`` (heat pump, boilers, CHP, thermal storage), ``hydrogen`` (electrolyser, hydrogen
+    storage, fuel cell) and ``heat_hydrogen``, where a hydrogen-fired CHP draws hydrogen from the internal
+    hydrogen balance and supplies the heat balance. All components are optimised together with exact carrier
+    balances; the net electricity exchange can be negative when CHPs or fuel cells generate. Full-horizon and
+    rolling-horizon operation are supported. Units are configured in ``sector_coupled_units.csv``, grouped by
+    ``parent_unit``, and receive heat and hydrogen demands and fuel prices through the new
+    ``SectorCoupledForecaster``. See :doc:`sector_coupling` for details.
+  - **Sector-coupled bidding strategies**: Added ``sector_coupled_energy_optimization`` for the energy market and
+    ``sector_coupled_energy_redispatch`` for redispatch. The redispatch strategy only offers flexibility the
+    system can deliver in all hours of the redispatch products together.
+  - **Flexible demand in redispatch**: The redispatch market can now re-dispatch sector-coupled systems as
+    flexible consumers, in addition to generators. After redispatch is accepted, the unit is re-optimised so
+    its storage levels and the next rolling window follow the delivered schedule.
+  - **Sector-coupling examples**: Added ``sector_coupled_3_nodes_heat`` (example_04b) and
+    ``sector_coupled_3_nodes_heat_h2`` (example_04c) on the three-node redispatch grid.
+
 0.7.0 - (11th November 2026)
 =========================
 

@@ -476,14 +476,25 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
 
         @self.model.Constraint(self.model.time_steps)
         def variable_cost_constraint(m, t):
+            # Components pay the electricity price for what they consume
+            # (power_in). Electricity from CHPs and fuel cells (power_out)
+            # replaces purchases or is exported, so it is credited at the same
+            # price. In total the system pays price x net exchange plus fuel
+            # and other costs.
             cost_terms = [
                 m.dsm_blocks[name].operating_cost[t]
                 for name in m.dsm_blocks
                 if hasattr(m.dsm_blocks[name], "operating_cost")
             ]
-            if not cost_terms:
-                return m.variable_cost[t] == 0
-            return m.variable_cost[t] == pyo.quicksum(cost_terms)
+            generated = [
+                m.dsm_blocks[name].power_out[t]
+                for name in m.dsm_blocks
+                if hasattr(m.dsm_blocks[name], "power_out")
+            ]
+            cost = pyo.quicksum(cost_terms) if cost_terms else 0
+            if generated:
+                cost = cost - m.electricity_price[t] * pyo.quicksum(generated)
+            return m.variable_cost[t] == cost
 
         self.model.absolute_carrier_demand_constraints = pyo.ConstraintList()
         for carrier, value in self.absolute_demands.items():
@@ -1019,18 +1030,36 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
 
         return instance, target_t, offset
 
-    def _solve_redispatch_extreme(self, start, sense: str) -> float:
+    def _solve_redispatch_extreme(
+        self, start, sense: str, product_starts: tuple = ()
+    ) -> float:
+        """
+        Lowest (``"min"``) or highest (``"max"``) consumption reachable at ``start``.
+
+        Hours before ``start`` keep the reference. The other hours in
+        ``product_starts`` keep their DA consumption, because the redispatch
+        market may move ``start`` alone; later hours stay free.
+        """
         if sense not in {"min", "max"}:
             raise ValueError("sense must be either 'min' or 'max'.")
 
         self.prepare_market_state()
 
+        product_starts = tuple(sorted(set(product_starts) | {start}))
+
         cache = getattr(self, "_sector_redispatch_cache", {})
-        key = (start, sense, *self._reference_key(start))
+        key = (start, sense, product_starts, *self._reference_key(start))
         if key in cache:
             return cache[key]
 
-        instance, target_t, _ = self._redispatch_instance(start)
+        instance, _, offset = self._redispatch_instance(product_starts[0])
+        target_t = self._index_position(start) - offset
+
+        for other in product_starts:
+            if other != start:
+                instance.total_power_input[self._index_position(other) - offset].fix(
+                    float(self.da_power.at[other])
+                )
 
         # The RD bound introduces its own objective.  Deactivate whichever
         # optimization objective is active in the cloned/fresh reference model.
@@ -1076,19 +1105,21 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
     def get_redispatch_power_bounds(
         self,
         start,
+        product_starts: tuple = (),
     ) -> tuple[float, float]:
         """
-        Return min/max feasible physical electricity consumption.
+        Return min/max feasible physical electricity consumption at ``start``.
 
         The complete parent system is re-optimized; carrier balances,
-        storage states and all component constraints remain active.
+        storage states and all component constraints remain active. The other
+        hours in ``product_starts`` keep their DA consumption.
         """
         tolerance = self._redispatch_tolerance
 
         self.prepare_market_state()
 
-        min_consumption = self._solve_redispatch_extreme(start, "min")
-        max_consumption = self._solve_redispatch_extreme(start, "max")
+        min_consumption = self._solve_redispatch_extreme(start, "min", product_starts)
+        max_consumption = self._solve_redispatch_extreme(start, "max", product_starts)
         base_consumption = float(self.da_power.at[start])
 
         if min_consumption > base_consumption + tolerance:
@@ -1131,24 +1162,27 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         starts,
     ) -> dict[Any, tuple[float, float]]:
         """
-        Return min/max consumption per hour that hold for all ``starts`` at once.
+        Return min/max consumption per hour for products cleared together.
 
-        :meth:`get_redispatch_power_bounds` looks at one hour and lets all other
-        hours re-optimise around it. The redispatch market clears all products
-        together, so it may use the flexibility of every hour at the same time,
-        which the system cannot always deliver (e.g. an electrolyser switched
-        off in every hour empties the hydrogen storage).
+        The redispatch market may move a single hour while the others keep
+        their DA consumption, or move every hour at the same time. Both must be
+        deliverable (e.g. an electrolyser switched off in every hour would
+        empty the hydrogen storage). So:
 
-        Here every hour keeps the same share of its own room below and above the
-        DA consumption. The share is the largest one for which the system can
-        follow the reduced (or increased) consumption in all hours together,
-        with storages back at their reference level at the end of the model.
+        1. each hour's room is calculated with the other product hours fixed
+           to their DA consumption, and
+        2. every hour keeps the same share of that room. The share is the
+           largest one for which the system can follow the reduced (or
+           increased) consumption in all hours together, with storages back at
+           their reference level at the end of the model.
+
+        Other combinations (e.g. some hours up, others down) are not checked
+        one by one.
         """
         tolerance = self._redispatch_tolerance
         starts = sorted(starts)
 
         base = {start: float(self.da_power.at[start]) for start in starts}
-        single = {start: self.get_redispatch_power_bounds(start) for start in starts}
 
         # Hours of different rolling windows are checked separately.
         groups: dict[tuple, list] = {}
@@ -1157,6 +1191,10 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
 
         bounds = {}
         for group in groups.values():
+            # Room of each hour if only that hour is redispatched.
+            single = {
+                s: self.get_redispatch_power_bounds(s, tuple(group)) for s in group
+            }
             room_below = {s: max(0.0, base[s] - single[s][0]) for s in group}
             room_above = {s: max(0.0, single[s][1] - base[s]) for s in group}
 
@@ -1230,6 +1268,98 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         cache[key] = share
         self._sector_redispatch_cache = cache
         return share
+
+    def get_redispatch_prices(
+        self,
+        bounds: dict,
+    ) -> dict[Any, tuple[float, float]]:
+        """
+        Price per MWh for each direction of redispatch, from the unit's own costs.
+
+        ``bounds`` maps each product start to the offered (min, max)
+        consumption. For every hour, the window model is re-solved with that
+        hour at its offered bound and the other product hours at their DA
+        consumption. The price is the change in the unit's cost per MWh moved,
+        plus the forecast electricity price of that hour, because the DA
+        purchase of that hour is paid either way:
+
+        - ``price_up`` (less consumption / more export): extra cost the unit
+          needs to be paid per MWh,
+        - ``price_down`` (more consumption / less export): cost the unit saves
+          per MWh, which it pays for the extra energy.
+
+        Without room in a direction, the forecast electricity price is used.
+        """
+        tolerance = self._redispatch_tolerance
+        starts = sorted(bounds)
+
+        groups: dict[tuple, list] = {}
+        for start in starts:
+            groups.setdefault(self._reference_key(start), []).append(start)
+
+        prices = {}
+        for group in groups.values():
+            base = {s: float(self.da_power.at[s]) for s in group}
+            reference_cost, price_of_hour = self._cost_with_consumption(group, base)
+
+            for s in group:
+                lowest, highest = bounds[s]
+                hour_price = price_of_hour[s]
+
+                price_up = hour_price
+                room_below = base[s] - lowest
+                if room_below > tolerance and reference_cost is not None:
+                    cost, _ = self._cost_with_consumption(group, {**base, s: lowest})
+                    if cost is not None:
+                        price_up = (cost - reference_cost) / room_below + hour_price
+
+                price_down = hour_price
+                room_above = highest - base[s]
+                if room_above > tolerance and reference_cost is not None:
+                    cost, _ = self._cost_with_consumption(group, {**base, s: highest})
+                    if cost is not None:
+                        price_down = (reference_cost - cost) / room_above + hour_price
+
+                prices[s] = (float(price_up), float(price_down))
+
+        return prices
+
+    def _cost_with_consumption(
+        self,
+        starts: list,
+        consumption: dict,
+    ) -> tuple[float | None, dict]:
+        """
+        Cost of the window with ``consumption`` fixed in the product hours.
+
+        Returns the total variable cost (``None`` if not solvable) and the
+        forecast electricity price of each product hour.
+        """
+        instance, _, offset = self._redispatch_instance(starts[0])
+
+        positions = {s: self._index_position(s) - offset for s in starts}
+        for s, t in positions.items():
+            instance.total_power_input[t].fix(consumption[s])
+
+        hour_price = {
+            s: float(pyo.value(instance.electricity_price[t]))
+            for s, t in positions.items()
+        }
+
+        ok, termination = self._solve_ok(instance)
+        if not ok:
+            logger.warning(
+                "Redispatch price of '%s' could not be calculated (%s); "
+                "using the electricity price forecast.",
+                self.id,
+                termination,
+            )
+            return None, hour_price
+
+        cost = float(
+            sum(pyo.value(instance.variable_cost[t]) for t in instance.time_steps)
+        )
+        return cost, hour_price
 
     def set_dispatch_plan(self, marketconfig, orderbook) -> None:
         """

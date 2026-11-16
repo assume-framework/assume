@@ -263,6 +263,10 @@ class SectorCoupledEnergyNaiveStrategy(MinMaxStrategy):
     """
     Submit the cost-optimal electrical position of a sector-coupled system.
 
+    The position is bid as a price taker: consumption at the market's maximum
+    bid price and net export (e.g. from a CHP or fuel cell) at its minimum bid
+    price, so both clear and the system can follow its internal plan.
+
     For rolling-horizon configured units, this strategy refreshes runtime
     forecasts and triggers the rolling-window optimization for the current
     market round before reading the EOM position.
@@ -284,18 +288,32 @@ class SectorCoupledEnergyNaiveStrategy(MinMaxStrategy):
 
         unit.prepare_market_state()
 
+        buy_price = getattr(market_config, "maximum_bid_price", None)
+        if buy_price is None:
+            buy_price = 3000.0
+        sell_price = getattr(market_config, "minimum_bid_price", None)
+        if sell_price is None:
+            sell_price = -500.0
+
         bids = []
 
         for start, end, only_hours in product_tuples:
             position = unit.get_eom_market_position(start)
             volume = float(position["volume"])
 
+            if volume < -1e-9:
+                price = buy_price
+            elif volume > 1e-9:
+                price = sell_price
+            else:
+                price = 0.0
+
             bids.append(
                 {
                     "start_time": start,
                     "end_time": end,
                     "only_hours": only_hours,
-                    "price": 3000 if abs(volume) > 1e-9 else 0.0,
+                    "price": price,
                     "volume": volume,
                     "node": position["node"],
                 }
@@ -313,6 +331,12 @@ class SectorCoupledRedispatchNaiveStrategy(MinMaxStrategy):
     sequence this is a no-op because the EOM strategy has already optimized and
     committed the relevant window. Redispatch then evaluates flexibility around
     the stored committed DA reference.
+
+    Each direction has its own price from the unit's own costs
+    (:meth:`~assume.units.sector_coupled_system.SectorCoupledSystem.get_redispatch_prices`):
+    ``price_up`` for less consumption / more export and ``price_down`` for more
+    consumption / less export. ``price`` repeats ``price_up`` for markets that
+    only read one price.
     """
 
     def calculate_bids(
@@ -337,23 +361,32 @@ class SectorCoupledRedispatchNaiveStrategy(MinMaxStrategy):
             [start for start, _, _ in product_tuples]
         )
 
+        prices = unit.get_redispatch_prices(bounds)
+
+        max_price = getattr(market_config, "maximum_bid_price", None)
+        min_price = getattr(market_config, "minimum_bid_price", None)
+
+        def within_market_limits(price: float) -> float:
+            if max_price is not None:
+                price = min(price, max_price)
+            if min_price is not None:
+                price = max(price, min_price)
+            return price
+
         bids = []
 
         for start, end, only_hours in product_tuples:
             position = unit.get_redispatch_market_position(start, bounds=bounds[start])
-
-            base_consumption = float(unit.da_power.at[start])
-            price = unit.calculate_marginal_cost(
-                start,
-                base_consumption,
-            )
+            price_up, price_down = (within_market_limits(p) for p in prices[start])
 
             bids.append(
                 {
                     "start_time": start,
                     "end_time": end,
                     "only_hours": only_hours,
-                    "price": price,
+                    "price": price_up,
+                    "price_up": price_up,
+                    "price_down": price_down,
                     "volume": position["volume"],
                     "min_power": position["min_power"],
                     "max_power": position["max_power"],

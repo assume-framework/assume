@@ -103,7 +103,12 @@ structures:
 - fuel consumption and variable operating costs per component.
 
 The default objective minimises the total variable cost over the horizon
-(``objective: min_variable_cost``).
+(``objective: min_variable_cost``). Electricity is valued at the electricity
+price forecast on the **net exchange**: components pay the price for the
+electricity they consume, and electricity from CHPs and fuel cells is credited
+at the same price, whether it covers the system's own consumption or is
+exported. The variable cost per time step is therefore
+``price x net exchange + fuel and other operating costs``.
 
 Additional modelling options:
 
@@ -128,15 +133,20 @@ The strategy registered under ``sector_coupled_energy_optimization``
 (:py:class:`assume.strategies.naive_strategies.SectorCoupledEnergyNaiveStrategy`)
 bids the reference consumption profile on the EOM:
 
-- consumption time steps are bid with negative volumes,
-- currently every non-zero bid uses a must-take price (3000 EUR/MWh in the
-  current implementation).
+- consumption is bid with a negative volume at the market's
+  ``maximum_bid_price``,
+- net export (e.g. from a CHP or fuel cell) is bid with a positive volume at
+  the market's ``minimum_bid_price``,
+- so both always clear and the system can follow its internal schedule. With
+  ``pay_as_clear``, the system pays or receives the clearing price, not its
+  bid price.
 
 .. note::
 
     The must-take pricing is an interim solution. It makes the EOM
     price signal not influence *when* the system consumes; the internal
-    schedule is cost-optimal with respect to fuel and marginal costs only.
+    schedule is cost-optimal with respect to the electricity price forecast
+    and fuel costs only.
     An opportunity-cost based bidding strategy that prices flexibility from
     the internal model is the planned next step.
 
@@ -151,19 +161,34 @@ under ``sector_coupled_energy_redispatch``
 - the base volume is the EOM-cleared reference schedule,
 - for each time step, the lowest and highest consumption the system can
   physically reach is computed by re-solving the internal model with the
-  earlier time steps fixed to the reference and all storages returned to their
-  reference level at the end of the optimisation window,
+  earlier time steps fixed to the reference, the other product time steps kept
+  at their DA consumption (the market may move a single time step) and all
+  storages returned to their reference level at the end of the optimisation
+  window,
 - because the redispatch market clears all products together, every time step
   then only offers the same share of its own room below and above the
   reference. The share is the largest one for which the system can follow the
   changed consumption in all time steps at once
   (:py:meth:`~assume.units.sector_coupled_system.SectorCoupledSystem.get_joint_redispatch_power_bounds`),
-  so the system can go to its offered bound in all time steps at once,
+- so the system can deliver its offered bound in any single time step and in
+  all time steps together. Other combinations (e.g. more consumption in some
+  time steps and less in others) are not checked one by one, and the common
+  share is conservative: one tight time step lowers the offer of all others,
 - the physical consumption interval ``[min_consumption, max_consumption]`` is
   converted to the market sign convention:
   ``min_power = -max_consumption``, ``max_power = -min_consumption``,
-- the bid price is the marginal cost of the internal system at the base
-  consumption.
+- each direction has its own bid price from the system's own costs
+  (:py:meth:`~assume.units.sector_coupled_system.SectorCoupledSystem.get_redispatch_prices`):
+  the internal model is re-solved with the time step at its offered bound and
+  the other product time steps at their DA consumption. ``price_up`` (less
+  consumption / more export) is the extra cost per MWh, ``price_down`` (more
+  consumption / less export) the saving per MWh, each plus the time step's
+  forecast electricity price, because its DA purchase is paid either way.
+  As the costs are averaged over the offered range and the internal model is
+  linear, accepting only part of the range never pays the system less than
+  its cost. Without room in a direction, the forecast price is used. The
+  redispatch market uses ``price_up``/``price_down`` per direction and settles
+  each accepted direction at its own price (``pay_as_bid``).
 
 After the redispatch market, the system is re-solved with its consumption
 fixed to the DA reference plus the accepted redispatch. Storage levels, and in
