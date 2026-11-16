@@ -166,6 +166,8 @@ def test_chp_capacity_limit():
         },
         {"fuel_type": "coal"},
         {"min_power": 20.0},
+        {"ramp_up": -1.0},
+        {"ramp_down": -1.0},
     ],
 )
 def test_chp_invalid_parameters(changes):
@@ -181,13 +183,7 @@ def test_chp_invalid_parameters(changes):
         CHP(**config)
 
 
-# TEST 6: CHP-only natural gas price creation
-
-
-# TEST 7: CHP heat production and electrical export in SCS
-
-
-# TEST 8: CHP energy conservation
+# TEST 6: CHP energy conservation
 
 
 def test_chp_energy_conservation():

@@ -497,6 +497,10 @@ class CHP:
             )
         if electrical_efficiency + thermal_efficiency > 1 + 1e-9:
             raise ValueError("CHP efficiencies must sum to at most 1.")
+        if ramp_up is not None and ramp_up < 0:
+            raise ValueError("CHP ramp_up must be non-negative.")
+        if ramp_down is not None and ramp_down < 0:
+            raise ValueError("CHP ramp_down must be non-negative.")
         if min_operating_steps < 0 or min_down_steps < 0:
             raise ValueError("CHP minimum operating/down steps must be >= 0.")
         if initial_operational_status not in (0, 1):
@@ -1276,6 +1280,16 @@ class FuelCell:
             raise ValueError("FuelCell min_power cannot exceed max_power.")
         if not 0 < efficiency <= 1:
             raise ValueError("FuelCell efficiency must be in the interval (0, 1].")
+        if ramp_up is not None and ramp_up < 0:
+            raise ValueError("FuelCell ramp_up must be non-negative.")
+        if ramp_down is not None and ramp_down < 0:
+            raise ValueError("FuelCell ramp_down must be non-negative.")
+        if min_operating_steps < 0 or min_down_steps < 0:
+            raise ValueError("FuelCell minimum operating/down steps must be >= 0.")
+        if initial_operational_status not in (0, 1):
+            raise ValueError("FuelCell initial_operational_status must be 0 or 1.")
+        if variable_cost < 0:
+            raise ValueError("FuelCell variable_cost must be non-negative.")
 
         self.max_power = max_power
         self.min_power = min_power

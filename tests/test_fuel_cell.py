@@ -109,6 +109,12 @@ def test_fuel_cell_capacity_limit():
         {"min_power": 20.0},
         {"efficiency": 0.0},
         {"efficiency": 1.2},
+        {"ramp_up": -1.0},
+        {"ramp_down": -1.0},
+        {"min_operating_steps": -1},
+        {"min_down_steps": -1},
+        {"initial_operational_status": 2},
+        {"variable_cost": -1.0},
     ],
 )
 def test_fuel_cell_invalid_parameters(changes):
