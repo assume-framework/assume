@@ -249,18 +249,15 @@ def test_naive_redispatch_strategy(
 
 
 @pytest.mark.parametrize(
-    "unit_id,node,power_requirement,expected_volume",
-    [("hs_north", "N", 2.0, -2.0), ("hs_south", "S", 5.0, -5.0)],
+    "node,power_requirement,expected_volume",
+    [("N", 2.0, -2.0), ("S", 5.0, -5.0)],
 )
 def test_sector_coupled_energy_strategy_creates_aggregate_demand_bid(
-    mock_market_config, unit_id, node, power_requirement, expected_volume
+    mock_market_config, node, power_requirement, expected_volume
 ):
     start = pd.Timestamp("2025-01-01 00:00:00")
     end = pd.Timestamp("2025-01-01 01:00:00")
     position = {
-        "unit_id": unit_id,
-        "parent_unit_id": unit_id,
-        "component_type": "aggregate",
         "node": node,
         "volume": -power_requirement,
     }
@@ -268,7 +265,7 @@ def test_sector_coupled_energy_strategy_creates_aggregate_demand_bid(
     unit = SimpleNamespace(
         horizon_mode="full_horizon",
         prepare_market_state=lambda: None,
-        get_eom_market_positions=lambda _start: [position],
+        get_eom_market_position=lambda _start: position,
     )
 
     bids = SectorCoupledEnergyNaiveStrategy().calculate_bids(
@@ -277,8 +274,6 @@ def test_sector_coupled_energy_strategy_creates_aggregate_demand_bid(
 
     assert len(bids) == 1
     bid = bids[0]
-    assert bid["unit_id"] == bid["parent_unit_id"] == unit_id
-    assert bid["component_type"] == "aggregate"
     assert bid["node"] == node
     assert bid["volume"] == pytest.approx(expected_volume, abs=1e-5)
     assert bid["price"] == pytest.approx(3000.0, abs=1e-5)

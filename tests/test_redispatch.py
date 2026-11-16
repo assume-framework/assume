@@ -383,60 +383,6 @@ def test_flexible_load_participates_in_redispatch(
     assert flows_df.loc[0, "line_N_S"] == pytest.approx(500.0, abs=eps)
 
 
-def test_component_level_sector_coupled_bid_is_rejected(
-    simple_redispatch_market_config,
-    grid_data_dict_2_nodes_with_flexible_load,
-):
-    """
-    The current redispatch market supports the aggregate parent representation.
-    Independently clearing child/component bids is deliberately blocked until
-    coupling constraints are implemented.
-    """
-    mc = simple_redispatch_market_config
-
-    sector_flexible_load = pd.DataFrame(
-        {
-            "node": ["S"],
-            "p_nom": [500.0],
-            "unit_type": ["sector_coupled_system"],
-        },
-        index=["hs_south"],
-    )
-
-    grid_data = {
-        **grid_data_dict_2_nodes_with_flexible_load,
-        "flexible_loads": sector_flexible_load,
-    }
-    mc.param_dict["grid_data"] = grid_data
-
-    next_opening = mc.opening_hours.after(datetime(2005, 6, 1))
-    products = get_available_products(mc.market_products, next_opening)
-    product = products[0]
-
-    component_order = {
-        "start_time": product[0],
-        "end_time": product[1],
-        "only_hours": product[2],
-        "unit_id": "hs_south_heat_pump",
-        "parent_unit_id": "hs_south",
-        "bid_id": "hs_south_heat_pump_bid",
-        "volume": -250.0,
-        "min_power": -500.0,
-        "max_power": 0.0,
-        "p_nom": 500.0,
-        "price": 10.0,
-        "node": "S",
-    }
-
-    rmr = RedispatchMarketRole(mc)
-
-    with pytest.raises(
-        NotImplementedError,
-        match="Component-level redispatch clearing is not supported yet",
-    ):
-        rmr.clear([component_order], products)
-
-
 # Tests with 3 nodes and 30 generators (gen5 to gen34) and 3 demand (dem1 to dem3)
 nodes_3 = pd.DataFrame(
     {

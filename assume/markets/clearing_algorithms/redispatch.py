@@ -124,18 +124,6 @@ class RedispatchMarketRole(MarketRole):
         orderbook_df["accepted_volume"] = 0.0
         orderbook_df["accepted_price"] = 0.0
 
-        if "parent_unit_id" in orderbook_df.columns:
-            component_mask = (
-                orderbook_df["parent_unit_id"].notna()
-                & orderbook_df["parent_unit_id"].ne(orderbook_df["unit_id"])
-                & orderbook_df["parent_unit_id"].isin(self.flexible_loads.index)
-            )
-
-            if component_mask.any():
-                raise NotImplementedError(
-                    "Component-level redispatch clearing is not supported yet."
-                )
-
         # Now you can pivot the DataFrame
         volume_pivot = orderbook_df.pivot(
             index="start_time", columns="unit_id", values="volume"

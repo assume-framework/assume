@@ -137,7 +137,6 @@ def make_sector_system(
         forecaster=forecaster,
         components=components,
         system_type="heat",
-        market_representation="aggregate",
         objective="min_variable_cost",
         flexibility_measure="cost_based_load_shift",
         cost_tolerance=10,

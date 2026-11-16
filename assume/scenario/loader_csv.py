@@ -215,7 +215,6 @@ def load_dsm_units(path: str, config: dict, file_name: str) -> dict:
         "peak_load_cap",
         "load_profile_deviation",
         "system_type",
-        "market_representation",
         "enforce_terminal_soc",
         "primary_carrier",
     ]
@@ -287,20 +286,7 @@ def load_dsm_units(path: str, config: dict, file_name: str) -> dict:
                 component_name = candidate
 
             component_data = row.drop(labels=metadata_columns, errors="ignore").dropna()
-            component_config = component_data.to_dict()
-
-            # `name` is the preferred explicit market-facing component ID.
-            # If it is absent, the CSV row index is a safe fallback.
-            market_unit_id = row.get("name")
-            if (
-                market_unit_id is None
-                or pd.isna(market_unit_id)
-                or str(market_unit_id).strip() == ""
-            ):
-                market_unit_id = row_index
-
-            component_config["market_unit_id"] = str(market_unit_id)
-            components[component_name] = component_config
+            components[component_name] = component_data.to_dict()
 
         dsm_unit["components"] = components
 

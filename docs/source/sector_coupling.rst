@@ -36,8 +36,8 @@ A sector-coupled system is built from a **parent unit** and its **components**:
   ``hs_north_heat_pump``).
 - Rows sharing the same ``parent_unit`` (e.g. ``hs_north``) are grouped by the
   scenario loader into a single ``SectorCoupledSystem`` parent.
-- The parent is the only object the market sees in the default
-  ``market_representation: aggregate`` mode.
+- The parent is the only object the market sees: it bids the net electricity
+  exchange of all its components as one position.
 
 **The components are never optimised independently.** Carrier balances,
 storage states and all component constraints live inside one parent Pyomo
@@ -149,15 +149,26 @@ under ``sector_coupled_energy_redispatch``
 (:py:class:`assume.strategies.naive_strategies.SectorCoupledRedispatchNaiveStrategy`):
 
 - the base volume is the EOM-cleared reference schedule,
-- the upward and downward headroom at each time step is computed by
-  re-solving the internal model and accepting a power level only if the
-  resulting cost increase stays within ``cost_tolerance``
-  (``flexibility_measure: cost_based_load_shift``),
+- for each time step, the lowest and highest consumption the system can
+  physically reach is computed by re-solving the internal model with the
+  earlier time steps fixed to the reference and all storages returned to their
+  reference level at the end of the optimisation window,
+- because the redispatch market clears all products together, every time step
+  then only offers the same share of its own room below and above the
+  reference. The share is the largest one for which the system can follow the
+  changed consumption in all time steps at once
+  (:py:meth:`~assume.units.sector_coupled_system.SectorCoupledSystem.get_joint_redispatch_power_bounds`),
+  so the system can go to its offered bound in all time steps at once,
 - the physical consumption interval ``[min_consumption, max_consumption]`` is
   converted to the market sign convention:
   ``min_power = -max_consumption``, ``max_power = -min_consumption``,
 - the bid price is the marginal cost of the internal system at the base
   consumption.
+
+After the redispatch market, the system is re-solved with its consumption
+fixed to the DA reference plus the accepted redispatch. Storage levels, and in
+rolling-horizon mode the start of the next window, then follow what was
+actually delivered.
 
 On the clearing side, the redispatch market accepts these flexible loads and
 integrates them into the PyPSA network model (see
@@ -167,25 +178,6 @@ be relieved by shifting the system's consumption within its feasible and
 costed envelope. The market configuration must provide the additional fields
 ``node``, ``min_power`` and ``max_power`` (payment mechanism
 ``pay_as_bid``).
-
-Aggregate vs. Component Market Representation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The ``market_representation`` column controls what the market sees:
-
-- ``aggregate`` (default): only the parent unit appears in the order books.
-- ``component``: the parent additionally exposes child market IDs
-  (``{parent}_{component}``) linked back via ``parent_unit_id``. In this mode
-  the parent's EOM volume and redispatch headroom are decomposed across the
-  components using cost-based weights.
-
-.. note::
-
-    The component decomposition is an **accounting attribution**, not an
-    independent feasibility guarantee: the child positions always sum exactly
-    to the parent position, but each child is not optimised on its own.
-    Component-level redispatch clearing is not implemented yet — the
-    redispatch market always clears the physical parent aggregate.
 
 Scenario Inputs
 ---------------
@@ -205,7 +197,6 @@ System-level columns (read from the parent's rows):
 - ``objective`` (default ``min_variable_cost``),
   ``flexibility_measure`` (default ``cost_based_load_shift``),
   ``cost_tolerance`` (default 10).
-- ``market_representation``: ``aggregate`` or ``component``.
 - ``enforce_terminal_soc``: ``TRUE``/``FALSE``.
 
 Component-level columns (per technology row):

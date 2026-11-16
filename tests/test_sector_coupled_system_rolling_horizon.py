@@ -93,7 +93,6 @@ def sector_heat_rh():
         flexibility_measure="cost_based_load_shift",
         cost_tolerance=10,
         node="node0",
-        market_representation="aggregate",
         enforce_terminal_soc=True,
         dsm_optimisation_config=RH_CONFIG,
     )

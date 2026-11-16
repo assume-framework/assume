@@ -287,24 +287,19 @@ class SectorCoupledEnergyNaiveStrategy(MinMaxStrategy):
         bids = []
 
         for start, end, only_hours in product_tuples:
-            positions = unit.get_eom_market_positions(start)
+            position = unit.get_eom_market_position(start)
+            volume = float(position["volume"])
 
-            for position in positions:
-                volume = float(position["volume"])
-
-                bids.append(
-                    {
-                        "start_time": start,
-                        "end_time": end,
-                        "only_hours": only_hours,
-                        "price": 3000 if abs(volume) > 1e-9 else 0.0,
-                        "volume": volume,
-                        "unit_id": position["unit_id"],
-                        "parent_unit_id": position["parent_unit_id"],
-                        "component_type": position["component_type"],
-                        "node": position["node"],
-                    }
-                )
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": only_hours,
+                    "price": 3000 if abs(volume) > 1e-9 else 0.0,
+                    "volume": volume,
+                    "node": position["node"],
+                }
+            )
 
         return bids
 
@@ -318,9 +313,6 @@ class SectorCoupledRedispatchNaiveStrategy(MinMaxStrategy):
     sequence this is a no-op because the EOM strategy has already optimized and
     committed the relevant window. Redispatch then evaluates flexibility around
     the stored committed DA reference.
-
-    In component mode the child capacities are an attribution of one coordinated
-    parent optimization, not independent physical flexibility promises.
     """
 
     def calculate_bids(
@@ -348,9 +340,7 @@ class SectorCoupledRedispatchNaiveStrategy(MinMaxStrategy):
         bids = []
 
         for start, end, only_hours in product_tuples:
-            positions = unit.get_redispatch_market_positions(
-                start, bounds=bounds[start]
-            )
+            position = unit.get_redispatch_market_position(start, bounds=bounds[start])
 
             base_consumption = float(unit.da_power.at[start])
             price = unit.calculate_marginal_cost(
@@ -358,29 +348,19 @@ class SectorCoupledRedispatchNaiveStrategy(MinMaxStrategy):
                 base_consumption,
             )
 
-            for position in positions:
-                bids.append(
-                    {
-                        "start_time": start,
-                        "end_time": end,
-                        "only_hours": only_hours,
-                        "price": price,
-                        "volume": position["volume"],
-                        "min_power": position["min_power"],
-                        "max_power": position["max_power"],
-                        "p_nom": position["p_nom"],
-                        "node": position["node"],
-                        "unit_id": position["unit_id"],
-                        "parent_unit_id": position["parent_unit_id"],
-                        "component_type": position["component_type"],
-                        "is_flexible_consumer": True,
-                        "parent_volume": position["parent_volume"],
-                        "parent_min_power": position["parent_min_power"],
-                        "parent_max_power": position["parent_max_power"],
-                        "upward_flexibility": position["upward_flexibility"],
-                        "downward_flexibility": position["downward_flexibility"],
-                    }
-                )
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": only_hours,
+                    "price": price,
+                    "volume": position["volume"],
+                    "min_power": position["min_power"],
+                    "max_power": position["max_power"],
+                    "p_nom": position["p_nom"],
+                    "node": position["node"],
+                }
+            )
 
         return bids
 

@@ -119,7 +119,6 @@ def _make_sector_system(
         forecaster=forecaster,
         components=components,
         system_type="heat",
-        market_representation="aggregate",
         objective="min_variable_cost",
         flexibility_measure="cost_based_load_shift",
         cost_tolerance=10,
@@ -393,11 +392,8 @@ def test_sector_coupled_eom_position_uses_aggregate_demand_sign(
 ):
     sector_system, _, _ = solved_base_sector_system
 
-    position = sector_system.get_eom_market_positions(time_index[0])[0]
+    position = sector_system.get_eom_market_position(time_index[0])
 
-    assert position["unit_id"] == "hs_north"
-    assert position["parent_unit_id"] == "hs_north"
-    assert position["component_type"] == "aggregate"
     assert position["node"] == "north"
     assert position["physical_power"] == pytest.approx(2.0, abs=TOL)
     assert position["volume"] == pytest.approx(-2.0, abs=TOL)
@@ -422,16 +418,14 @@ def test_sector_coupled_redispatch_strategy_full_replacement(
 
     bid = bids[0]
 
-    assert bid["unit_id"] == "hs_north"
-    assert bid["parent_unit_id"] == "hs_north"
-    assert bid["component_type"] == "aggregate"
     assert bid["volume"] == pytest.approx(-2.0, abs=TOL)
     assert bid["min_power"] == pytest.approx(-2.0, abs=TOL)
     assert bid["max_power"] == pytest.approx(0.0, abs=TOL)
     assert bid["p_nom"] == pytest.approx(2.0, abs=TOL)
     assert bid["node"] == "north"
-    assert bid["upward_flexibility"] == pytest.approx(2.0, abs=TOL)
-    assert bid["downward_flexibility"] == pytest.approx(0.0, abs=TOL)
+    # Market sign: up to 2 MW less consumption, no more consumption possible.
+    assert bid["max_power"] - bid["volume"] == pytest.approx(2.0, abs=TOL)
+    assert bid["volume"] - bid["min_power"] == pytest.approx(0.0, abs=TOL)
 
 
 def test_sector_coupled_redispatch_strategy_respects_heat_requirement(
@@ -468,7 +462,7 @@ def test_sector_coupled_redispatch_strategy_respects_heat_requirement(
     assert bid["min_power"] == pytest.approx(-2.0, abs=TOL)
     assert bid["max_power"] == pytest.approx(-0.5, abs=TOL)
     assert bid["p_nom"] == pytest.approx(2.0, abs=TOL)
-    assert bid["upward_flexibility"] == pytest.approx(1.5, abs=TOL)
+    assert bid["max_power"] - bid["volume"] == pytest.approx(1.5, abs=TOL)
 
 
 def test_heat_hydrogen_h2_chp_couples_heat_hydrogen_and_electricity(time_index):
@@ -515,7 +509,6 @@ def test_heat_hydrogen_h2_chp_couples_heat_hydrogen_and_electricity(time_index):
         forecaster=forecaster,
         components=components,
         system_type="heat_hydrogen",
-        market_representation="aggregate",
         objective="min_variable_cost",
         flexibility_measure="cost_based_load_shift",
         cost_tolerance=10,
@@ -558,10 +551,7 @@ def test_heat_hydrogen_h2_chp_couples_heat_hydrogen_and_electricity(time_index):
     assert not hasattr(instance, "hydrogen_gas_price")
 
     # Market sign convention: +8.5 MW physical import -> -8.5 MW EOM demand bid.
-    position = sector_system.get_eom_market_positions(time_index[0])[0]
-    assert position["unit_id"] == "hh_north"
-    assert position["parent_unit_id"] == "hh_north"
-    assert position["component_type"] == "aggregate"
+    position = sector_system.get_eom_market_position(time_index[0])
     assert position["node"] == "north"
     assert position["physical_power"] == pytest.approx(8.5, abs=TOL)
     assert position["volume"] == pytest.approx(-8.5, abs=TOL)

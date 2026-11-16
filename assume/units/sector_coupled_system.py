@@ -62,10 +62,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
     Generic sector-coupled ASSUME unit.
 
     The unit is a physical parent system that coordinates several internal DSM
-    components while exposing either:
-
-    1. one aggregate market position, or
-    2. component-level market positions linked to the physical parent.
+    components and bids their net electricity exchange as one market position.
 
     Presets (``system_type``):
         - ``heat``: heat_pump + boiler + chp + thermal_storage
@@ -98,7 +95,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
     components such as fuel cells and CHPs.
     """
 
-    _component_market_tolerance = 1e-7
+    _redispatch_tolerance = 1e-7
 
     SYSTEM_PRESETS: dict[str, dict[str, Any]] = {
         "heat": {
@@ -154,7 +151,6 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         cost_tolerance: float = 10,
         node: str = "node0",
         location: tuple[float, float] = (0.0, 0.0),
-        market_representation: str = "aggregate",
         absolute_demands: dict[str, float] | None = None,
         demand: float = 0.0,
         enforce_terminal_soc: bool = True,
@@ -178,15 +174,9 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                 raise ValueError("carrier_balances must not be empty.")
             primary_carrier = next(iter(carrier_balances))
 
-        if market_representation not in {"aggregate", "component"}:
-            raise ValueError(
-                "market_representation must be 'aggregate' or 'component'."
-            )
-
         self.system_type = system_type
         self.carrier_balances = copy.deepcopy(carrier_balances)
         self.primary_carrier = primary_carrier
-        self.market_representation = market_representation
         self.enforce_terminal_soc = enforce_terminal_soc
         self.objective = objective
         self.flexibility_measure = flexibility_measure
@@ -335,26 +325,6 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                     "producing 'heat_out' and a hydrogen balance with 'chp' "
                     "consuming 'hydrogen_in', e.g. system_type='heat_hydrogen'."
                 )
-
-    def _component_output_variable(
-        self,
-        component_name: str,
-    ) -> str | None:
-        for spec in self.carrier_balances.values():
-            for term in spec.get("producers", []):
-                if self._matches_prefix(component_name, term["prefix"]):
-                    return term["variable"]
-        return None
-
-    def _storage_spec(
-        self,
-        component_name: str,
-    ) -> dict[str, Any] | None:
-        for spec in self.carrier_balances.values():
-            for storage in spec.get("storages", []):
-                if self._matches_prefix(component_name, storage["prefix"]):
-                    return storage
-        return None
 
     # Pyomo physical model
     def define_parameters(self):
@@ -540,20 +510,6 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                         block.soc[last_t] == block.initial_soc
                     )
 
-    # Market/reference helpers
-    def _component_market_id(self, component_name: str) -> str:
-        component = self.components[component_name]
-        kwargs = getattr(component, "kwargs", {}) or {}
-        market_id = kwargs.get("market_unit_id")
-
-        if market_id is not None and not pd.isna(market_id):
-            return str(market_id)
-
-        return f"{self.id}_{component_name}"
-
-    def get_component_market_ids(self) -> dict[str, str]:
-        return {name: self._component_market_id(name) for name in self.components}
-
     def _index_position(self, start) -> int:
         for pos, timestamp in enumerate(self.index):
             if timestamp == start:
@@ -561,19 +517,6 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         raise KeyError(
             f"Timestamp {start!r} is not contained in SectorCoupledSystem '{self.id}'."
         )
-
-    @staticmethod
-    def _value_at(
-        series: pd.Series | None,
-        timestamp,
-        default: float = 0.0,
-    ) -> float:
-        if series is None:
-            return float(default)
-        try:
-            return float(series.at[timestamp])
-        except (KeyError, AttributeError, TypeError):
-            return float(default)
 
     def _on_rolling_window_solved(
         self,
@@ -690,37 +633,10 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
 
                 target_states[variable_name] = full_series
 
-        self._rebuild_market_reference_views()
+        self._clear_redispatch_cache()
 
-    def _rebuild_market_reference_views(self) -> None:
-        """Rebuild derived market-reference views from ``da_component_state``."""
-        self.da_component_power = {}
-        self.da_storage_soc = {}
-        self.da_storage_charge = {}
-        self.da_storage_discharge = {}
-
-        for name, state in self.da_component_state.items():
-            power_in = state.get("power_in")
-            power_out = state.get("power_out")
-
-            if power_in is not None or power_out is not None:
-                if power_in is None:
-                    self.da_component_power[name] = -power_out
-                elif power_out is None:
-                    self.da_component_power[name] = power_in
-                else:
-                    self.da_component_power[name] = power_in - power_out
-
-            if "soc" in state:
-                self.da_storage_soc[name] = state["soc"]
-
-            if "charge" in state:
-                self.da_storage_charge[name] = state["charge"]
-
-            if "discharge" in state:
-                self.da_storage_discharge[name] = state["discharge"]
-
-        # Any cached RD envelope was calculated around the old reference.
+    def _clear_redispatch_cache(self) -> None:
+        """Forget redispatch bounds that were calculated around an old reference."""
         self._sector_redispatch_cache = {}
 
     def _extract_component_trajectory(
@@ -769,7 +685,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
 
         self.da_component_state = self._extract_component_trajectory(instance)
 
-        self._rebuild_market_reference_views()
+        self._clear_redispatch_cache()
 
     def prepare_market_state(self, force: bool = False) -> None:
         """Solve and store the physically consistent cost-optimal reference."""
@@ -796,88 +712,6 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
             )
 
         self._store_market_reference(instance)
-
-    def _reference_component_value(
-        self,
-        component_name: str,
-        variable_name: str,
-        start,
-        default: float = 0.0,
-    ) -> float:
-        self.prepare_market_state()
-        series = self.da_component_state.get(component_name, {}).get(variable_name)
-        return self._value_at(series, start, default)
-
-    def _reference_component_net_power(
-        self,
-        component_name: str,
-        start,
-    ) -> float:
-        power_in = self._reference_component_value(
-            component_name,
-            "power_in",
-            start,
-            0.0,
-        )
-        power_out = self._reference_component_value(
-            component_name,
-            "power_out",
-            start,
-            0.0,
-        )
-
-        return power_in - power_out
-
-    @staticmethod
-    def _snapshot_value(
-        snapshot: dict[str, dict[str, float]],
-        component_name: str,
-        variable_name: str,
-        default: float = 0.0,
-    ) -> float:
-        return float(snapshot.get(component_name, {}).get(variable_name, default))
-
-    @staticmethod
-    def _snapshot_component_net_power(
-        snapshot: dict[str, dict[str, float]],
-        component_name: str,
-    ) -> float:
-        """
-        Return the component's net electrical grid exchange from a
-        solved component snapshot.
-
-        Positive values denote electricity consumption/import.
-        Negative values denote electricity generation/export.
-        """
-        values = snapshot.get(component_name, {})
-
-        power_in = float(values.get("power_in", 0.0))
-        power_out = float(values.get("power_out", 0.0))
-
-        return power_in - power_out
-
-    def _extract_component_snapshot(
-        self,
-        instance: pyo.ConcreteModel,
-        target_t: int,
-    ) -> dict[str, dict[str, float]]:
-        snapshot: dict[str, dict[str, float]] = {}
-
-        for component_name in self.components:
-            block = instance.dsm_blocks[component_name]
-            values: dict[str, float] = {}
-
-            for variable in block.component_objects(pyo.Var, active=True):
-                if not variable.is_indexed():
-                    continue
-                try:
-                    values[variable.local_name] = float(pyo.value(variable[target_t]))
-                except (KeyError, ValueError, TypeError):
-                    continue
-
-            snapshot[component_name] = values
-
-        return snapshot
 
     # State-aware redispatch envelope
     def _fix_committed_past_to_reference(
@@ -1185,9 +1019,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
 
         return instance, target_t, offset
 
-    def _solve_redispatch_extreme(
-        self, start, sense: str
-    ) -> tuple[float, dict[str, dict[str, float]]]:
+    def _solve_redispatch_extreme(self, start, sense: str) -> float:
         if sense not in {"min", "max"}:
             raise ValueError("sense must be either 'min' or 'max'.")
 
@@ -1235,12 +1067,11 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
             )
 
         power = float(pyo.value(instance.total_power_input[target_t]))
-        snapshot = self._extract_component_snapshot(instance, target_t)
 
-        cache[key] = (power, snapshot)
+        cache[key] = power
         self._sector_redispatch_cache = cache
 
-        return power, snapshot
+        return power
 
     def get_redispatch_power_bounds(
         self,
@@ -1252,12 +1083,12 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         The complete parent system is re-optimized; carrier balances,
         storage states and all component constraints remain active.
         """
-        tolerance = self._component_market_tolerance
+        tolerance = self._redispatch_tolerance
 
         self.prepare_market_state()
 
-        min_consumption, _ = self._solve_redispatch_extreme(start, "min")
-        max_consumption, _ = self._solve_redispatch_extreme(start, "max")
+        min_consumption = self._solve_redispatch_extreme(start, "min")
+        max_consumption = self._solve_redispatch_extreme(start, "max")
         base_consumption = float(self.da_power.at[start])
 
         if min_consumption > base_consumption + tolerance:
@@ -1313,7 +1144,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         follow the reduced (or increased) consumption in all hours together,
         with storages back at their reference level at the end of the model.
         """
-        tolerance = self._component_market_tolerance
+        tolerance = self._redispatch_tolerance
         starts = sorted(starts)
 
         base = {start: float(self.da_power.at[start]) for start in starts}
@@ -1355,7 +1186,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
 
         ``direction`` is -1 for less consumption and +1 for more consumption.
         """
-        tolerance = self._component_market_tolerance
+        tolerance = self._redispatch_tolerance
         if all(value <= tolerance for value in room.values()):
             return 0.0
 
@@ -1422,7 +1253,7 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
             accepted = float(order.get("accepted_volume") or 0.0)
             # Positive accepted volume is upward redispatch, i.e. less consumption.
             consumption[start] = float(self.da_power.at[start]) - accepted
-            if abs(accepted) > self._component_market_tolerance:
+            if abs(accepted) > self._redispatch_tolerance:
                 any_accepted = True
 
         if any_accepted:
@@ -1509,311 +1340,25 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
                 self.id,
             )
 
-        self._rebuild_market_reference_views()
+        self._clear_redispatch_cache()
 
-    def get_component_eom_positions(
-        self,
-        start,
-    ) -> list[dict[str, Any]]:
-        """Return direct electrical EOM positions per internal component."""
+    # Market positions used by the sector-coupled strategies
+    def get_eom_market_position(self, start) -> dict[str, Any]:
+        """Return the EOM position at ``start`` (negative volume = consumption)."""
         self.prepare_market_state()
-        positions = []
-
-        for component_name in self.components:
-            power = self._reference_component_net_power(
-                component_name,
-                start,
-            )
-
-            positions.append(
-                {
-                    "unit_id": self._component_market_id(component_name),
-                    "parent_unit_id": self.id,
-                    "component_type": component_name,
-                    "node": self.node,
-                    "volume": -float(power),
-                    "physical_power": float(power),
-                }
-            )
-
-        summed_power = sum(item["physical_power"] for item in positions)
-        parent_power = float(self.da_power.at[start])
-
-        if abs(summed_power - parent_power) > 1e-6:
-            raise RuntimeError(
-                f"Component electrical powers of '{self.id}' "
-                f"do not sum to total_power_input at {start}: "
-                f"components={summed_power}, parent={parent_power}."
-            )
-
-        return positions
-
-    def _sector_flexibility_weights(
-        self,
-        start,
-        min_snapshot: dict[str, dict[str, float]],
-        max_snapshot: dict[str, dict[str, float]],
-    ) -> tuple[dict[str, float], dict[str, float]]:
-        """
-        Heuristic physical attribution of parent electrical flexibility.
-
-        This attribution is an accounting decomposition, not an independent
-        feasibility claim for each child component.
-        """
-        tolerance = self._component_market_tolerance
-        up_weights: dict[str, float] = {}
-        down_weights: dict[str, float] = {}
-
-        for name in self.components:
-            storage = self._storage_spec(name)
-
-            if storage is not None:
-                charge_var = storage.get("charge", "charge")
-                discharge_var = storage.get("discharge", "discharge")
-
-                base_net = self._reference_component_value(
-                    name, discharge_var, start, 0.0
-                ) - self._reference_component_value(name, charge_var, start, 0.0)
-                min_net = self._snapshot_value(
-                    min_snapshot, name, discharge_var, 0.0
-                ) - self._snapshot_value(min_snapshot, name, charge_var, 0.0)
-                max_net = self._snapshot_value(
-                    max_snapshot, name, discharge_var, 0.0
-                ) - self._snapshot_value(max_snapshot, name, charge_var, 0.0)
-
-                up_weights[name] = max(0.0, min_net - base_net)
-                down_weights[name] = max(0.0, base_net - max_net)
-                continue
-
-            # Prefer direct electrical changes whenever the component exchanges
-            # electricity with the grid.
-            base_power = self._reference_component_net_power(name, start)
-            min_power = self._snapshot_component_net_power(min_snapshot, name)
-            max_power = self._snapshot_component_net_power(max_snapshot, name)
-
-            if max(abs(base_power), abs(min_power), abs(max_power)) > tolerance:
-                # Upward redispatch means reducing net consumption or increasing
-                # generation, i.e. moving towards a lower net electrical exchange
-                up_weights[name] = max(0.0, base_power - min_power)
-
-                # Downward redispatch means increasing net consumption or reducing
-                # generation.
-                down_weights[name] = max(0.0, max_power - base_power)
-                continue
-
-            # Components without direct electrical exchange can still influence
-            # electrical flexibility indirectly through the coupled carrier balance
-            output_var = self._component_output_variable(name)
-            if output_var is None:
-                continue
-
-            base_output = self._reference_component_value(name, output_var, start, 0.0)
-            min_output = self._snapshot_value(min_snapshot, name, output_var, 0.0)
-            max_output = self._snapshot_value(max_snapshot, name, output_var, 0.0)
-
-            up_weights[name] = max(0.0, min_output - base_output)
-            down_weights[name] = max(0.0, base_output - max_output)
-
-        return up_weights, down_weights
-
-    @staticmethod
-    def _allocate_total_by_weights(
-        total: float,
-        weights: dict[str, float],
-        names: list[str],
-        tolerance: float,
-    ) -> dict[str, float]:
-        allocation = {name: 0.0 for name in names}
-        positive = {name: max(0.0, float(weights.get(name, 0.0))) for name in names}
-        weight_sum = sum(positive.values())
-
-        if total <= tolerance or weight_sum <= tolerance:
-            return allocation
-
-        for name, weight in positive.items():
-            allocation[name] = total * weight / weight_sum
-
-        residual = total - sum(allocation.values())
-        if abs(residual) > tolerance:
-            best = max(positive, key=positive.get)
-            allocation[best] += residual
-
-        return allocation
-
-    def get_component_redispatch_positions(
-        self,
-        start,
-    ) -> list[dict[str, Any]]:
-        """Decompose the physically feasible parent RD envelope over components."""
-        tolerance = self._component_market_tolerance
-        self.prepare_market_state()
-
-        base_consumption = float(self.da_power.at[start])
-        min_consumption, min_snapshot = self._solve_redispatch_extreme(start, "min")
-        max_consumption, max_snapshot = self._solve_redispatch_extreme(start, "max")
-
-        up_total = max(0.0, base_consumption - min_consumption)
-        down_total = max(0.0, max_consumption - base_consumption)
-
-        names = list(self.components)
-
-        up_weights, down_weights = self._sector_flexibility_weights(
-            start,
-            min_snapshot,
-            max_snapshot,
-        )
-
-        up_allocation = self._allocate_total_by_weights(
-            up_total,
-            up_weights,
-            names,
-            tolerance,
-        )
-        down_allocation = self._allocate_total_by_weights(
-            down_total,
-            down_weights,
-            names,
-            tolerance,
-        )
-
-        # Fallback: attribute unexplained flexibility to direct changes in
-        # electrical input.
-        if up_total > tolerance and sum(up_allocation.values()) <= tolerance:
-            direct_up = {}
-            for name in names:
-                base_power = self._reference_component_net_power(name, start)
-                min_power = self._snapshot_component_net_power(min_snapshot, name)
-                direct_up[name] = max(0.0, base_power - min_power)
-            up_allocation = self._allocate_total_by_weights(
-                up_total,
-                direct_up,
-                names,
-                tolerance,
-            )
-
-        if down_total > tolerance and sum(down_allocation.values()) <= tolerance:
-            direct_down = {}
-            for name in names:
-                base_power = self._reference_component_net_power(name, start)
-                max_power = self._snapshot_component_net_power(max_snapshot, name)
-                direct_down[name] = max(0.0, max_power - base_power)
-            down_allocation = self._allocate_total_by_weights(
-                down_total,
-                direct_down,
-                names,
-                tolerance,
-            )
-
-        def add_residual(
-            total: float,
-            allocation: dict[str, float],
-        ) -> None:
-            residual = total - sum(allocation.values())
-            if residual <= tolerance:
-                return
-
-            for name in names:
-                base_power = self._reference_component_net_power(name, start)
-
-                if abs(base_power) > tolerance:
-                    allocation[name] += residual
-                    return
-
-            if names:
-                allocation[names[0]] += residual
-
-        add_residual(up_total, up_allocation)
-        add_residual(down_total, down_allocation)
-
-        records = []
-
-        for name in names:
-            baseline_power = self._reference_component_net_power(
-                name,
-                start,
-            )
-            signed_volume = -baseline_power
-
-            up_cap = max(0.0, up_allocation.get(name, 0.0))
-            down_cap = max(0.0, down_allocation.get(name, 0.0))
-
-            max_power = signed_volume + up_cap
-            min_power = signed_volume - down_cap
-            p_nom = max(
-                abs(signed_volume),
-                abs(min_power),
-                abs(max_power),
-                tolerance,
-            )
-
-            records.append(
-                {
-                    "unit_id": self._component_market_id(name),
-                    "parent_unit_id": self.id,
-                    "component_type": name,
-                    "node": self.node,
-                    "volume": float(signed_volume),
-                    "min_power": float(min_power),
-                    "max_power": float(max_power),
-                    "p_nom": float(p_nom),
-                    "is_flexible_consumer": True,
-                    "parent_volume": -base_consumption,
-                    "parent_min_power": -max_consumption,
-                    "parent_max_power": -min_consumption,
-                    "upward_flexibility": float(up_cap),
-                    "downward_flexibility": float(down_cap),
-                }
-            )
-
-        child_baseline = sum(item["volume"] for item in records)
-        child_up = sum(item["max_power"] - item["volume"] for item in records)
-        child_down = sum(item["volume"] - item["min_power"] for item in records)
-
-        if abs(child_baseline + base_consumption) > 1e-6:
-            raise RuntimeError(
-                f"Component RD baseline of '{self.id}' "
-                "does not reproduce parent baseline."
-            )
-        if abs(child_up - up_total) > 1e-6:
-            raise RuntimeError(
-                f"Component upward RD headroom of '{self.id}' "
-                "does not reproduce parent headroom."
-            )
-        if abs(child_down - down_total) > 1e-6:
-            raise RuntimeError(
-                f"Component downward RD headroom of '{self.id}' "
-                "does not reproduce parent headroom."
-            )
-
-        return records
-
-    # Public market interface used by generic strategies
-    def get_eom_market_positions(
-        self,
-        start,
-    ) -> list[dict[str, Any]]:
-        self.prepare_market_state()
-
-        if self.market_representation == "component":
-            return self.get_component_eom_positions(start)
 
         physical_power = float(self.da_power.at[start])
-        return [
-            {
-                "unit_id": self.id,
-                "parent_unit_id": self.id,
-                "component_type": "aggregate",
-                "node": self.node,
-                "volume": -physical_power,
-                "physical_power": physical_power,
-            }
-        ]
+        return {
+            "node": self.node,
+            "volume": -physical_power,
+            "physical_power": physical_power,
+        }
 
-    def get_redispatch_market_positions(
+    def get_redispatch_market_position(
         self,
         start,
         bounds: tuple[float, float] | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> dict[str, Any]:
         """
         Return the redispatch position at ``start``.
 
@@ -1823,39 +1368,22 @@ class SectorCoupledSystem(DSMFlex, SupportsMinMax):
         """
         self.prepare_market_state()
 
-        if self.market_representation == "component":
-            return self.get_component_redispatch_positions(start)
-
         base = float(self.da_power.at[start])
         if bounds is None:
             bounds = self.get_redispatch_power_bounds(start)
         min_consumption, max_consumption = bounds
 
-        signed_volume = -base
+        volume = -base
         min_power = -max_consumption
         max_power = -min_consumption
         p_nom = max(
-            abs(signed_volume),
-            abs(min_power),
-            abs(max_power),
-            self._component_market_tolerance,
+            abs(volume), abs(min_power), abs(max_power), self._redispatch_tolerance
         )
 
-        return [
-            {
-                "unit_id": self.id,
-                "parent_unit_id": self.id,
-                "component_type": "aggregate",
-                "node": self.node,
-                "volume": signed_volume,
-                "min_power": min_power,
-                "max_power": max_power,
-                "p_nom": p_nom,
-                "is_flexible_consumer": True,
-                "parent_volume": signed_volume,
-                "parent_min_power": min_power,
-                "parent_max_power": max_power,
-                "upward_flexibility": base - min_consumption,
-                "downward_flexibility": max_consumption - base,
-            }
-        ]
+        return {
+            "node": self.node,
+            "volume": volume,
+            "min_power": min_power,
+            "max_power": max_power,
+            "p_nom": p_nom,
+        }
