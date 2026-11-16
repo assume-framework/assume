@@ -196,7 +196,7 @@ def test_demand_energy_heuristic_elastic_config_and_errors():
 
     with pytest.raises(
         ValueError,
-        match="max_power must be < 0 but is 100 for unit bad_maxpower",
+        match="max_power must be <= 0 but is 100 for unit bad_maxpower",
     ):
         Demand(
             id="bad_maxpower",
@@ -214,7 +214,7 @@ def test_demand_energy_heuristic_elastic_config_and_errors():
 
     with pytest.raises(
         ValueError,
-        match="min_power must be < 0 but is 100 for unit bad_minpower",
+        match="min_power must be <= 0 but is 100 for unit bad_minpower",
     ):
         Demand(
             id="bad_minpower",
@@ -283,7 +283,7 @@ def test_demand_energy_heuristic_elastic_config_and_errors():
         )
 
     # Invalid: num_bids < 1
-    with pytest.raises(ValueError, match="'num_bids' parameter must be >= 1"):
+    with pytest.raises(ValueError, match="'num_bids' parameter must be > 1"):
         Demand(
             id="bad_num_bids",
             unit_operator="UO1",
@@ -360,8 +360,8 @@ def test_invalid_demand_reports_all_violations():
     assert exc.value.id == "dem_test"
     assert exc.value.field == "max_power"
     message = str(exc.value)
-    assert "max_power must be < 0 but is 10 for unit dem_test" in message
-    assert "min_power must be < 0 but is 20 for unit dem_test" in message
+    assert "max_power must be <= 0 but is 10 for unit dem_test" in message
+    assert "min_power must be <= 0 but is 20 for unit dem_test" in message
 
 
 def test_demand_zero_power_is_allowed_despite_the_message():

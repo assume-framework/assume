@@ -14,6 +14,7 @@ from assume.common.forecaster import DemandForecaster
 from assume.common.unit_params import (
     FieldValueError,
     Number,
+    NumberOrSeries,
     UnitParams,
     validate_params,
 )
@@ -29,7 +30,7 @@ class DemandParams(UnitParams):
 
     max_power: Number
     min_power: Number
-    price: Number = 3000.0
+    price: NumberOrSeries = 3000.0
     max_price: Number | None = None
     elasticity: Number = 0
     elasticity_model: str | Number = 0
@@ -119,12 +120,12 @@ class Demand(SupportsMinMax):
         unit_operator: str,
         technology: str,
         bidding_strategies: dict,
-        max_power: float,
-        min_power: float,
+        max_power: Number,
+        min_power: Number,
         forecaster: DemandForecaster,
         node: str = "node0",
-        price: float = 3000.0,
-        location: tuple[float, float] = (0.0, 0.0),
+        price: NumberOrSeries = 3000.0,
+        location: tuple[Number, Number] = (0.0, 0.0),
         **kwargs,
     ):
         super().__init__(
