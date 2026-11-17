@@ -1,6 +1,6 @@
 .. SPDX-FileCopyrightText: ASSUME Developers
 ..
-.. SPDX-License-Identifier: AGPL-3.0-or-later
+.. SPDX-License-Identifier: MIT
 
 Scenario Loaders
 ================
@@ -34,6 +34,21 @@ OEDS Infrastructure
 -------------------
 
 .. automodule:: assume.scenario.oeds.infrastructure
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. _entsoe_loader:
+
+ENTSO-E Loader
+--------------
+
+.. automodule:: assume.scenario.loader_entsoe
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: assume.scenario.entsoe_helper.fuel_prices
    :members:
    :undoc-members:
    :show-inheritance:

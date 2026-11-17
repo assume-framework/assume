@@ -1,13 +1,13 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 repos:
   - repo: https://github.com/fsfe/reuse-tool
     rev: v6.2.0
     hooks:
       - id: reuse
-        args: ["annotate", "--license", "AGPL-3.0-or-later", "--recursive", "--copyright", "ASSUME Developers", "--exclude-year", "--skip-unrecognised", "--skip-existing", "."]
+        args: ["annotate", "--license", "MIT", "--recursive", "--copyright", "ASSUME Developers", "--exclude-year", "--skip-unrecognised", "--skip-existing", "."]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
@@ -32,3 +32,12 @@ repos:
           - tomli
         types_or: [python, rst, markdown]
         files: ^(assume|docs|tests)/
+  - repo: local
+    hooks:
+      # ASSUME treats naive datetimes as UTC, these calls treat them as local time
+      # use the helpers from assume.common.utils, mark intended uses with "# tz-ok"
+      - id: no-local-time-conversion
+        name: use datetime2timestamp / timestamp2datetime instead of local time conversions
+        language: pygrep
+        entry: '^(?!.*# tz-ok).*(\.timestamp\(\)|time\.mktime\(|fromtimestamp\((?![^)]*tz=))'
+        files: ^(assume|tests)/.*\.py$

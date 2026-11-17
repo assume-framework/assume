@@ -1,6 +1,6 @@
 REM SPDX-FileCopyrightText: ASSUME Developers
 REM
-REM SPDX-License-Identifier: AGPL-3.0-or-later
+REM SPDX-License-Identifier: MIT
 
 @ECHO OFF
 

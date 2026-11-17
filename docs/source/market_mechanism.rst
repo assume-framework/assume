@@ -1,6 +1,6 @@
 .. SPDX-FileCopyrightText: ASSUME Developers
 ..
-.. SPDX-License-Identifier: AGPL-3.0-or-later
+.. SPDX-License-Identifier: MIT
 
 ##################
 Market Mechanisms
@@ -40,7 +40,8 @@ The available market mechanisms are the following:
 
 
 The :code:`PayAsClearRole` performs an electricity market clearing using a pay-as-clear mechanism.
-This means that the clearing price is the highest price that is still accepted.
+This means that the clearing price is the highest supply bid price that is still accepted.
+Only if the supply is not sufficient to meet the demand (supply scarcity), the clearing price is the lowest demand bid price that is still accepted.
 This price is then valid for all accepted orders.
 For this, the demand and supply are separated, before the demand is sorted from highest to lowest order price
 and the supply lowest to highest order price.
@@ -79,7 +80,13 @@ is given by: :math:`\mathbf{a}_{c, p} \: u_c \leq u_{p} \quad \forall \: c, p \i
 
 with the incidence matrix :math:`\mathbf{a}_{c, p}` defining the links between bids as 1, if c is linked as child to p, 0 else.
 
-Flows in the network are limited by the Net Transfer Capacity ('s_nom' * 's_max_pu') of each line l: :math:`\quad -NTC_{l} \leq F_{l, t} \leq NTC_{l} \quad \forall \: l \in \mathcal{L}, t \in \mathcal{T}`,
+Flows in the network are limited by the Net Transfer Capacity of each line :math:`l`. By default ASSUME derives a symmetric limit from ``s_nom * s_max_pu`` and applies it in both directions:
+
+.. math::
+
+  -NTC_{l} \leq F_{l, t} \leq NTC_{l} \quad \forall \: l \in \mathcal{L}, t \in \mathcal{T}
+
+If ``lines.csv`` additionally provides ``s_nom_forward`` and/or ``s_nom_reverse``, the complex clearing uses these directional limits instead, still taking ``s_max_pu`` into account. This allows transport constraints to differ by flow direction, which is useful for zonal representations with asymmetric commercial transfer capacities.
 
 Because with this algorithm, paradoxically accepted bids (PABs) can occur, the objective is solved in an iterative manner:
 

@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: MIT
+
+Contracts:
+  - SenderId: 100
+    ReceiverId: 200
+    ProductName: EnergyExchange

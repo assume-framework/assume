@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import logging
 import shutil
@@ -15,7 +15,7 @@ import pandas as pd
 from dateutil import rrule as rr
 from mango import Role
 from pandas.api.types import is_bool_dtype, is_numeric_dtype
-from psycopg2.errors import UndefinedColumn
+from psycopg.errors import UndefinedColumn
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
@@ -24,6 +24,7 @@ from assume.common.utils import (
     calculate_content_size,
     convert_tensors,
     separate_orders,
+    utc_rrule,
 )
 
 logger = logging.getLogger(__name__)
@@ -200,12 +201,11 @@ class WriteOutput(Role):
             self.delete_db_scenario(self.simulation_id)
 
         if self.save_frequency_hours is not None:
-            recurrency_task = rr.rrule(
+            recurrency_task = utc_rrule(
                 freq=rr.HOURLY,
                 interval=self.save_frequency_hours,
                 dtstart=self.start,
                 until=self.end,
-                cache=True,
             )
             self.context.schedule_recurrent_task(
                 self.store_dfs,
