@@ -206,8 +206,11 @@ class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
 
     For every product the strategy submits:
 
-    - ``volume``: the currently cleared (signed) dispatch (``+`` discharge,
-      ``-`` charge) around which redispatch is applied.
+    - ``volume``: the grid baseline around which redispatch is applied - what the
+      storage can actually run of its cleared (signed) dispatch (``+`` discharge,
+      ``-`` charge). It equals the cleared dispatch unless that is not
+      SOC-feasible; then the grid model sees the real injection and the shortfall
+      is covered by other units.
     - ``max_power`` / ``min_power``: the **state-of-charge aware** discharge
       (``>= 0``) and charge (``<= 0``) bounds, so a near-empty battery offers
       little additional discharge and a near-full one little additional charge.
@@ -215,6 +218,13 @@ class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
       (``max_power_charge`` is negative, so this adds), which keeps the fixed
       baseline within ``[-1, 1]`` per unit and prevents the up/down redispatch
       potential from clipping prematurely in the clearing.
+    - ``energy_discharge_headroom`` / ``energy_charge_headroom``: the energy (MWh)
+      above ``min_soc`` / below ``max_soc`` at the end of the product along the
+      baseline SOC path. The clearing uses them to bound the *cumulative*
+      redispatch energy over the horizon, since the per-product power bounds alone
+      would let it request more energy than the storage holds. Both come from
+      :meth:`Storage.calculate_soc_path`, together with ``efficiency_charge`` /
+      ``efficiency_discharge``, which the clearing needs for the same constraint.
     - ``price``: the opportunity cost of the stored energy - the round-trip
       adjusted market price at which the energy was procured plus the variable
       charge/discharge costs. Because redispatch clears **after** EOM and CRM,
@@ -254,10 +264,12 @@ class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
             Orderbook: Bids containing start_time, end_time, only_hours, price,
             volume, max_power, min_power, p_nom and node.
         """
-        start = product_tuples[0][0]
-        # theoretic SOC is advanced by the cleared dispatch so the SoC-aware
-        # bounds of later products reflect the running state of charge
-        theoretic_SOC = unit.outputs["soc"].at[start]
+        # SOC path along the current (day-ahead) schedule for the whole redispatch
+        # window, computed by the storage itself. It respects the SOC limits and treats
+        # hours without a cleared schedule as idle.
+        soc_path, runnable = unit.calculate_soc_path(
+            product_tuples[0][0], product_tuples[-1][1]
+        )
 
         # static nameplate power span; guarantees the fixed baseline d/p_nom stays
         # within [-1, 1] and the per-unit up/down potential does not clip early
@@ -277,28 +289,25 @@ class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
         for product in product_tuples:
             start, end = product[0], product[1]
 
-            # Committed (pre-SoC-clip) dispatch (+ discharge, - charge). The redispatch
-            # balances against the volume the energy market cleared and the generators
-            # were dispatched for. outputs["energy"] holds the SoC-clipped value; using
-            # it would make storage disagree with the rest of the network and force a
-            # spurious net redispatch. energy_committed is recorded in set_dispatch_plan.
-            current_power = unit.outputs["energy_committed"].at[start]
+            # Grid baseline (+ discharge, - charge): what the storage can actually run
+            # of its DA plan. Equal to the plan unless the DA schedule is infeasible;
+            # then the grid model sees the real injection, and the shortfall against
+            # the plan is covered by other units instead of being hidden.
+            current_power = runnable[start]
 
-            # Additional feasible head-room at the current state of charge, already net
-            # of the cleared dispatch and of capacity reserved on other markets (CRM),
-            # so reserve MW that were already sold are not offered again to redispatch.
-            _, max_power_discharge = unit.calculate_min_max_discharge(
-                start, end, soc=theoretic_SOC
-            )
-            _, max_power_charge = unit.calculate_min_max_charge(
-                start, end, soc=theoretic_SOC
+            # Absolute power range at the SOC at the start of this product (SOC limits
+            # applied to the absolute power, CRM reservations kept free). The clearing
+            # derives up = max_power - volume and down = volume - min_power from it.
+            max_power_charge, max_power_discharge = (
+                unit.calculate_redispatch_power_bounds(start, soc_path[start])
             )
 
-            # Absolute injection bounds around the committed dispatch, matching the
-            # clearing's head-room formula (up = max_power - volume, down = volume -
-            # min_power).
-            max_power_discharge = current_power + max_power_discharge[0]
-            max_power_charge = current_power + max_power_charge[0]
+            # Energy head-room at the END of this product along the SOC path. The
+            # clearing uses it to bound the CUMULATIVE redispatch energy, see
+            # Storage.add_redispatch_soc_constraints.
+            energy_discharge_headroom, energy_charge_headroom = (
+                unit.calculate_redispatch_energy_headroom(soc_path[end])
+            )
 
             # opportunity cost of the stored energy: round-trip adjusted market
             # price plus the variable charge/discharge costs
@@ -323,26 +332,13 @@ class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
                     "max_power": max_power_discharge,
                     "min_power": max_power_charge,
                     "p_nom": p_nom,
+                    "energy_discharge_headroom": energy_discharge_headroom,
+                    "energy_charge_headroom": energy_charge_headroom,
+                    "efficiency_charge": unit.efficiency_charge,
+                    "efficiency_discharge": unit.efficiency_discharge,
                     "node": unit.node,
                 }
             )
-
-            # advance the theoretic SOC by the currently cleared dispatch
-            time_delta = (end - start) / timedelta(hours=1)
-            if current_power > 0:
-                delta_soc = (
-                    -(current_power * time_delta / unit.efficiency_discharge)
-                    / unit.capacity
-                )
-            elif current_power < 0:
-                delta_soc = (
-                    -(current_power * time_delta * unit.efficiency_charge)
-                    / unit.capacity
-                )
-            else:
-                delta_soc = 0
-
-            theoretic_SOC += delta_soc
 
         # keep zero-volume bids: an idle storage is a valid redispatch resource
         return bids

@@ -1046,3 +1046,259 @@ def test_ensure_soc_clips_the_last_time_step(mock_market_config, storage_unit):
 if __name__ == "__main__":
     # run pytest and enable prints
     pytest.main(["-s", __file__])
+
+
+@pytest.fixture
+def small_storage() -> Storage:
+    """20 MWh / 20 MW storage, lossless, starting half full."""
+    index = pd.date_range("2023-01-02", periods=6, freq="h")
+    forecaster = UnitForecaster(index, availability=1, market_prices={"EOM": 50})
+    return Storage(
+        id="small_storage",
+        unit_operator="op",
+        technology="battery",
+        bidding_strategies={},
+        forecaster=forecaster,
+        max_power_charge=-20,
+        max_power_discharge=20,
+        capacity=20,
+        initial_soc=0.5,
+    )
+
+
+def test_calculate_soc_path_follows_schedule_and_clips(small_storage):
+    s = small_storage
+    t = s.index
+    # charge 8 MW, then 8 MW again (only 2 MWh of room left), then discharge 5 MW
+    s.outputs["energy"].loc[t[0] : t[2]] = [-8, -8, 5]
+
+    path, _ = s.calculate_soc_path(t[0], t[4])
+
+    assert [round(path[x] * s.capacity, 6) for x in t[:5]] == [10, 18, 20, 15, 15]
+
+
+def test_calculate_soc_path_beyond_index_treats_storage_as_idle(small_storage):
+    s = small_storage
+    t = s.index
+    s.outputs["energy"].at[t[5]] = 4  # last time step in the index
+
+    path, _ = s.calculate_soc_path(t[5], t[5] + 2 * s.index.freq)
+
+    assert path[t[5] + s.index.freq] * s.capacity == pytest.approx(6)
+    assert path[t[5] + 2 * s.index.freq] * s.capacity == pytest.approx(6)
+
+
+def test_calculate_redispatch_energy_headroom(small_storage):
+    assert small_storage.calculate_redispatch_energy_headroom(0.25) == (5.0, 15.0)
+    assert small_storage.calculate_redispatch_energy_headroom(1.0) == (20.0, 0.0)
+
+
+def test_add_redispatch_soc_constraints_limits_cumulative_energy():
+    """4 snapshots, 20 MW of upward redispatch would be cheap, but only 10 MWh exist."""
+    linopy = pytest.importorskip("linopy")
+
+    m = linopy.Model()
+    snapshots = pd.RangeIndex(4, name="snapshot")
+    up = m.add_variables(lower=0, upper=20, coords=[snapshots], name="up")
+    down = m.add_variables(lower=0, upper=20, coords=[snapshots], name="down")
+    m.add_objective(-up.sum() + 0.1 * down.sum())  # maximise upward redispatch
+
+    Storage.add_redispatch_soc_constraints(
+        model=m,
+        name="s",
+        up=up,
+        down=down,
+        duration_hours=[1, 1, 1, 1],
+        energy_discharge_headroom=[10, 10, 10, 10],
+        energy_charge_headroom=[10, 10, 10, 10],
+        efficiency_charge=1.0,
+        efficiency_discharge=1.0,
+    )
+    status, _ = m.solve(solver_name="highs")
+
+    assert status == "ok"
+    assert float(up.solution.sum() - down.solution.sum()) == pytest.approx(10)
+
+
+def test_set_dispatch_plan_warns_if_redispatch_is_not_soc_feasible(
+    small_storage, caplog
+):
+    from assume.common.market_objects import MarketConfig, MarketProduct
+
+    s = small_storage
+    t = s.index
+    config = MarketConfig(
+        market_id="redispatch",
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+        product_type="energy",
+        market_mechanism="redispatch",
+    )
+    # 20 MW for 1 h needs 20 MWh, but only 10 MWh are stored: 10 MWh are curtailed
+    order = {
+        "start_time": t[0],
+        "end_time": t[1],
+        "accepted_volume": 20,
+        "accepted_price": 50,
+    }
+    with caplog.at_level("WARNING"):
+        s.set_dispatch_plan(config, [order])
+
+    assert "not SOC-feasible" in caplog.text
+    # only the 10 MWh that are stored can actually run
+    _, runnable = s.calculate_soc_path(t[0], t[1])
+    assert runnable[t[0]] == pytest.approx(10)
+
+
+def test_as_dict_keeps_efficiencies_in_place(small_storage):
+    small_storage.efficiency_charge = 0.9
+    small_storage.efficiency_discharge = 0.8
+    d = small_storage.as_dict()
+    assert d["efficiency_charge"] == 0.9
+    assert d["efficiency_discharge"] == 0.8
+
+
+@pytest.mark.parametrize(
+    "initial_soc, da_volume, expected_up, expected_down",
+    [
+        (1.0, 50.0, 50.0, 50.0),  # full, discharging: can still discharge less
+        (0.0, -50.0, 50.0, 50.0),  # empty, charging: can still charge less
+        (0.5, 0.0, 50.0, 50.0),  # half full, idle: 50 MWh either way
+    ],
+)
+def test_redispatch_bid_power_range_around_da_schedule(
+    initial_soc, da_volume, expected_up, expected_down
+):
+    """100 MWh / 100 MW lossless battery: redispatch range around the DA schedule."""
+    from assume.common.market_objects import MarketConfig, MarketProduct
+    from assume.strategies.flexable_storage import (
+        StorageEnergyHeuristicRedispatchStrategy,
+    )
+
+    index = pd.date_range("2023-01-02", periods=4, freq="h")
+    t0, t1, t2 = index[:3]
+    storage = Storage(
+        id="battery",
+        unit_operator="op",
+        technology="battery",
+        bidding_strategies={},
+        forecaster=UnitForecaster(index, availability=1, market_prices={"EOM": 50}),
+        max_power_charge=-100,
+        max_power_discharge=100,
+        capacity=100,
+        initial_soc=initial_soc,
+    )
+
+    def config(market_id):
+        return MarketConfig(
+            market_id=market_id,
+            product_type="energy",
+            market_mechanism="redispatch"
+            if market_id == "redispatch"
+            else "pay_as_clear",
+            market_products=[MarketProduct(timedelta(hours=1), 2, timedelta(hours=1))],
+        )
+
+    def order(t, volume):
+        return {
+            "start_time": t,
+            "end_time": t + timedelta(hours=1),
+            "accepted_volume": volume,
+            "accepted_price": 50,
+        }
+
+    storage.set_dispatch_plan(config("EOM"), [order(t0, da_volume), order(t1, 0)])
+    bid = StorageEnergyHeuristicRedispatchStrategy().calculate_bids(
+        storage, config("redispatch"), [(t0, t1, None), (t1, t2, None)]
+    )[0]
+
+    assert bid["volume"] == pytest.approx(da_volume)
+    assert bid["max_power"] - bid["volume"] == pytest.approx(expected_up)
+    assert bid["volume"] - bid["min_power"] == pytest.approx(expected_down)
+
+
+def test_soc_follows_da_plus_redispatch():
+    """Full 100 MWh battery: DA accepts 50 of a 70 MW bid, redispatch adds +20."""
+    from assume.common.market_objects import MarketConfig, MarketProduct
+
+    index = pd.date_range("2023-01-02", periods=4, freq="h")
+    t0, t1 = index[:2]
+    storage = Storage(
+        id="battery",
+        unit_operator="op",
+        technology="battery",
+        bidding_strategies={},
+        forecaster=UnitForecaster(index, availability=1, market_prices={"EOM": 50}),
+        max_power_charge=-100,
+        max_power_discharge=100,
+        capacity=100,
+        initial_soc=1.0,
+    )
+    eom = MarketConfig(
+        market_id="EOM",
+        product_type="energy",
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+    )
+    redispatch = MarketConfig(
+        market_id="redispatch",
+        product_type="energy",
+        market_mechanism="redispatch",
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+    )
+
+    def order(volume):
+        return {
+            "start_time": t0,
+            "end_time": t1,
+            "accepted_volume": volume,
+            "accepted_price": 50,
+        }
+
+    storage.set_dispatch_plan(eom, [order(50)])  # only the accepted volume counts
+    assert storage.get_soc(t1) * 100 == pytest.approx(50)
+    storage.set_dispatch_plan(redispatch, [order(20)])
+    storage.execute_current_dispatch(t0, t0)
+
+    assert storage.outputs["energy"].at[t0] == pytest.approx(70)
+    assert storage.get_soc(t1) * 100 == pytest.approx(30)
+
+
+def test_redispatch_on_top_of_infeasible_plan_is_delivered(small_storage, caplog):
+    """
+    A full storage has a DA plan to charge 10 MW, which it cannot do (it runs 0 MW).
+    Redispatch bounds are measured from what it can run, so "+8 MW" means discharge
+    8 MW. That must be what is delivered - not -10 + 8 = -2 MW, which a full
+    storage would again run as 0 MW.
+    """
+    from assume.common.market_objects import MarketConfig, MarketProduct
+
+    s = small_storage
+    t = s.index
+    s.set_soc(t[0], 1.0)
+    product = [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))]
+    eom = MarketConfig(market_id="EOM", product_type="energy", market_products=product)
+    redispatch = MarketConfig(
+        market_id="redispatch",
+        product_type="energy",
+        market_mechanism="redispatch",
+        market_products=product,
+    )
+
+    def order(volume):
+        return {
+            "start_time": t[0],
+            "end_time": t[1],
+            "accepted_volume": volume,
+            "accepted_price": 50,
+        }
+
+    s.set_dispatch_plan(eom, [order(-10)])
+    _, runnable = s.calculate_soc_path(t[0], t[1])
+    assert runnable[t[0]] == pytest.approx(0)  # full: the planned charge cannot run
+
+    with caplog.at_level("WARNING"):
+        s.set_dispatch_plan(redispatch, [order(8)])
+    s.execute_current_dispatch(t[0], t[0])
+
+    assert "not SOC-feasible" not in caplog.text
+    assert s.outputs["energy"].at[t[0]] == pytest.approx(8)
+    assert s.get_soc(t[1]) * s.capacity == pytest.approx(20 - 8)

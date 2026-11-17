@@ -120,36 +120,43 @@ def test_redispatch_storage(mock_market_config, storage):
     assert bids[0]["min_power"] > storage.max_power_charge
 
 
-def test_redispatch_storage_uses_committed_not_clipped(mock_market_config, storage):
+def test_redispatch_storage_baseline_is_runnable_power(mock_market_config, storage):
     """
-    The redispatch base must be the market-committed (pre-SoC-clip) dispatch, not the
-    SoC-clipped executed value. The generators were dispatched against the committed
-    volume, so the redispatch network only balances (supply == demand, no spurious
-    net up/down) when storage reports that same committed volume.
+    The redispatch baseline (grid injection) is what the storage can actually run of
+    its DA plan, not the committed plan. Otherwise the grid model would compute line
+    flows with an injection that never happens.
     """
     start = datetime(2023, 7, 1)
     end = datetime(2023, 7, 1, 1)
     strategy = StorageEnergyHeuristicRedispatchStrategy()
     product_tuples = [(start, end, None)]
 
-    # market committed 60 MW of charging; the SoC clip cut the executed charge to 40 MW
-    storage.outputs["energy_committed"][start] = -60
-    storage.outputs["energy"][start] = -40
+    # market committed 60 MW of charging, but the storage only has room for 40 MW
+    storage.set_soc(
+        start, storage.max_soc - 40 * storage.efficiency_charge / storage.capacity
+    )
+    storage.outputs["energy"][start] = -60
+    _, runnable = storage.calculate_soc_path(start, end)
+    assert runnable[start] == pytest.approx(-40)
 
     bids = strategy.calculate_bids(
         storage, mock_market_config, product_tuples=product_tuples
     )
 
-    # the redispatch base is the committed -60, NOT the clipped -40
-    assert bids[0]["volume"] == pytest.approx(-60)
+    # the grid baseline is the runnable -40, NOT the committed -60
+    assert bids[0]["volume"] == pytest.approx(-40)
+    # no further charging possible: the storage is full after this hour
+    assert bids[0]["min_power"] == pytest.approx(-40)
+    assert bids[0]["energy_charge_headroom"] == pytest.approx(0, abs=1e-6)
 
 
-def test_storage_records_committed_energy_before_soc_clip(mock_market_config, storage):
+def test_storage_keeps_committed_plan_and_runs_what_soc_allows(
+    mock_market_config, storage
+):
     """
-    Storage.set_dispatch_plan must mirror the market-committed (pre-clip) energy into
-    outputs["energy_committed"] BEFORE the SoC clip rewrites outputs["energy"].
-    The redispatch baseline is taken from that committed volume, because the
-    generators were dispatched against it.
+    outputs["energy"] keeps the market-committed plan (the redispatch baseline,
+    because the generators were dispatched against it), while the SOC path only
+    runs what the state of charge can back.
     """
     start = datetime(2023, 7, 1)
     end = datetime(2023, 7, 1, 1)
@@ -158,7 +165,7 @@ def test_storage_records_committed_energy_before_soc_clip(mock_market_config, st
 
     # nearly empty battery: it can physically deliver only
     # soc * capacity * efficiency_discharge = 0.01 * 1000 * 0.95 = 9.5 MW
-    storage.outputs["soc"].at[start] = 0.01
+    storage.set_soc(start, 0.01)
 
     orderbook = [
         {
@@ -170,13 +177,14 @@ def test_storage_records_committed_energy_before_soc_clip(mock_market_config, st
     ]
     storage.set_dispatch_plan(mc, orderbook)
 
-    # the committed schedule keeps the unclipped 100 ...
-    assert storage.outputs["energy_committed"].at[start] == pytest.approx(100)
-    # ... while the executed energy is clipped down to what the SoC allows
-    assert storage.outputs["energy"].at[start] == pytest.approx(
+    # the plan keeps the committed 100 ...
+    assert storage.outputs["energy"].at[start] == pytest.approx(100)
+    # ... while only what the SOC allows can actually run
+    soc_path, runnable = storage.calculate_soc_path(start, end)
+    assert runnable[start] == pytest.approx(
         0.01 * storage.capacity * storage.efficiency_discharge
     )
-    assert storage.outputs["energy"].at[start] < 100
+    assert soc_path[end] == pytest.approx(storage.min_soc)
 
 
 def test_redispatch_storage_excludes_reserved_crm_capacity(mock_market_config, storage):
@@ -498,3 +506,42 @@ if __name__ == "__main__":
     import pytest
 
     pytest.main(["-s", __file__])
+
+
+@pytest.mark.parametrize(
+    "market_prices, expected_price",
+    [
+        # no EOM forecast: use the redispatch market's own forecast
+        ({"redispatch": 60.0}, 60.0),
+        # neither EOM nor the own market: use any available forecast
+        ({"other_market": 70.0}, 70.0),
+    ],
+)
+def test_redispatch_storage_price_forecast_fallback(market_prices, expected_price):
+    from assume.common.market_objects import MarketConfig, MarketProduct
+
+    index = pd.date_range("2023-07-01", periods=4, freq="h")
+    unit = Storage(
+        id="battery",
+        unit_operator="op",
+        technology="battery",
+        bidding_strategies={},
+        forecaster=UnitForecaster(index, availability=1, market_prices=market_prices),
+        max_power_charge=-10,
+        max_power_discharge=10,
+        capacity=40,
+        efficiency_charge=0.8,
+        efficiency_discharge=0.5,
+        initial_soc=0.5,
+    )
+    config = MarketConfig(
+        market_id="redispatch",
+        product_type="energy",
+        market_mechanism="redispatch",
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+    )
+    bids = StorageEnergyHeuristicRedispatchStrategy().calculate_bids(
+        unit, config, product_tuples=[(index[0], index[1], None)]
+    )
+    # flat forecast: price = forecast / (eta_charge * eta_discharge)
+    assert bids[0]["price"] == pytest.approx(expected_price / (0.8 * 0.5))
