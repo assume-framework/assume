@@ -318,8 +318,8 @@ def load_dsm_units(path: str, config: dict, file_name: str) -> dict:
 
 def build_flexible_loads(dsm_units: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """
-    Build the static grid-facing representation of sector-coupled systems
-    that participate in redispatch as flexible loads.
+    Build the static grid-facing representation of DSM units
+    that may participate in redispatch as flexible consumers.
 
     Only sector-coupled systems are included: their redispatch strategy offers
     a physically feasible range (``min_power``/``max_power``). Other DSM units
@@ -341,8 +341,6 @@ def build_flexible_loads(dsm_units: dict[str, pd.DataFrame]) -> pd.DataFrame:
         return pd.DataFrame(columns=["node", "p_nom", "unit_type"])
 
     for unit_type, units_df in dsm_units.items():
-        if unit_type != "sector_coupled_system":
-            continue
         if units_df is None or units_df.empty:
             continue
 
