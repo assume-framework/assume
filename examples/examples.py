@@ -73,6 +73,16 @@ available_examples = {
         "scenario": "example_01h",
         "study_case": "eom",
     },
+    # portfolio optimization example
+    "portfolio_optimization": {
+        "scenario": "example_01i",
+        "study_case": "base",
+    },
+    # example_01j shows how to use the new uni-directional line limits feature
+    "uni_directional_line_limits": {
+        "scenario": "example_01j",
+        "study_case": "zonal_case",
+    },
     #
     # DRL references case for learning advancement testing
     "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
@@ -123,7 +133,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small_with_vre_and_storage"
+    example = "uni_directional_line_limits"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
