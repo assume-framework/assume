@@ -125,6 +125,8 @@ async def test_get_actual_dispatch(units_operator: UnitsOperator):
     assert datetime2timestamp(unit_dfs[0]["time"][0]) == clock.time
     assert len(unit_dfs[0]["time"]) == 1
     assert len(market_dispatch) == 0
+    # all units export their costs, independent of the bidding strategy
+    assert {"starting_costs", "total_costs"} <= unit_dfs[0].keys()
 
     # WHEN another hour passes
     last = clock.time

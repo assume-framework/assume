@@ -38,6 +38,21 @@ OEDS Infrastructure
    :undoc-members:
    :show-inheritance:
 
+.. _entsoe_loader:
+
+ENTSO-E Loader
+--------------
+
+.. automodule:: assume.scenario.loader_entsoe
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: assume.scenario.entsoe_helper.fuel_prices
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 .. _amiris_loader:
 
 AMIRIS Loader

@@ -21,7 +21,7 @@ Developers
 ----------
 The project is :doc:`developed by <developers>`
 a collaborative team of researchers from INATECH at the University of Freiburg,
-IISM at Karlsruhe Institute of Technology, Fraunhofer Institute for Systems and Innovation Research,
+WIN at Karlsruhe Institute of Technology, Fraunhofer Institute for Systems and Innovation Research (ISI),
 Fraunhofer Institution for Energy Infrastructures and Geothermal Energy,
 and FH Aachen - University of Applied Sciences.
 Each contributor brings valuable expertise in electricity market modeling, deep reinforcement learning,

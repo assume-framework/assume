@@ -117,37 +117,99 @@ def test_calculate_operational_window(storage_unit):
     assert min_power_discharge[0] == 40
     assert max_power_discharge[0] == 60
 
-    start = start + timedelta(hours=1)
+    # the reserves leave exactly one feasible power, min equals max
+    storage_unit.outputs["capacity_pos"][start] = 50
 
+    min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
+        start, end
+    )
+    assert min_power_charge[0] == -60
+    assert max_power_charge[0] == -60
 
-def test_soc_constraint(storage_unit):
-    # start should not be the first hour of index to manipulate soc
-    start = datetime(2022, 1, 1, 1)
-    end = datetime(2022, 1, 1, 2)
-
-    storage_unit.outputs["energy"][start] = 10
-    storage_unit.outputs["capacity_neg"][start] = -50
-    storage_unit.outputs["capacity_pos"][start] = 30
-
-    storage_unit.outputs["soc"][start - timedelta(hours=1)] = 0.05
-    assert storage_unit.outputs["soc"][start - storage_unit.index.freq] == 0.05
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
     )
     assert min_power_discharge[0] == 40
-    assert max_power_discharge[0] == 60
+    assert max_power_discharge[0] == 40
 
-    storage_unit.outputs["soc"][start] = 0.95
+    start = start + timedelta(hours=1)
+
+
+def test_soc_constraint(storage_unit):
+    start = datetime(2022, 1, 1, 1)
+    end = datetime(2022, 1, 1, 2)
+
+    # 50 MWh stored back 47.5 MW of discharge, below the 100 MW power limit
+    storage_unit.set_soc(start, 0.05)
+    min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
+        start, end
+    )
+    assert min_power_discharge[0] == 0
+    assert math.isclose(
+        max_power_discharge[0],
+        0.05 * storage_unit.capacity * storage_unit.efficiency_discharge,
+    )
+
+    # 50 MWh of room take 55.6 MW of charging, below the 100 MW power limit
+    storage_unit.set_soc(start, 0.95)
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end
     )
-    assert min_power_charge[0] == -40
+    assert min_power_charge[0] == 0
     assert math.isclose(
-        max_power_charge[0], -50 / storage_unit.efficiency_charge, abs_tol=0.1
+        max_power_charge[0],
+        -0.05 * storage_unit.capacity / storage_unit.efficiency_charge,
+    )
+
+
+def test_soc_limit_covers_the_current_power(storage_unit):
+    """
+    The SoC limits the total power, so the power already sold on another
+    market uses part of it - only the rest can be offered on top.
+    """
+    start = datetime(2022, 1, 1, 1)
+    end = datetime(2022, 1, 1, 2)
+
+    # 50 MWh stored back 47.5 MW of discharge
+    storage_unit.outputs["energy"][start] = 30
+    _, max_power_discharge = storage_unit.calculate_min_max_discharge(
+        start, end, soc=0.05
+    )
+    assert max_power_discharge[0] == pytest.approx(47.5 - 30)
+    # more committed than the SoC backs - nothing is offered on top
+    storage_unit.outputs["energy"][start] = 60
+    _, max_power_discharge = storage_unit.calculate_min_max_discharge(
+        start, end, soc=0.05
+    )
+    assert max_power_discharge[0] == 0
+
+    # 50 MWh of room take 55.6 MW of charging
+    storage_unit.outputs["energy"][start] = -30
+    _, max_power_charge = storage_unit.calculate_min_max_charge(start, end, soc=0.95)
+    assert max_power_charge[0] == pytest.approx(-50 / 0.9 + 30)
+
+
+def test_ramp_soc_limit_covers_the_current_power(storage_unit):
+    """
+    The ramp checks limit the power on top of the current power, so the SoC
+    limit covers the current power as well. The ramps allow 30 MW on top here.
+    """
+    # 50 MWh stored back 47.5 MW of discharge, 30 MW of them are already sold
+    assert storage_unit.calculate_ramp_discharge(0.05, 0, 100, 30) == pytest.approx(
+        47.5 - 30
+    )
+    # 50 MWh of room take 55.6 MW of charging, 30 MW of them are already bought
+    assert storage_unit.calculate_ramp_charge(0.95, 0, -100, -30) == pytest.approx(
+        -50 / 0.9 + 30
     )
 
 
 def test_storage_feedback(storage_unit, mock_market_config):
+    """
+    The first market accepts 50 MW of discharge.
+    A second market for the same hour can only get the remaining 50 MW.
+    The next hour starts with the full range again.
+    """
     start = datetime(2022, 1, 1, 0)
     end = datetime(2022, 1, 1, 1)
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
@@ -221,13 +283,13 @@ def test_storage_ramping(storage_unit):
     assert min_power_discharge[0] == 0
     assert max_power_discharge[0] == 100
 
-    max_ramp_discharge = storage_unit.calculate_ramp_discharge(
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(
         0.5, 0, max_power_discharge[0]
     )
-    max_ramp_charge = storage_unit.calculate_ramp_charge(0.5, 0, max_power_charge[0])
+    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 0, max_power_charge[0])
 
-    assert max_ramp_discharge == 60
-    assert max_ramp_charge == -60
+    assert adjusted_discharge == 60
+    assert adjusted_charge == -60
 
     # discharge power gets accepted
     storage_unit.outputs["energy"][start] += 60
@@ -236,13 +298,28 @@ def test_storage_ramping(storage_unit):
     start = datetime(2022, 1, 1, 1)
     end = datetime(2022, 1, 1, 2)
 
-    max_ramp_discharge = storage_unit.calculate_ramp_discharge(
+    # test ramping in discharging case with a discharging power that is feasible
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(
         0.5, 60, max_power_discharge[0]
     )
-    max_ramp_charge = storage_unit.calculate_ramp_charge(0.5, 60, max_power_charge[0])
+    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 60, max_power_charge[0])
 
-    assert max_ramp_discharge == 100
-    assert max_ramp_charge == -60
+    assert adjusted_discharge == 100
+    assert adjusted_charge == 0
+
+    # test ramping in discharging case with a discharging power that is not feasible (too low)
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, 60, 5)
+    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 60, max_power_charge[0])
+
+    assert adjusted_discharge == 10
+    assert adjusted_charge == 0
+
+    # test ramping in discharging case with a discharging power that is 0 and not feasible (too low)
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, 60, 0)
+    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 60, max_power_charge[0])
+
+    assert adjusted_discharge == 10
+    assert adjusted_charge == 0
 
     # charging scenario
     storage_unit.outputs["energy"][start] = -60
@@ -251,13 +328,123 @@ def test_storage_ramping(storage_unit):
     start = datetime(2022, 1, 1, 2)
     end = datetime(2022, 1, 1, 3)
 
-    max_ramp_discharge = storage_unit.calculate_ramp_discharge(
+    # test ramping in charging case with a charging power that is feasible
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(
         0.5, -60, max_power_discharge[0]
     )
-    max_ramp_charge = storage_unit.calculate_ramp_charge(0.5, -60, max_power_charge[0])
+    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, -60, max_power_charge[0])
 
-    assert max_ramp_discharge == 60
-    assert max_ramp_charge == -100
+    assert adjusted_discharge == 0
+    assert adjusted_charge == -100
+
+    # test ramping in charging case with a charging power that is not feasible (too high)
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(
+        0.5, -60, max_power_discharge[0]
+    )
+    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, -60, -5)
+
+    assert adjusted_discharge == 0
+    assert adjusted_charge == -10
+
+    # test ramping in charging case with a charging power that is 0 and not feasible (too high)
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(
+        0.5, -60, max_power_discharge[0]
+    )
+    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, -60, 0)
+
+    assert adjusted_discharge == 0
+    assert adjusted_charge == -10
+
+
+def test_storage_ramping_sign_switch(storage_unit):
+    """
+    This test checks that the ramping functions correctly handle cases where the power would switch sign.
+    """
+    # test ramping in discharging case with a power that would switch sign and is not feasible
+    # imagine an order that would charge 5 MW
+    assert storage_unit.calculate_ramp_charge(0.5, 60, -5) == 0
+
+    # test ramping in charging case with a power that would switch sign and is not feasible
+    # imagine an order that would discharge 5 MW
+    assert storage_unit.calculate_ramp_discharge(0.5, -60, 5) == 0
+
+
+def test_net_ramping_constraint(storage_unit):
+    # if simultaneous charge and discharge is not allowed, we use the net ramping constraint to limit ramping in case of sign switches.
+    # This test checks, if the net_ramp is correctly distributed between charge and discharge.
+    # And it checks that if one of the ramp limits is fully used, no remaining net_ramp is used.
+    storage_unit.simultaneous_charge_discharge_ramping = False
+
+    # case1: discharging -> charging with ramp_down_discharge 30/50 used
+    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 30, -100, 0)
+    assert (
+        adjusted_charge == -25
+    )  # ramp_down_discharge = 50, 30 used. net_ramp = 55, so we can ramp up charge to -25
+
+    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 50, -100, 0)
+    assert (
+        adjusted_charge == 0
+    )  # ramp_down_discharge = 50, 50 used. remaining net_ramp of 55-50=5 cannot be used
+
+    # case2: charging -> discharging with ramp_down_charge -10/-50 used
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, -10, 100, 0)
+    assert (
+        adjusted_discharge == 45
+    )  # ramp_down_charge = -50, -10 used. net_ramp = 55, so we can ramp up discharge to 45
+
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, -50, 100, 0)
+    assert (
+        adjusted_discharge == 0
+    )  # ramp_down_charge = -50, -50 used. remaining net_ramp of 55-50=5 cannot be used
+
+
+def test_net_ramping_constraint_one_ramp_undefined(storage_unit):
+    # even if we do not allow simultaneous charging and sicharging ramps within one timestep, we must ensure only existing ramp rates are applied
+    storage_unit.simultaneous_charge_discharge_ramping = False
+    # case1 discharging -> charging
+    # 1.1 ramp_down_discharge undefined
+    storage_unit.ramp_down_discharge = None
+    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 30, -100, 0)
+    assert (
+        adjusted_charge == -60
+    )  # ramp_down_discharge is undefined, so we can ramp up charge to -60
+
+    # 1.2 ramp_down_discharge and ramp_up_charge undefined
+    storage_unit.ramp_up_charge = None
+    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 30, -100, 0)
+    assert (
+        adjusted_charge == -100
+    )  # both ramps are undefined, so we can ramp up charge to -100
+
+    # 1.3 ramp_up_charge undefined
+    storage_unit.ramp_down_discharge = 50
+    adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 30, -100, 0)
+    assert (
+        adjusted_charge == -100
+    )  # we can ramp_down_discharge to 0 and are then unrestricted
+
+    # case2 discharging -> charging
+    # 2.1 ramp_down_charge undefined
+    storage_unit.ramp_up_charge = -60
+    storage_unit.ramp_down_charge = None
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, -90, 100, 0)
+    assert (
+        adjusted_discharge == 60
+    )  # ramp_down_charge is undefined, so we can ramp up discharge to 60
+
+    # 2.2 ramp_down_charge and ramp_up_discharge undefined
+    storage_unit.ramp_up_discharge = None
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, -90, 100, 0)
+    assert (
+        adjusted_discharge == 100
+    )  # both ramps are undefined, so we can ramp up discharge to 100
+
+    # 2.3 ramp_up_discharge undefined
+    storage_unit.ramp_down_charge = -50
+    adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, -40, 100, 0)
+    assert (
+        adjusted_discharge == 100
+    )  # ramp_up_discharge is undefined, so we can ramp up discharge to 100
 
 
 def test_execute_dispatch(storage_unit):
@@ -268,6 +455,7 @@ def test_execute_dispatch(storage_unit):
     storage_unit.outputs["soc"][start] = 0.5
 
     # dispatch full discharge
+    # Discharging 100 MW for one hour removes 100/0.95 MWh from the storage.
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy[0] == 100
     assert math.isclose(
@@ -276,6 +464,7 @@ def test_execute_dispatch(storage_unit):
     )
 
     # dispatch full charging
+    # Charging 100 MW for one hour adds 100*0.9 MWh.
     storage_unit.outputs["energy"][start] = -100
     storage_unit.outputs["soc"][start] = 0.5
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
@@ -303,6 +492,7 @@ def test_execute_dispatch(storage_unit):
     )
 
     # step into the next hour
+    # SoC is 1, charging is not possible.
     start = start + storage_unit.index.freq
     end = end + storage_unit.index.freq
     storage_unit.outputs["energy"][start] = -100
@@ -325,6 +515,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     storage_unit.outputs["energy"][start] = 100
     storage_unit.outputs["soc"][start] = 0.5
 
+    # Verify that a full existing discharge leaves no additional bid capacity.
     bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
     assert len(bids) == 0
 
@@ -382,8 +573,72 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     end = end + storage_unit.index.freq
     product_tuples = [(start, end, None)]
 
+    # the SoC is 1, charging is not possible
+    # but the previous hour charging is -55.5, while the ramp_down_charge is only -50
+    # this is a special case, where one of both constraints must be violated
+    # as the SoC constraint is enforced after the ramping in the Storage class,
+    # this will result in a bid volume of 0 (soc limit, ramping limit violated).
+    # The empty bid is then removed by self.remove_empty_bids().
+    bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
+    assert len(bids) == 0
+
+    # step into the next hour. The power of the previous hour was 0, bidding is possible again.
+    start = start + storage_unit.index.freq
+    end = end + storage_unit.index.freq
+    product_tuples = [(start, end, None)]
+
     bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
     assert len(bids) == 1
+
+
+def test_ramping_limits_on_sequential_markets(storage_unit):
+    """
+    EOM1 closing 2 hours before delivery and an EOM2 closing 1 hour before delivery are considered.
+    """
+
+    # previously charging, bought -20 on first market, now request_discharge of 100
+    # ramp_down_charge = -50 and ramp_up_discharge=60, to switch sign from previous power we use net ramping which is 55.
+    # We can ramp up to 35 and since we can technically offset the current power (-60), we can place a bid of up to 95, knowingly that we will only run 35.
+    # This bid would sell on market2 10 of the 20 MWh we have bought on market1.
+    assert storage_unit.calculate_ramp_discharge(0.5, -20, 100, -60) == 95
+
+    # ramp_down_charge = -50, so -10 is the best we can do. So we should be able to place a discharge bid between 0 and 10 MWh.
+    # This bid would sell on market2 10 of the 20 MWh we have bought on market1. So that the actual dispatch will discharge at 10 MWh.
+    assert storage_unit.calculate_ramp_discharge(0.5, -60, 100, -20) == 10
+
+    # if we request to discharge 5, this should be allowed and not clipped
+    assert storage_unit.calculate_ramp_discharge(0.5, -60, 5, -20) == 5
+
+    # previously discharging, sold 60 on first market, now request -100 MWh.
+    # the request requires switching sign, so we use net ramping. The net ramp is 55, so we can ramp down to -35
+    # and since we can technically offset the current power (60), we can place a bid of up to -95, knowingly that we will only run -35.
+    assert storage_unit.calculate_ramp_charge(0.5, 20, -100, 60) == -95
+
+    # previously discharging, sold 100 on first market, now request -100 MWh.
+    # ramp_down_discharge = 50, so 60-50=10 is the best we can do. So we should be able to place a charge bid between -90 and 0 MWh.
+    # This bid would buy on market2 90 of the 100 MWh we have sold on market1.
+    assert storage_unit.calculate_ramp_charge(0.5, 60, -100, 100) == -90
+
+
+def test_feasible_bid_can_exceed_the_nominal_power_limit(storage_unit):
+    """
+    A feasible bid for one market is checked against max_power_discharge/max_power_charge
+    net of current_power (already committed on another market), so it can be numerically
+    larger in magnitude than the unit's own max_power_discharge/max_power_charge.
+    """
+
+    # previously charging -20, now market1 already charges -90 for this hour.
+    # Net ramping from -20 allows ramping up to 35 (net_ramp=55, utilized=20).
+    # Offsetting the current power (-90) on top of that gives a feasible bid of 125,
+    # 25 MW above max_power_discharge=100 - but combined with the -90 already on
+    # market1, the real total of 35 stays well within the physical limit.
+    assert storage_unit.calculate_ramp_discharge(0.5, -20, 992, -90) == 125
+
+    # mirrored on the charging side: previously discharging 20, market1 already
+    # sold 90 for this hour. Net ramping from 20 allows ramping down to -35
+    # (net_ramp=55, utilized=20). Offsetting the current power (90) gives a
+    # feasible bid of -125, 25 MW beyond max_power_charge=-100 in magnitude.
+    assert storage_unit.calculate_ramp_charge(0.5, 20, -992, 90) == -125
 
 
 def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
@@ -423,9 +678,7 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
     for i in range(1, 3):
         s = datetime(2022, 1, 1, i)
         s_next = datetime(2022, 1, 1, i + 1)
-        delta_soc_set_dispatch = (
-            storage_unit.outputs["soc"][s] - storage_unit.outputs["soc"][s_next]
-        )
+        delta_soc_set_dispatch = storage_unit.get_soc(s) - storage_unit.get_soc(s_next)
 
         if delta_soc_set_dispatch <= 0:
             delta_set_dispatch = (
@@ -572,6 +825,222 @@ def test_initialising_invalid_storages():
         d = param_dict.copy()
         d["downtime_warm_start"] = -10
         Storage(**d)
+
+
+class BalancingCapacityMarketConfig:
+    """A balancing capacity market - it awards capacity, not energy."""
+
+    market_id = "CRM_pos"
+    maximum_bid_price = 3000.0
+    minimum_bid_price = -500.0
+    product_type = "capacity_pos"
+    additional_fields = []
+
+
+def _order(start, end, volume, price=45):
+    return {
+        "start_time": start,
+        "end_time": end,
+        "only_hours": None,
+        "accepted_volume": volume,
+        "accepted_price": price,
+    }
+
+
+def _charged_soc(unit, power):
+    """The SoC after charging ``power`` MW for one hour from the initial SoC."""
+    return unit.initial_soc + power * unit.efficiency_charge / unit.capacity
+
+
+def test_soc_is_propagated_over_idle_time_steps(mock_market_config, storage_unit):
+    """
+    Time steps without orders - e.g. after ``remove_empty_bids`` - carry the
+    SoC forward instead of keeping the initial SoC (#562, #884).
+    """
+    t0, t1, t2, t3 = storage_unit.index[:4]
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t0, t1, -100)])
+    storage_unit.set_dispatch_plan(mock_market_config, [])
+
+    charged = _charged_soc(storage_unit, 100)
+    assert storage_unit.get_soc(t1) == pytest.approx(charged)
+    assert storage_unit.get_soc(t2) == pytest.approx(charged)
+    assert storage_unit.get_soc(t3) == pytest.approx(charged)
+
+
+def test_soc_is_invalidated_by_a_later_commitment(mock_market_config, storage_unit):
+    """A commitment within the already propagated range updates the SoC after it."""
+    t0, t1, t3 = storage_unit.index[0], storage_unit.index[1], storage_unit.index[3]
+    assert storage_unit.get_soc(t3) == storage_unit.initial_soc
+
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t0, t1, -100)])
+
+    assert storage_unit.get_soc(t3) == pytest.approx(_charged_soc(storage_unit, 100))
+
+
+def test_balancing_capacity_products_do_not_move_the_soc(storage_unit):
+    """Only energy products move the SoC, capacity products do not."""
+    t0, t1, t3 = storage_unit.index[0], storage_unit.index[1], storage_unit.index[3]
+    storage_unit.set_dispatch_plan(
+        BalancingCapacityMarketConfig(), [_order(t0, t1, 100, price=20)]
+    )
+
+    assert storage_unit.outputs["capacity_pos"].at[t0] == 100
+    assert storage_unit.outputs["energy"].at[t0] == 0
+    assert storage_unit.get_soc(t3) == storage_unit.initial_soc
+
+
+def test_projected_soc_matches_executed_soc(mock_market_config, storage_unit):
+    """
+    The SoC read before delivery equals the SoC after it, also if more is
+    committed than the SoC backs: 20 MWh deliver 19 MW instead of 100 MW.
+    """
+    t0, t1, t2 = storage_unit.index[:3]
+    storage_unit.set_soc(t0, 0.02)
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t0, t1, 100)])
+    projected_soc = storage_unit.get_soc(t1)
+
+    storage_unit.execute_current_dispatch(t0, t2)
+
+    assert projected_soc == pytest.approx(storage_unit.min_soc)
+    assert storage_unit.get_soc(t1) == pytest.approx(projected_soc)
+    assert storage_unit.outputs["energy"].at[t0] == pytest.approx(19)
+
+
+def test_soc_follows_the_power_limits(mock_market_config, storage_unit):
+    """
+    Two markets commit 120 MW on a 100 MW unit. The SoC moves by the 100 MW
+    the unit can run at, the 120 MW stay the plan until delivery.
+    """
+    t0, t1 = storage_unit.index[:2]
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t0, t1, 60)])
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t0, t1, 60)])
+
+    assert storage_unit.get_soc(t1) == pytest.approx(
+        storage_unit.initial_soc
+        - 100 / storage_unit.efficiency_discharge / storage_unit.capacity
+    )
+    assert storage_unit.outputs["energy"].at[t0] == 120
+    assert storage_unit.execute_current_dispatch(t0, t0)[0] == 100
+
+
+@pytest.mark.parametrize("read_soc_in_between", [False, True])
+def test_dispatch_does_not_depend_on_when_the_soc_is_read(
+    mock_market_config, storage_unit, read_soc_in_between
+):
+    """
+    Reading the SoC between two clearings leaves the committed plan as it is:
+    -100 MW and +60 MW add up to -40 MW, also on a nearly full storage.
+    """
+    t0, t1, t2 = storage_unit.index[:3]
+    storage_unit.set_soc(t0, 0.98)
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t0, t1, -100)])
+    if read_soc_in_between:
+        storage_unit.get_soc(t2)
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t0, t1, 60)])
+
+    assert storage_unit.outputs["energy"].at[t0] == -40
+
+
+def test_planning_builds_on_the_committed_plan(mock_market_config, storage_unit):
+    """
+    100 MW are sold, but 50 MWh only deliver 47.5 MW. Further bids build on the
+    100 MW sold: nothing is left to sell, and all of it can be bought back.
+    The SoC builds on the 47.5 MW delivered, so the storage ends empty.
+    """
+    t0, t1 = storage_unit.index[:2]
+    storage_unit.set_soc(t0, 0.05)
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t0, t1, 100)])
+
+    assert storage_unit.get_soc(t1) == pytest.approx(storage_unit.min_soc)
+    assert storage_unit.get_output_before(t1) == 100
+    _, max_power_discharge = storage_unit.calculate_min_max_discharge(t0, t1)
+    _, max_power_charge = storage_unit.calculate_min_max_charge(t0, t1)
+    assert max_power_discharge[0] == 0
+    assert max_power_charge[0] == storage_unit.max_power_charge - 100
+    # without a further market, only 47.5 MW are delivered
+    assert storage_unit.execute_current_dispatch(t0, t0)[0] == pytest.approx(47.5)
+
+
+def test_set_soc_invalidates_everything_after_it(mock_market_config, storage_unit):
+    """The SoC after a set SoC is propagated from it again."""
+    t1, t2, t3 = storage_unit.index[1], storage_unit.index[2], storage_unit.index[3]
+    storage_unit.set_dispatch_plan(mock_market_config, [_order(t1, t2, -100)])
+    assert storage_unit.get_soc(t3) != storage_unit.initial_soc
+
+    storage_unit.set_soc(t1, 0.3)
+
+    expected = 0.3 + 100 * storage_unit.efficiency_charge / storage_unit.capacity
+    assert storage_unit.get_soc(t2) == pytest.approx(expected)
+    assert storage_unit.get_soc(t3) == pytest.approx(expected)
+
+
+def test_soc_frontier_stays_on_the_index_grid(storage_unit):
+    """
+    Times between two index steps - the units operator executes from one
+    second past the last executed step - are rounded up to the next step.
+    """
+    t1, t2, t3 = storage_unit.index[1], storage_unit.index[2], storage_unit.index[3]
+    storage_unit.outputs["energy"].at[t1] = -100
+
+    storage_unit.execute_current_dispatch(t1 + timedelta(seconds=1), t2)
+    assert storage_unit._soc_valid_until in storage_unit.index
+
+    storage_unit.ensure_soc(t3 - timedelta(minutes=30))
+    assert storage_unit._soc_valid_until in storage_unit.index
+    assert storage_unit.get_soc(t2) == pytest.approx(_charged_soc(storage_unit, 100))
+
+
+def test_execute_current_dispatch_unaligned_end_does_not_advance_past_executed(
+    storage_unit,
+):
+    """An end between two steps marks the SoC valid only up to the executed steps."""
+    t0, t1 = storage_unit.index[:2]
+    storage_unit.outputs["energy"].at[t0] = -100
+    storage_unit.outputs["energy"].at[t1] = -100
+
+    storage_unit.execute_current_dispatch(t0, t0 + timedelta(minutes=15))
+
+    assert storage_unit._soc_valid_until == t1
+
+
+def test_execute_current_dispatch_after_the_horizon(mock_market_config, storage_unit):
+    """A window after the last time step executes nothing and keeps the plan."""
+    t0, t1 = storage_unit.index[:2]
+    last, freq = storage_unit.index[-1], storage_unit.index.freq
+    storage_unit.set_dispatch_plan(
+        mock_market_config,
+        [_order(t0, t1, -100), _order(last, last + freq, 250)],
+    )
+
+    dispatch = storage_unit.execute_current_dispatch(last + freq, last + 2 * freq)
+
+    assert len(dispatch) == 0
+    assert storage_unit.outputs["energy"].at[last] == 250
+    assert storage_unit._soc_valid_until in storage_unit.index
+    assert storage_unit.get_soc(t1) == pytest.approx(_charged_soc(storage_unit, 100))
+
+
+def test_ensure_soc_stops_at_the_end_of_the_horizon(storage_unit):
+    """Propagating past the last time step stops at the last time step."""
+    t3 = storage_unit.index[-1]
+
+    storage_unit.ensure_soc(t3 + 10 * storage_unit.index.freq)
+
+    assert storage_unit._soc_valid_until == t3
+    assert storage_unit.get_soc(t3) == storage_unit.initial_soc
+
+
+def test_ensure_soc_clips_the_last_time_step(mock_market_config, storage_unit):
+    """The last time step moves no later SoC, but its dispatch is still clipped."""
+    t2, t3 = storage_unit.index[2], storage_unit.index[-1]
+    storage_unit.set_dispatch_plan(
+        mock_market_config, [_order(t3, t3 + storage_unit.index.freq, 250)]
+    )
+    storage_unit.execute_current_dispatch(t2, t2)
+
+    assert storage_unit.execute_current_dispatch(t3, t3)[0] == (
+        storage_unit.max_power_discharge
+    )
 
 
 if __name__ == "__main__":

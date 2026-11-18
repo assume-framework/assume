@@ -313,5 +313,27 @@ def test_demand_energy_heuristic_elastic_config_and_errors():
         )
 
 
+def test_demand_has_no_costs():
+    index = pd.date_range(start=datetime(2023, 7, 1), periods=3, freq="1h")
+    dem = Demand(
+        id="demand",
+        unit_operator="UO1",
+        technology="energy",
+        bidding_strategies={"EOM": EnergyNaiveStrategy()},
+        max_power=-150,
+        min_power=0,
+        forecaster=DemandForecaster(index, demand=-150),
+        price=2000,
+    )
+    dem.outputs["energy"].loc[index[1] : index[2]] = -150
+
+    dem.calculate_costs(index[0], index[2])
+
+    # written as 0, as the dashboards calculate with this column
+    assert "energy_generation_costs" in dem.outputs
+    assert dem.outputs["energy_generation_costs"].at[index[1]] == 0
+    assert dem.outputs["total_costs"].at[index[1]] == 0
+
+
 if __name__ == "__main__":
     test_demand()

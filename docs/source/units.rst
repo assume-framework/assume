@@ -19,4 +19,15 @@ The primary unit types in this context include:
 Each unit type has specific characteristics that affect how the power system operates, and understanding these is key to modeling and optimizing grid performance.
 
 
+Impact of Initial Conditions
+============================
+
+No dispatch history exists before the simulation's first time step, so each unit type needs an assumption for its initial condition. Power plants start as if they had been switched off long before (see :ref:`powerplant-initial-state`), storage units start at their ``initial_soc`` (see :ref:`storage-initial-state`).
+
+The initial conditions of units can significantly influence the simulation results, especially in the early stages. For power plants, starting from a cold state may lead to higher initial costs and slower response times as they need to ramp up. For storage units, the initial state of charge can affect their ability to provide energy during peak demand periods. This might lead to high prices in early hours. We therefore advise to start your simulation a couple of days before the time frame of interest, to allow the units to even out before the results are evaluated.
+
+.. include:: powerplants.rst
+
+.. include:: storages.rst
+
 .. include:: demand_side_agent.rst

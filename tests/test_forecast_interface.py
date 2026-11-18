@@ -22,12 +22,18 @@ from assume.common.forecast_algorithms import (
 from assume.common.forecaster import (
     DemandForecaster,
     DsmUnitForecaster,
+    ExchangeForecaster,
     PowerplantForecaster,
     UnitsOperatorForecaster,
 )
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.strategies import EnergyHeuristicElasticStrategy, EnergyNaiveStrategy
+from assume.strategies import (
+    EnergyHeuristicElasticStrategy,
+    EnergyNaiveStrategy,
+    ExchangeEnergyNaiveStrategy,
+)
 from assume.units import Demand, PowerPlant
+from assume.units.exchange import Exchange
 
 path = Path("./tests/fixtures/forecast_init")
 
@@ -349,7 +355,12 @@ def test_forecast_interface__empty_grid(market_setup, forecast_setup):
 
 def test_forecast_interface__elastic_demand(index, market_setup, forecast_setup):
     """
-    TODO: make better test scenario for elastic demand
+    Elastic demand bids are setting the price for all timesteps in the underlying SimpleClearing, because we have supply scarcity in all timesteps.
+    300 demand bids for each hour, with max_price=300 and max_volume=-3000 MW, and elasticity_model=linear.
+    The corresponding bids are each 10 MW, with prices from 300 to 1 €/MWh.
+    08:00 - 10:00: nuclear + wind = 2500 MW -> 2500 MW demand accepted, last accepted demand bid sets price to 51 €/MWh
+    11:00 - 13:00: nuclear + wind + solar = 2800 MW -> 2800 MW demand accepted, last accepted demand bid sets price to 21 €/MWh
+    14:00 - 15:00: nuclear + wind = 2750 MW -> 2750 MW demand accepted, last accepted demand bid sets price to 26 €/MWh
     """
     mock_dsm_forecaster = forecast_setup["mock_dsm_forecaster"]
 
@@ -363,7 +374,7 @@ def test_forecast_interface__elastic_demand(index, market_setup, forecast_setup)
     # 2. Assert that results are generated like expected
     market_forecast = mock_dsm_forecaster.price
 
-    assert np.isclose(list(market_forecast["EOM"]), [8.0] * 7).all()
+    assert np.isclose(list(market_forecast["EOM"]), [51, 51, 51, 21, 21, 21, 26]).all()
 
 
 def test_forecast_interface__elastic_demand_complex_clearing(
@@ -398,6 +409,55 @@ def test_forecast_interface__elastic_demand_complex_clearing(
     assert np.isfinite(price_forecast).all()
     assert (price_forecast >= 8.0).all()
     assert (price_forecast <= market_config.maximum_bid_price).all()
+
+    # check that forecast bids align with products when first delivery is 24 hours
+    index_24h = pd.date_range("2019-01-01 08:00", periods=24, freq="h")
+    fast_index_24h = FastIndex(
+        start=index_24h[0], end=index_24h[-1], freq=pd.infer_freq(index_24h)
+    )
+    market_config.market_products = [
+        MarketProduct(pd.Timedelta(hours=1), 24, pd.Timedelta(hours=24))
+    ]
+    units_24h = tuple(forecast_setup["units_elastic_case"])
+
+    def extend_series(series):
+        return FastSeries(
+            index=fast_index_24h,
+            value=np.resize(series.data, len(index_24h)),
+        )
+
+    for unit in units_24h:
+        forecaster = unit.forecaster
+        forecaster.index = fast_index_24h
+        forecaster.availability = extend_series(forecaster.availability)
+        if hasattr(forecaster, "demand"):
+            forecaster.demand = extend_series(forecaster.demand)
+        if hasattr(forecaster, "fuel_prices"):
+            forecaster.fuel_prices = {
+                fuel: extend_series(price)
+                for fuel, price in forecaster.fuel_prices.items()
+            }
+        if hasattr(unit, "marginal_cost"):
+            unit.marginal_cost = extend_series(unit.marginal_cost)
+        if isinstance(getattr(unit, "price", None), FastSeries):
+            unit.price = extend_series(unit.price)
+
+    dsm_forecaster_24h = DsmUnitForecaster(
+        index=fast_index_24h,
+        forecast_registries=get_forecast_registries(),
+    )
+    dsm_forecaster_24h.initialize(
+        units_24h,
+        {"EOM": market_config}.values(),
+        None,
+        None,
+    )
+
+    price_forecast_24h = np.array(list(dsm_forecaster_24h.price["EOM"]))
+    assert len(price_forecast_24h) == 24
+    assert np.isfinite(price_forecast_24h).all()
+    assert (price_forecast_24h >= 8.0).all()
+    assert (price_forecast_24h <= market_config.maximum_bid_price).all()
 
 
 def test_forecast_interface__cache(market_setup, forecast_setup, shared_FastIndex):
@@ -505,3 +565,62 @@ def test_units_operator_forecaster__extra_kwargs(index, shared_FastIndex):
 
     assert isinstance(operator_forecaster.custom_forecast, FastSeries)
     assert list(operator_forecaster.custom_forecast) == [2.0] * len(index)
+
+
+def test_naive_forecast__exchange_imports_are_supply(index, shared_FastIndex):
+    """Imports reduce and exports increase the demand of the naive forecasts."""
+    market_config = MarketConfig(market_id="EOM")
+    registries = get_forecast_registries()
+    plants = tuple(
+        PowerPlant(
+            id=f"plant_{cost}",
+            unit_operator="op",
+            technology="gas",
+            bidding_strategies={"EOM": EnergyNaiveStrategy()},
+            max_power=100,
+            min_power=0,
+            efficiency=1,
+            additional_cost=cost,
+            fuel_type="renewable",
+            forecaster=PowerplantForecaster(
+                index=shared_FastIndex, forecast_registries=registries
+            ),
+        )
+        for cost in (10, 50)
+    )
+    demand = Demand(
+        id="demand",
+        unit_operator="op",
+        technology="inflex_demand",
+        bidding_strategies={"EOM": EnergyNaiveStrategy()},
+        max_power=-1000,
+        min_power=0,
+        price=300,
+        forecaster=DemandForecaster(
+            index=shared_FastIndex,
+            demand=pd.Series(-120.0, index=index),
+            forecast_registries=registries,
+        ),
+    )
+    exchange = Exchange(
+        id="exchange",
+        unit_operator="op",
+        bidding_strategies={"EOM": ExchangeEnergyNaiveStrategy()},
+        forecaster=ExchangeForecaster(
+            index=shared_FastIndex,
+            volume_import=pd.Series([50.0] * 3 + [0.0] * 4, index=index),
+            volume_export=pd.Series([0.0] * 3 + [40.0] * 4, index=index),
+            forecast_registries=registries,
+        ),
+    )
+    units = (*plants, demand, exchange)
+
+    price = calculate_naive_price_inelastic(shared_FastIndex, units, market_config)
+    residual_load = calculate_naive_residual_load(
+        shared_FastIndex, units, market_config
+    )
+
+    # import of 50 MW: residual demand of 70 MW is covered by the cheap plant
+    # export of 40 MW: residual demand of 160 MW needs the expensive plant
+    assert list(price) == [10] * 3 + [50] * 4
+    assert list(residual_load) == [70] * 3 + [160] * 4

@@ -24,12 +24,14 @@ Switching the clock is done by adding the `real_time=True` parameter during the 
     )
 
 The start of the simulation should be configured to be the next full minute.
-Note that the time must be provided in UTC as every timestamp in mango is interpreted as UTC/zulu time to be timezone agnostic.
+Note that the time must be provided in UTC, as ASSUME treats all naive datetimes (without ``tzinfo``) as UTC, independent of the timezone of the machine.
+The mango clock itself counts seconds since 1970-01-01 00:00 UTC, but Python's ``datetime.timestamp()`` and ``datetime.fromtimestamp()`` as well as mango's recurrence rules interpret naive datetimes in the local time of the machine.
+Convert between datetimes and clock timestamps with :func:`assume.common.utils.datetime2timestamp` and :func:`assume.common.utils.timestamp2datetime` instead.
 
 This simulation starts directly and ends after one hour.
 
-Take a look at the `realtime/world_rt.py` example for a full working real time simulation which can be run using
+Take a look at the `real_time/world_rt.py` example for a full working real time simulation which can be run using
 
-    python examples/realtime/world_rt.py
+    python examples/real_time/world_rt.py
 
 Here, we have a simple market which is scheduled every single minute and creates similar market results.

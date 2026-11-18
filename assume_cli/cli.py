@@ -173,6 +173,106 @@ def cli(args=None):
         sys.exit(1)
 
 
+def market_config_case_completer(prefix, parsed_args, **kwargs):
+    config_file = Path(parsed_args.config)
+    if config_file.is_dir():
+        config_file = config_file / "config.yaml"
+    if config_file.is_file():
+        with open(str(config_file)) as f:
+            config = yaml.safe_load(f)
+        return list(config.keys())
+    return [""]
+
+
+def create_market_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Show and check the timing of the markets of an ASSUME config before running a simulation",
+    )
+    parser.add_argument(
+        "config",
+        help="path to the config.yaml or to the scenario folder containing it",
+        type=str,
+    ).completer = argcomplete.FilesCompleter()
+    parser.add_argument(
+        "-c",
+        "--case-study",
+        help="name of the case in the config which should be shown, defaults to the first one",
+        default="",
+        type=str,
+    ).completer = market_config_case_completer
+    parser.add_argument(
+        "--start",
+        help="start of the shown interval, defaults to the first market opening",
+        default=None,
+        type=str,
+    )
+    parser.add_argument(
+        "--end",
+        help="end of the shown interval, defaults to one full cycle of all markets",
+        default=None,
+        type=str,
+    )
+    parser.add_argument(
+        "--ascii",
+        help="use ASCII instead of unicode box drawing characters",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--mermaid",
+        help="print the mermaid gantt diagram instead of rendering it in the terminal",
+        action="store_true",
+    )
+    return parser
+
+
+def market_cli(args=None):
+    """
+    Render the market timing of a config and print the timing issues.
+    Exits with code 1 if the timing contains errors.
+    """
+    if not args:
+        args = sys.argv[1:]
+    parser = create_market_parser()
+
+    argcomplete.autocomplete(parser)
+    args = parser.parse_args(args)
+
+    import pandas as pd
+
+    from assume.common.market_timing import (
+        check_market_timing,
+        market_timing_to_mermaid,
+        render_market_timing,
+    )
+    from assume.scenario.loader_csv import load_market_configs
+
+    try:
+        market_configs = load_market_configs(args.config, args.case_study)
+    except (OSError, ValueError) as e:
+        parser.error(str(e))
+
+    start = pd.Timestamp(args.start).to_pydatetime() if args.start else None
+    end = pd.Timestamp(args.end).to_pydatetime() if args.end else None
+    title = args.case_study or "Market timing"
+    try:
+        "█▓◆┊".encode(sys.stdout.encoding or "ascii")
+        use_ascii = args.ascii
+    except UnicodeEncodeError:
+        # e.g. piped output on windows can not show box drawing characters
+        use_ascii = True
+
+    if args.mermaid:
+        print(market_timing_to_mermaid(market_configs, start, end, title))
+    else:
+        print(
+            render_market_timing(market_configs, start, end, title, use_ascii=use_ascii)
+        )
+
+    issues = check_market_timing(market_configs, start, end)
+    if any(issue.level == "error" for issue in issues):
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     cli()
 

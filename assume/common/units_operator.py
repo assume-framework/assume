@@ -367,26 +367,30 @@ class UnitsOperator(Role):
             tuple[list[tuple[datetime, float, str, str]], list[dict]]: market_dispatch and unit_dispatch dataframes
         """
         now = timestamp2datetime(self.context.current_timestamp)
-        # add one second to exclude the first time stamp, because it is already executed in the last step
-        start = timestamp2datetime(last + 1)
+        last = timestamp2datetime(last)
 
         market_dispatch = aggregate_step_amount(
             orderbook=self.valid_orders[product_type],
-            begin=timestamp2datetime(last),
+            begin=last,
             end=now,
             groupby=["market_id", "unit_id"],
         )
 
         unit_dispatch = []
         for unit_id, unit in self.units.items():
+            # the step at last was already executed in the previous call
+            start = unit.index.align_up(last)
+            if start == last:
+                start += unit.index.freq
             current_dispatch = unit.execute_current_dispatch(start, now)
             end = now
             dispatch = {"power": current_dispatch}
-            unit.calculate_generation_cost(start, now, "energy")
+            unit.calculate_costs(start, now)
             valid_outputs = [
                 "soc",
                 "cashflow",
                 "generation_costs",
+                "starting_costs",
                 "total_costs",
                 "heat",
             ]

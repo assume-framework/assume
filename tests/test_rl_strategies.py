@@ -151,9 +151,7 @@ def test_learning_strategies_parametrized(
     reward = reward_cache[last_ts][unit_id][0]
     profit = profit_cache[last_ts][unit_id][0]
     regret = regret_cache[last_ts][unit_id][0]
-    costs = power_plant.outputs["total_costs"].loc[product_index]
 
     assert reward == 0.1
     assert profit == 10000.0
     assert regret == 0.0
-    assert costs[0] == 40000.0  # Assumes hot_start_cost = 20000 by default

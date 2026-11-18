@@ -6,11 +6,15 @@ import math
 from datetime import datetime, timedelta
 
 import pandas as pd
+import pyomo.environ as pyo
 from dateutil import rrule as rr
 
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
-from assume.markets.clearing_algorithms import ComplexClearingRole
+from assume.markets.clearing_algorithms import (
+    ComplexClearingRole,
+    complex_clearing,
+)
 
 from .utils import extend_orderbook
 
@@ -32,6 +36,23 @@ simple_dayahead_auction_config = MarketConfig(
     market_mechanism="complex_clearing",
 )
 eps = 1e-4
+
+
+def test_empty_energy_balance_is_feasible():
+    timestamp = datetime(2019, 1, 1, 23)
+    model = pyo.ConcreteModel()
+
+    complex_clearing.market_clearing_opt_constraints(
+        model=model,
+        orders=[],
+        market_products=[(timestamp, timestamp + timedelta(hours=1), [])],
+        mode="default",
+        with_linked_bids=False,
+        incidence_matrix=None,
+        lines=None,
+    )
+
+    assert model.energy_balance["node0", timestamp].expr is pyo.Constraint.Feasible
 
 
 def test_complex_clearing():

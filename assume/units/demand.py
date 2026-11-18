@@ -83,7 +83,7 @@ class Demand(SupportsMinMax):
         self.price = FastSeries(index=self.index, value=price)
 
         # Elastic demand parameters
-        self.max_price = price
+        self.max_price = kwargs.get("max_price", price)
         self.elasticity = kwargs.get("elasticity", 0)
         self.elasticity_model = kwargs.get("elasticity_model", 0)
         self.num_bids = int(kwargs.get("num_bids", 0))
@@ -167,6 +167,19 @@ class Demand(SupportsMinMax):
             float: the marginal cost of the unit for the given power.
         """
         return self.price.at[start]
+
+    def calculate_generation_cost(
+        self, start: datetime, end: datetime, product_type: str
+    ) -> None:
+        """
+        Demand has no generation costs, the procurement is part of the cashflow.
+
+        Args:
+            start (datetime.datetime): The start time for the calculation.
+            end (datetime.datetime): The end time for the calculation.
+            product_type (str): The type of product.
+        """
+        self.outputs[f"{product_type}_generation_costs"].loc[start:end] = 0
 
     def as_dict(self) -> dict:
         """

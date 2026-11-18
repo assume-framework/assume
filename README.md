@@ -205,7 +205,7 @@ For additional CLI options, run `assume -h`.
 
 ## Contributors and Funding
 
-The project is developed by a collaborative team of researchers from INATECH at the University of Freiburg, IISM at Karlsruhe Institute of Technology, Fraunhofer Institute for Systems and Innovation Research, Fraunhofer Institution for Energy Infrastructures and Geothermal Energy, and FH Aachen - University of Applied Sciences. Each contributor brings valuable expertise in electricity market modeling, deep reinforcement learning, demand side flexibility, and infrastructure modeling.
+The project is developed by a collaborative team of researchers from INATECH at the University of Freiburg, WIN at Karlsruhe Institute of Technology, Fraunhofer Institute for Systems and Innovation Research (ISI), Fraunhofer Institution for Energy Infrastructures and Geothermal Energy, and FH Aachen - University of Applied Sciences. Each contributor brings valuable expertise in electricity market modeling, deep reinforcement learning, demand side flexibility, and infrastructure modeling.
 
 ASSUME is funded by the Federal Ministry for Economic Affairs and Climate Action (BMWK).
 We are grateful for their support in making this project possible.

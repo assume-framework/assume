@@ -398,3 +398,43 @@ def test_compare_and_save_policies_early_stopping_still_records_other_metrics():
         c.kwargs["directory"] for c in learn.rl_algorithm.save_params.call_args_list
     ]
     assert saved_dirs[-1] == "saved/last_policies"
+
+
+@pytest.mark.require_learning
+def test_load_inter_episodic_data_applies_noise_decay():
+    from assume.reinforcement_learning.learning_utils import NormalActionNoise
+
+    learn = Learning(
+        LearningConfig(
+            train_freq="1h",
+            algorithm="matd3",
+            actor_architecture="mlp",
+            learning_mode=True,
+            training_episodes=5,
+            episodes_collecting_initial_experience=1,
+            action_noise_schedule="linear",
+            noise_dt=1,
+        ),
+        start=start,
+        end=end,
+    )
+    learn.rl_algorithm = MagicMock()
+    # strategies of a new episode start with the initial noise_dt
+    strategy = MagicMock()
+    strategy.action_noise = NormalActionNoise(action_dimension=2, dt=1)
+    learn.rl_strats["test_id"] = strategy
+
+    learn.load_inter_episodic_data(
+        {
+            "episodes_done": 3,
+            "eval_episodes_done": 0,
+            "max_eval": {},
+            "all_eval": {},
+            "avg_all_eval": [],
+            "buffer": None,
+            "actors_and_critics": None,
+        }
+    )
+
+    # 2 of 4 learning episodes done -> half of the noise_dt is left
+    assert strategy.action_noise.dt == pytest.approx(0.5)
