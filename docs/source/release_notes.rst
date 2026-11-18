@@ -12,6 +12,9 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**New Features:**
+  - **CHP and Fuel Cell DSM unit**: Added a ``CHP`` and ``FuelCell`` unit modelling a fuel-switchable(Natural gas and H2) combined heat and power plant.
+
 0.7.0 - (11th November 2026)
 =========================
 
