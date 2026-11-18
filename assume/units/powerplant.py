@@ -205,7 +205,7 @@ class PowerPlant(SupportsMinMax):
         Returns:
             np.ndarray: The volume of the unit within the given time range.
         """
-        start = max(start, self.index[0])
+        start = max(start, self.index.start)
 
         max_power_values = self.forecaster.availability.loc[start:end] * self.max_power
 

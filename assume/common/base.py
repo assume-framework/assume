@@ -195,7 +195,7 @@ class BaseUnit:
             product_type (str): The type of product for which the generation cost is to be calculated.
         """
 
-        start = max(start, self.index[0])
+        start = max(start, self.index.start)
 
         # Adjusted code for accessing product data and mapping over the index
         product_data = self.outputs[product_type].loc[start:end]
@@ -219,14 +219,16 @@ class BaseUnit:
         """
         self.calculate_generation_cost(start, end, "energy")
 
-        start = max(start, self.index[0])
-        for t in self.index[start:end]:
-            starting_cost = 0.0
-            if self.outputs["energy"].at[t] != 0 and self.get_output_before(t) == 0:
+        start = max(start, self.index.start)
+        energy = self.outputs["energy"].loc[start:end]
+        starting_costs = np.zeros(len(energy))
+        for i, t in enumerate(self.index[start:end]):
+            previous = energy[i - 1] if i > 0 else self.get_output_before(t)
+            if energy[i] != 0 and previous == 0:
                 op_time = self.get_operation_time(t)
                 if op_time < 0:
-                    starting_cost = self.get_starting_costs(op_time)
-            self.outputs["starting_costs"].at[t] = starting_cost
+                    starting_costs[i] = self.get_starting_costs(op_time)
+        self.outputs["starting_costs"].loc[start:end] = starting_costs
 
         self.outputs["total_costs"].loc[start:end] = (
             self.outputs["energy_generation_costs"].loc[start:end]
@@ -266,7 +268,7 @@ class BaseUnit:
         Returns:
             The output before the given datetime.
         """
-        if dt - self.index.freq < self.index[0]:
+        if dt - self.index.freq < self.index.start:
             # before start of index: the unit is assumed to be off
             return 0
         else:
@@ -477,11 +479,11 @@ class SupportsMinMax(BaseUnit):
             int: The operation time as a positive integer if operating, or negative if shut down.
         """
         max_time = self.get_max_lookback_op_time()
-        begin = max(start - self.index.freq * max_time, self.index[0])
+        begin = max(start - self.index.freq * max_time, self.index.start)
         end = start - self.index.freq
 
         # add consistent behavior at beginning of simulation
-        if start <= self.index[0]:
+        if start <= self.index.start:
             # the unit is assumed to be off, consistent with get_output_before returning 0 for the same range
             # exceeds min_down_time and every start tier, so a start in the first time step is never blocked and is always booked as a cold start.
             initial_downtime = (
@@ -586,7 +588,7 @@ class SupportsMinMaxCharge(BaseUnit):
                 raise ValueError(f"strategy {strategy} is not a MinMaxChargeStrategy!")
 
         # outputs["soc"] is only valid up to here (inclusive), see ensure_soc
-        self._soc_valid_until = self.index[0]
+        self._soc_valid_until = self.index.start
 
     def calculate_min_max_charge(
         self, start: datetime, end: datetime, soc: float = None
