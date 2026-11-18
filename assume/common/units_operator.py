@@ -143,18 +143,18 @@ class UnitsOperator(Role):
 
             # the component specification of the DSM units is static as well, but
             # it holds one row per component parameter instead of one per unit
-            dsm_specs = [
-                spec
+            dsm_component_meta = [
+                row
                 for unit in self.units.values()
-                if hasattr(unit, "get_component_specs")
-                for spec in unit.get_component_specs()
+                if hasattr(unit, "get_component_meta")
+                for row in unit.get_component_meta()
             ]
-            if dsm_specs:
+            if dsm_component_meta:
                 await self.context.send_message(
                     content={
                         "context": "write_results",
-                        "type": "dsm_specs",
-                        "data": dsm_specs,
+                        "type": "dsm_component_meta",
+                        "data": dsm_component_meta,
                     },
                     receiver_addr=db_addr,
                 )

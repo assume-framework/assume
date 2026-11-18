@@ -1810,7 +1810,7 @@ class DSMFlex:
 
         return unit_dict
 
-    # DSM schedule output (``dsm_schedule`` / ``dsm_specs`` tables)
+    # DSM schedule output (``dsm_schedule`` / ``dsm_component_meta`` tables)
     @staticmethod
     def _component_schedule_values(instance, n_steps: int) -> dict[tuple, list]:
         """Read the first *n_steps* values of every schedule variable of *instance*.
@@ -1879,7 +1879,7 @@ class DSMFlex:
             )
 
         if mode == "baseline":
-            self._capture_component_specs(instance)
+            self._capture_component_meta(instance)
 
     def _schedule_variable_meta(self, technology: str, variable: str) -> tuple:
         """Metadata ``(carrier, direction, unit of measure)`` of a schedule variable.
@@ -1895,16 +1895,16 @@ class DSMFlex:
                 return class_meta[variable]
         return SCHEDULE_VARIABLE_META.get(variable, ("", "", ""))
 
-    def _capture_component_specs(self, instance) -> None:
+    def _capture_component_meta(self, instance) -> None:
         """Store the technical specification of every component block of *instance*.
 
         The specification covers all scalar Pyomo parameters of each technology block
         (capacities, efficiencies, power limits, ...) plus the component class name.
         """
-        specs = []
+        meta = []
         for technology, block in instance.dsm_blocks.items():
             component = self.components.get(technology)
-            specs.append(
+            meta.append(
                 {
                     "unit": self.id,
                     "technology": technology,
@@ -1919,7 +1919,7 @@ class DSMFlex:
                     value = pyo.value(param)
                 except (ValueError, TypeError):
                     continue
-                specs.append(
+                meta.append(
                     {
                         "unit": self.id,
                         "technology": technology,
@@ -1927,9 +1927,9 @@ class DSMFlex:
                         "value": value,
                     }
                 )
-        self._component_specs = specs
+        self._component_meta = meta
 
-    def get_component_specs(self) -> list[dict]:
+    def get_component_meta(self) -> list[dict]:
         """Technical specification of the unit's components for the output agent.
 
         Returns:
@@ -1937,7 +1937,7 @@ class DSMFlex:
             ``unit``, ``technology``, ``parameter`` and ``value``. Empty as long as
             no baseline optimisation ran.
         """
-        return getattr(self, "_component_specs", [])
+        return getattr(self, "_component_meta", [])
 
     def _commit_component_schedule(
         self, values: dict[tuple, list], window_start: int

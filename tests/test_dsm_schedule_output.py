@@ -77,11 +77,11 @@ def test_dispatch_carries_variable_metadata(plant):
     assert dispatch[("unit", "electricity_price")]["direction"] == "price"
 
 
-def test_component_specs_are_captured(plant):
-    specs = plant.get_component_specs()
+def test_component_meta_is_captured(plant):
+    meta = plant.get_component_meta()
 
-    assert all(spec["unit"] == plant.id for spec in specs)
-    by_key = {(s["technology"], s["parameter"]): s["value"] for s in specs}
+    assert all(row["unit"] == plant.id for row in meta)
+    by_key = {(s["technology"], s["parameter"]): s["value"] for s in meta}
     assert by_key[("electrolyser", "component_class")] == "Electrolyser"
     assert by_key[("electrolyser", "max_power")] == 100
     assert by_key[("eaf", "component_class")] == "ElectricArcFurnace"
@@ -147,7 +147,7 @@ def test_dsm_schedule_is_written_to_csv(plant, tmp_path):
     assert len(eaf) == len(plant.index)
 
 
-def test_dsm_specs_are_written_to_csv(plant, tmp_path):
+def test_dsm_component_meta_are_written_to_csv(plant, tmp_path):
     output = WriteOutput(
         "test_sim",
         datetime(2023, 1, 1),
@@ -158,14 +158,14 @@ def test_dsm_specs_are_written_to_csv(plant, tmp_path):
     output.handle_output_message(
         {
             "context": "write_results",
-            "type": "dsm_specs",
-            "data": plant.get_component_specs(),
+            "type": "dsm_component_meta",
+            "data": plant.get_component_meta(),
         },
         {"sender_id": None},
     )
     asyncio.run(output.store_dfs())
 
-    df = pd.read_csv(tmp_path / "test_sim" / "dsm_specs.csv", index_col="unit")
+    df = pd.read_csv(tmp_path / "test_sim" / "dsm_component_meta.csv", index_col="unit")
     assert set(df.columns) == {"parameter", "simulation", "technology", "value"}
     assert (df.index == plant.id).all()
     assert {"electrolyser", "dri_plant", "eaf"} <= set(df["technology"])
@@ -187,7 +187,7 @@ class _OutputContextStub:
 
 
 class _PlainUnit:
-    """A unit without component specs, e.g. a demand or power plant."""
+    """A unit without component meta data, e.g. a demand or power plant."""
 
     def as_dict(self) -> dict:
         return {"id": "plain", "unit_type": "demand"}
@@ -205,26 +205,28 @@ def _sent_types(operator):
     return [message["type"] for message in operator.context.sent]
 
 
-def test_dsm_specs_are_sent_with_the_unit_meta_data(plant):
+def test_dsm_component_meta_are_sent_with_the_unit_meta_data(plant):
     operator = _operator_with([plant], now=plant.index[1])
     asyncio.run(operator.store_units())
 
-    assert _sent_types(operator).count("dsm_specs") == 1
-    specs = next(m for m in operator.context.sent if m["type"] == "dsm_specs")
-    assert specs["data"] == plant.get_component_specs()
+    assert _sent_types(operator).count("dsm_component_meta") == 1
+    message = next(
+        m for m in operator.context.sent if m["type"] == "dsm_component_meta"
+    )
+    assert message["data"] == plant.get_component_meta()
 
 
-def test_dsm_specs_are_not_sent_without_dsm_units():
+def test_dsm_component_meta_are_not_sent_without_dsm_units():
     operator = _operator_with([_PlainUnit()], now=datetime(2023, 1, 1))
     asyncio.run(operator.store_units())
 
-    assert "dsm_specs" not in _sent_types(operator)
+    assert "dsm_component_meta" not in _sent_types(operator)
 
 
-def test_dsm_specs_are_not_sent_again_on_every_dispatch(plant):
-    """The specs are static, so they must not be exported with each dispatch."""
+def test_dsm_component_meta_are_not_sent_again_on_every_dispatch(plant):
+    """The component meta data is static, so it must not be exported with each dispatch."""
     operator = _operator_with([plant], now=plant.index[1])
     operator.write_actual_dispatch("energy")
 
-    assert "dsm_specs" not in _sent_types(operator)
+    assert "dsm_component_meta" not in _sent_types(operator)
     assert "dsm_schedule" in _sent_types(operator)

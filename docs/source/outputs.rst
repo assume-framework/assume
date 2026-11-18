@@ -80,7 +80,7 @@ When the outputs are stored in CSV files, the data is organized in a similar str
      - Planned operating schedule per technology of the demand-side units, in long format. See :ref:`dsm-output-tables`.
      - simulation, time, unit, technology, variable, carrier, direction, unit_of_measure, baseline, flex
 
-   * - dsm_specs
+   * - dsm_component_meta
      - Technical specification of the demand-side units per technology. See :ref:`dsm-output-tables`.
      - simulation, unit, technology, parameter, value
 
@@ -112,7 +112,7 @@ When the outputs are stored in CSV files, the data is organized in a similar str
 DSM Output Tables
 =================
 
-The tables ``dsm_schedule`` and ``dsm_specs`` are written whenever demand-side units
+The tables ``dsm_schedule`` and ``dsm_component_meta`` are written whenever demand-side units
 (steel plant, cement plant, hydrogen plant, steam plant, building) are part of the
 simulation.
 
@@ -149,7 +149,7 @@ diagrams.
 Technical specification
 -----------------------
 
-``dsm_specs`` holds one row per unit, technology and scalar parameter of that technology
+``dsm_component_meta`` holds one row per unit, technology and scalar parameter of that technology
 (rated powers, capacities, efficiencies, specific consumptions, ...), plus the name of
 the component class as ``component_class``. It is sent once at the start of the
 simulation, together with the other unit meta data.

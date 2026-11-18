@@ -234,7 +234,7 @@ class WriteOutput(Role):
             "market_dispatch",
             "unit_dispatch",
             "dsm_schedule",
-            "dsm_specs",
+            "dsm_component_meta",
             "rl_params",
             "rl_grad_params",
         ]:
@@ -431,16 +431,16 @@ class WriteOutput(Role):
 
         return data
 
-    def convert_dsm_specs(self, dsm_specs: list[dict]):
+    def convert_dsm_component_meta(self, dsm_component_meta: list[dict]):
         """
         Convert the static component specification of the DSM units to a DataFrame.
 
         Args:
-            dsm_specs (list): One dictionary per unit, technology and scalar
+            dsm_component_meta (list): One dictionary per unit, technology and scalar
                 parameter with the keys ``unit``, ``technology``, ``parameter``
                 and ``value``.
         """
-        data = pd.DataFrame(dsm_specs)
+        data = pd.DataFrame(dsm_component_meta)
         data["simulation"] = self.simulation_id
         data.set_index("unit", inplace=True)
 
@@ -510,8 +510,8 @@ class WriteOutput(Role):
                         df = self.convert_unit_dispatch(data_list)
                     case "dsm_schedule":
                         df = self.convert_dsm_schedule(data_list)
-                    case "dsm_specs":
-                        df = self.convert_dsm_specs(data_list)
+                    case "dsm_component_meta":
+                        df = self.convert_dsm_component_meta(data_list)
                     case "rl_params":
                         df = self.convert_rl_params(data_list)
                     case "rl_grad_params":
