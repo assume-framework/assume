@@ -177,9 +177,10 @@ def test_supply_and_demand_curves_vertical_overlap():
         - gen1: volume = 100, price = 8
         - gen2: volume = 100, price = 12
     Supply and demand curves intersect at volume 100MW from 10€ to 12€.
-    SimpleClearing should clear at 8€ with 100MW (last supply bid sets price).
-    ComplexClearing should clear at 10€ with 100MW.
-    (Any price between 10€ and 12€ is correct in reality. SimpleClearing yields 8€ anyway, as supply is always setting the price, except in scarcity situations.)
+    SimpleClearing should clear at 10€ with 100MW, as dem2 would pay more than gen1,
+    so a price of 8€ would paradoxically reject dem2.
+    ComplexClearing should clear at 10€ with 100MW too.
+    (Any price between 10€ and 12€ is correct in reality.)
     """
     orderbook = extend_orderbook(products, -100, 20)
     orderbook = extend_orderbook(products, -100, 10, orderbook)
@@ -198,7 +199,7 @@ def test_supply_and_demand_curves_vertical_overlap():
     assert len(rejected) == 2
     assert meta[0]["supply_volume"] == 100
     assert meta[0]["demand_volume"] == 100
-    assert meta[0]["price"] == 8  # last accepted supply bid sets price
+    assert meta[0]["price"] == 10  # next demand bid sets price
     assert accepted[0]["volume"] == -100
     assert accepted[0]["accepted_volume"] == -100
 
@@ -212,6 +213,53 @@ def test_supply_and_demand_curves_vertical_overlap():
     assert meta[0]["price"] == 10  # next demand bid sets price
     assert accepted[0]["volume"] == -100
     assert accepted[0]["accepted_volume"] == -100
+
+
+def test_supply_and_demand_curves_partially_accepted_demand_with_supply_left():
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
+    products = get_available_products(
+        simple_dayahead_auction_config.market_products, next_opening
+    )
+    assert len(products) == 1
+
+    """
+    Create Orderbook with constant order volumes and prices:
+        - dem1: volume = -100, price = 50
+        - gen1: volume = 60, price = 10
+        - gen2: volume = 100, price = 80
+    dem1 is partially accepted with 60MW, gen2 is too expensive.
+    SimpleClearing should clear at 50€ with 60MW, as dem1 would pay more than gen1,
+    so a price of 10€ would paradoxically reject the rest of dem1.
+    ComplexClearing should clear at 50€ with 60MW too.
+    """
+    orderbook = extend_orderbook(products, -100, 50)
+    orderbook = extend_orderbook(products, 60, 10, orderbook)
+    orderbook = extend_orderbook(products, 100, 80, orderbook)
+
+    orderbook_copy = copy.deepcopy(orderbook)
+
+    mr_simple_pac = PayAsClearRole(simple_dayahead_auction_config)
+    mr_complex_pac = ComplexClearingRole(complex_dayahead_auction_config)
+
+    accepted, rejected, meta, flows = mr_simple_pac.clear(orderbook, products)
+    assert len(accepted) == 2
+    assert len(rejected) == 1
+    assert meta[0]["supply_volume"] == 60
+    assert meta[0]["demand_volume"] == 60
+    assert meta[0]["price"] == 50  # partially accepted demand bid sets price
+    assert accepted[0]["volume"] == -100
+    assert accepted[0]["accepted_volume"] == -60
+
+    accepted, rejected, meta, flows = mr_complex_pac.clear(orderbook_copy, products)
+    assert len(accepted) == 2
+    assert len(rejected) == 1
+    assert meta[0]["supply_volume"] == 60
+    assert meta[0]["demand_volume"] == 60
+    assert meta[0]["price"] == 50
+    assert accepted[0]["volume"] == -100
+    assert accepted[0]["accepted_volume"] == -60
 
 
 def test_supply_and_demand_curves_full_vertical_overlap():
@@ -381,6 +429,8 @@ def test_supply_and_demand_no_overlap_and_volume_at_supply_and_demand_curve_step
         - dem3: volume = -50, price = 10
         - gen1: volume = 100, price = 0
     Supply and demand curves do not overlap and supply is scarce.
+    Both clearings clear at 10€, as dem3 is the first demand bid not served and would pay more than gen1.
+    (Any price between 10€ and 20€ is correct in reality.)
     """
     next_opening = simple_dayahead_auction_config.opening_hours.after(
         datetime(2005, 6, 1)
@@ -402,7 +452,7 @@ def test_supply_and_demand_no_overlap_and_volume_at_supply_and_demand_curve_step
     assert len(rejected) == 1
     assert meta[0]["supply_volume"] == 100
     assert meta[0]["demand_volume"] == 100
-    assert meta[0]["price"] == 20  # last accepted demand bid sets price
+    assert meta[0]["price"] == 10  # next demand bid sets price
 
     cr_complex_pac = ComplexClearingRole(complex_dayahead_auction_config)
     accepted, rejected, meta, flows = cr_complex_pac.clear(orderbook, products)

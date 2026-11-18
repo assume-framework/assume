@@ -41,7 +41,7 @@ The available market mechanisms are the following:
 
 The :code:`PayAsClearRole` performs an electricity market clearing using a pay-as-clear mechanism.
 This means that the clearing price is the highest supply bid price that is still accepted.
-Only if the supply is not sufficient to meet the demand (supply scarcity), the clearing price is the lowest demand bid price that is still accepted.
+Only if the first demand bid which is not fully served would pay more than that, e.g. during supply scarcity, this demand bid sets the clearing price.
 This price is then valid for all accepted orders.
 For this, the demand and supply are separated, before the demand is sorted from highest to lowest order price
 and the supply lowest to highest order price.

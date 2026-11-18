@@ -23,7 +23,7 @@ This class implements the pay-as-bid mechanism in a simple way using iterative c
 
 Pay-as-Clear
 ^^^^^^^^^^^^
-This class implements the pay-as-clear mechanism within the merit order clearing algorithm. It is a simple clearing algorithm that clears the market by sorting the bids and offers in ascending order and then matching them one by one until the market is cleared. In general, the last accepted supply bid sets the market clearing price. Only if the supply is not sufficient to meet the demand (supply scarcity), the price is set by the lowest accepted demand bid price.
+This class implements the pay-as-clear mechanism within the merit order clearing algorithm. It is a simple clearing algorithm that clears the market by sorting the bids and offers in ascending order and then matching them one by one until the market is cleared. In general, the last accepted supply bid sets the market clearing price. Only if the first demand bid which is not fully served would pay more than that, e.g. during supply scarcity, this demand bid sets the price.
 
 .. autoclass:: assume.markets.clearing_algorithms.simple.PayAsClearRole
    :members:

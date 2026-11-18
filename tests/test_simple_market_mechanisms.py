@@ -5,6 +5,7 @@
 import copy
 from datetime import datetime, timedelta
 
+import numpy as np
 from dateutil import rrule as rr
 
 from assume.common.market_objects import MarketConfig, MarketProduct
@@ -14,6 +15,7 @@ from assume.markets.clearing_algorithms import (
     PayAsClearRole,
     clearing_mechanisms,
 )
+from assume.markets.clearing_algorithms.simple import clear_merit_order
 
 from .utils import create_orderbook, extend_orderbook
 
@@ -241,3 +243,42 @@ def test_market_pay_as_bid_supply_scarcity():
     assert accepted[2]["volume"] == 100
     assert accepted[2]["accepted_volume"] == 100
     assert accepted[2]["price"] == 100
+
+
+def test_clear_merit_order_on_arrays():
+    """
+    clear_merit_order is used directly by the price forecasts: the accepted volumes are returned
+    in input order, price ties keep the input order without rng and volume 0 is ignored.
+    """
+    price, accepted_supply, accepted_demand = clear_merit_order(
+        supply_price=[50, 10, 30, 30, 0],
+        supply_volume=[100, 100, 100, 100, 0],
+        demand_price=[1000],
+        demand_volume=[250],
+    )
+    assert price == 30
+    assert accepted_supply.tolist() == [0, 100, 100, 50, 0]
+    assert accepted_demand.tolist() == [250]
+
+    # empty sides: no trade
+    price, accepted_supply, accepted_demand = clear_merit_order([], [], [10], [100])
+    assert price == 0
+    assert len(accepted_supply) == 0
+    assert accepted_demand.tolist() == [0]
+
+
+def test_clear_merit_order_random_ties_are_seedable():
+    def clear(seed):
+        _, accepted_supply, _ = clear_merit_order(
+            supply_price=[10, 10, 10, 10],
+            supply_volume=[100, 100, 100, 100],
+            demand_price=[100],
+            demand_volume=[150],
+            rng=np.random.default_rng(seed),
+        )
+        return tuple(accepted_supply.tolist())
+
+    assert clear(1) == clear(1)
+    outcomes = {clear(seed) for seed in range(20)}
+    assert len(outcomes) > 1
+    assert all(sum(outcome) == 150 for outcome in outcomes)
