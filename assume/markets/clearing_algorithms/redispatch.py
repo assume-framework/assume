@@ -9,6 +9,7 @@ import pandas as pd
 import pypsa
 
 from assume.common.grid_utils import (
+    add_redispatch_flexible_loads,
     add_redispatch_generators,
     add_redispatch_loads,
     calculate_network_meta,
@@ -70,6 +71,15 @@ class RedispatchMarketRole(MarketRole):
             loads=self.grid_data["loads"],
         )
 
+        self.flexible_loads = self.grid_data.get(
+            "flexible_loads", pd.DataFrame(columns=["node", "p_nom"])
+        )
+        if not self.flexible_loads.empty:
+            add_redispatch_flexible_loads(
+                network=self.network,
+                flexible_loads=self.flexible_loads,
+            )
+
         self.solver_name = get_supported_solver_linopy(
             marketconfig.param_dict.get("solver_name", "highs")
         )
@@ -114,6 +124,16 @@ class RedispatchMarketRole(MarketRole):
         orderbook_df["accepted_volume"] = 0.0
         orderbook_df["accepted_price"] = 0.0
 
+        # Units may bid without a range (e.g. DSM units without min_power /
+        # max_power). They stay in the grid model at their volume but offer
+        # no redispatch.
+        for column in ["min_power", "max_power", "p_nom"]:
+            if column not in orderbook_df.columns:
+                orderbook_df[column] = np.nan
+        no_range = orderbook_df["min_power"].isna() | orderbook_df["max_power"].isna()
+        orderbook_df.loc[no_range, "min_power"] = orderbook_df.loc[no_range, "volume"]
+        orderbook_df.loc[no_range, "max_power"] = orderbook_df.loc[no_range, "volume"]
+
         # Now you can pivot the DataFrame
         volume_pivot = orderbook_df.pivot(
             index="start_time", columns="unit_id", values="volume"
@@ -131,6 +151,12 @@ class RedispatchMarketRole(MarketRole):
             index="start_time", columns="unit_id", values="p_nom"
         )
 
+        # Units may price the two directions separately (price_up for more
+        # generation / less consumption, price_down for the opposite).
+        # Otherwise both directions use price.
+        price_up_pivot = self._direction_price_pivot(orderbook_df, "price_up")
+        price_down_pivot = self._direction_price_pivot(orderbook_df, "price_down")
+
         # Update the network parameters
         redispatch_network = self.network.copy()
 
@@ -142,14 +168,18 @@ class RedispatchMarketRole(MarketRole):
         max_power_pivot.reset_index(inplace=True, drop=True)
         min_power_pivot.reset_index(inplace=True, drop=True)
         price_pivot.reset_index(inplace=True, drop=True)
+        price_up_pivot.reset_index(inplace=True, drop=True)
+        price_down_pivot.reset_index(inplace=True, drop=True)
         p_nom_pivot.reset_index(inplace=True, drop=True)
 
         # Generators and loads from the grid data
         generator_names = self.grid_data["generators"].index
         load_names = self.grid_data["loads"].index
+        flexible_load_names = self.flexible_loads.index
 
         gen_cols = p_set.columns.intersection(generator_names)
         load_cols = p_set.columns.intersection(load_names)
+        flex_cols = p_set.columns.intersection(flexible_load_names)
 
         # 1. Fixed generator dispatch
         gen_p_set = p_set[gen_cols].copy()
@@ -166,8 +196,12 @@ class RedispatchMarketRole(MarketRole):
         redispatch_network.generators_t.p_max_pu.update(p_set_pu)
 
         # 2. Fixed demand/load profile
-        # PyPSA p_set values to positive values since the sign of the p_set values is usually positive
-        load_p_set = p_set[load_cols].copy().abs()
+        # Demand bids have negative volumes; PyPSA loads are positive consumption.
+        # Flexible loads keep their sign, so a net-exporting unit (e.g. with a
+        # CHP or fuel cell) enters the grid model as a negative load.
+        load_p_set = pd.concat(
+            [p_set[load_cols.difference(flex_cols)].abs(), -p_set[flex_cols]], axis=1
+        )
 
         redispatch_network.loads_t.p_set = load_p_set.reindex(
             index=redispatch_network.snapshots,
@@ -176,22 +210,34 @@ class RedispatchMarketRole(MarketRole):
         )
 
         # 3. Redispatch flexibility only for power plants
+
+        # All redispatch-capable units
+        redisp_cols = gen_cols.union(flex_cols)
+        redisp_p_nom = pd.Series(
+            {
+                u: redispatch_network.generators.at[f"{u}_up", "p_nom"]
+                for u in redisp_cols
+            }
+        )
+
         # Upward redispatch capacity:
-        # Possible maximum upwards generation : availability * max_power - market_cleared_capacity (no incorporation of ramping constraints yet)
+        # Possible maximum upwards generation : availability * max_power - market_cleared_capacity
+        # no incorporation of ramping constraints yet
         p_max_pu_up = (
-            (max_power_pivot[gen_cols] - gen_p_set)
-            .div(p_nom.where(p_nom != 0, np.inf))
-            .clip(lower=0, upper=1)
+            (max_power_pivot[redisp_cols] - p_set[redisp_cols])
+            .div(redisp_p_nom, axis="columns")
+            .clip(lower=0.0, upper=1.0)
         )
 
         # Downward redispatch capacity:
         # Possible maximum downward generation : market_cleared_capacity - min_power (no incorporation of ramping constraints yet)
         p_max_pu_down = (
-            (gen_p_set - min_power_pivot[gen_cols])
-            .div(p_nom.where(p_nom != 0, np.inf))
-            .clip(lower=0, upper=1)
+            (p_set[redisp_cols] - min_power_pivot[redisp_cols])
+            .div(redisp_p_nom, axis="columns")
+            .clip(lower=0.0, upper=1.0)
         )
-        costs = price_pivot[gen_cols]
+        costs_up = price_up_pivot[redisp_cols]
+        costs_down = price_down_pivot[redisp_cols]
 
         redispatch_network.generators_t.p_max_pu.update(p_max_pu_up.add_suffix("_up"))
 
@@ -199,10 +245,10 @@ class RedispatchMarketRole(MarketRole):
             p_max_pu_down.add_suffix("_down")
         )
 
-        redispatch_network.generators_t.marginal_cost.update(costs.add_suffix("_up"))
+        redispatch_network.generators_t.marginal_cost.update(costs_up.add_suffix("_up"))
 
         redispatch_network.generators_t.marginal_cost.update(
-            costs.add_suffix("_down") * (-1)
+            costs_down.add_suffix("_down") * (-1)
         )
 
         # run linear powerflow
@@ -263,6 +309,18 @@ class RedispatchMarketRole(MarketRole):
 
         return accepted_orders, rejected_orders, meta, flows
 
+    @staticmethod
+    def _direction_price_pivot(orderbook_df: pd.DataFrame, column: str) -> pd.DataFrame:
+        """Pivot ``column`` per unit and time; missing values fall back to ``price``."""
+        price = orderbook_df["price"]
+        if column in orderbook_df.columns:
+            price = orderbook_df[column].fillna(price)
+        return (
+            orderbook_df.assign(direction_price=price)
+            .pivot(index="start_time", columns="unit_id", values="direction_price")
+            .astype(float)
+        )
+
     def process_dispatch_data(self, network: pypsa.Network, orderbook_df: pd.DataFrame):
         """
         This function processes the dispatch data to calculate the redispatch volumes and prices
@@ -296,13 +354,22 @@ class RedispatchMarketRole(MarketRole):
                 ].values
 
             if self.payment_mechanism == "pay_as_bid":
-                # set accepted price as the price bid price from the orderbook
+                # Set accepted price as the bid price of the accepted direction
+                price = orderbook_df.loc[unit_orders, "price"]
+                price_up = price
+                price_down = price
+                if "price_up" in orderbook_df.columns:
+                    price_up = orderbook_df.loc[unit_orders, "price_up"].fillna(price)
+                if "price_down" in orderbook_df.columns:
+                    price_down = orderbook_df.loc[unit_orders, "price_down"].fillna(
+                        price
+                    )
                 orderbook_df.loc[unit_orders, "accepted_price"] = np.where(
                     orderbook_df.loc[unit_orders, "accepted_volume"] > 0,
-                    orderbook_df.loc[unit_orders, "price"],
+                    price_up,
                     np.where(
                         orderbook_df.loc[unit_orders, "accepted_volume"] < 0,
-                        orderbook_df.loc[unit_orders, "price"],
+                        price_down,
                         0,  # This sets accepted_price to 0 when redispatch_volume is exactly 0
                     ),
                 )

@@ -55,6 +55,22 @@ class DSMFlex:
     # saved and sliced to the window during _solve_rolling_horizon_next_window.
     _extra_price_attrs: list = []
 
+    def _on_rolling_window_solved(
+        self,
+        instance,
+        window_start: int,
+        window_end: int,
+        commit_end: int,
+        saved_index,
+    ) -> None:
+        """
+        Hook called after a rolling-horizon window has been solved.
+
+        Subclasses may override this to retain the solved look-ahead
+        trajectory or update market-reference information.
+        """
+        return None
+
     def _values_for_model(self, series):
         """Return values aligned to the current model index for Pyomo params.
 
@@ -1498,6 +1514,16 @@ class DSMFlex:
                 self._extract_component_operations(
                     instance, window_start, commit_end, saved_index
                 )
+
+            # Allow subclasses to capture the solved rolling-window trajectory
+            # before the committed state is advanced to the next window.
+            self._on_rolling_window_solved(
+                instance=instance,
+                window_start=window_start,
+                window_end=window_end,
+                commit_end=commit_end,
+                saved_index=saved_index,
+            )
 
             self._update_init_states(instance, n_commit - 1, init_states)
 

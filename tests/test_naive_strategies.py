@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -17,7 +18,10 @@ from assume.strategies import (
     EnergyNaiveProfileStrategy,
     EnergyNaiveStrategy,
 )
-from assume.strategies.naive_strategies import EnergyNaiveRedispatchStrategy
+from assume.strategies.naive_strategies import (
+    EnergyNaiveRedispatchStrategy,
+    SectorCoupledEnergyNaiveStrategy,
+)
 from tests.conftest import MockMinMaxUnit
 
 start = datetime(2023, 7, 1)
@@ -242,6 +246,38 @@ def test_naive_redispatch_strategy(
     assert [bids[i]["price"] for i in range(len(bids))] == pytest.approx(
         [3] * len(bids)
     )  # should bid at marginal cost, which are set to 3 in MockMinMaxUnit
+
+
+@pytest.mark.parametrize(
+    "node,power_requirement,expected_volume",
+    [("N", 2.0, -2.0), ("S", 5.0, -5.0)],
+)
+def test_sector_coupled_energy_strategy_creates_aggregate_demand_bid(
+    mock_market_config, node, power_requirement, expected_volume
+):
+    start = pd.Timestamp("2025-01-01 00:00:00")
+    end = pd.Timestamp("2025-01-01 01:00:00")
+    position = {
+        "node": node,
+        "volume": -power_requirement,
+    }
+
+    unit = SimpleNamespace(
+        horizon_mode="full_horizon",
+        prepare_market_state=lambda: None,
+        get_eom_market_position=lambda _start: position,
+    )
+
+    bids = SectorCoupledEnergyNaiveStrategy().calculate_bids(
+        unit, mock_market_config, [(start, end, None)]
+    )
+
+    assert len(bids) == 1
+    bid = bids[0]
+    assert bid["node"] == node
+    assert bid["volume"] == pytest.approx(expected_volume, abs=1e-5)
+    assert bid["price"] == pytest.approx(3000.0, abs=1e-5)
+    assert (bid["start_time"], bid["end_time"], bid["only_hours"]) == (start, end, None)
 
 
 if __name__ == "__main__":

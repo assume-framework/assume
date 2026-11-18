@@ -117,6 +117,9 @@ available_examples = {
     },
     # redispatch example
     "redisp_3_nodes": {"scenario": "example_04a", "study_case": "base"},
+    # sector-coupling examples
+    "sector_coupled_3_nodes_heat": {"scenario": "example_04b", "study_case": "base"},
+    "sector_coupled_3_nodes_heat_h2": {"scenario": "example_04c", "study_case": "base"},
 }
 
 

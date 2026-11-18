@@ -74,6 +74,16 @@ demand = pd.DataFrame(
 ).set_index("name")
 
 
+flexible_loads = pd.DataFrame(
+    {
+        "name": ["flex_S"],
+        "node": ["S"],
+        "p_nom": [500.0],
+        "unit_type": ["sector_coupled_system"],
+    }
+).set_index("name")
+
+
 @pytest.fixture
 def grid_data_dict_2_nodes():
     return {
@@ -81,6 +91,17 @@ def grid_data_dict_2_nodes():
         "lines": lines,
         "generators": generators,
         "loads": demand,
+    }
+
+
+@pytest.fixture
+def grid_data_dict_2_nodes_with_flexible_load():
+    return {
+        "buses": nodes,
+        "lines": lines,
+        "generators": generators,
+        "loads": demand,
+        "flexible_loads": flexible_loads,
     }
 
 
@@ -98,10 +119,48 @@ def test_initialization(simple_redispatch_market_config, grid_data_dict_2_nodes)
     # network should have: base fixed DA generator + up and down for each generator + backup up and down at each node
     expected_num_generators = len(generators) * 3 + len(nodes) * 2
     assert len(rmr.network.generators) == expected_num_generators
+    assert len(rmr.network.loads) == len(demand)
+    assert rmr.flexible_loads.empty
     # network snapshots are not indexed by time, but length should match
     assert len(rmr.network.snapshots) == mc.market_products[0].count
     assert rmr.payment_mechanism == "pay_as_bid"  # Default value
     assert rmr.solver_name == "highs"  # Default solver
+
+
+def test_initialization_adds_flexible_load_assets(
+    simple_redispatch_market_config,
+    grid_data_dict_2_nodes_with_flexible_load,
+):
+    """
+    Flexible DSM units are static grid assets.
+
+    Each flexible consumer is represented by:
+      - one PyPSA Load for its baseline demand,
+      - one *_up Generator for load reduction,
+      - one *_down Generator for load increase.
+    """
+    mc = simple_redispatch_market_config
+    mc.param_dict["grid_data"] = grid_data_dict_2_nodes_with_flexible_load
+
+    rmr = RedispatchMarketRole(mc)
+
+    assert list(rmr.flexible_loads.index) == ["flex_S"]
+    assert "flex_S" in rmr.network.loads.index
+    assert "flex_S_up" in rmr.network.generators.index
+    assert "flex_S_down" in rmr.network.generators.index
+
+    assert rmr.network.loads.at["flex_S", "bus"] == "S"
+    assert rmr.network.generators.at["flex_S_up", "bus"] == "S"
+    assert rmr.network.generators.at["flex_S_down", "bus"] == "S"
+
+    assert rmr.network.generators.at["flex_S_up", "p_nom"] == pytest.approx(500.0)
+    assert rmr.network.generators.at["flex_S_down", "p_nom"] == pytest.approx(500.0)
+
+    # Flexible proxies should be unavailable until clear() applies the bid envelope.
+    assert rmr.network.generators_t.p_max_pu["flex_S_up"].iloc[0] == pytest.approx(0.0)
+    assert rmr.network.generators_t.p_max_pu["flex_S_down"].iloc[0] == pytest.approx(
+        0.0
+    )
 
 
 def test_initialization_missing_grid_data(simple_redispatch_market_config):
@@ -257,6 +316,269 @@ def test_two_nodes_redispatch(
     # check flows
     flows_df = pd.Series(flows).unstack()
     assert flows_df.loc[0, "line_N_S"] == pytest.approx(expected_flows[0], abs=eps)
+
+
+@pytest.mark.require_network
+def test_flexible_load_participates_in_redispatch(
+    simple_redispatch_market_config,
+    grid_data_dict_2_nodes_with_flexible_load,
+):
+    """
+    The flexible load at node S reduces consumption when that is the cheapest
+    way to relieve the N->S congestion.
+
+    Baseline:
+      coal_N = 1000 MW
+      fixed load at S = 500 MW
+      flexible load at S = 500 MW
+      line limit = 500 MW
+
+    Expected redispatch:
+      coal_N down by 500 MW
+      flex_S load reduction by 500 MW
+    """
+    mc = simple_redispatch_market_config
+    mc.param_dict["grid_data"] = grid_data_dict_2_nodes_with_flexible_load
+    mc.param_dict["log_flows"] = True
+
+    next_opening = mc.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(mc.market_products, next_opening)
+    product = products[0]
+
+    def order(unit_id, volume, min_power, max_power, p_nom, price, node):
+        return {
+            "start_time": product[0],
+            "end_time": product[1],
+            "only_hours": product[2],
+            "unit_id": unit_id,
+            "bid_id": f"{unit_id}_bid",
+            "volume": volume,
+            "min_power": min_power,
+            "max_power": max_power,
+            "p_nom": p_nom,
+            "price": price,
+            "node": node,
+        }
+
+    orderbook = [
+        order("coal_N", 1000.0, 0.0, 1000.0, 1000.0, 10.0, "N"),
+        order("coal_S", 0.0, 0.0, 1000.0, 1000.0, 50.0, "S"),
+        order("gas_S", 0.0, 0.0, 1000.0, 1000.0, 100.0, "S"),
+        # Ordinary load: fixed in redispatch.
+        order("dem_S", -500.0, 0.0, -1000.0, -1000.0, 1000.0, "S"),
+        # Flexible load: physical consumption may move from 500 MW to 0 MW.
+        order("flex_S", -500.0, -500.0, 0.0, 500.0, 1.0, "S"),
+    ]
+
+    rmr = RedispatchMarketRole(mc)
+    accepted_orders, _, _, flows = rmr.clear(orderbook, products)
+
+    accepted = {item["unit_id"]: item["accepted_volume"] for item in accepted_orders}
+
+    assert accepted["coal_N"] == pytest.approx(-500.0, abs=eps)
+    assert accepted["flex_S"] == pytest.approx(500.0, abs=eps)
+    assert sum(accepted.values()) == pytest.approx(0.0, abs=eps)
+
+    flows_df = pd.Series(flows).unstack()
+    assert flows_df.loc[0, "line_N_S"] == pytest.approx(500.0, abs=eps)
+
+
+def test_direction_prices_decide_and_settle_redispatch(
+    simple_redispatch_market_config,
+    grid_data_dict_2_nodes_with_flexible_load,
+):
+    """
+    flex_S bids 1 EUR/MWh in general but 60 EUR/MWh for less consumption.
+    coal_S (50 EUR/MWh) is then the cheaper way to relieve the line, and the
+    flexible load is not used.
+    """
+    mc = simple_redispatch_market_config
+    mc.param_dict["grid_data"] = grid_data_dict_2_nodes_with_flexible_load
+
+    next_opening = mc.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(mc.market_products, next_opening)
+    product = products[0]
+
+    def order(unit_id, volume, min_power, max_power, price, node, **prices):
+        return {
+            "start_time": product[0],
+            "end_time": product[1],
+            "only_hours": product[2],
+            "unit_id": unit_id,
+            "bid_id": f"{unit_id}_bid",
+            "volume": volume,
+            "min_power": min_power,
+            "max_power": max_power,
+            "p_nom": 1000.0,
+            "price": price,
+            "node": node,
+            **prices,
+        }
+
+    orderbook = [
+        order("coal_N", 1000.0, 0.0, 1000.0, 10.0, "N"),
+        order("coal_S", 0.0, 0.0, 1000.0, 50.0, "S"),
+        order("gas_S", 0.0, 0.0, 1000.0, 100.0, "S"),
+        order("dem_S", -500.0, 0.0, -1000.0, 1000.0, "S"),
+        order("flex_S", -500.0, -500.0, 0.0, 1.0, "S", price_up=60.0, price_down=1.0),
+    ]
+
+    rmr = RedispatchMarketRole(mc)
+    accepted_orders, _, _, _ = rmr.clear(orderbook, products)
+    accepted = {o["unit_id"]: o for o in accepted_orders}
+
+    assert accepted["coal_S"]["accepted_volume"] == pytest.approx(500.0, abs=eps)
+    assert accepted["coal_N"]["accepted_volume"] == pytest.approx(-500.0, abs=eps)
+    assert "flex_S" not in accepted or accepted["flex_S"][
+        "accepted_volume"
+    ] == pytest.approx(0.0, abs=eps)
+
+    # With a cheap up price, flex_S is used and settled at that price.
+    orderbook[-1] = order(
+        "flex_S", -500.0, -500.0, 0.0, 99.0, "S", price_up=7.0, price_down=99.0
+    )
+    accepted_orders, _, _, _ = rmr.clear(orderbook, products)
+    accepted = {o["unit_id"]: o for o in accepted_orders}
+
+    assert accepted["flex_S"]["accepted_volume"] == pytest.approx(500.0, abs=eps)
+    assert accepted["flex_S"]["accepted_price"] == pytest.approx(7.0)
+
+
+def test_flexible_load_without_range_stays_fixed(
+    simple_redispatch_market_config,
+    grid_data_dict_2_nodes_with_flexible_load,
+):
+    """
+    A DSM unit that bids only a volume (no min_power / max_power) is kept in
+    the grid at that volume: its consumption counts for the line flow, but it
+    is not redispatched.
+    """
+    mc = simple_redispatch_market_config
+    mc.param_dict["grid_data"] = grid_data_dict_2_nodes_with_flexible_load
+    mc.param_dict["log_flows"] = True
+
+    next_opening = mc.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(mc.market_products, next_opening)
+    product = products[0]
+
+    def order(unit_id, volume, price, node, **fields):
+        return {
+            "start_time": product[0],
+            "end_time": product[1],
+            "only_hours": product[2],
+            "unit_id": unit_id,
+            "bid_id": f"{unit_id}_bid",
+            "volume": volume,
+            "price": price,
+            "node": node,
+            **fields,
+        }
+
+    def ranged(unit_id, volume, min_power, max_power, price, node):
+        return order(
+            unit_id,
+            volume,
+            price,
+            node,
+            min_power=min_power,
+            max_power=max_power,
+            p_nom=1000.0,
+        )
+
+    orderbook = [
+        ranged("coal_N", 1000.0, 0.0, 1000.0, 10.0, "N"),
+        ranged("coal_S", 0.0, 0.0, 1000.0, 50.0, "S"),
+        ranged("gas_S", 0.0, 0.0, 1000.0, 100.0, "S"),
+        ranged("dem_S", -500.0, 0.0, -1000.0, 1000.0, "S"),
+        # Like DsmEnergyNaiveRedispatchStrategy: volume and price only.
+        order("flex_S", -500.0, 1.0, "S"),
+    ]
+
+    rmr = RedispatchMarketRole(mc)
+    accepted_orders, _, _, flows = rmr.clear(orderbook, products)
+    accepted = {o["unit_id"]: o["accepted_volume"] for o in accepted_orders}
+
+    # 1000 MW at S would need 1000 MW over the 500 MW line: coal_S takes over.
+    assert accepted["coal_N"] == pytest.approx(-500.0, abs=eps)
+    assert accepted["coal_S"] == pytest.approx(500.0, abs=eps)
+    assert accepted.get("flex_S", 0.0) == pytest.approx(0.0, abs=eps)
+
+    flows_df = pd.Series(flows).unstack()
+    assert flows_df.loc[0, "line_N_S"] == pytest.approx(500.0, abs=eps)
+
+
+flexible_loads_north = pd.DataFrame(
+    {
+        "name": ["flex_N"],
+        "node": ["N"],
+        "p_nom": [500.0],
+        "unit_type": ["sector_coupled_system"],
+    }
+).set_index("name")
+
+
+def test_net_exporting_flexible_load_is_injection(simple_redispatch_market_config):
+    """
+    A flexible load with a positive volume (net export, e.g. CHP or fuel cell)
+    injects power into the grid; it must not be treated as consumption.
+
+    Baseline:
+      coal_N = 400 MW (fixed), flex_N exports 300 MW at N,
+      fixed load at S = 700 MW, line limit = 500 MW
+      -> 700 MW would flow N->S.
+
+    Expected redispatch:
+      flex_N exports 200 MW less, coal_S up by 200 MW, line at 500 MW.
+    """
+    mc = simple_redispatch_market_config
+    mc.param_dict["grid_data"] = {
+        "buses": nodes,
+        "lines": lines,
+        "generators": generators,
+        "loads": demand,
+        "flexible_loads": flexible_loads_north,
+    }
+    mc.param_dict["log_flows"] = True
+
+    next_opening = mc.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(mc.market_products, next_opening)
+    product = products[0]
+
+    def order(unit_id, volume, min_power, max_power, p_nom, price, node):
+        return {
+            "start_time": product[0],
+            "end_time": product[1],
+            "only_hours": product[2],
+            "unit_id": unit_id,
+            "bid_id": f"{unit_id}_bid",
+            "volume": volume,
+            "min_power": min_power,
+            "max_power": max_power,
+            "p_nom": p_nom,
+            "price": price,
+            "node": node,
+        }
+
+    orderbook = [
+        order("coal_N", 400.0, 400.0, 400.0, 1000.0, 10.0, "N"),
+        order("coal_S", 0.0, 0.0, 1000.0, 1000.0, 50.0, "S"),
+        order("gas_S", 0.0, 0.0, 1000.0, 1000.0, 100.0, "S"),
+        order("dem_S", -700.0, 0.0, -1000.0, -1000.0, 1000.0, "S"),
+        # Net export of 300 MW that may drop to 0 MW.
+        order("flex_N", 300.0, 0.0, 300.0, 500.0, 1.0, "N"),
+    ]
+
+    rmr = RedispatchMarketRole(mc)
+    accepted_orders, _, _, flows = rmr.clear(orderbook, products)
+
+    accepted = {item["unit_id"]: item["accepted_volume"] for item in accepted_orders}
+
+    assert accepted["flex_N"] == pytest.approx(-200.0, abs=eps)
+    assert accepted["coal_S"] == pytest.approx(200.0, abs=eps)
+    assert sum(accepted.values()) == pytest.approx(0.0, abs=eps)
+
+    flows_df = pd.Series(flows).unstack()
+    assert flows_df.loc[0, "line_N_S"] == pytest.approx(500.0, abs=eps)
 
 
 # Tests with 3 nodes and 30 generators (gen5 to gen34) and 3 demand (dem1 to dem3)
