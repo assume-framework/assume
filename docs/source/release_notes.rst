@@ -12,6 +12,12 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**Improvements:**
+  - **Shared array-based pay-as-clear kernel**: The merit-order matching of ``PayAsClearRole`` was moved into the standalone function ``clear_merit_order`` in ``assume.markets.clearing_algorithms.simple``, which works on numpy arrays of bid prices and volumes and returns the clearing price and the accepted volumes. ``PayAsClearRole`` only does the orderbook bookkeeping around it. The naive inelastic price forecast (``price_naive_forecast``) now uses the same kernel instead of its own merit-order implementation, so forecast and market clearing follow the same rules. Both the market clearing and the naive price forecast are considerably faster.
+
+**Bug Fixes:**
+  - **Consistent clearing price in** ``PayAsClearRole``: The last accepted supply bid sets the clearing price. Only if the first demand bid that is not fully served would pay more, e.g. during supply scarcity, this demand bid sets the price, so that no bid is paradoxically accepted or rejected. Price ties are traded, maximising the accepted volume, and are broken randomly using ``np.random`` (seeded by the simulation seed). This can slightly change clearing prices compared to previous versions.
+
 0.7.0 - (11th November 2026)
 =========================
 
