@@ -12,6 +12,9 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**Improvements:**
+  - **Faster cost calculation**: ``calculate_costs`` reads and writes the dispatched interval at once instead of per time step. This speeds up simulations where each dispatch covers several time steps, e.g. by about 4 % for example_01f with daily clearing.
+
 0.7.0 - (11th November 2026)
 =========================
 
