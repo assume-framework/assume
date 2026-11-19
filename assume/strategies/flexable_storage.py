@@ -193,6 +193,157 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
         return bids
 
 
+class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
+    """
+    A redispatch bidding strategy for storage units.
+
+    Storage is a special case in redispatch: unlike a power plant, a storage unit
+    can be pushed **both** ways around its already-cleared EOM/CRM position -
+    discharge more / charge less (upward redispatch) or charge more / discharge
+    less (downward redispatch) - regardless of whether it was charging or
+    discharging. It is therefore modelled in the redispatch network as a
+    bidirectional generator (fixed baseline + ``_up`` + ``_down``).
+
+    For every product the strategy submits:
+
+    - ``volume``: the grid baseline around which redispatch is applied - what the
+      storage can actually run of its cleared (signed) dispatch (``+`` discharge,
+      ``-`` charge). It equals the cleared dispatch unless that is not
+      SOC-feasible; then the grid model sees the real injection and the shortfall
+      is covered by other units.
+    - ``max_power`` / ``min_power``: the **state-of-charge aware** discharge
+      (``>= 0``) and charge (``<= 0``) bounds, so a near-empty battery offers
+      little additional discharge and a near-full one little additional charge.
+    - ``p_nom``: the full power span ``max_power_discharge - max_power_charge``
+      (``max_power_charge`` is negative, so this adds), which keeps the fixed
+      baseline within ``[-1, 1]`` per unit and prevents the up/down redispatch
+      potential from clipping prematurely in the clearing.
+    - ``energy_discharge_headroom`` / ``energy_charge_headroom``: the energy (MWh)
+      above ``min_soc`` / below ``max_soc`` at the end of the product along the
+      baseline SOC path. The clearing uses them to bound the *cumulative*
+      redispatch energy over the horizon, since the per-product power bounds alone
+      would let it request more energy than the storage holds. Both come from
+      :meth:`Storage.calculate_soc_path`, together with ``efficiency_charge`` /
+      ``efficiency_discharge``, which the clearing needs for the same constraint.
+    - ``price``: the opportunity cost of the stored energy - the round-trip
+      adjusted market price at which the energy was procured plus the variable
+      charge/discharge costs. Because redispatch clears **after** EOM and CRM,
+      the reference price for the delivery hours is already known.
+
+    Attributes:
+        foresight (datetime.timedelta): Foresight for the average price calculation.
+
+    Args:
+        *args: Additional arguments.
+        **kwargs: Additional keyword arguments.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.foresight = parse_duration(kwargs.get("eom_foresight", "12h"))
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMaxCharge,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Takes information from a storage unit and defines how it participates
+        in the redispatch market.
+
+        Args:
+            unit (SupportsMinMaxCharge): The unit that is dispatched.
+            market_config (MarketConfig): The market configuration.
+            product_tuples (list[Product]): List of product tuples.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Orderbook: Bids containing start_time, end_time, only_hours, price,
+            volume, max_power, min_power, p_nom and node.
+        """
+        # SOC path along the current (day-ahead) schedule for the whole redispatch
+        # window, computed by the storage itself. It respects the SOC limits and treats
+        # hours without a cleared schedule as idle.
+        soc_path, runnable = unit.calculate_soc_path(
+            product_tuples[0][0], product_tuples[-1][1]
+        )
+
+        # static nameplate power span; guarantees the fixed baseline d/p_nom stays
+        # within [-1, 1] and the per-unit up/down potential does not clip early
+        p_nom = unit.max_power_discharge - unit.max_power_charge
+
+        # reference market price used to value the stored energy. Redispatch
+        # clears after the EOM, so the EOM price reflects what the energy was
+        # traded at. Fall back gracefully if no EOM forecast is available.
+        if "EOM" in unit.forecaster.price:
+            price_forecast = unit.forecaster.price["EOM"]
+        elif market_config.market_id in unit.forecaster.price:
+            price_forecast = unit.forecaster.price[market_config.market_id]
+        else:
+            price_forecast = next(iter(unit.forecaster.price.values()))
+
+        bids = []
+        for product in product_tuples:
+            start, end = product[0], product[1]
+
+            # Grid baseline (+ discharge, - charge): what the storage can actually run
+            # of its DA plan. Equal to the plan unless the DA schedule is infeasible;
+            # then the grid model sees the real injection, and the shortfall against
+            # the plan is covered by other units instead of being hidden.
+            current_power = runnable[start]
+
+            # Absolute power range at the SOC at the start of this product (SOC limits
+            # applied to the absolute power, CRM reservations kept free). The clearing
+            # derives up = max_power - volume and down = volume - min_power from it.
+            max_power_charge, max_power_discharge = (
+                unit.calculate_redispatch_power_bounds(start, soc_path[start])
+            )
+
+            # Energy head-room at the END of this product along the SOC path. The
+            # clearing uses it to bound the CUMULATIVE redispatch energy, see
+            # Storage.add_redispatch_soc_constraints.
+            energy_discharge_headroom, energy_charge_headroom = (
+                unit.calculate_redispatch_energy_headroom(soc_path[end])
+            )
+
+            # opportunity cost of the stored energy: round-trip adjusted market
+            # price plus the variable charge/discharge costs
+            average_price = calculate_price_average(
+                current_time=start,
+                foresight=self.foresight,
+                price_forecast=price_forecast,
+            )
+            price = (
+                average_price / (unit.efficiency_charge * unit.efficiency_discharge)
+                + unit.additional_cost_charge
+                + unit.additional_cost_discharge
+            )
+
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "price": price,
+                    "volume": current_power,
+                    "max_power": max_power_discharge,
+                    "min_power": max_power_charge,
+                    "p_nom": p_nom,
+                    "energy_discharge_headroom": energy_discharge_headroom,
+                    "energy_charge_headroom": energy_charge_headroom,
+                    "efficiency_charge": unit.efficiency_charge,
+                    "efficiency_discharge": unit.efficiency_discharge,
+                    "node": unit.node,
+                }
+            )
+
+        # keep zero-volume bids: an idle storage is a valid redispatch resource
+        return bids
+
+
 class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
     """
     The strategy is based on the storage strategy in flexABLE.

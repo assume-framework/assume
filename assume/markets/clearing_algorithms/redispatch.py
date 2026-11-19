@@ -11,12 +11,14 @@ import pypsa
 from assume.common.grid_utils import (
     add_redispatch_generators,
     add_redispatch_loads,
+    add_redispatch_storages,
     calculate_network_meta,
     get_supported_solver_linopy,
     read_pypsa_grid,
 )
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.markets.base_market import MarketRole
+from assume.units.storage import Storage
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +71,15 @@ class RedispatchMarketRole(MarketRole):
             network=self.network,
             loads=self.grid_data["loads"],
         )
+
+        # storage units are optional; they participate in redispatch as
+        # bidirectional generators (fixed baseline + up + down)
+        storage_units = self.grid_data.get("storage_units")
+        if storage_units is not None and not storage_units.empty:
+            add_redispatch_storages(
+                network=self.network,
+                storages=storage_units,
+            )
 
         self.solver_name = get_supported_solver_linopy(
             marketconfig.param_dict.get("solver_name", "highs")
@@ -144,24 +155,33 @@ class RedispatchMarketRole(MarketRole):
         price_pivot.reset_index(inplace=True, drop=True)
         p_nom_pivot.reset_index(inplace=True, drop=True)
 
-        # Generators and loads from the grid data
+        # Generators, loads and storage units from the grid data
         generator_names = self.grid_data["generators"].index
         load_names = self.grid_data["loads"].index
+        storage_units = self.grid_data.get("storage_units")
+        storage_names = (
+            storage_units.index if storage_units is not None else pd.Index([])
+        )
 
         gen_cols = p_set.columns.intersection(generator_names)
         load_cols = p_set.columns.intersection(load_names)
+        storage_cols = p_set.columns.intersection(storage_names)
 
-        # 1. Fixed generator dispatch
-        gen_p_set = p_set[gen_cols].copy()
+        # Power plants and storage units are redispatched the same way: a fixed
+        # baseline (the cleared dispatch) plus "_up" and "_down" generators. Storage
+        # differs in only three points, marked "storage:" below.
+        flex_cols = gen_cols.union(storage_cols)
+        is_storage = pd.Series(flex_cols.isin(storage_cols), index=flex_cols)
 
-        redispatch_network.generators_t.p_set = gen_p_set.reindex(
-            index=redispatch_network.snapshots, columns=gen_cols, fill_value=0.0
+        # 1. Fixed dispatch
+        flex_p_set = p_set[flex_cols].copy()
+        redispatch_network.generators_t.p_set = flex_p_set.reindex(
+            index=redispatch_network.snapshots, columns=flex_cols, fill_value=0.0
         )
-
-        p_nom = p_nom_pivot[gen_cols].copy()
-
-        p_set_pu = gen_p_set.div(p_nom.where(p_nom != 0, np.inf)).clip(lower=0, upper=1)
-
+        p_nom = p_nom_pivot[flex_cols].where(p_nom_pivot[flex_cols] != 0, np.inf)
+        # storage: the baseline may be negative (charging)
+        lower = is_storage.map({True: -1.0, False: 0.0})
+        p_set_pu = flex_p_set.div(p_nom).clip(lower=lower, upper=1, axis=1)
         redispatch_network.generators_t.p_min_pu.update(p_set_pu)
         redispatch_network.generators_t.p_max_pu.update(p_set_pu)
 
@@ -175,34 +195,69 @@ class RedispatchMarketRole(MarketRole):
             fill_value=0.0,
         )
 
-        # 3. Redispatch flexibility only for power plants
-        # Upward redispatch capacity:
-        # Possible maximum upwards generation : availability * max_power - market_cleared_capacity (no incorporation of ramping constraints yet)
-        p_max_pu_up = (
-            (max_power_pivot[gen_cols] - gen_p_set)
-            .div(p_nom.where(p_nom != 0, np.inf))
-            .clip(lower=0, upper=1)
-        )
+        # 3. Energy information of storage units (sent in their bids). A storage
+        # without it could be over-committed, so it gets no redispatch head-room.
+        # rows aligned to the network snapshots: same sorted start times as p_set
+        snapshot_starts = volume_pivot.index
+        storage_bids = {
+            field: orderbook_df.pivot(
+                index="start_time", columns="unit_id", values=field
+            )
+            .reindex(index=snapshot_starts, columns=storage_cols)
+            .reset_index(drop=True)
+            if field in orderbook_df
+            else pd.DataFrame(np.nan, index=p_set.index, columns=storage_cols)
+            for field in [
+                "energy_discharge_headroom",
+                "energy_charge_headroom",
+                "efficiency_charge",
+                "efficiency_discharge",
+            ]
+        }
+        incomplete = pd.concat(storage_bids.values()).isna().any()
+        blocked = storage_cols[incomplete.to_numpy()]
+        if len(blocked) > 0:
+            logger.warning(
+                "Market '%s': storage %s sent no energy head-room or efficiencies; "
+                "its redispatch is blocked.",
+                self.marketconfig.market_id,
+                list(blocked),
+            )
+        max_power = max_power_pivot[flex_cols].copy()
+        min_power = min_power_pivot[flex_cols].copy()
+        max_power[blocked] = min_power[blocked] = flex_p_set[blocked]
 
-        # Downward redispatch capacity:
-        # Possible maximum downward generation : market_cleared_capacity - min_power (no incorporation of ramping constraints yet)
-        p_max_pu_down = (
-            (gen_p_set - min_power_pivot[gen_cols])
-            .div(p_nom.where(p_nom != 0, np.inf))
-            .clip(lower=0, upper=1)
-        )
-        costs = price_pivot[gen_cols]
-
+        # 4. Redispatch flexibility (no ramping constraints yet)
+        # up: max_power - cleared dispatch; down: cleared dispatch - min_power
+        p_max_pu_up = (max_power - flex_p_set).div(p_nom).clip(lower=0, upper=1)
+        p_max_pu_down = (flex_p_set - min_power).div(p_nom).clip(lower=0, upper=1)
         redispatch_network.generators_t.p_max_pu.update(p_max_pu_up.add_suffix("_up"))
-
         redispatch_network.generators_t.p_max_pu.update(
             p_max_pu_down.add_suffix("_down")
         )
 
+        # Reducing a power plant's output refunds its costs (-price). storage:
+        # charging more / discharging less saves nothing, so it costs 0 (a negative
+        # price would let the optimiser charge storage purely for profit).
+        costs = price_pivot[flex_cols]
+        down_costs = -costs
+        down_costs[storage_cols] = 0.0
         redispatch_network.generators_t.marginal_cost.update(costs.add_suffix("_up"))
-
         redispatch_network.generators_t.marginal_cost.update(
-            costs.add_suffix("_down") * (-1)
+            down_costs.add_suffix("_down")
+        )
+
+        # 5. storage: the redispatch energy over all snapshots may not exceed what
+        # the storage holds; the constraint is built by the Storage unit
+        # duration of every snapshot (products may differ in length)
+        ends = orderbook_df.groupby("start_time")["end_time"].max()
+        duration_hours = [
+            (ends[start] - start).total_seconds() / 3600 for start in snapshot_starts
+        ]
+        extra_functionality = Storage.redispatch_soc_callback(
+            storage_ids=storage_cols.difference(blocked),
+            storage_bids=storage_bids,
+            duration_hours=duration_hours,
         )
 
         # run linear powerflow
@@ -223,6 +278,7 @@ class RedispatchMarketRole(MarketRole):
                 # do not show tqdm progress bars for large grids
                 # https://github.com/PyPSA/linopy/pull/375
                 progress=False,
+                extra_functionality=extra_functionality,
                 # Constant objective terms do not affect dispatch or nodal prices; omit for speed/stability.
                 include_objective_constant=False,
             )

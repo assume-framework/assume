@@ -471,3 +471,428 @@ def test_three_nodes_redispatch(
     assert flows_df.loc[0, "line_1_2"] == pytest.approx(expected_flows_3[0], abs=eps)
     assert flows_df.loc[0, "line_1_3"] == pytest.approx(expected_flows_3[1], abs=eps)
     assert flows_df.loc[0, "line_2_3"] == pytest.approx(expected_flows_3[2], abs=eps)
+
+
+# Storage in redispatch: a cheap northern generator feeds a southern demand across
+# an undersized line, so the line is congested. A storage at the southern bus can
+# discharge (upward redispatch) to relieve the congestion.
+storage_lines = pd.DataFrame(
+    {
+        "name": ["line_N_S"],
+        "bus0": ["N"],
+        "bus1": ["S"],
+        "s_nom": [100.0],
+        "x": [0.01],
+        "r": [0.001],
+    }
+).set_index("name")
+
+storage_generators = pd.DataFrame(
+    {
+        "name": ["gen_N"],
+        "node": ["N"],
+        "marginal_cost": [10.0],
+        "max_power": [1000.0],
+    }
+).set_index("name")
+
+storage_demand = pd.DataFrame(
+    {
+        "name": ["dem_S"],
+        "node": ["S"],
+        "max_power": [-1000.0],
+    }
+).set_index("name")
+
+storage_units_df = pd.DataFrame(
+    {
+        "name": ["storage_S"],
+        "node": ["S"],
+        "max_power_discharge": [500.0],
+        "max_power_charge": [-500.0],
+    }
+).set_index("name")
+
+STORAGE_P_NOM = 500.0 - (-500.0)  # full power span used as p_nom
+
+
+@pytest.fixture
+def grid_data_with_storage():
+    return {
+        "buses": nodes,
+        "lines": storage_lines,
+        "generators": storage_generators,
+        "loads": storage_demand,
+        "storage_units": storage_units_df,
+    }
+
+
+def test_initialization_with_storage(
+    simple_redispatch_market_config, grid_data_with_storage
+):
+    """Storage adds a fixed + up + down generator triple to the redispatch network."""
+    mc = simple_redispatch_market_config
+    mc.param_dict["grid_data"] = grid_data_with_storage
+    rmr = RedispatchMarketRole(mc)
+
+    # generators*3 + nodes*2 backups + storages*3
+    expected_num_generators = (
+        len(storage_generators) * 3 + len(nodes) * 2 + len(storage_units_df) * 3
+    )
+    assert len(rmr.network.generators) == expected_num_generators
+
+
+@pytest.mark.parametrize(
+    "storage_baseline, gen_cleared, expected_storage_volume, expected_gen_volume",
+    [
+        # idle storage discharges 200 MW upward; northern gen backs down 200 MW
+        (0.0, 300.0, 200.0, -200.0),
+        # charging storage (-100) swings up by 300 MW (stops charging + discharges 200)
+        (-100.0, 400.0, 300.0, -300.0),
+    ],
+)
+def test_redispatch_with_storage(
+    simple_redispatch_market_config,
+    grid_data_with_storage,
+    storage_baseline,
+    gen_cleared,
+    expected_storage_volume,
+    expected_gen_volume,
+):
+    market_config = simple_redispatch_market_config
+    market_config.param_dict["grid_data"] = grid_data_with_storage
+    market_config.param_dict["log_flows"] = True
+
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(market_config.market_products, next_opening)
+    start, end = products[0][0], products[0][1]
+
+    orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "only_hours": None,
+            "unit_id": "gen_N",
+            "bid_id": "gen_N_1",
+            "volume": gen_cleared,
+            "min_power": 0.0,
+            "max_power": 1000.0,
+            "p_nom": 1000.0,
+            "price": 10.0,
+            "node": "N",
+        },
+        {
+            "start_time": start,
+            "end_time": end,
+            "only_hours": None,
+            "unit_id": "dem_S",
+            "bid_id": "dem_S_1",
+            "volume": -300.0,
+            "min_power": 0.0,
+            "max_power": -1000.0,
+            "p_nom": 1000.0,
+            "price": 3000.0,
+            "node": "S",
+        },
+        {
+            "start_time": start,
+            "end_time": end,
+            "only_hours": None,
+            "unit_id": "storage_S",
+            "bid_id": "storage_S_1",
+            "volume": storage_baseline,
+            "min_power": -500.0,  # SoC-aware charge bound (negative)
+            "max_power": 500.0,  # SoC-aware discharge bound (positive)
+            "p_nom": STORAGE_P_NOM,
+            "price": 20.0,
+            # plenty of stored energy and room: only the power limits bind here
+            "energy_discharge_headroom": 1000.0,
+            "energy_charge_headroom": 1000.0,
+            "efficiency_charge": 1.0,
+            "efficiency_discharge": 1.0,
+            "node": "S",
+        },
+    ]
+
+    rmr = RedispatchMarketRole(market_config)
+    accepted_orders, _, meta, flows = rmr.clear(orderbook, products)
+
+    accepted = {o["unit_id"]: o for o in accepted_orders}
+
+    # the storage is redispatched upward (discharge) to relieve the congestion ...
+    assert "storage_S" in accepted
+    assert accepted["storage_S"]["accepted_volume"] == pytest.approx(
+        expected_storage_volume, abs=1e-1
+    )
+    assert accepted["storage_S"]["accepted_price"] == pytest.approx(20.0)
+    # ... while the cheap northern generator is redispatched downward
+    assert accepted["gen_N"]["accepted_volume"] == pytest.approx(
+        expected_gen_volume, abs=1e-1
+    )
+    # upward and downward redispatch balance out
+    assert sum(o["accepted_volume"] for o in accepted_orders) == pytest.approx(
+        0.0, abs=1e-1
+    )
+    # congestion is resolved: the final flow respects the line rating
+    flows_df = pd.Series(flows).unstack()
+    assert (
+        abs(flows_df.loc[0, "line_N_S"]) <= storage_lines.loc["line_N_S", "s_nom"] + eps
+    )
+
+
+def test_redispatch_storage_energy_limit(simple_redispatch_market_config):
+    """
+    The storage may not deliver more redispatch energy over the horizon than it
+    holds. Every hour needs 200 MW of upward redispatch in the south, the storage
+    offers 500 MW per hour but holds only 300 MWh, so it must stop at 300 MWh and
+    the expensive southern generator has to cover the rest.
+    """
+    n_hours = 4
+    energy_available = 300.0  # MWh above min_soc
+
+    market_config = simple_redispatch_market_config
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), n_hours, timedelta(hours=1))
+    ]
+    market_config.param_dict["grid_data"] = {
+        "buses": nodes,
+        "lines": storage_lines,
+        "generators": pd.DataFrame(
+            {
+                "name": ["gen_N", "gen_S"],
+                "node": ["N", "S"],
+                "marginal_cost": [10.0, 100.0],
+                "max_power": [1000.0, 1000.0],
+            }
+        ).set_index("name"),
+        "loads": storage_demand,
+        "storage_units": storage_units_df.assign(
+            efficiency_charge=1.0, efficiency_discharge=1.0
+        ),
+    }
+
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(market_config.market_products, next_opening)
+
+    orderbook = []
+    for start, end, _ in products:
+        common = {"start_time": start, "end_time": end, "only_hours": None}
+        orderbook += [
+            {
+                **common,
+                "unit_id": "gen_N",
+                "bid_id": f"gen_N_{start}",
+                "volume": 300.0,
+                "min_power": 0.0,
+                "max_power": 1000.0,
+                "p_nom": 1000.0,
+                "price": 10.0,
+                "node": "N",
+            },
+            {
+                **common,
+                "unit_id": "gen_S",
+                "bid_id": f"gen_S_{start}",
+                "volume": 0.0,
+                "min_power": 0.0,
+                "max_power": 1000.0,
+                "p_nom": 1000.0,
+                "price": 100.0,
+                "node": "S",
+            },
+            {
+                **common,
+                "unit_id": "dem_S",
+                "bid_id": f"dem_S_{start}",
+                "volume": -300.0,
+                "min_power": 0.0,
+                "max_power": -1000.0,
+                "p_nom": 1000.0,
+                "price": 3000.0,
+                "node": "S",
+            },
+            {
+                **common,
+                "unit_id": "storage_S",
+                "bid_id": f"storage_S_{start}",
+                "volume": 0.0,
+                "min_power": -500.0,
+                "max_power": 500.0,
+                "p_nom": STORAGE_P_NOM,
+                "price": 20.0,
+                # idle baseline -> head-room stays constant over the horizon
+                "energy_discharge_headroom": energy_available,
+                "energy_charge_headroom": 1000.0,
+                "efficiency_charge": 1.0,
+                "efficiency_discharge": 1.0,
+                "node": "S",
+            },
+        ]
+
+    rmr = RedispatchMarketRole(market_config)
+    accepted_orders, _, _, _ = rmr.clear(orderbook, products)
+
+    volume = {}
+    for o in accepted_orders:
+        volume[o["unit_id"]] = volume.get(o["unit_id"], 0.0) + o["accepted_volume"]
+
+    # without the energy constraint the cheap storage would deliver 4 x 200 MWh
+    assert volume["storage_S"] == pytest.approx(energy_available, abs=1e-1)
+    assert volume["gen_S"] == pytest.approx(
+        n_hours * 200.0 - energy_available, abs=1e-1
+    )
+    assert volume["gen_N"] == pytest.approx(-n_hours * 200.0, abs=1e-1)
+
+
+def test_redispatch_storage_without_headroom_is_blocked(
+    simple_redispatch_market_config, grid_data_with_storage, caplog
+):
+    """A storage bid without energy headroom must not be redispatched at all."""
+    market_config = simple_redispatch_market_config
+    market_config.param_dict["grid_data"] = grid_data_with_storage
+
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(market_config.market_products, next_opening)
+    common = {"start_time": products[0][0], "end_time": products[0][1]}
+    common["only_hours"] = None
+    orderbook = [
+        {
+            **common,
+            "unit_id": "gen_N",
+            "bid_id": "gen_N_1",
+            "volume": 300.0,
+            "min_power": 0.0,
+            "max_power": 1000.0,
+            "p_nom": 1000.0,
+            "price": 10.0,
+            "node": "N",
+        },
+        {
+            **common,
+            "unit_id": "dem_S",
+            "bid_id": "dem_S_1",
+            "volume": -300.0,
+            "min_power": 0.0,
+            "max_power": -1000.0,
+            "p_nom": 1000.0,
+            "price": 3000.0,
+            "node": "S",
+        },
+        {
+            **common,
+            "unit_id": "storage_S",
+            "bid_id": "storage_S_1",
+            "volume": 0.0,
+            "min_power": -500.0,
+            "max_power": 500.0,
+            "p_nom": STORAGE_P_NOM,
+            "price": 20.0,
+            "node": "S",
+        },
+    ]
+
+    rmr = RedispatchMarketRole(market_config)
+    with caplog.at_level("WARNING"):
+        accepted_orders, _, _, _ = rmr.clear(orderbook, products)
+
+    assert "redispatch is blocked" in caplog.text
+    assert "storage_S" not in {o["unit_id"] for o in accepted_orders}
+
+
+def test_redispatch_storage_energy_limit_with_different_durations(
+    simple_redispatch_market_config,
+):
+    """
+    Products of different length: 1 h and then 2 h. The storage holds 30 MWh, so
+    up_0 * 1 h + up_1 * 2 h must not exceed 30 MWh. Using one duration for all
+    snapshots would let it deliver 20 MWh + 10 MW * 2 h = 40 MWh.
+    """
+    energy_available = 30.0
+    market_config = simple_redispatch_market_config
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), 2, timedelta(hours=1))
+    ]
+    market_config.param_dict["grid_data"] = {
+        "buses": nodes,
+        "lines": storage_lines,
+        "generators": pd.DataFrame(
+            {
+                "name": ["gen_N", "gen_S"],
+                "node": ["N", "S"],
+                "marginal_cost": [10.0, 100.0],
+                "max_power": [1000.0, 1000.0],
+            }
+        ).set_index("name"),
+        "loads": storage_demand,
+        "storage_units": storage_units_df,
+    }
+
+    t0 = datetime(2005, 6, 1, 1)
+    products = [
+        (t0, t0 + timedelta(hours=1), None),
+        (t0 + timedelta(hours=1), t0 + timedelta(hours=3), None),
+    ]
+    orderbook = []
+    for start, end, _ in products:
+        common = {"start_time": start, "end_time": end, "only_hours": None}
+        orderbook += [
+            {
+                **common,
+                "unit_id": "gen_N",
+                "bid_id": f"gen_N_{start}",
+                "volume": 120.0,
+                "min_power": 0.0,
+                "max_power": 1000.0,
+                "p_nom": 1000.0,
+                "price": 10.0,
+                "node": "N",
+            },
+            {
+                **common,
+                "unit_id": "gen_S",
+                "bid_id": f"gen_S_{start}",
+                "volume": 0.0,
+                "min_power": 0.0,
+                "max_power": 1000.0,
+                "p_nom": 1000.0,
+                "price": 100.0,
+                "node": "S",
+            },
+            {
+                **common,
+                "unit_id": "dem_S",
+                "bid_id": f"dem_S_{start}",
+                "volume": -120.0,
+                "min_power": 0.0,
+                "max_power": -1000.0,
+                "p_nom": 1000.0,
+                "price": 3000.0,
+                "node": "S",
+            },
+            {
+                **common,
+                "unit_id": "storage_S",
+                "bid_id": f"storage_S_{start}",
+                "volume": 0.0,
+                "min_power": -500.0,
+                "max_power": 500.0,
+                "p_nom": STORAGE_P_NOM,
+                "price": 20.0,
+                "energy_discharge_headroom": energy_available,
+                "energy_charge_headroom": 1000.0,
+                "efficiency_charge": 1.0,
+                "efficiency_discharge": 1.0,
+                "node": "S",
+            },
+        ]
+
+    rmr = RedispatchMarketRole(market_config)
+    accepted_orders, _, _, _ = rmr.clear(orderbook, products)
+
+    energy = sum(
+        o["accepted_volume"] * (o["end_time"] - o["start_time"]).total_seconds() / 3600
+        for o in accepted_orders
+        if o["unit_id"] == "storage_S"
+    )
+    # 20 MW of congestion in both products: the storage gives exactly its 30 MWh
+    assert energy == pytest.approx(energy_available, abs=1e-1)
