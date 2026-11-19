@@ -14,6 +14,7 @@ Upcoming Release
 
 **Improvements:**
   - **Faster cost calculation**: ``calculate_costs`` reads and writes the dispatched interval at once instead of per time step. This speeds up simulations where each dispatch covers several time steps, e.g. by about 4 % for example_01f with daily clearing.
+
 **Bug Fixes:**
   - **Compare Scenarios dashboard: bid difference panels** (#787): "Accepted Bid Prices Difference" and "Accepted Bid Volume Difference" compared the selected simulation with itself and always showed 0. They now compare ``simulation`` with ``simulation_comp``.
 
