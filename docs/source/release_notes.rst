@@ -12,6 +12,9 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**Bug Fixes:**
+  - **Compare Scenarios dashboard: bid difference panels** (#787): "Accepted Bid Prices Difference" and "Accepted Bid Volume Difference" compared the selected simulation with itself and always showed 0. They now compare ``simulation`` with ``simulation_comp``.
+
 0.7.0 - (11th November 2026)
 =========================
 
