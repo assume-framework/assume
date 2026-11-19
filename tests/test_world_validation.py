@@ -367,3 +367,63 @@ def test_duplicate_market_id(world):
         world.add_market(
             market_operator_id="market_operator", market_config=duplicate_market_config
         )
+
+
+def test_add_units_with_operator_subprocess_registration(world):
+    """Adding units via subprocess properly registers operators and units in world."""
+    world.add_market_operator("market_operator")
+    market_opening = rr.rrule(rr.HOURLY, dtstart=world.start, until=world.end)
+    market_products = [
+        MarketProduct(
+            duration=datetime.timedelta(hours=1),
+            count=1,
+            first_delivery=datetime.timedelta(hours=1),
+        )
+    ]
+    market_config = MarketConfig(
+        "test_EOM", opening_hours=market_opening, market_products=market_products
+    )
+    world.add_market(market_operator_id="market_operator", market_config=market_config)
+
+    units_op1 = [
+        {
+            "id": "gen1",
+            "unit_type": "power_plant",
+            "unit_operator_id": "op1",
+            "unit_params": {
+                "bidding_strategies": {"test_EOM": "naive_eom"},
+                "technology": "energy",
+                "max_power": 10,
+                "min_power": 0,
+            },
+            "forecaster": PowerplantForecaster(index),
+        }
+    ]
+    units_op2 = [
+        {
+            "id": "gen2",
+            "unit_type": "power_plant",
+            "unit_operator_id": "op2",
+            "unit_params": {
+                "bidding_strategies": {"test_EOM": "naive_eom"},
+                "technology": "energy",
+                "max_power": 10,
+                "min_power": 0,
+            },
+            "forecaster": PowerplantForecaster(index),
+        }
+    ]
+    world.add_units_with_operator_subprocess(
+        id="op1", units=units_op1, strategies={"test_EOM": "naive_eom"}
+    )
+    world.add_units_with_operator_subprocess(
+        id="op2", units=units_op2, strategies={"test_EOM": "naive_eom"}
+    )
+
+    assert "op1" in world.unit_operators
+    assert "op2" in world.unit_operators
+    assert "gen1" in world.units
+    assert "gen2" in world.units
+
+    # Validation must succeed without ValueError
+    world._validate_setup()
