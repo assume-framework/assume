@@ -1139,8 +1139,10 @@ class LearningConfig:
         episodes_collecting_initial_experience (int): The number of episodes at the start during which random
             actions are chosen instead of using the actor network. This helps populate the replay buffer with
             diverse experiences. Default is 5.
-        exploration_noise_std (float): The standard deviation of Gaussian noise added to actions during
-            exploration in the environment. Higher values encourage more exploration. Default is 0.2.
+        exploration_noise_std (float): The standard deviation of the Gaussian noise that is used as action during
+            the first episodes_collecting_initial_experience episodes, in which the actor network is not used yet.
+            Higher values cover a larger part of the action space. Afterwards, the exploration noise is defined by
+            noise_sigma, noise_scale and noise_dt. Default is 0.2.
         training_episodes (int): The number of training episodes, where one episode is the entire simulation
             horizon specified in the general config. Default is 100.
         validation_episodes_interval (int): The interval (in episodes) at which validation episodes are run
@@ -1148,7 +1150,7 @@ class LearningConfig:
         train_freq (str): Defines the frequency in time steps at which the actor and critic networks are updated.
             Accepts time strings like "24h" for 24 hours or "1d" for 1 day. Default is "24h".
         batch_size (int): The batch size of experiences sampled from the replay buffer for each training update.
-            Larger batches provide more stable gradients but require more memory. In environments with many leanring agents we advise small batch sizes.
+            Larger batches provide more stable gradients but require more memory. In environments with many learning agents we advise small batch sizes.
             Default is 128.
         gradient_steps (int): The number of gradient descent steps performed during each training update.
             More steps can lead to better learning but increase computation time. Default is 100.
@@ -1166,15 +1168,15 @@ class LearningConfig:
         algorithm (str): Specifies which reinforcement learning algorithm to use. Currently, only "matd3"
             (Multi-Agent Twin Delayed Deep Deterministic Policy Gradient) is implemented. Default is "matd3".
         replay_buffer_size (int): The maximum number of transitions stored in the replay buffer for experience replay.
-            Larger buffers allow for more diverse training samples. Default is 500000.
+            Larger buffers allow for more diverse training samples. Default is 50000.
         gamma (float): The discount factor for future rewards, ranging from 0 to 1. Higher values give more
             weight to long-term rewards in decision-making. Default is 0.99.
         actor_architecture (str): The architecture of the neural networks used for the actors. Options include
             "mlp" (Multi-Layer Perceptron) and "lstm" (Long Short-Term Memory). Default is "mlp".
         policy_delay (int): The frequency (in gradient steps) at which the actor policy is updated.
             TD3 updates the critic more frequently than the actor to stabilize training. Default is 2.
-        noise_sigma (float): Standard deviation of the Gaussian exploration noise added to the actor's actions.
-            The effective noise std is noise_sigma * noise_scale * noise_dt. Default is 0.1.
+        noise_sigma (float): Standard deviation of the Gaussian exploration noise added to the actor's actions
+            after the initial experience collection. The effective noise std is noise_sigma * noise_scale * noise_dt. Default is 0.1.
         noise_scale (float): Constant factor multiplied onto the sampled noise. Larger values increase exploration.
             Default is 1.
         noise_dt (float): Noise multiplier that is subject to the action noise schedule. With

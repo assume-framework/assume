@@ -22,6 +22,8 @@ Throughout the code and this page, the same sign convention is used everywhere:
   ``max_power_charge`` is the most negative / largest-magnitude charging power).
 - A power of ``0`` means the unit is idle.
 
+An overview of the sign conventions of all units and markets is given on the :doc:`conventions` page.
+
 
 The usable energy content of the storage is tracked as a **state of charge (SOC)**, a value between 0 and 1 relative to the unit's ``capacity`` in MWh. The SOC of a time step is the value at its beginning, before the dispatch of that step: an SOC of 0.5 at 22:00 means that half of the capacity is stored at 22:00, and the dispatch from 22:00 to 23:00 changes the SOC of 23:00.
 The SOC is kept within ``min_soc`` and ``max_soc``. How far the unit can charge or discharge in the current step is additionally capped by how much energy is actually left in (or missing from) the storage -- this is computed by :meth:`~assume.units.storage.Storage.calculate_soc_max_charge` and :meth:`~assume.units.storage.Storage.calculate_soc_max_discharge`.
