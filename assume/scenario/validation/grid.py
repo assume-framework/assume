@@ -17,7 +17,7 @@ from assume.scenario.validation.config import StudyCase
 from assume.scenario.validation.folder import ScenarioFolder
 from assume.scenario.validation.report import Reporter
 from assume.scenario.validation.schema import GRID_FILES, UNIT_FILES
-from assume.scenario.validation.utils import hint, listed
+from assume.scenario.validation.utils import check_rows, hint, listed
 
 # clearing mechanisms which cannot work without a grid
 GRID_MECHANISMS = ("nodal_clearing", "redispatch")
@@ -89,20 +89,20 @@ class GridChecker:
         network = directory.relative_to(self.folder.path)
         for name in GRID_FILES:
             if not (directory / name).is_file():
-                self.folder.reporter(self.folder.CONFIG_FILE).error(
+                self.folder.report.scope(self.folder.CONFIG_FILE).error(
                     f"network_path '{network}' needs '{name}'"
                 )
         buses = self._read(directory / "buses.csv")
         lines = self._read(directory / "lines.csv")
         if buses is not None:
-            self._check_buses(buses, self.folder.reporter("buses.csv"))
+            self._check_buses(buses, self.folder.report.scope("buses.csv"))
         if lines is not None:
-            self._check_lines(lines, buses, self.folder.reporter("lines.csv"))
+            self._check_lines(lines, buses, self.folder.report.scope("lines.csv"))
         if buses is not None:
             self._check_unit_nodes(directory, buses, zones)
 
     def _check_buses(self, buses: pd.DataFrame, log: Reporter) -> None:
-        if not self._has_rows(buses, "bus", log):
+        if not check_rows(buses, "bus", log):
             return
         for column in BUS_NUMERIC:
             self._check_numeric(buses, column, log)
@@ -110,7 +110,7 @@ class GridChecker:
     def _check_lines(
         self, lines: pd.DataFrame, buses: pd.DataFrame | None, log: Reporter
     ) -> None:
-        if not self._has_rows(lines, "line", log):
+        if not check_rows(lines, "line", log):
             return
         missing = [c for c in LINE_REQUIRED if c not in lines.columns]
         for column in missing:
@@ -149,27 +149,15 @@ class GridChecker:
             nodes |= set(buses[zone].dropna())
         for key in UNIT_FILES:
             path = directory / f"{key}.csv"
-            df = self.folder.read(path) if path.is_file() else None
+            df = self._read(path)
             if df is None or "node" not in df.columns:
                 continue
             unknown = df.loc[~df["node"].isin(nodes), "node"].dropna()
             if len(unknown):
-                self.folder.reporter(path.name).warning(
+                self.folder.report.scope(path.name).warning(
                     f"'node' of {listed(unknown.index)} is no bus of buses.csv: "
                     f"{listed(unknown.unique())}{hint(unknown.iloc[0], nodes)}"
                 )
-
-    @staticmethod
-    def _has_rows(df: pd.DataFrame, what: str, log: Reporter) -> bool:
-        if df.empty:
-            log.error("contains no rows")
-            return False
-        duplicates = df.index[df.index.duplicated()].unique()
-        if len(duplicates):
-            log.error(f"duplicate {what} names: {listed(duplicates)}")
-        if df.index.isna().any():
-            log.error(f"has rows without a {what} name in the first column")
-        return True
 
     @staticmethod
     def _check_numeric(

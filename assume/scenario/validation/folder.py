@@ -11,7 +11,7 @@ from typing import NamedTuple
 import pandas as pd
 import yaml
 
-from assume.scenario.validation.report import Reporter, ValidationReport
+from assume.scenario.validation.report import ValidationReport
 from assume.scenario.validation.schema import FILE_KEYS, GRID_FILES
 from assume.scenario.validation.utils import YamlMapping, YamlValue, hint
 
@@ -61,12 +61,9 @@ class ScenarioFolder:
         self.report = ValidationReport(path=str(path))
         self._csv: dict[Path, pd.DataFrame | None] = {}
 
-    def reporter(self, file: str, prefix: str = "") -> Reporter:
-        return self.report.scope(file, prefix)
-
     def load_config(self) -> dict[object, YamlValue] | None:
         """Read ``config.yaml``; report and return None if that is not possible."""
-        log = self.reporter(self.CONFIG_FILE)
+        log = self.report.scope(self.CONFIG_FILE)
         if not self.path.is_dir():
             self.report.error(str(self.path), "is not a directory")
             return None
@@ -113,7 +110,7 @@ class ScenarioFolder:
                 UnicodeDecodeError,
                 ValueError,
             ) as e:
-                self.reporter(path.name).error(f"is not a valid csv file: {e}")
+                self.report.scope(path.name).error(f"is not a valid csv file: {e}")
                 self._csv[path] = None
         return self._csv[path]
 
