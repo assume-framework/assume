@@ -7,6 +7,7 @@ from typing import cast
 
 from assume.scenario.validation.config import ConfigChecker, StudyCase
 from assume.scenario.validation.folder import ScenarioFolder
+from assume.scenario.validation.grid import GridChecker
 from assume.scenario.validation.report import ValidationReport
 from assume.scenario.validation.tables import CaseFiles
 from assume.scenario.validation.utils import quiet_logging
@@ -44,6 +45,7 @@ class ScenarioVerifier:
         for case in cases:
             self.checker.check(case)
             CaseFiles(self.folder, case).check(markets)
+            GridChecker(self.folder, case).check()
 
     def _dry_run(self, case: StudyCase) -> None:
         """Load a study case into a World exactly like a simulation would, but do not run it."""
