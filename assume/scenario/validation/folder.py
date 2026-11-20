@@ -135,7 +135,8 @@ class ScenarioFolder:
         for file in sorted(self.path.iterdir()):
             if not file.is_file() or file.name.startswith("."):
                 continue
-            if file in used or file.suffix == ".license":
+            # only files the loader could read; others (logs, notes, licenses) are no mistake
+            if file in used or file.suffix not in (".csv", ".yaml", ".yml"):
                 continue
             self.report.warning(
                 file.name,
