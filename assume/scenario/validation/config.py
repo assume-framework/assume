@@ -64,7 +64,7 @@ class ConfigChecker:
         config = self.folder.load_config()
         if config is None:
             return []
-        log = self.folder.reporter(self.folder.CONFIG_FILE)
+        log = self.folder.report.scope(self.folder.CONFIG_FILE)
         cases = []
         for name, case_config in config.items():
             if isinstance(case_config, dict):

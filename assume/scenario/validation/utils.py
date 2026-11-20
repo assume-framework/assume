@@ -11,6 +11,10 @@ from collections.abc import Generator, Iterable
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from typing import Any, TypeAlias
 
+import pandas as pd
+
+from assume.scenario.validation.report import Reporter
+
 MAX_LISTED = 5
 
 # A value read by ``yaml.safe_load``. Its type is not known in advance: finding it out is the
@@ -71,6 +75,26 @@ def listed(items: Iterable[object]) -> str:
     names = [str(i) for i in items]
     more = f" and {len(names) - MAX_LISTED} more" if len(names) > MAX_LISTED else ""
     return ", ".join(names[:MAX_LISTED]) + more
+
+
+def check_rows(
+    df: pd.DataFrame,
+    what: str,
+    log: Reporter,
+    unique: bool = True,
+    empty_is_error: bool = True,
+) -> bool:
+    """Report an empty file, duplicate or unnamed rows; False if there is nothing left to check."""
+    if df.empty:
+        (log.error if empty_is_error else log.warning)("contains no rows")
+        return False
+    if unique:
+        duplicates = df.index[df.index.duplicated()].unique()
+        if len(duplicates):
+            log.error(f"duplicate {what} names: {listed(duplicates)}")
+    if df.index.isna().any():
+        log.error(f"has rows without a {what} name in the first column")
+    return True
 
 
 @contextmanager

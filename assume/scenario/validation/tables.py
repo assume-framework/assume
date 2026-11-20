@@ -34,6 +34,7 @@ from assume.scenario.validation.schema import (
 )
 from assume.scenario.validation.utils import (
     Annotation,
+    check_rows,
     hint,
     listed,
     quiet_logging,
@@ -83,23 +84,11 @@ class Table:
         self.key = key  # the file's name in the config, e.g. "powerplant_units"
         self.path = path
         self.df = df
-        self.log = folder.reporter(path.name)
+        self.log = folder.report.scope(path.name)
 
     @property
     def index(self) -> pd.Index:
         return self.df.index
-
-    def has_rows(self) -> bool:
-        """Report an empty file or unnamed rows; False if there is nothing left to check."""
-        if self.df.empty:
-            report = (
-                self.log.error if self.key in REQUIRED_UNIT_FILES else self.log.warning
-            )
-            report("contains no rows")
-            return False
-        if self.index.isna().any():
-            self.log.error("has rows without a unit name in the first column")
-        return True
 
 
 class BiddingTable(Table):
@@ -115,12 +104,14 @@ class BiddingTable(Table):
         Args:
             markets (set[str]): The ids of all markets defined in the study cases.
         """
-        if not self.has_rows():
+        if not check_rows(
+            self.df,
+            "unit",
+            self.log,
+            unique=self.UNIQUE_NAMES,
+            empty_is_error=self.key in REQUIRED_UNIT_FILES,
+        ):
             return
-        if self.UNIQUE_NAMES:
-            duplicates = self.index[self.index.duplicated()].unique()
-            if len(duplicates):
-                self.log.error(f"duplicate unit names: {listed(duplicates)}")
         self.check_columns()
         for column in self.bidding_columns:
             self._check_bidding_column(column, markets)
@@ -156,7 +147,7 @@ class BiddingTable(Table):
                 )
                 self.log.error(
                     f"{unit}: unknown bidding strategy '{strategy}' in '{column}'"
-                    f"{hint(strategy, strategies)}{learning}"
+                    f"{hint(strategy, strategies)}{learning}. "
                     f"Ignore this message if you defined this custom strategy"
                 )
 
@@ -317,7 +308,7 @@ class CaseFiles:
                         f"'{key}' points to missing file '{ref.path.name}'"
                     )
                 elif key in REQUIRED_UNIT_FILES:
-                    self.folder.reporter(ref.path.name).error(
+                    self.folder.report.scope(ref.path.name).error(
                         f"required file not found in {self.folder.path}"
                     )
                 continue
