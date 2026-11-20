@@ -34,8 +34,8 @@ class PowerPlant(SupportsMinMax):
         partial_load_eff (bool, optional): Does the efficiency vary at part loads? Defaults to False.
         fuel_type (str, optional): The type of fuel used by the power plant for power generation. Defaults to "others".
         emission_factor (float, optional): The emission factor associated with the power plant's fuel type (tons of CO2 emissions per MWh). Defaults to 0.0.
-        ramp_up (Union[float, None], optional): The ramp-up rate of the power plant, indicating how quickly it can increase power output. Defaults to None.
-        ramp_down (Union[float, None], optional): The ramp-down rate of the power plant, indicating how quickly it can decrease power output. Defaults to None.
+        ramp_up (Union[float, None], optional): The ramp-up rate (positive, in MW/min) of the power plant, indicating how quickly it can increase power output. Defaults to None.
+        ramp_down (Union[float, None], optional): The ramp-down rate (positive, in MW/min) of the power plant, indicating how quickly it can decrease power output. Defaults to None.
         hot_start_cost (float, optional): The cost of a hot start, where the power plant is restarted after a recent shutdown. Defaults to 0.
         warm_start_cost (float, optional): The cost of a warm start, where the power plant is restarted after a moderate downtime. Defaults to 0.
         cold_start_cost (float, optional): The cost of a cold start, where the power plant is restarted after a prolonged downtime. Defaults to 0.

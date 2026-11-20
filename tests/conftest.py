@@ -33,8 +33,8 @@ class MockMinMaxUnit(SupportsMinMax):
         )
         self.max_power = 1000
         self.min_power = 0
-        self.ramp_down = 200
-        self.ramp_up = 400
+        self.ramp_down = 200/60
+        self.ramp_up = 400/60
 
     def calculate_min_max_power(
         self, start: datetime, end: datetime, product_type="energy"
