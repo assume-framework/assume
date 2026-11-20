@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 import warnings
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
@@ -11,7 +12,8 @@ import pandas as pd
 import yaml
 
 from assume.scenario.validation.report import Reporter, ValidationReport
-from assume.scenario.validation.utils import YamlMapping, YamlValue
+from assume.scenario.validation.schema import FILE_KEYS, GRID_FILES
+from assume.scenario.validation.utils import YamlMapping, YamlValue, hint
 
 
 @dataclass(frozen=True)
@@ -122,3 +124,57 @@ class ScenarioFolder:
             return False
         self._checked.add(path)
         return True
+
+    def check_unused_files(self, case_configs: Iterable[YamlMapping]) -> None:
+        """
+        Warn about files in the folder that no study case reads, as they may be named wrong.
+
+        Args:
+            case_configs (Iterable[YamlMapping]): The configuration of every verified study case.
+        """
+        if not self.path.is_dir():
+            return
+        used = {self.path / self.CONFIG_FILE}
+        for case_config in case_configs:
+            for key in FILE_KEYS:
+                ref = self.resolve(case_config, key)
+                # a file disabled with `null` is left out on purpose, so it is not a mistake
+                used.add(ref.path or self.path / f"{key}.csv")
+            used |= self._referenced_paths(case_config)
+
+        expected = [f"{key}.csv" for key in FILE_KEYS]
+        for file in sorted(self.path.iterdir()):
+            if not file.is_file() or file.name.startswith("."):
+                continue
+            if file in used or file.suffix == ".license":
+                continue
+            self.report.warning(
+                file.name,
+                "is not used by any study case, is the name correct?"
+                + hint(file.name, expected),
+            )
+
+    def _referenced_paths(self, config: YamlMapping) -> set[Path]:
+        """Files that the config refers to through keys ending in ``_path`` or ``forecast_save_file``."""
+        found: set[Path] = set()
+
+        def walk(node: YamlValue) -> None:
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    if isinstance(key, str) and isinstance(value, str):
+                        if key == "forecast_save_file":
+                            found.add(self.path / value)
+                        elif key.endswith("_path"):
+                            target = self.path / value
+                            found.add(target)
+                            if key == "network_path":
+                                found.update(target / f for f in GRID_FILES)
+                    walk(value)
+            elif isinstance(node, list):
+                for item in node:
+                    walk(item)
+
+        walk(config)
+        if config.get("save_forecasts"):
+            found.add(self.path / "saved_forecasts.csv")
+        return found
