@@ -393,7 +393,7 @@ class SupportsMinMax(BaseUnit):
         self,
         op_time: int,
         previous_power: float,
-        power: float,
+        requested_power: float,
         current_power: float = 0,
     ) -> float:
         """
@@ -402,32 +402,32 @@ class SupportsMinMax(BaseUnit):
         Args:
             op_time (int): The operation time.
             previous_power (float): The previous power output of the unit.
-            power (float): The planned power offer of the unit.
+            requested_power (float): The planned power offer of the unit.
             current_power (float): The current power output of the unit.
 
         Returns:
             float: The corrected possible power to offer according to ramping restrictions.
         """
         if self.ramp_down is None and self.ramp_up is None:
-            return power
+            return requested_power
 
         # was off before, but should be on now and min_down_time is not reached
-        if power > 0 and op_time < 0 and op_time > -self.min_down_time:
+        if requested_power > 0 and op_time < 0 and op_time > -self.min_down_time:
             power = 0
         # was on before, but should be off now and min_operating_time is not reached
-        elif power == 0 and op_time > 0 and op_time < self.min_operating_time:
+        elif requested_power == 0 and op_time > 0 and op_time < self.min_operating_time:
             power = self.min_power
 
-        if power == 0:
+        if requested_power == 0:
             # if less than min_power is required, we run min_power
             # we could also split at self.min_power/2
-            return power
+            return requested_power
 
         # ramp up constraint
         # max_power + current_power < previous_power + unit.ramp_up
         if self.ramp_up is not None:
             power = min(
-                power,
+                requested_power,
                 previous_power + self.ramp_up - current_power,
                 self.max_power - current_power,
             )
@@ -435,7 +435,7 @@ class SupportsMinMax(BaseUnit):
         # min_power + current_power > previous_power - unit.ramp_down
         if self.ramp_down is not None:
             power = max(
-                power,
+                requested_power,
                 previous_power - self.ramp_down - current_power,
                 self.min_power - current_power,
             )
