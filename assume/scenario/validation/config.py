@@ -59,20 +59,12 @@ class ConfigChecker:
         self.folder = folder
         self.registry = folder.registry
 
-    def load_cases(self, only_case: str = "") -> list[StudyCase]:
-        """Read the study cases from ``config.yaml``: all of them, or only ``only_case``."""
+    def load_cases(self) -> list[StudyCase]:
+        """Read all study cases from ``config.yaml``."""
         config = self.folder.load_config()
         if config is None:
             return []
         log = self.folder.reporter(self.folder.CONFIG_FILE)
-        if only_case:
-            if only_case not in config:
-                log.error(
-                    f"study case '{only_case}' not found{hint(only_case, config)}. "
-                    f"Available: {listed(config)}"
-                )
-                return []
-            config = {only_case: config[only_case]}
         cases = []
         for name, case_config in config.items():
             if isinstance(case_config, dict):

@@ -27,22 +27,35 @@ BUS_NUMERIC = ("v_nom", "x", "y")
 
 
 class GridChecker:
-    """Checks the grid files that the markets of one study case refer to."""
+    """Checks the grid files that the markets of the study cases refer to."""
 
-    def __init__(self, folder: ScenarioFolder, case: StudyCase):
+    def __init__(self, folder: ScenarioFolder, cases: list[StudyCase]):
         self.folder = folder
-        self.case = case
+        self.cases = cases
 
     def check(self) -> None:
-        markets = self.case.config.get("markets_config")
-        if not isinstance(markets, dict):
-            return
-        for market_id, params in markets.items():
-            if isinstance(params, dict):
-                self._check_market(str(market_id), params)
+        """Check the grid settings of every market, then each grid folder once."""
+        # grid folder -> the zones_identifier of all markets that use it
+        grids: dict[Path, set[str]] = {}
+        for case in self.cases:
+            markets = case.config.get("markets_config")
+            if not isinstance(markets, dict):
+                continue
+            for market_id, params in markets.items():
+                if not isinstance(params, dict):
+                    continue
+                log = case.reporter(section=f"markets_config.{market_id}: ")
+                grid = self._check_market(params, log)
+                if grid is not None:
+                    directory, zones = grid
+                    grids.setdefault(directory, set()).update(zones)
+        for directory, zones in grids.items():
+            self._check_grid(directory, zones)
 
-    def _check_market(self, market_id: str, params: dict) -> None:
-        log = self.case.reporter(section=f"markets_config.{market_id}: ")
+    def _check_market(
+        self, params: dict, log: Reporter
+    ) -> tuple[Path, set[str]] | None:
+        """Check the grid settings of a market; return its grid folder and zone column."""
         param_dict = params.get("param_dict")
         param_dict = param_dict if isinstance(param_dict, dict) else {}
         network = param_dict.get("network_path")
@@ -52,44 +65,41 @@ class GridChecker:
                     f"'{params['market_mechanism']}' needs a grid: set param_dict.network_path"
                     " to the folder with buses.csv and lines.csv"
                 )
-            return
+            return None
         directory = self.folder.path / network
         if not directory.is_dir():
-            return  # reported by the config checker
-        buses, lines = self._read(directory, log)
+            return None  # reported by the config checker
         zones = param_dict.get("zones_identifier")
-        if buses is not None and isinstance(zones, str) and zones not in buses.columns:
+        if not isinstance(zones, str):
+            return directory, set()
+        buses = self._read(directory / "buses.csv")
+        if buses is not None and zones not in buses.columns:
             log.error(
                 f"param_dict.zones_identifier '{zones}' is no column of buses.csv"
                 f"{hint(zones, buses.columns)}"
             )
-            zones = None
-        if self.folder.first_visit(directory):
-            self._check_files(directory, buses, lines)
+            return directory, set()
+        return directory, {zones}
 
-    def _read(
-        self, directory: Path, log: Reporter
-    ) -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
-        found = []
+    def _read(self, path: Path) -> pd.DataFrame | None:
+        return self.folder.read(path) if path.is_file() else None
+
+    def _check_grid(self, directory: Path, zones: set[str]) -> None:
+        """Check the files of a grid folder, which may be shared by several markets."""
+        network = directory.relative_to(self.folder.path)
         for name in GRID_FILES:
-            path = directory / name
-            if path.is_file():
-                found.append(self.folder.read(path))
-            else:
-                log.error(f"needs '{name}' in network_path '{directory.name}'")
-                found.append(None)
-        buses, lines = found
-        return buses, lines
-
-    def _check_files(
-        self, directory: Path, buses: pd.DataFrame | None, lines: pd.DataFrame | None
-    ) -> None:
+            if not (directory / name).is_file():
+                self.folder.reporter(self.folder.CONFIG_FILE).error(
+                    f"network_path '{network}' needs '{name}'"
+                )
+        buses = self._read(directory / "buses.csv")
+        lines = self._read(directory / "lines.csv")
         if buses is not None:
             self._check_buses(buses, self.folder.reporter("buses.csv"))
         if lines is not None:
             self._check_lines(lines, buses, self.folder.reporter("lines.csv"))
         if buses is not None:
-            self._check_unit_nodes(directory, buses, self._zone_columns(directory))
+            self._check_unit_nodes(directory, buses, zones)
 
     def _check_buses(self, buses: pd.DataFrame, log: Reporter) -> None:
         if not self._has_rows(buses, "bus", log):
@@ -129,21 +139,6 @@ class GridChecker:
             loops = lines.index[lines["bus0"] == lines["bus1"]]
             if len(loops):
                 log.warning(f"lines connect a bus with itself: {listed(loops)}")
-
-    def _zone_columns(self, directory: Path) -> set[str]:
-        """The ``zones_identifier`` of all markets of the study case using this grid."""
-        zones = set()
-        for params in self.case.config["markets_config"].values():
-            param_dict = params.get("param_dict") if isinstance(params, dict) else None
-            if isinstance(param_dict, dict):
-                network, zone = (
-                    param_dict.get("network_path"),
-                    param_dict.get("zones_identifier"),
-                )
-                if isinstance(network, str) and isinstance(zone, str):
-                    if self.folder.path / network == directory:
-                        zones.add(zone)
-        return zones
 
     def _check_unit_nodes(
         self, directory: Path, buses: pd.DataFrame, zones: set[str]

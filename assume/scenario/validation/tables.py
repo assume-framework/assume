@@ -9,6 +9,9 @@ Every csv file is wrapped in a :class:`Table`. The subclasses know what their ki
 must look like: :class:`UnitTable` (power plants, demand, storage, exchange), :class:`DsmUnitTable`,
 :class:`OperatorTable` and :class:`TimeSeriesTable`. :class:`CaseFiles` bundles the tables of one
 study case and checks how they fit together.
+
+Unit and operator files (:class:`BiddingTable`) do not depend on the study case, so they are checked
+once per file. Time series depend on the time line of a study case and are checked per study case.
 """
 
 import difflib
@@ -75,21 +78,12 @@ class UnitSignature:
 class Table:
     """A csv file of the scenario folder."""
 
-    def __init__(
-        self,
-        folder: ScenarioFolder,
-        case: StudyCase,
-        key: str,
-        path: Path,
-        df: pd.DataFrame,
-    ):
+    def __init__(self, folder: ScenarioFolder, key: str, path: Path, df: pd.DataFrame):
         self.folder = folder
-        self.case = case
         self.key = key  # the file's name in the config, e.g. "powerplant_units"
         self.path = path
         self.df = df
-        self.log = folder.reporter(path.name)  # about the file itself
-        self.case_log = case.reporter(path.name)  # about the file in this study case
+        self.log = folder.reporter(path.name)
 
     @property
     def index(self) -> pd.Index:
@@ -109,7 +103,7 @@ class Table:
 
 
 class BiddingTable(Table):
-    """A table of units or operators with ``bidding_<market>`` columns, which are shared by study cases."""
+    """A table of units or operators with ``bidding_<market>`` columns, shared by the study cases."""
 
     UNIQUE_NAMES = True
     NEEDS_STRATEGY = True  # whether units without any strategy are suspicious
@@ -119,7 +113,7 @@ class BiddingTable(Table):
         Check the file.
 
         Args:
-            markets (set[str]): The ids of all markets defined in the verified study cases.
+            markets (set[str]): The ids of all markets defined in the study cases.
         """
         if not self.has_rows():
             return
@@ -183,15 +177,8 @@ class BiddingTable(Table):
 class UnitTable(BiddingTable):
     """Power plants, demand, storage and exchange units: columns are the unit's constructor arguments."""
 
-    def __init__(
-        self,
-        folder: ScenarioFolder,
-        case: StudyCase,
-        key: str,
-        path: Path,
-        df: pd.DataFrame,
-    ):
-        super().__init__(folder, case, key, path, df)
+    def __init__(self, folder: ScenarioFolder, key: str, path: Path, df: pd.DataFrame):
+        super().__init__(folder, key, path, df)
         unit_class = self.folder.registry.unit_types[UNIT_FILES[self.key]]
         self.signature = UnitSignature.of(unit_class)
 
@@ -260,6 +247,18 @@ class OperatorTable(BiddingTable):
 class TimeSeriesTable(Table):
     """A table indexed by time (demand, availability, fuel prices, ...), checked per study case."""
 
+    def __init__(
+        self,
+        folder: ScenarioFolder,
+        key: str,
+        path: Path,
+        df: pd.DataFrame,
+        case: StudyCase,
+    ):
+        super().__init__(folder, key, path, df)
+        self.case = case
+        self.case_log = case.reporter(path.name)  # about the file in this study case
+
     def check(self) -> None:
         """Check that the table is numeric and covers the simulation time line of the study case."""
         log, df, index = self.case_log, self.df, self.case.index
@@ -289,9 +288,7 @@ class TimeSeriesTable(Table):
             return False
 
 
-def table_class(key: str) -> type[TimeSeriesTable | BiddingTable]:
-    if key in TIMESERIES_FILES:
-        return TimeSeriesTable
+def bidding_table_class(key: str) -> type[BiddingTable]:
     if key in DSM_FILES:
         return DsmUnitTable
     if key == "unit_operators":
@@ -305,7 +302,8 @@ class CaseFiles:
     def __init__(self, folder: ScenarioFolder, case: StudyCase):
         self.folder = folder
         self.case = case
-        self.tables: dict[str, TimeSeriesTable | BiddingTable] = {}
+        self.units: dict[str, BiddingTable] = {}  # unit and operator files
+        self.series: dict[str, TimeSeriesTable] = {}
         self._load()
 
     def _load(self) -> None:
@@ -323,36 +321,30 @@ class CaseFiles:
                         f"required file not found in {self.folder.path}"
                     )
                 continue
-            is_timeseries = key in TIMESERIES_FILES
-            df = (
-                self.folder.read(ref.path, parse_dates=True)
-                if is_timeseries
-                else self.folder.read(ref.path)
-            )
-            if df is not None:
-                self.tables[key] = table_class(key)(
-                    self.folder, self.case, key, ref.path, df
-                )
+            if key in TIMESERIES_FILES:
+                df = self.folder.read(ref.path, parse_dates=True)
+                if df is not None:
+                    self.series[key] = TimeSeriesTable(
+                        self.folder, key, ref.path, df, self.case
+                    )
+            else:
+                df = self.folder.read(ref.path)
+                if df is not None:
+                    self.units[key] = bidding_table_class(key)(
+                        self.folder, key, ref.path, df
+                    )
 
-    def check(self, markets: set[str]) -> None:
-        """
-        Check all files of the study case and how they fit together.
-
-        Args:
-            markets (set[str]): The ids of all markets defined in the verified study cases.
-        """
-        for table in self.tables.values():
-            if isinstance(table, TimeSeriesTable):
-                table.check()  # depends on the time line, so once per study case
-            elif self.folder.first_visit(table.path):
-                table.check(markets)
+    def check(self) -> None:
+        """Check the time series of the study case and how the files fit together."""
+        for table in self.series.values():
+            table.check()
         self._check_demand()
         self._check_availability()
         self._check_exchanges()
         self._check_fuel_prices()
 
     def _check_demand(self) -> None:
-        units, series = self.tables.get("demand_units"), self.tables.get("demand_df")
+        units, series = self.units.get("demand_units"), self.series.get("demand_df")
         if units is None:
             return  # a missing demand_units file is already reported as an error
         if series is None:
@@ -372,13 +364,13 @@ class CaseFiles:
             )
 
     def _check_availability(self) -> None:
-        series = self.tables.get("availability_df")
+        series = self.series.get("availability_df")
         if series is None:
             return
         units = pd.Index([])
         for key in (*UNIT_FILES, *DSM_FILES):
-            if key in self.tables:
-                units = units.append(self.tables[key].index)
+            if key in self.units:
+                units = units.append(self.units[key].index)
         unknown = series.df.columns.difference(units)
         if len(unknown):
             series.case_log.warning(
@@ -386,10 +378,10 @@ class CaseFiles:
             )
 
     def _check_exchanges(self) -> None:
-        units = self.tables.get("exchange_units")
+        units = self.units.get("exchange_units")
         if units is None:
             return
-        series = self.tables.get("exchanges_df")
+        series = self.series.get("exchanges_df")
         if series is None:
             self.case.reporter("exchanges_df.csv").error(
                 "required by exchange_units but missing"
@@ -401,10 +393,10 @@ class CaseFiles:
                     series.case_log.error(f"missing column '{unit}_{direction}'")
 
     def _check_fuel_prices(self) -> None:
-        plants = self.tables.get("powerplant_units")
+        plants = self.units.get("powerplant_units")
         if plants is None or "fuel_type" not in plants.df.columns:
             return
-        prices = self.tables.get("fuel_prices_df")
+        prices = self.series.get("fuel_prices_df")
         if prices is None:
             return
         known = set(prices.df.columns)
