@@ -65,3 +65,6 @@ REQUIRED_MARKET_KEYS = (
     "market_mechanism",
 )
 PRODUCT_KEYS = ("duration", "count", "first_delivery")
+
+# files of a grid, found in the folder that a market names as `param_dict.network_path`
+GRID_FILES = ("buses.csv", "lines.csv")
