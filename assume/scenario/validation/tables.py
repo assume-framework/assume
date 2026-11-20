@@ -353,7 +353,12 @@ class CaseFiles:
 
     def _check_demand(self) -> None:
         units, series = self.tables.get("demand_units"), self.tables.get("demand_df")
-        if units is None or series is None:
+        if units is None:
+            return  # a missing demand_units file is already reported as an error
+        if series is None:
+            self.case.reporter("demand_df.csv").warning(
+                "no demand time series provided, demand is filled with zeros"
+            )
             return
         unknown = series.df.columns.difference(units.index)
         if len(unknown):

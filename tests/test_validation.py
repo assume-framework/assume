@@ -264,7 +264,10 @@ def test_disabled_file_is_not_checked(scenario):
     edit_config(scenario, demand_df=None)
     report = verify_scenario_folder(scenario, study_case="tiny", dry_run=False)
     assert report.ok, messages(report)
-    assert not report.issues
+    # the file is not read, but the missing demand is pointed out
+    assert [issue.message for issue in report.issues] == [
+        "[tiny] no demand time series provided, demand is filled with zeros"
+    ]
 
 
 def test_learning_config_paths(scenario):
