@@ -27,8 +27,8 @@ def heat_pump_config():
         "max_power": 80,
         "cop": 3.5,
         "min_power": 10,
-        "ramp_up": 20,
-        "ramp_down": 20,
+        "ramp_up": 20/60,
+        "ramp_down": 20/60,
         "min_operating_steps": 2,
         "min_down_steps": 2,
         "initial_operational_status": 1,  # Assuming it starts as operational

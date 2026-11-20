@@ -205,8 +205,8 @@ def test_powerplant_feedback(power_plant_1, mock_market_config):
 
 
 def test_powerplant_ramping(power_plant_1):
-    power_plant_1.ramp_down = 100
-    power_plant_1.ramp_up = 200
+    power_plant_1.ramp_down = 100/60
+    power_plant_1.ramp_up = 200/60
     power_plant_1.min_operating_time = 3
     power_plant_1.min_down_time = 2
     power_plant_1.min_power = 50
@@ -230,10 +230,10 @@ def test_powerplant_ramping(power_plant_1):
     max_ramp = power_plant_1.calculate_ramp(op_time, 100, max_power[0])
     min_ramp = power_plant_1.calculate_ramp(op_time, 100, min_power[0])
 
-    assert min_ramp == 50
+    assert min_ramp == 50 # MW per timestep
     assert min_cost == 40.0
 
-    assert max_ramp == 300
+    assert max_ramp == 300 # MW per timestep
     assert max_cost == 40
 
     # min_power gets accepted
@@ -258,8 +258,8 @@ def test_powerplant_ramping(power_plant_1):
     min_ramp = power_plant_1.calculate_ramp(op_time, 300, min_power[0])
     max_ramp = power_plant_1.calculate_ramp(op_time, 300, max_power[0])
 
-    assert min_ramp == 200
-    assert max_ramp == 500
+    assert min_ramp == 200 # MW per timestep
+    assert max_ramp == 500 # MW per timestep
 
     # accept max_power
     power_plant_1.outputs["energy"].loc[start:end_excl] += 500
@@ -279,8 +279,8 @@ def test_powerplant_ramping(power_plant_1):
     min_ramp = power_plant_1.calculate_ramp(op_time, 500, min_power[0])
     max_ramp = power_plant_1.calculate_ramp(op_time, 500, max_power[0])
 
-    assert min_ramp == 400
-    assert max_ramp == 700
+    assert min_ramp == 400 # MW per timestep
+    assert max_ramp == 700 # MW per timestep
 
     # ramp_up if min_down_time is not reached
     power_plant_1.outputs["energy"].loc[start - power_plant_1.index.freq] = 0
@@ -291,8 +291,8 @@ def test_powerplant_ramping(power_plant_1):
     min_ramp = power_plant_1.calculate_ramp(op_time, 0, 0)
     max_ramp = power_plant_1.calculate_ramp(op_time, 0, 100)
 
-    assert min_ramp == 0
-    assert max_ramp == 0
+    assert min_ramp == 0 # MW per timestep
+    assert max_ramp == 0 # MW per timestep
 
     # ramp_down if min_operating_time is not reached
     power_plant_1.outputs["energy"].loc[start - power_plant_1.index.freq * 2] = 0
@@ -304,8 +304,8 @@ def test_powerplant_ramping(power_plant_1):
     min_ramp = power_plant_1.calculate_ramp(op_time, 100, 0)
     max_ramp = power_plant_1.calculate_ramp(op_time, 100, 1000)
 
-    assert min_ramp == 50
-    assert max_ramp == 300
+    assert min_ramp == 50 # MW per timestep
+    assert max_ramp == 300 # MW per timestep
 
 
 def test_powerplant_availability(power_plant_1):
@@ -319,8 +319,8 @@ def test_powerplant_availability(power_plant_1):
     power_plant_1.forecaster = ff
     power_plant_1.max_power = 1000
     power_plant_1.min_power = 200
-    power_plant_1.ramp_down = 1000
-    power_plant_1.ramp_up = 1000
+    power_plant_1.ramp_down = 1000/60
+    power_plant_1.ramp_up = 1000/60
 
     start = datetime(2022, 1, 1, 0)
     end = datetime(2022, 1, 1, 1)
@@ -714,8 +714,8 @@ def _make_start_cost_plant(freq: str = "h", periods: int = 40, **kwargs) -> Powe
         additional_cost=0,
         fuel_type="lignite",
         emission_factor=0,
-        ramp_down=500,
-        ramp_up=500,
+        ramp_down=500/60,
+        ramp_up=500/60,
         forecaster=forecaster,
         **params,
     )

@@ -48,8 +48,8 @@ def cement_components():
             "fuel_type": "fossil",
             "eta_fossil": 0.9,
             "fossil_ng_share": 1,
-            "ramp_up": 10,
-            "ramp_down": 10,
+            "ramp_up": 10/60,
+            "ramp_down": 10/60,
         },
         "calciner": {
             "max_heat_out": 5,
@@ -59,8 +59,8 @@ def cement_components():
             "eta_fossil": 0.9,
             "fossil_ng_share": 0.7,
             "calcination_emission_factor": 0.525,
-            "ramp_up": 5,
-            "ramp_down": 5,
+            "ramp_up": 5/60,
+            "ramp_down": 5/60,
         },
         "kiln": {
             "max_heat_out": 20,
@@ -69,8 +69,8 @@ def cement_components():
             "fuel_type": "fossil",
             "eta_fossil": 0.9,
             "fossil_ng_share": 1,
-            "ramp_up": 20,
-            "ramp_down": 20,
+            "ramp_up": 20/60,
+            "ramp_down": 20/60,
         },
     }
 
@@ -191,8 +191,8 @@ def test_thermal_storage_requires_a_calciner(cement_components):
         "capacity": 20,
         "max_power_charge": 10,
         "max_power_discharge": 20,
-        "ramp_up": 10,
-        "ramp_down": 10,
+        "ramp_up": 10/60,
+        "ramp_down": 10/60,
         "initial_soc": 0,
         "storage_type": "short-term_with_generator",
     }
@@ -383,8 +383,8 @@ def test_hydrogen_fired_kiln_with_electrolyser(cement_components):
         "max_power": 200,
         "min_power": 0,
         "efficiency": 0.7,
-        "ramp_up": 200,
-        "ramp_down": 200,
+        "ramp_up": 200/60,
+        "ramp_down": 200/60,
     }
     plant = make_plant(
         components, make_forecaster(n=n), demand=10, plant_id="test_h2_kiln"
@@ -418,8 +418,8 @@ def test_electric_thermal_storage_displaces_burner_heat(cement_components):
         "capacity": 20,
         "max_power_charge": 10,
         "max_power_discharge": 20,
-        "ramp_up": 10,
-        "ramp_down": 10,
+        "ramp_up": 10/60,
+        "ramp_down": 10/60,
         "initial_soc": 0,
         "storage_type": "short-term_with_generator",
         "eta_electric": 0.97,
@@ -473,8 +473,8 @@ def test_cement_mill_grinds_the_clinker(cement_components):
         "min_power": 0,
         "efficiency": 1.0,
         "specific_electricity_consumption": 0.04,
-        "ramp_up": 25,
-        "ramp_down": 25,
+        "ramp_up": 25/60,
+        "ramp_down": 25/60,
     }
     plant = make_plant(
         components, make_forecaster(n=n), demand=demand, plant_id="test_cement_mill"
@@ -558,8 +558,8 @@ def test_raw_material_mill_is_a_valid_component(cement_components):
         "min_power": 0,
         "efficiency": 1.0,
         "specific_electricity_consumption": 0.02,
-        "ramp_up": 15,
-        "ramp_down": 15,
+        "ramp_up": 15/60,
+        "ramp_down": 15/60,
     }
     plant = make_plant(
         components, make_forecaster(n=4), demand=20, plant_id="test_raw_mill_valid"
@@ -577,8 +577,8 @@ def test_standalone_cement_mill_meets_its_own_demand():
             "min_power": 0,
             "efficiency": 1.0,
             "specific_electricity_consumption": 0.04,
-            "ramp_up": 25,
-            "ramp_down": 25,
+            "ramp_up": 25/60,
+            "ramp_down": 25/60,
         }
     }
     plant = make_plant(
@@ -610,8 +610,8 @@ def test_standalone_raw_material_mill_meets_its_own_demand():
             "min_power": 0,
             "efficiency": 1.0,
             "specific_electricity_consumption": 0.02,
-            "ramp_up": 15,
-            "ramp_down": 15,
+            "ramp_up": 15/60,
+            "ramp_down": 15/60,
         }
     }
     plant = make_plant(
@@ -643,8 +643,8 @@ def test_kiln_line_demand_ignores_a_present_but_unconnected_mill(cement_componen
         "min_power": 0,
         "efficiency": 1.0,
         "specific_electricity_consumption": 0.02,
-        "ramp_up": 15,
-        "ramp_down": 15,
+        "ramp_up": 15/60,
+        "ramp_down": 15/60,
     }
     plant = make_plant(
         components, make_forecaster(n=n), demand=demand, plant_id="test_kiln_plus_mill"
@@ -675,16 +675,16 @@ def test_cement_mill_takes_priority_over_raw_material_mill_when_standalone():
             "min_power": 0,
             "efficiency": 1.0,
             "specific_electricity_consumption": 0.04,
-            "ramp_up": 25,
-            "ramp_down": 25,
+            "ramp_up": 25/60,
+            "ramp_down": 25/60,
         },
         "raw_material_mill": {
             "max_power": 15,
             "min_power": 0,
             "efficiency": 1.0,
             "specific_electricity_consumption": 0.02,
-            "ramp_up": 15,
-            "ramp_down": 15,
+            "ramp_up": 15/60,
+            "ramp_down": 15/60,
         },
     }
     plant = make_plant(
@@ -735,8 +735,8 @@ def test_ramp_up_exactly_determines_a_forced_startup_trajectory():
             "specific_heat_demand": 1.0,
             "fuel_type": "electricity",
             "eta_electric": 1.0,
-            "ramp_up": 5,
-            "ramp_down": 20,
+            "ramp_up": 5/60,
+            "ramp_down": 20/60,
             "initial_operational_status": 1,
         }
     }
@@ -772,8 +772,8 @@ def test_ramp_down_exactly_determines_a_forced_shutdown_trajectory():
             "specific_heat_demand": 1.0,
             "fuel_type": "electricity",
             "eta_electric": 1.0,
-            "ramp_up": 20,
-            "ramp_down": 5,
+            "ramp_up": 20/60,
+            "ramp_down": 5/60,
             "initial_operational_status": 1,
         }
     }
@@ -808,8 +808,8 @@ def test_min_operating_and_down_steps_prevent_rapid_switching_on_a_thermal_stage
             "specific_heat_demand": 1.0,
             "fuel_type": "electricity",
             "eta_electric": 1.0,
-            "ramp_up": 10,
-            "ramp_down": 10,
+            "ramp_up": 10/60,
+            "ramp_down": 10/60,
             "min_operating_steps": 3,
             "min_down_steps": 2,
             "initial_operational_status": 0,
@@ -856,8 +856,8 @@ def test_min_operating_and_down_steps_prevent_rapid_switching_on_a_standalone_mi
             "min_power": 5,
             "efficiency": 1.0,
             "specific_electricity_consumption": 1.0,
-            "ramp_up": 25,
-            "ramp_down": 25,
+            "ramp_up": 25/60,
+            "ramp_down": 25/60,
             "min_operating_steps": 3,
             "min_down_steps": 2,
             "initial_operational_status": 0,
@@ -901,8 +901,8 @@ def test_grinding_mill_efficiency_below_one_creates_a_real_mass_loss():
             "min_power": 0,
             "efficiency": 0.8,
             "specific_electricity_consumption": 0.04,
-            "ramp_up": 25,
-            "ramp_down": 25,
+            "ramp_up": 25/60,
+            "ramp_down": 25/60,
         }
     }
     plant = make_plant(
@@ -938,23 +938,23 @@ def test_dual_hydrogen_burners_share_one_electrolyser_exactly():
             "fuel_type": "hydrogen",
             "eta_fossil": 0.9,
             "calcination_emission_factor": 0.525,
-            "ramp_up": 5,
-            "ramp_down": 5,
+            "ramp_up": 5/60,
+            "ramp_down": 5/60,
         },
         "kiln": {
             "max_heat_out": 20,
             "specific_heat_demand": 1.7,
             "fuel_type": "hydrogen",
             "eta_fossil": 0.9,
-            "ramp_up": 20,
-            "ramp_down": 20,
+            "ramp_up": 20/60,
+            "ramp_down": 20/60,
         },
         "electrolyser": {
             "max_power": 30,
             "min_power": 0,
             "efficiency": 0.7,
-            "ramp_up": 30,
-            "ramp_down": 30,
+            "ramp_up": 30/60,
+            "ramp_down": 30/60,
         },
     }
     plant = make_plant(
@@ -1003,15 +1003,15 @@ def test_thermal_storage_soc_balance_matches_the_exact_formula():
             "eta_fossil": 0.9,
             "fossil_ng_share": 0.7,
             "calcination_emission_factor": 0.525,
-            "ramp_up": 5,
-            "ramp_down": 5,
+            "ramp_up": 5/60,
+            "ramp_down": 5/60,
         },
         "thermal_storage": {
             "capacity": 20,
             "max_power_charge": 10,
             "max_power_discharge": 20,
-            "ramp_up": 10,
-            "ramp_down": 20,
+            "ramp_up": 10/60,
+            "ramp_down": 20/60,
             "initial_soc": 0.2,
             "storage_type": "short-term_with_generator",
             "eta_electric": 0.97,
@@ -1077,8 +1077,8 @@ def test_full_plant_golden_integration(cement_components):
         "capacity": 20,
         "max_power_charge": 10,
         "max_power_discharge": 20,
-        "ramp_up": 10,
-        "ramp_down": 20,
+        "ramp_up": 10/60,
+        "ramp_down": 20/60,
         "initial_soc": 0,
         "storage_type": "short-term_with_generator",
         "eta_electric": 0.97,
@@ -1088,8 +1088,8 @@ def test_full_plant_golden_integration(cement_components):
         "min_power": 0,
         "efficiency": 0.95,
         "specific_electricity_consumption": 0.04,
-        "ramp_up": 25,
-        "ramp_down": 25,
+        "ramp_up": 25/60,
+        "ramp_down": 25/60,
     }
     plant = make_plant(
         components,
@@ -1407,8 +1407,8 @@ def test_rolling_window_carries_thermal_storage_state(cement_components, rh_conf
         "capacity": 20,
         "max_power_charge": 10,
         "max_power_discharge": 20,
-        "ramp_up": 10,
-        "ramp_down": 10,
+        "ramp_up": 10/60,
+        "ramp_down": 10/60,
         "initial_soc": 0,
         "storage_type": "short-term_with_generator",
     }
@@ -1472,8 +1472,8 @@ def test_rolling_horizon_full_day_meets_demand_every_window(cement_components):
         "capacity": 20,
         "max_power_charge": 10,
         "max_power_discharge": 20,
-        "ramp_up": 10,
-        "ramp_down": 10,
+        "ramp_up": 10/60,
+        "ramp_down": 10/60,
         "initial_soc": 0,
         "storage_type": "short-term_with_generator",
     }
@@ -1538,8 +1538,8 @@ def test_rolling_horizon_works_for_a_standalone_mill():
             "min_power": 0,
             "efficiency": 1.0,
             "specific_electricity_consumption": 0.04,
-            "ramp_up": 25,
-            "ramp_down": 25,
+            "ramp_up": 25/60,
+            "ramp_down": 25/60,
         }
     }
     forecaster = make_forecaster(n=n, prices=prices, clinker_demand=per_hour_min)
@@ -1591,8 +1591,8 @@ def test_rolling_horizon_never_overproduces_once_demand_is_met():
             "specific_heat_demand": 1.0,
             "fuel_type": "electricity",
             "eta_electric": 1.0,
-            "ramp_up": 10,
-            "ramp_down": 10,
+            "ramp_up": 10/60,
+            "ramp_down": 10/60,
         }
     }
     prices = [10, 10, 10, 200, 200, 200, 200, 200, 200]

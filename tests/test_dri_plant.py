@@ -29,8 +29,8 @@ def dri_plant_config():
         "max_power": 50,
         "min_power": 10,  # Changed from 0 to 10 to test min_power constraints
         "fuel_type": "natural_gas",
-        "ramp_up": 50,
-        "ramp_down": 50,
+        "ramp_up": 50/60,
+        "ramp_down": 50/60,
         "min_operating_steps": 2,
         "min_down_steps": 2,
         "initial_operational_status": 1,

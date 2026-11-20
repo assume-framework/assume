@@ -26,8 +26,8 @@ def electric_boiler_config():
         "efficiency": 0.85,
         "fuel_type": "electricity",  # Electric fuel type supports operational constraints
         "min_power": 20,
-        "ramp_up": 50,
-        "ramp_down": 50,
+        "ramp_up": 50/60,
+        "ramp_down": 50/60,
         "min_operating_steps": 2,
         "min_down_steps": 1,
         "initial_operational_status": 1,
@@ -42,8 +42,8 @@ def gas_boiler_config():
         "efficiency": 0.85,
         "fuel_type": "natural_gas",  # Natural gas does not support operational constraints
         "min_power": 0,
-        "ramp_up": 50,
-        "ramp_down": 50,
+        "ramp_up": 50/60,
+        "ramp_down": 50/60,
         # Do not set min_operating_steps and min_down_steps for natural_gas
         "initial_operational_status": 1,  # This will be ignored for natural_gas
     }
@@ -57,8 +57,8 @@ def hydrogen_boiler_config():
         "efficiency": 0.85,
         "fuel_type": "hydrogen_gas",
         "min_power": 0,
-        "ramp_up": 50,
-        "ramp_down": 50,
+        "ramp_up": 50/60,
+        "ramp_down": 50/60  ,
         "initial_operational_status": 1,
     }
 
