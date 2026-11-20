@@ -137,13 +137,6 @@ def test_read_caches_files():
     assert folder.read(EXAMPLE / "demand_units.csv") is first
 
 
-def test_first_visit():
-    folder = ScenarioFolder(EXAMPLE)
-    assert folder.first_visit(EXAMPLE / "demand_units.csv")
-    assert not folder.first_visit(EXAMPLE / "demand_units.csv")
-    assert folder.first_visit(EXAMPLE / "powerplant_units.csv")
-
-
 # -- config ---------------------------------------------------------------------------------
 def test_load_cases():
     checker = ConfigChecker(ScenarioFolder(EXAMPLE))
@@ -155,14 +148,11 @@ def test_load_cases():
         "dam",
         "dam_with_complex_clearing",
     ]
-    assert [c.name for c in checker.load_cases("tiny")] == ["tiny"]
-    assert checker.load_cases("tinyy") == []
-    assert "did you mean 'tiny'" in str(checker.folder.report.errors[0])
 
 
 def test_check_builds_the_time_line():
     checker = ConfigChecker(ScenarioFolder(EXAMPLE))
-    (case,) = checker.load_cases("tiny")
+    (case,) = [c for c in checker.load_cases() if c.name == "tiny"]
     assert case.index is None
     checker.check(case)
     assert not checker.folder.report.issues

@@ -40,7 +40,7 @@ It exits with code 1 if the timing contains errors.
 Verifying a scenario folder
 ---------------------------
 
-Before running a simulation, ``assume --verify <dir>`` checks that a scenario folder
+Before running a simulation, ``assume --verify <dir>`` checks that all study cases of a scenario folder
 (the folder containing ``config.yaml`` and the csv files) can be loaded into ASSUME.
 Nothing is simulated and nothing is written to the folder.
 The report is printed to the terminal.
@@ -48,7 +48,6 @@ The report is printed to the terminal.
 .. code-block:: bash
 
    assume --verify examples/inputs/example_01a
-   assume --verify examples/inputs/example_01a -c tiny   # only one study case
 
 The verification runs in two stages:
 

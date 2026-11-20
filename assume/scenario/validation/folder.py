@@ -60,7 +60,6 @@ class ScenarioFolder:
         self.registry = registry or Registry.load()
         self.report = ValidationReport(path=str(path))
         self._csv: dict[Path, pd.DataFrame | None] = {}
-        self._checked: set[Path] = set()
 
     def reporter(self, file: str, prefix: str = "") -> Reporter:
         return self.report.scope(file, prefix)
@@ -118,19 +117,12 @@ class ScenarioFolder:
                 self._csv[path] = None
         return self._csv[path]
 
-    def first_visit(self, path: Path) -> bool:
-        """True the first time it is called for ``path``, to check shared files only once."""
-        if path in self._checked:
-            return False
-        self._checked.add(path)
-        return True
-
     def check_unused_files(self, case_configs: Iterable[YamlMapping]) -> None:
         """
         Warn about files in the folder that no study case reads, as they may be named wrong.
 
         Args:
-            case_configs (Iterable[YamlMapping]): The configuration of every verified study case.
+            case_configs (Iterable[YamlMapping]): The configuration of every study case.
         """
         if not self.path.is_dir():
             return

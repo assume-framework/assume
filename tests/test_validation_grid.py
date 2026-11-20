@@ -87,3 +87,9 @@ def test_duplicate_names(grid):
 def test_unit_on_unknown_bus_is_warned(grid):
     edit_df(grid, "demand_units.csv", lambda df: df.__setitem__("node", "nowhere"))
     assert "is no bus of buses.csv" in verify(grid, "warning")
+
+
+def test_shared_grid_is_checked_once(grid):
+    # all study cases and markets of example_01d use the same grid folder
+    edit_df(grid, "lines.csv", lambda df: df.drop(columns="s_nom"))
+    assert verify(grid).count("missing column 's_nom'") == 1
