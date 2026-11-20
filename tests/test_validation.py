@@ -84,6 +84,25 @@ def test_required_file_missing(scenario):
     assert "powerplant_units.csv: required file not found" in messages(report)
 
 
+def test_unused_file_is_warned_about(scenario):
+    (scenario / "fuel_prices_df.csv").rename(scenario / "fuel_price_df.csv")
+    (scenario / "notes.txt").write_text("not read by ASSUME")
+    (scenario / "notes.txt.license").write_text("license files are fine")
+    report = verify_scenario_folder(scenario, study_case="tiny", dry_run=False)
+    warnings = messages(report, "warning")
+    assert "fuel_price_df.csv: is not used" in warnings
+    assert "did you mean 'fuel_prices_df.csv'" in warnings
+    assert "notes.txt: is not used" in warnings
+    assert "license" not in warnings
+
+
+def test_renamed_file_in_config_is_used(scenario):
+    (scenario / "fuel_prices_df.csv").rename(scenario / "fuel.csv")
+    edit_config(scenario, fuel_prices_df="fuel.csv")
+    report = verify_scenario_folder(scenario, study_case="tiny", dry_run=False)
+    assert "not used" not in messages(report, "warning")
+
+
 def test_configured_file_missing(scenario):
     edit_config(scenario, storage_units="nonexistent.csv")
     report = verify_scenario_folder(scenario, study_case="tiny", dry_run=False)

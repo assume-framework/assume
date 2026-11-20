@@ -46,6 +46,7 @@ class ScenarioVerifier:
             self.checker.check(case)
             CaseFiles(self.folder, case).check(markets)
             GridChecker(self.folder, case).check()
+        self.folder.check_unused_files([case.config for case in cases])
 
     def _dry_run(self, case: StudyCase) -> None:
         """Load a study case into a World exactly like a simulation would, but do not run it."""
