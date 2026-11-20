@@ -38,31 +38,118 @@ The following table shows the options that can be adjusted and gives a short exp
   max_bid_price                           The maximum bid price which limits the action of the actor to this price. Used to constrain the actor's output to a price range. Note: Align this with realistic market constraints. Too low = limited strategy space. Too high = noisy learning.  Default is 100.0.
   device                                  The device to use for PyTorch computations. Options include "cpu", "cuda", or specific CUDA devices like "cuda:0". Default is "cpu".
   episodes_collecting_initial_experience  The number of episodes at the start during which random actions are chosen instead of using the actor network. This helps populate the replay buffer with diverse experiences. Note: Increase (5–20) for larger environments. Too low causes early high variance and instability; too high wastes time.  Default is 5.
-  exploration_noise_std                   The standard deviation of Gaussian noise added to actions during exploration in the environment. Higher values encourage more exploration. Default is 0.2.
+  exploration_noise_std                   The standard deviation of the Gaussian noise that is used as action during the first episodes_collecting_initial_experience episodes, in which the actor network is not used yet. Higher values cover a larger part of the action space. Afterwards, the exploration noise is defined by noise_sigma, noise_scale and noise_dt. Default is 0.2.
   training_episodes                       The number of training episodes, where one episode is the entire simulation horizon specified in the general config. Default is 100.
   validation_episodes_interval            The interval (in episodes) at which validation episodes are run to evaluate the current policy's performance without training updates. Note: With long simulation horizons, choosing this higher will reduce training time. Default is 5.
   train_freq                              Defines the frequency in time steps at which the actor and critic networks are updated. Accepts time strings like "24h" for 24 hours or "1d" for 1 day. Note: Shorter intervals = frequent updates, faster but less stable learning. Longer intervals = slower but more reliable. Use intervals > "72h" for units that require time coupling such as storages. Default is "24h".
   batch_size                              The batch size of experiences sampled from the replay buffer for each training update. Larger batches provide more stable gradients but require more memory. In environments with many learning agents we advise small batch sizes. Default is 128.
   gradient_steps                          The number of gradient descent steps performed during each training update. More steps can lead to better learning but increase computation time. Note: For environments with many agents one should use not many gradient steps, as policies of other agents are updated as well outdating the current best strategy. Default is 100.
-  learning_rate                           The learning rate (step size) for the optimizer, which controls how much the policy and value networks are updated during training. Note: Start around 1e-3. Decrease (e.g. 3e-4, 1e-4) if training oscillates or diverges. Default is 0.001.
+  learning_rate                           The learning rate (step size) for the optimizer, which controls how much the policy and value networks are updated during training. Note: Start around 1e-3. Decrease (e.g. 3e-4, 1e-4) if training oscillates or diverges. Values outside of 1e-6 to 1e-2 are unusual. Default is 0.001.
   learning_rate_schedule                  Which learning rate decay schedule to use. Currently only "linear" decay is available, which linearly decreases the learning rate over time. Default is None (constant learning rate).
   early_stopping_steps                    The number of validation steps over which the moving average reward is calculated for early stopping. If the reward doesn't change by early_stopping_threshold over this many steps, training stops. Note: It prevents wasting compute on runs that have plateaued. Higher values are safer for noisy environments to avoid premature stopping; lower values react faster in stable settings. If None, early stopping is disabled. Default is None.
   early_stopping_threshold                The minimum improvement in moving average reward required to avoid early stopping. If the reward improvement is less than this threshold over early_stopping_steps, training is terminated early. Note: If training stops too early, reduce the threshold. In noisy environments, combine a lower threshold with higher early_stopping_steps. Default is 0.05. Only used if early_stopping_steps is set.
   algorithm                               Specifies which reinforcement learning algorithm to use. Currently, only "matd3" (Multi-Agent Twin Delayed Deep Deterministic Policy Gradient) is implemented. Default is "matd3".
-  replay_buffer_size                      The maximum number of transitions stored in the replay buffer for experience replay. Larger buffers allow for more diverse training samples. Default is 500000.
+  replay_buffer_size                      The maximum number of transitions stored in the replay buffer for experience replay. Larger buffers allow for more diverse training samples. Default is 50000.
   gamma                                   The discount factor for future rewards, ranging from 0 to 1. Higher values give more weight to long-term rewards in decision-making, which should be chosen for units with time coupling like storages. Default is 0.99.
   actor_architecture                      The architecture of the neural networks used for the actors. Options include "mlp" (Multi-Layer Perceptron) and "lstm" (Long Short-Term Memory). Default is "mlp".
-  policy_delay                            The frequency (in gradient steps) at which the actor policy is updated. TD3 updates the critic more frequently than the actor to stabilize training. Default is 2.
-  noise_sigma                             Standard deviation of the Gaussian exploration noise added to the actor's actions. The effective noise std is noise_sigma * noise_scale * noise_dt. Note: In multi-agent environments high noises are necessary to encourage sufficient exploration. Default is 0.1.
+  policy_delay                            The frequency (in gradient steps) at which the actor policy is updated. TD3 updates the critic more frequently than the actor to stabilize training. Must be at least 1. Default is 2.
+  noise_sigma                             Standard deviation of the Gaussian exploration noise added to the actor's actions after the initial experience collection (see exploration_noise_std for the noise before). The effective noise std is noise_sigma * noise_scale * noise_dt. Note: In multi-agent environments high noises are necessary to encourage sufficient exploration. Default is 0.1.
   noise_scale                             Constant factor multiplied onto the sampled noise. Larger values increase exploration. Default is 1.
   noise_dt                                Noise multiplier that is subject to the action noise schedule. With action_noise_schedule="linear" it decays linearly from noise_dt to 0 over the training episodes; with None it stays constant at noise_dt. Default is 1.
   action_noise_schedule                   Which action noise decay schedule to use. Currently only "linear" is available, which linearly decreases noise_dt (and with it the exploration noise) to 0 over training. Default is None (constant exploration noise).
-  tau                                     The soft update coefficient for updating target networks. Controls how slowly target networks track the main networks. Smaller values mean slower updates. Default is 0.005.
+  tau                                     The soft update coefficient for updating target networks. Controls how slowly target networks track the main networks. Smaller values mean slower updates. Must be between 0 and 1, default is 0.005.
   target_policy_noise                     The standard deviation of noise added to target policy actions during critic updates. This smoothing helps prevent overfitting to narrow policy peaks. Default is 0.2.
   target_noise_clip                       The maximum absolute value for clipping the target policy noise. Prevents the noise from being too large. Default is 0.5.
  ======================================== ==========================================================================================================
 
 Note: We advise to not use the setting of a seed in the general config (``seed=null``) when using learning, as it will decrease performance, see https://docs.pytorch.org/docs/stable/notes/randomness.html. Completely reproducible results are not guaranteed across different PyTorch versions, hardware, or CUDA configurations.
+
+.. note::
+   Except for ``episodes_collecting_initial_experience`` (set to at least 1) and ``gradient_steps`` (must be positive),
+   the learning config is currently not validated. Check your values against the ranges given above, as unusual values
+   do not raise an error but can make the training fail silently.
+
+.. _combining_learning_strategies:
+
+Combining learning strategies
+-----------------------------
+
+All units with a learning strategy are trained together by one learning role, using one algorithm, one replay buffer
+and a per agent centralized critic, which gets the observations and actions of all agents as input (see :ref:`learning_implementation`).
+Because of this shared structure, the current implementation requires that **all learning strategies in a simulation
+have the same dimensions**:
+
+- ``foresight``: the number of future time steps of the time series in the observation,
+- ``act_dim``: the number of actions of the actor,
+- ``unique_obs_dim``: the number of observations that are specific to the unit and placed at the end of the observation,
+- ``num_timeseries_obs_dim``: the number of time series in the observation (e.g. residual load and price forecast),
+- ``obs_dim``: the total size of the observation, which is ``num_timeseries_obs_dim * foresight + unique_obs_dim``.
+
+If they differ, the simulation stops with a ``ValueError`` when the scenario is loaded, before the actor and critic networks are created. The error lists the dimensions
+of all learning strategies. This is not a fundamental limitation of multi-agent learning, but of the current implementation,
+which stores the observations and actions of all agents in shared tensors.
+
+The default dimensions of the built-in learning strategies are:
+
+.. list-table::
+   :header-rows: 1
+
+   * - bidding strategy
+     - class
+     - foresight
+     - act_dim
+     - unique_obs_dim
+     - obs_dim
+   * - ``powerplant_energy_learning``
+     - :class:`~assume.strategies.learning_strategies.EnergyLearningStrategy`
+     - 12
+     - 2
+     - 2
+     - 38
+   * - ``powerplant_energy_learning_single_bid``
+     - :class:`~assume.strategies.learning_strategies.EnergyLearningSingleBidStrategy`
+     - 24
+     - 1
+     - 2
+     - 74
+   * - ``storage_energy_learning``
+     - :class:`~assume.strategies.learning_strategies.StorageEnergyLearningStrategy`
+     - 24
+     - 1
+     - 3
+     - 75
+   * - ``renewable_energy_learning_single_bid``
+     - :class:`~assume.strategies.learning_strategies.RenewableEnergyLearningSingleBidStrategy`
+     - 24
+     - 1
+     - 3
+     - 75
+   * - ``portfolio_learning``
+     - :class:`~assume.strategies.portfolio_learning_strategies.PortfolioLearningStrategy`
+     - 12
+     - 4
+     - 10
+     - 46
+
+All of them use ``num_timeseries_obs_dim = 3``. With the default settings, only ``storage_energy_learning`` and
+``renewable_energy_learning_single_bid`` can be combined. The dimensions of the ``portfolio_learning`` strategy depend on
+its ``nbins`` and ``steps`` parameters (``act_dim = nbins * steps`` and ``unique_obs_dim = 2 * nbins + 2``).
+If you write your own learning strategy that should be combined with others, make sure that it has the same dimensions,
+e.g. by padding the observation.
+
+**Unit operator of learning units.**
+When the scenario is loaded, every unit that uses a learning strategy for any of its markets is assigned to the unit
+operator ``Operator-RL``, regardless of the operator given in the input data. The original operator is only reported in
+the debug log. As a consequence:
+
+- a unit operator whose units all use learning strategies is not created at all,
+- the units are no longer bid by the portfolio strategy of their original operator, also not on markets for which they do not
+  use a learning strategy,
+- combining the ``portfolio_learning`` strategy with unit-level learning strategies is currently not supported. It fails
+  only at the end of the training, when the policies are loaded for the final evaluation run.
+
+This behaviour is going to be changed, see `#900 <https://github.com/assume-framework/assume/issues/900>`_ and
+`#901 <https://github.com/assume-framework/assume/issues/901>`_.
 
 
 How to use continue learning
