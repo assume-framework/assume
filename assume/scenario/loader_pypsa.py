@@ -86,8 +86,9 @@ def load_pypsa(
 
         max_power = generator.max_power or 1000
         # if p_nom is not set, generator.p_nom_extendable must be
-        ramp_up = generator.ramp_limit_start_up * max_power
-        ramp_down = generator.ramp_limit_shut_down * max_power
+        # ramps in PyPSA are per unit of the nominal power p_nom (which becomes max_power in ASSUME) and per snapshot -> no conversion to simulation timestep needed
+        ramp_up = generator.ramp_limit_up * max_power
+        ramp_down = generator.ramp_limit_down * max_power
         world.add_unit(
             generator.name,
             unit_type,
@@ -102,8 +103,8 @@ def load_pypsa(
                 "node": generator.node,
                 "efficiency": 1,  # do not use generator.efficiency as it is respected in marginal_cost,
                 "fuel_type": generator.carrier,
-                "ramp_up": ramp_up,
-                "ramp_down": ramp_down,
+                "ramp_up": ramp_up, # MW/timestep
+                "ramp_down": ramp_down, # MW/timestep
                 "min_operating_time": generator.min_up_time or 1,
                 "min_down_time": generator.min_down_time or 1,
             },
