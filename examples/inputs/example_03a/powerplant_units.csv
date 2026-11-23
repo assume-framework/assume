@@ -1,149 +1,149 @@
-,name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,DISABLED_additional_cost,DISABLED_hot_start_cost,DISABLED_warm_start_cost,DISABLED_cold_start_cost,unit_operator
-0,Wind Onshore,wind_onshore,powerplant_energy_heuristic_flexable,renewable,0.0,53190,0,1.0,,,-90.0,0.0,0.0,0.0,renewables_operator
-1,Wind Offshore,wind_offshore,powerplant_energy_heuristic_flexable,renewable,0.0,7560,0,1.0,,,-90.0,0.0,0.0,0.0,renewables_operator
-2,Solar,solar,powerplant_energy_heuristic_flexable,renewable,0.0,48860,0,1.0,,,-90.0,0.0,0.0,0.0,renewables_operator
-3,Hydro,hydro,powerplant_energy_heuristic_flexable,renewable,0.0,4940,0,1.0,,,-90.0,0.0,0.0,0.0,renewables_operator
-4,Biomass,biomass,powerplant_energy_heuristic_flexable,renewable,0.0,8340,0,1.0,,,-90.0,0.0,0.0,0.0,renewables_operator
-5,KKW ISAR 2,nuclear,powerplant_energy_learning,uranium,0.0,1485,590,0.33,14.833,14.833,10.3,140.0,140.0,140.0,RL_operator
-6,KKW BROKDORF,nuclear,powerplant_energy_learning,uranium,0.0,1480,590,0.33,14.833,14.833,10.3,140.0,140.0,140.0,RL_operator
-7,KKW PHILIPPSBURG 2,nuclear,powerplant_energy_learning,uranium,0.0,1468,590,0.33,14.667,14.667,10.3,140.0,140.0,140.0,RL_operator
-8,KKW GROHNDE,nuclear,powerplant_energy_learning,uranium,0.0,1430,570,0.33,14.333,14.333,10.3,140.0,140.0,140.0,RL_operator
-9,KKW EMSLAND,nuclear,powerplant_energy_learning,uranium,0.0,1406,560,0.33,14.0,14.0,10.3,140.0,140.0,140.0,RL_operator
-10,KKW NECKARWESTHEIM,nuclear,powerplant_energy_learning,uranium,0.0,1400,560,0.33,14.0,14.0,10.3,140.0,140.0,140.0,RL_operator
-11,KKW GUNDREMMINGEN C,nuclear,powerplant_energy_learning,uranium,0.0,1344,540,0.33,13.5,13.5,10.3,140.0,140.0,140.0,RL_operator
-12,NEURATH F,lignite,powerplant_energy_learning,lignite,0.406,1120,560,0.434,9.833,9.833,1.65,30.4,47.5,69.3,RL_operator
-13,NEURATH G,lignite,powerplant_energy_learning,lignite,0.406,1120,560,0.434,9.833,9.833,1.65,30.4,47.5,69.3,RL_operator
-14,NIEDERAUSSEM K,lignite,powerplant_energy_learning,lignite,0.406,1012,510,0.422,9.0,9.0,1.65,30.4,47.5,69.3,RL_operator
-15,LIPPENDORF R,lignite,powerplant_energy_learning,lignite,0.406,933,470,0.416,8.167,8.167,1.65,30.4,47.5,69.3,RL_operator
-16,LIPPENDORF S,lignite,powerplant_energy_learning,lignite,0.406,933,470,0.415,8.167,8.167,1.65,30.4,47.5,69.3,RL_operator
-17,BOXBERG Q,lignite,powerplant_energy_learning,lignite,0.406,907,460,0.415,8.0,8.0,1.65,30.4,47.5,69.3,RL_operator
-18,SCHWARZE PUMPE A,lignite,powerplant_energy_learning,lignite,0.406,800,400,0.408,7.0,7.0,1.65,30.4,47.5,69.3,RL_operator
-19,SCHWARZE PUMPE B,lignite,powerplant_energy_learning,lignite,0.406,800,400,0.407,7.0,7.0,1.65,30.4,47.5,69.3,RL_operator
-20,BOXBERG R,lignite,powerplant_energy_learning,lignite,0.406,675,340,0.433,6.0,6.0,1.65,30.4,47.5,69.3,RL_operator
-21,NIEDERAUSSEM G,lignite,powerplant_energy_learning,lignite,0.406,620,310,0.38,5.5,5.5,1.65,30.4,47.5,69.3,RL_operator
-22,NIEDERAUSSEM H,lignite,powerplant_energy_learning,lignite,0.406,620,310,0.374,5.5,5.5,1.65,30.4,47.5,69.3,RL_operator
-23,NEURATH D,lignite,powerplant_energy_learning,lignite,0.406,600,300,0.364,5.333,5.333,1.65,30.4,47.5,69.3,RL_operator
-24,WEISWEILER H,lignite,powerplant_energy_learning,lignite,0.406,600,300,0.364,5.333,5.333,1.65,30.4,47.5,69.3,RL_operator
-25,NEURATH E,lignite,powerplant_energy_learning,lignite,0.406,600,300,0.363,5.333,5.333,1.65,30.4,47.5,69.3,RL_operator
-26,WEISWEILER G,lignite,powerplant_energy_learning,lignite,0.406,600,300,0.354,5.333,5.333,1.65,30.4,47.5,69.3,RL_operator
-27,JAENSCHWALDE D,lignite,powerplant_energy_learning,lignite,0.406,500,250,0.388,4.5,4.5,1.65,30.4,47.5,69.3,RL_operator
-28,JAENSCHWALDE E,lignite,powerplant_energy_learning,lignite,0.406,500,250,0.386,4.5,4.5,1.65,30.4,47.5,69.3,RL_operator
-29,JAENSCHWALDE F,lignite,powerplant_energy_learning,lignite,0.406,500,250,0.386,4.5,4.5,1.65,30.4,47.5,69.3,RL_operator
-30,JAENSCHWALDE B,lignite,powerplant_energy_learning,lignite,0.406,500,250,0.38,4.5,4.5,1.65,30.4,47.5,69.3,RL_operator
-31,JAENSCHWALDE C,lignite,powerplant_energy_learning,lignite,0.406,500,250,0.379,4.5,4.5,1.65,30.4,47.5,69.3,RL_operator
-32,BOXBERG P,lignite,powerplant_energy_learning,lignite,0.406,500,250,0.372,4.5,4.5,1.65,30.4,47.5,69.3,RL_operator
-33,JAENSCHWALDE A,lignite,powerplant_energy_learning,lignite,0.406,500,250,0.37,4.5,4.5,1.65,30.4,47.5,69.3,RL_operator
-34,BOXBERG N,lignite,powerplant_energy_learning,lignite,0.406,500,250,0.362,4.5,4.5,1.65,30.4,47.5,69.3,RL_operator
-35,SCHKOPAU II A,lignite,powerplant_energy_learning,lignite,0.406,480,240,0.41,4.333,4.333,1.65,30.4,47.5,69.3,RL_operator
-36,SCHKOPAU II B,lignite,powerplant_energy_learning,lignite,0.406,480,240,0.41,4.333,4.333,1.65,30.4,47.5,69.3,RL_operator
-37,NIEDERAUSSEM C,lignite,powerplant_energy_learning,lignite,0.406,335,170,0.338,3.0,3.0,1.65,30.4,47.5,69.3,RL_operator
-38,NIEDERAUSSEM F,lignite,powerplant_energy_learning,lignite,0.406,320,160,0.346,2.833,2.833,1.65,30.4,47.5,69.3,RL_operator
-39,NIEDERAUSSEM E,lignite,powerplant_energy_learning,lignite,0.406,315,160,0.346,2.833,2.833,1.65,30.4,47.5,69.3,RL_operator
-40,NEURATH A,lignite,powerplant_energy_learning,lignite,0.406,300,150,0.355,2.667,2.667,1.65,45.1,73.9,73.2,RL_operator
-41,NEURATH B,lignite,powerplant_energy_learning,lignite,0.406,300,150,0.355,2.667,2.667,1.65,45.1,73.9,73.2,RL_operator
-42,NEURATH C,lignite,powerplant_energy_learning,lignite,0.406,300,150,0.355,2.667,2.667,1.65,45.1,73.9,73.2,RL_operator
-43,FRIMMERSDORF Q,lignite,powerplant_energy_learning,lignite,0.406,300,150,0.346,2.667,2.667,1.65,45.1,73.9,73.2,RL_operator
-44,WEISWEILER E,lignite,powerplant_energy_learning,lignite,0.406,300,150,0.338,2.667,2.667,1.65,45.1,73.9,73.2,RL_operator
-45,FRIMMERSDORF P,lignite,powerplant_energy_learning,lignite,0.406,300,150,0.337,2.667,2.667,1.65,45.1,73.9,73.2,RL_operator
-46,NIEDERAUSSEM D,lignite,powerplant_energy_learning,lignite,0.406,300,150,0.337,2.667,2.667,1.65,45.1,73.9,73.2,RL_operator
-47,WEISWEILER F,lignite,powerplant_energy_learning,lignite,0.406,300,150,0.337,2.667,2.667,1.65,45.1,73.9,73.2,RL_operator
-48,RDK (KARLSRUHE) 8,hard coal,powerplant_energy_learning,hard coal,0.335,912,370,0.452,10.333,10.333,1.3,30.4,47.5,69.3,RL_operator
-49,GKM 9,hard coal,powerplant_energy_learning,hard coal,0.335,911,370,0.454,10.333,10.333,1.3,30.4,47.5,69.3,RL_operator
-50,HEYDEN 4,hard coal,powerplant_energy_learning,hard coal,0.335,911,370,0.396,10.333,10.333,1.3,30.4,47.5,69.3,RL_operator
-51,MOORBURG A,hard coal,powerplant_energy_learning,hard coal,0.335,865,350,0.465,9.833,9.833,1.3,30.4,47.5,69.3,RL_operator
-52,MOORBURG B,hard coal,powerplant_energy_learning,hard coal,0.335,865,350,0.465,9.833,9.833,1.3,30.4,47.5,69.3,RL_operator
-53,WESTFALEN E,hard coal,powerplant_energy_learning,hard coal,0.335,820,330,0.452,9.333,9.333,1.3,30.4,47.5,69.3,RL_operator
-54,IBBENBUEREN B NO 1,hard coal,powerplant_energy_learning,hard coal,0.335,808,330,0.398,9.167,9.167,1.3,30.4,47.5,69.3,RL_operator
-55,WILHELMSHAVEN C,hard coal,powerplant_energy_learning,hard coal,0.335,800,320,0.452,9.0,9.0,1.3,30.4,47.5,69.3,RL_operator
-56,WALSUM 10,hard coal,powerplant_energy_learning,hard coal,0.335,790,320,0.454,9.0,9.0,1.3,30.4,47.5,69.3,RL_operator
-57,BERGKAMEN A,hard coal,powerplant_energy_learning,hard coal,0.335,777,320,0.38,8.833,8.833,1.3,30.4,47.5,69.3,RL_operator
-58,BEXBACH C 1,hard coal,powerplant_energy_learning,hard coal,0.335,773,310,0.389,8.833,8.833,1.3,30.4,47.5,69.3,RL_operator
-59,WILHELMSHAVEN A,hard coal,powerplant_energy_learning,hard coal,0.335,770,310,0.373,8.667,8.667,1.3,30.4,47.5,69.3,RL_operator
-60,VOERDE B,hard coal,powerplant_energy_learning,hard coal,0.335,761,310,0.398,8.667,8.667,1.3,30.4,47.5,69.3,RL_operator
-61,VOERDE A,hard coal,powerplant_energy_learning,hard coal,0.335,761,310,0.39,8.667,8.667,1.3,30.4,47.5,69.3,RL_operator
-62,HEILBRONN 7,hard coal,powerplant_energy_learning,hard coal,0.335,760,310,0.398,8.667,8.667,1.3,30.4,47.5,69.3,RL_operator
-63,MEHRUM,hard coal,powerplant_energy_learning,hard coal,0.335,752,310,0.382,8.5,8.5,1.3,30.4,47.5,69.3,RL_operator
-64,LUENEN 2 STUMMHAFEN,hard coal,powerplant_energy_learning,hard coal,0.335,750,300,0.459,8.5,8.5,1.3,30.4,47.5,69.3,RL_operator
-65,WEIHER 3,hard coal,powerplant_energy_learning,hard coal,0.335,707,290,0.373,8.0,8.0,1.3,30.4,47.5,69.3,RL_operator
-66,GERSTEINWERK BLOCK K,hard coal,powerplant_energy_learning,hard coal,0.335,670,270,0.42,7.667,7.667,1.3,30.4,47.5,69.3,RL_operator
-67,ROSTOCK 1,hard coal,powerplant_energy_learning,hard coal,0.335,553,230,0.432,6.333,6.333,1.3,30.4,47.5,69.3,RL_operator
-68,RDK (KARLSRUHE) 7,hard coal,powerplant_energy_learning,hard coal,0.335,550,220,0.398,6.333,6.333,1.3,30.4,47.5,69.3,RL_operator
-69,STAUDINGER 5,hard coal,powerplant_energy_learning,hard coal,0.335,510,210,0.412,5.833,5.833,1.3,30.4,47.5,69.3,RL_operator
-70,HERNE BLOCK 4,hard coal,powerplant_energy_learning,hard coal,0.335,500,200,0.405,5.667,5.667,1.3,30.4,47.5,69.3,RL_operator
-71,GKM 8,hard coal,powerplant_energy_learning,hard coal,0.335,480,200,0.412,5.5,5.5,1.3,30.4,47.5,69.3,RL_operator
-72,GKM 7,hard coal,powerplant_energy_learning,hard coal,0.335,475,190,0.39,5.5,5.5,1.3,30.4,47.5,69.3,RL_operator
-73,ZOLLING LEININGER 5,hard coal,powerplant_energy_learning,hard coal,0.335,474,190,0.398,5.333,5.333,1.3,30.4,47.5,69.3,RL_operator
-74,ALTBACH DEIZISAU HKW I,hard coal,powerplant_energy_learning,hard coal,0.335,460,190,0.398,5.333,5.333,1.3,30.4,47.5,69.3,RL_operator
-75,WALSUM BLOCK 9,hard coal,powerplant_energy_learning,hard coal,0.335,410,170,0.406,4.667,4.667,1.3,30.4,47.5,69.3,RL_operator
-76,SCHOLVEN C,hard coal,powerplant_energy_learning,hard coal,0.335,370,150,0.356,4.167,4.167,1.3,30.4,47.5,69.3,RL_operator
-77,SCHOLVEN B,hard coal,powerplant_energy_learning,hard coal,0.335,370,150,0.347,4.167,4.167,1.3,30.4,47.5,69.3,RL_operator
-78,HKW MUENCHEN NORD 2,hard coal,powerplant_energy_learning,hard coal,0.335,365,150,0.412,4.167,4.167,1.3,30.4,47.5,69.3,RL_operator
-79,WEST (VOERDE) 1,hard coal,powerplant_energy_learning,hard coal,0.335,356,150,0.356,4.167,4.167,1.3,30.4,47.5,69.3,RL_operator
-80,WEST (VOERDE) 2,hard coal,powerplant_energy_learning,hard coal,0.335,356,150,0.356,4.167,4.167,1.3,30.4,47.5,69.3,RL_operator
-81,KIEL A,hard coal,powerplant_energy_learning,hard coal,0.335,354,150,0.356,4.0,4.0,1.3,30.4,47.5,69.3,RL_operator
-82,BREMEN FARGE,hard coal,powerplant_energy_learning,hard coal,0.335,350,140,0.356,4.0,4.0,1.3,30.4,47.5,69.3,RL_operator
-83,LUENEN 7,hard coal,powerplant_energy_learning,hard coal,0.335,350,140,0.356,4.0,4.0,1.3,30.4,47.5,69.3,RL_operator
-84,ALTBACH DEIZISAU HKW II,hard coal,powerplant_energy_learning,hard coal,0.335,348,140,0.428,4.0,4.0,1.3,30.4,47.5,69.3,RL_operator
-85,BREMEN HAFEN 6,hard coal,powerplant_energy_learning,hard coal,0.335,330,140,0.452,3.833,3.833,1.3,30.4,47.5,69.3,RL_operator
-86,WERDOHL ELVERLINGSEN E4,hard coal,powerplant_energy_learning,hard coal,0.335,315,130,0.39,3.667,3.667,1.3,30.4,47.5,69.3,RL_operator
-87,GKH HANNOVER,hard coal,powerplant_energy_learning,hard coal,0.335,300,120,0.405,3.5,3.5,1.3,45.1,73.9,73.2,RL_operator
-88,HKW BERLIN REUTER WEST E,hard coal,powerplant_energy_learning,hard coal,0.335,300,120,0.405,3.5,3.5,1.3,45.1,73.9,73.2,RL_operator
-89,HKW BERLIN REUTER WEST D,hard coal,powerplant_energy_learning,hard coal,0.335,300,120,0.382,3.5,3.5,1.3,45.1,73.9,73.2,RL_operator
-90,HERNE 3,hard coal,powerplant_energy_learning,hard coal,0.335,300,120,0.347,3.5,3.5,1.3,45.1,73.9,73.2,RL_operator
-91,IRSCHING 5,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,860,350,0.597,11.833,11.833,3.5,24.1,34.2,46.7,RL_operator
-92,EMSLAND LINGEN D,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,850,340,0.592,11.833,11.7,3.5,24.1,34.2,46.7,RL_operator
-93,GUD HUERTH KNAPSACK 1,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,800,320,0.548,11.0,11.0,3.5,24.1,34.2,46.7,RL_operator
-94,KW LAUSWARD BLOCK FORTUNA GUD,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,595,240,0.6,8.333,8.333,3.5,24.1,34.2,46.7,RL_operator
-95,DORMAGEN RWE,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,580,240,0.523,8.0,8.0,3.5,24.1,34.2,46.7,RL_operator
-96,IRSCHING 4,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,565,230,0.59,7.833,7.833,3.5,24.1,34.2,46.7,RL_operator
-97,KW BASF LUDWIGSHAFEN MITTE,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,490,200,0.56,6.833,6.833,3.5,24.1,34.2,46.7,RL_operator
-98,EMSLAND LINGEN B,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,481,200,0.46,6.667,6.667,3.5,24.1,34.2,46.7,RL_operator
-99,EMSLAND LINGEN C,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,481,200,0.46,6.667,6.667,3.5,24.1,34.2,46.7,RL_operator
-100,KW BREMEN MITTELSBUEREN BLOCK 5 GUD,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,445,180,0.58,6.167,6.167,3.5,24.1,34.2,46.7,RL_operator
-101,BERLIN MITTE HKW,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,444,180,0.488,6.167,6.167,3.5,24.1,34.2,46.7,RL_operator
-102,GUD HUERTH KNAPSACK 2,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,430,180,0.59,6.0,6.0,3.5,24.1,34.2,46.7,RL_operator
-103,HKW MUENCHEN SUED GUD,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,426,180,0.54,6.0,6.0,3.5,24.1,34.2,46.7,RL_operator
-104,KW LAUSWARD BLOCK EMIL GUD,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,424,170,0.363,5.833,5.833,3.5,24.1,34.2,46.7,RL_operator
-105,KW HERDECKE CUNO MARK E,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,417,170,0.548,5.833,5.833,3.5,24.1,34.2,46.7,RL_operator
-106,GERSTEINWERK BLOCK F,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,410,170,0.41,5.667,5.667,3.5,24.1,34.2,46.7,RL_operator
-107,GERSTEINWERK BLOCK G,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,410,170,0.41,5.667,5.667,3.5,24.1,34.2,46.7,RL_operator
-108,KOELN NIEHL 2,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,405,170,0.54,5.667,5.667,3.5,24.1,34.2,46.7,RL_operator
-109,HAMM UENTROP BLOCK 10,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,400,160,0.575,5.5,5.5,3.5,24.1,34.2,46.7,RL_operator
-110,HAMM UENTROP BLOCK 20,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,400,160,0.575,5.5,5.5,3.5,24.1,34.2,46.7,RL_operator
-111,MAINZ III,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,397,160,0.58,5.5,5.5,3.5,24.1,34.2,46.7,RL_operator
-112,KW BASF LUDWIGSHAFEN SUED,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,396,160,0.51,5.5,5.5,3.5,24.1,34.2,46.7,RL_operator
-113,RDK (KARLSRUHE) 4RP,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,378,160,0.497,5.333,5.333,3.5,24.1,34.2,46.7,RL_operator
-114,KW STAUDINGER 4,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,622,160,0.317,10.367,10.367,5.5,17.1,21.8,29.6,RL_operator
-115,NUERNBERG FRANKEN 1,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,440,110,0.363,7.333,7.333,5.5,17.1,21.8,29.6,RL_operator
-116,IRSCHING 3,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,440,110,0.308,7.333,7.333,5.5,17.1,21.8,29.6,RL_operator
-117,KW HUNTORF CAES GT,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,321,90,0.31,5.35,5.35,5.5,17.1,21.8,29.6,RL_operator
-118,KW DUISBURG HUCKINGEN BLOCK A,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,303,80,0.363,5.05,5.05,5.5,17.1,21.8,29.6,RL_operator
-119,KW DUISBURG HUCKINGEN BLOCK B,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,303,80,0.363,5.05,5.05,5.5,17.1,21.8,29.6,RL_operator
-120,Agg_PP_1,lignite,powerplant_energy_learning,lignite,0.406,425,223,0.35,3.833,3.833,1.65,45.1,73.9,73.2,RL_operator
-121,Agg_PP_2,lignite,powerplant_energy_learning,lignite,0.406,180,90,0.38,1.6,1.6,1.65,45.1,73.9,73.2,RL_operator
-122,Agg_PP_3,hard coal,powerplant_energy_learning,hard coal,0.335,492,210,0.42,5.667,5.667,1.3,45.1,73.9,73.2,RL_operator
-123,Agg_PP_4,hard coal,powerplant_energy_learning,hard coal,0.335,535,230,0.38,6.333,6.333,1.3,45.1,73.9,73.2,RL_operator
-124,Agg_PP_5,hard coal,powerplant_energy_learning,hard coal,0.335,440,190,0.33,5.333,5.333,1.3,45.1,73.9,73.2,RL_operator
-125,Agg_PP_6,hard coal,powerplant_energy_learning,hard coal,0.335,512,220,0.36,6.0,6.0,1.3,45.1,73.9,73.2,RL_operator
-126,Agg_PP_7,hard coal,powerplant_energy_learning,hard coal,0.335,459,211,0.39,5.233,5.233,1.3,45.1,73.9,73.2,RL_operator
-127,Agg_PP_8,hard coal,powerplant_energy_learning,hard coal,0.335,402,164,0.39,4.583,4.583,1.3,45.1,73.9,73.2,RL_operator
-128,Agg_PP_9,hard coal,powerplant_energy_learning,hard coal,0.335,237,97,0.39,2.733,2.733,1.3,45.1,73.9,73.2,RL_operator
-129,Agg_PP_10,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,510,210,0.5,7.167,7.167,3.5,24.1,34.2,46.7,RL_operator
-130,Agg_PP_11,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,460,200,0.47,6.333,6.333,3.5,24.1,34.2,46.7,RL_operator
-131,Agg_PP_12,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,566,230,0.51,8.167,8.167,3.5,24.1,34.2,46.7,RL_operator
-132,Agg_PP_13,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,487,210,0.39,7.0,7.0,3.5,24.1,34.2,46.7,RL_operator
-133,Agg_PP_14,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,417,190,0.56,5.833,5.833,3.5,24.1,34.2,46.7,RL_operator
-134,Agg_PP_15,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,454,200,0.5,6.667,6.667,3.5,24.1,34.2,46.7,RL_operator
-135,Agg_PP_16,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,408,170,0.53,6.017,6.017,3.5,24.1,34.2,46.7,RL_operator
-136,Agg_PP_17,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,419,170,0.5,5.8,5.8,3.5,24.1,34.2,46.7,RL_operator
-137,Agg_PP_18,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,442,178,0.5,6.117,6.117,3.5,24.1,34.2,46.7,RL_operator
-138,Agg_PP_19,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,420,171,0.42,5.833,5.833,3.5,24.1,34.2,46.7,RL_operator
-139,Agg_PP_20,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,407,167,0.44,5.683,5.683,3.5,24.1,34.2,46.7,RL_operator
-140,Agg_PP_21,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,43,18,0.45,0.617,0.617,3.5,24.1,34.2,46.7,RL_operator
-141,Agg_PP_22,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,544,140,0.38,9.067,9.067,5.5,17.1,21.8,29.6,RL_operator
-142,Agg_PP_23,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,478,130,0.35,7.967,7.967,5.5,17.1,21.8,29.6,RL_operator
-143,Agg_PP_24,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,400,110,0.33,6.667,6.667,5.5,17.1,21.8,29.6,RL_operator
-144,Agg_PP_25,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,412,105,0.36,6.867,6.867,5.5,17.1,21.8,29.6,RL_operator
-145,Agg_PP_26,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,443,113,0.35,7.383,7.383,5.5,17.1,21.8,29.6,RL_operator
-146,Agg_PP_27,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,411,105,0.35,6.85,6.85,5.5,14.18,17.11,21.99,RL_operator
-147,Agg_PP_28,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,353,92,0.35,5.883,5.883,5.5,9.3,9.3,9.3,RL_operator
+name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,DISABLED_additional_cost,DISABLED_hot_start_cost,DISABLED_warm_start_cost,DISABLED_cold_start_cost,unit_operator
+Wind Onshore,wind_onshore,powerplant_energy_heuristic_flexable,renewable,0.0,53190,0,1.0,,,-90.0,0.0,0.0,0.0,renewables_operator
+Wind Offshore,wind_offshore,powerplant_energy_heuristic_flexable,renewable,0.0,7560,0,1.0,,,-90.0,0.0,0.0,0.0,renewables_operator
+Solar,solar,powerplant_energy_heuristic_flexable,renewable,0.0,48860,0,1.0,,,-90.0,0.0,0.0,0.0,renewables_operator
+Hydro,hydro,powerplant_energy_heuristic_flexable,renewable,0.0,4940,0,1.0,,,-90.0,0.0,0.0,0.0,renewables_operator
+Biomass,biomass,powerplant_energy_heuristic_flexable,renewable,0.0,8340,0,1.0,,,-90.0,0.0,0.0,0.0,renewables_operator
+KKW ISAR 2,nuclear,powerplant_energy_learning,uranium,0.0,1485,590,0.33,14.833,14.833,10.3,140.0,140.0,140.0,RL_operator
+KKW BROKDORF,nuclear,powerplant_energy_learning,uranium,0.0,1480,590,0.33,14.833,14.833,10.3,140.0,140.0,140.0,RL_operator
+KKW PHILIPPSBURG 2,nuclear,powerplant_energy_learning,uranium,0.0,1468,590,0.33,14.667,14.667,10.3,140.0,140.0,140.0,RL_operator
+KKW GROHNDE,nuclear,powerplant_energy_learning,uranium,0.0,1430,570,0.33,14.333,14.333,10.3,140.0,140.0,140.0,RL_operator
+KKW EMSLAND,nuclear,powerplant_energy_learning,uranium,0.0,1406,560,0.33,14.0,14.0,10.3,140.0,140.0,140.0,RL_operator
+KKW NECKARWESTHEIM,nuclear,powerplant_energy_learning,uranium,0.0,1400,560,0.33,14.0,14.0,10.3,140.0,140.0,140.0,RL_operator
+KKW GUNDREMMINGEN C,nuclear,powerplant_energy_learning,uranium,0.0,1344,540,0.33,13.5,13.5,10.3,140.0,140.0,140.0,RL_operator
+NEURATH F,lignite,powerplant_energy_learning,lignite,0.406,1120,560,0.434,9.833,9.833,1.65,30.4,47.5,69.3,RL_operator
+NEURATH G,lignite,powerplant_energy_learning,lignite,0.406,1120,560,0.434,9.833,9.833,1.65,30.4,47.5,69.3,RL_operator
+NIEDERAUSSEM K,lignite,powerplant_energy_learning,lignite,0.406,1012,510,0.422,9.0,9.0,1.65,30.4,47.5,69.3,RL_operator
+LIPPENDORF R,lignite,powerplant_energy_learning,lignite,0.406,933,470,0.416,8.167,8.167,1.65,30.4,47.5,69.3,RL_operator
+LIPPENDORF S,lignite,powerplant_energy_learning,lignite,0.406,933,470,0.415,8.167,8.167,1.65,30.4,47.5,69.3,RL_operator
+BOXBERG Q,lignite,powerplant_energy_learning,lignite,0.406,907,460,0.415,8.0,8.0,1.65,30.4,47.5,69.3,RL_operator
+SCHWARZE PUMPE A,lignite,powerplant_energy_learning,lignite,0.406,800,400,0.408,7.0,7.0,1.65,30.4,47.5,69.3,RL_operator
+SCHWARZE PUMPE B,lignite,powerplant_energy_learning,lignite,0.406,800,400,0.407,7.0,7.0,1.65,30.4,47.5,69.3,RL_operator
+BOXBERG R,lignite,powerplant_energy_learning,lignite,0.406,675,340,0.433,6.0,6.0,1.65,30.4,47.5,69.3,RL_operator
+NIEDERAUSSEM G,lignite,powerplant_energy_learning,lignite,0.406,620,310,0.38,5.5,5.5,1.65,30.4,47.5,69.3,RL_operator
+NIEDERAUSSEM H,lignite,powerplant_energy_learning,lignite,0.406,620,310,0.374,5.5,5.5,1.65,30.4,47.5,69.3,RL_operator
+NEURATH D,lignite,powerplant_energy_learning,lignite,0.406,600,300,0.364,5.333,5.333,1.65,30.4,47.5,69.3,RL_operator
+WEISWEILER H,lignite,powerplant_energy_learning,lignite,0.406,600,300,0.364,5.333,5.333,1.65,30.4,47.5,69.3,RL_operator
+NEURATH E,lignite,powerplant_energy_learning,lignite,0.406,600,300,0.363,5.333,5.333,1.65,30.4,47.5,69.3,RL_operator
+WEISWEILER G,lignite,powerplant_energy_learning,lignite,0.406,600,300,0.354,5.333,5.333,1.65,30.4,47.5,69.3,RL_operator
+JAENSCHWALDE D,lignite,powerplant_energy_learning,lignite,0.406,500,250,0.388,4.5,4.5,1.65,30.4,47.5,69.3,RL_operator
+JAENSCHWALDE E,lignite,powerplant_energy_learning,lignite,0.406,500,250,0.386,4.5,4.5,1.65,30.4,47.5,69.3,RL_operator
+JAENSCHWALDE F,lignite,powerplant_energy_learning,lignite,0.406,500,250,0.386,4.5,4.5,1.65,30.4,47.5,69.3,RL_operator
+JAENSCHWALDE B,lignite,powerplant_energy_learning,lignite,0.406,500,250,0.38,4.5,4.5,1.65,30.4,47.5,69.3,RL_operator
+JAENSCHWALDE C,lignite,powerplant_energy_learning,lignite,0.406,500,250,0.379,4.5,4.5,1.65,30.4,47.5,69.3,RL_operator
+BOXBERG P,lignite,powerplant_energy_learning,lignite,0.406,500,250,0.372,4.5,4.5,1.65,30.4,47.5,69.3,RL_operator
+JAENSCHWALDE A,lignite,powerplant_energy_learning,lignite,0.406,500,250,0.37,4.5,4.5,1.65,30.4,47.5,69.3,RL_operator
+BOXBERG N,lignite,powerplant_energy_learning,lignite,0.406,500,250,0.362,4.5,4.5,1.65,30.4,47.5,69.3,RL_operator
+SCHKOPAU II A,lignite,powerplant_energy_learning,lignite,0.406,480,240,0.41,4.333,4.333,1.65,30.4,47.5,69.3,RL_operator
+SCHKOPAU II B,lignite,powerplant_energy_learning,lignite,0.406,480,240,0.41,4.333,4.333,1.65,30.4,47.5,69.3,RL_operator
+NIEDERAUSSEM C,lignite,powerplant_energy_learning,lignite,0.406,335,170,0.338,3.0,3.0,1.65,30.4,47.5,69.3,RL_operator
+NIEDERAUSSEM F,lignite,powerplant_energy_learning,lignite,0.406,320,160,0.346,2.833,2.833,1.65,30.4,47.5,69.3,RL_operator
+NIEDERAUSSEM E,lignite,powerplant_energy_learning,lignite,0.406,315,160,0.346,2.833,2.833,1.65,30.4,47.5,69.3,RL_operator
+NEURATH A,lignite,powerplant_energy_learning,lignite,0.406,300,150,0.355,2.667,2.667,1.65,45.1,73.9,73.2,RL_operator
+NEURATH B,lignite,powerplant_energy_learning,lignite,0.406,300,150,0.355,2.667,2.667,1.65,45.1,73.9,73.2,RL_operator
+NEURATH C,lignite,powerplant_energy_learning,lignite,0.406,300,150,0.355,2.667,2.667,1.65,45.1,73.9,73.2,RL_operator
+FRIMMERSDORF Q,lignite,powerplant_energy_learning,lignite,0.406,300,150,0.346,2.667,2.667,1.65,45.1,73.9,73.2,RL_operator
+WEISWEILER E,lignite,powerplant_energy_learning,lignite,0.406,300,150,0.338,2.667,2.667,1.65,45.1,73.9,73.2,RL_operator
+FRIMMERSDORF P,lignite,powerplant_energy_learning,lignite,0.406,300,150,0.337,2.667,2.667,1.65,45.1,73.9,73.2,RL_operator
+NIEDERAUSSEM D,lignite,powerplant_energy_learning,lignite,0.406,300,150,0.337,2.667,2.667,1.65,45.1,73.9,73.2,RL_operator
+WEISWEILER F,lignite,powerplant_energy_learning,lignite,0.406,300,150,0.337,2.667,2.667,1.65,45.1,73.9,73.2,RL_operator
+RDK (KARLSRUHE) 8,hard coal,powerplant_energy_learning,hard coal,0.335,912,370,0.452,10.333,10.333,1.3,30.4,47.5,69.3,RL_operator
+GKM 9,hard coal,powerplant_energy_learning,hard coal,0.335,911,370,0.454,10.333,10.333,1.3,30.4,47.5,69.3,RL_operator
+HEYDEN 4,hard coal,powerplant_energy_learning,hard coal,0.335,911,370,0.396,10.333,10.333,1.3,30.4,47.5,69.3,RL_operator
+MOORBURG A,hard coal,powerplant_energy_learning,hard coal,0.335,865,350,0.465,9.833,9.833,1.3,30.4,47.5,69.3,RL_operator
+MOORBURG B,hard coal,powerplant_energy_learning,hard coal,0.335,865,350,0.465,9.833,9.833,1.3,30.4,47.5,69.3,RL_operator
+WESTFALEN E,hard coal,powerplant_energy_learning,hard coal,0.335,820,330,0.452,9.333,9.333,1.3,30.4,47.5,69.3,RL_operator
+IBBENBUEREN B NO 1,hard coal,powerplant_energy_learning,hard coal,0.335,808,330,0.398,9.167,9.167,1.3,30.4,47.5,69.3,RL_operator
+WILHELMSHAVEN C,hard coal,powerplant_energy_learning,hard coal,0.335,800,320,0.452,9.0,9.0,1.3,30.4,47.5,69.3,RL_operator
+WALSUM 10,hard coal,powerplant_energy_learning,hard coal,0.335,790,320,0.454,9.0,9.0,1.3,30.4,47.5,69.3,RL_operator
+BERGKAMEN A,hard coal,powerplant_energy_learning,hard coal,0.335,777,320,0.38,8.833,8.833,1.3,30.4,47.5,69.3,RL_operator
+BEXBACH C 1,hard coal,powerplant_energy_learning,hard coal,0.335,773,310,0.389,8.833,8.833,1.3,30.4,47.5,69.3,RL_operator
+WILHELMSHAVEN A,hard coal,powerplant_energy_learning,hard coal,0.335,770,310,0.373,8.667,8.667,1.3,30.4,47.5,69.3,RL_operator
+VOERDE B,hard coal,powerplant_energy_learning,hard coal,0.335,761,310,0.398,8.667,8.667,1.3,30.4,47.5,69.3,RL_operator
+VOERDE A,hard coal,powerplant_energy_learning,hard coal,0.335,761,310,0.39,8.667,8.667,1.3,30.4,47.5,69.3,RL_operator
+HEILBRONN 7,hard coal,powerplant_energy_learning,hard coal,0.335,760,310,0.398,8.667,8.667,1.3,30.4,47.5,69.3,RL_operator
+MEHRUM,hard coal,powerplant_energy_learning,hard coal,0.335,752,310,0.382,8.5,8.5,1.3,30.4,47.5,69.3,RL_operator
+LUENEN 2 STUMMHAFEN,hard coal,powerplant_energy_learning,hard coal,0.335,750,300,0.459,8.5,8.5,1.3,30.4,47.5,69.3,RL_operator
+WEIHER 3,hard coal,powerplant_energy_learning,hard coal,0.335,707,290,0.373,8.0,8.0,1.3,30.4,47.5,69.3,RL_operator
+GERSTEINWERK BLOCK K,hard coal,powerplant_energy_learning,hard coal,0.335,670,270,0.42,7.667,7.667,1.3,30.4,47.5,69.3,RL_operator
+ROSTOCK 1,hard coal,powerplant_energy_learning,hard coal,0.335,553,230,0.432,6.333,6.333,1.3,30.4,47.5,69.3,RL_operator
+RDK (KARLSRUHE) 7,hard coal,powerplant_energy_learning,hard coal,0.335,550,220,0.398,6.333,6.333,1.3,30.4,47.5,69.3,RL_operator
+STAUDINGER 5,hard coal,powerplant_energy_learning,hard coal,0.335,510,210,0.412,5.833,5.833,1.3,30.4,47.5,69.3,RL_operator
+HERNE BLOCK 4,hard coal,powerplant_energy_learning,hard coal,0.335,500,200,0.405,5.667,5.667,1.3,30.4,47.5,69.3,RL_operator
+GKM 8,hard coal,powerplant_energy_learning,hard coal,0.335,480,200,0.412,5.5,5.5,1.3,30.4,47.5,69.3,RL_operator
+GKM 7,hard coal,powerplant_energy_learning,hard coal,0.335,475,190,0.39,5.5,5.5,1.3,30.4,47.5,69.3,RL_operator
+ZOLLING LEININGER 5,hard coal,powerplant_energy_learning,hard coal,0.335,474,190,0.398,5.333,5.333,1.3,30.4,47.5,69.3,RL_operator
+ALTBACH DEIZISAU HKW I,hard coal,powerplant_energy_learning,hard coal,0.335,460,190,0.398,5.333,5.333,1.3,30.4,47.5,69.3,RL_operator
+WALSUM BLOCK 9,hard coal,powerplant_energy_learning,hard coal,0.335,410,170,0.406,4.667,4.667,1.3,30.4,47.5,69.3,RL_operator
+SCHOLVEN C,hard coal,powerplant_energy_learning,hard coal,0.335,370,150,0.356,4.167,4.167,1.3,30.4,47.5,69.3,RL_operator
+SCHOLVEN B,hard coal,powerplant_energy_learning,hard coal,0.335,370,150,0.347,4.167,4.167,1.3,30.4,47.5,69.3,RL_operator
+HKW MUENCHEN NORD 2,hard coal,powerplant_energy_learning,hard coal,0.335,365,150,0.412,4.167,4.167,1.3,30.4,47.5,69.3,RL_operator
+WEST (VOERDE) 1,hard coal,powerplant_energy_learning,hard coal,0.335,356,150,0.356,4.167,4.167,1.3,30.4,47.5,69.3,RL_operator
+WEST (VOERDE) 2,hard coal,powerplant_energy_learning,hard coal,0.335,356,150,0.356,4.167,4.167,1.3,30.4,47.5,69.3,RL_operator
+KIEL A,hard coal,powerplant_energy_learning,hard coal,0.335,354,150,0.356,4.0,4.0,1.3,30.4,47.5,69.3,RL_operator
+BREMEN FARGE,hard coal,powerplant_energy_learning,hard coal,0.335,350,140,0.356,4.0,4.0,1.3,30.4,47.5,69.3,RL_operator
+LUENEN 7,hard coal,powerplant_energy_learning,hard coal,0.335,350,140,0.356,4.0,4.0,1.3,30.4,47.5,69.3,RL_operator
+ALTBACH DEIZISAU HKW II,hard coal,powerplant_energy_learning,hard coal,0.335,348,140,0.428,4.0,4.0,1.3,30.4,47.5,69.3,RL_operator
+BREMEN HAFEN 6,hard coal,powerplant_energy_learning,hard coal,0.335,330,140,0.452,3.833,3.833,1.3,30.4,47.5,69.3,RL_operator
+WERDOHL ELVERLINGSEN E4,hard coal,powerplant_energy_learning,hard coal,0.335,315,130,0.39,3.667,3.667,1.3,30.4,47.5,69.3,RL_operator
+GKH HANNOVER,hard coal,powerplant_energy_learning,hard coal,0.335,300,120,0.405,3.5,3.5,1.3,45.1,73.9,73.2,RL_operator
+HKW BERLIN REUTER WEST E,hard coal,powerplant_energy_learning,hard coal,0.335,300,120,0.405,3.5,3.5,1.3,45.1,73.9,73.2,RL_operator
+HKW BERLIN REUTER WEST D,hard coal,powerplant_energy_learning,hard coal,0.335,300,120,0.382,3.5,3.5,1.3,45.1,73.9,73.2,RL_operator
+HERNE 3,hard coal,powerplant_energy_learning,hard coal,0.335,300,120,0.347,3.5,3.5,1.3,45.1,73.9,73.2,RL_operator
+IRSCHING 5,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,860,350,0.597,11.833,11.833,3.5,24.1,34.2,46.7,RL_operator
+EMSLAND LINGEN D,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,850,340,0.592,11.833,11.7,3.5,24.1,34.2,46.7,RL_operator
+GUD HUERTH KNAPSACK 1,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,800,320,0.548,11.0,11.0,3.5,24.1,34.2,46.7,RL_operator
+KW LAUSWARD BLOCK FORTUNA GUD,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,595,240,0.6,8.333,8.333,3.5,24.1,34.2,46.7,RL_operator
+DORMAGEN RWE,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,580,240,0.523,8.0,8.0,3.5,24.1,34.2,46.7,RL_operator
+IRSCHING 4,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,565,230,0.59,7.833,7.833,3.5,24.1,34.2,46.7,RL_operator
+KW BASF LUDWIGSHAFEN MITTE,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,490,200,0.56,6.833,6.833,3.5,24.1,34.2,46.7,RL_operator
+EMSLAND LINGEN B,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,481,200,0.46,6.667,6.667,3.5,24.1,34.2,46.7,RL_operator
+EMSLAND LINGEN C,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,481,200,0.46,6.667,6.667,3.5,24.1,34.2,46.7,RL_operator
+KW BREMEN MITTELSBUEREN BLOCK 5 GUD,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,445,180,0.58,6.167,6.167,3.5,24.1,34.2,46.7,RL_operator
+BERLIN MITTE HKW,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,444,180,0.488,6.167,6.167,3.5,24.1,34.2,46.7,RL_operator
+GUD HUERTH KNAPSACK 2,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,430,180,0.59,6.0,6.0,3.5,24.1,34.2,46.7,RL_operator
+HKW MUENCHEN SUED GUD,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,426,180,0.54,6.0,6.0,3.5,24.1,34.2,46.7,RL_operator
+KW LAUSWARD BLOCK EMIL GUD,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,424,170,0.363,5.833,5.833,3.5,24.1,34.2,46.7,RL_operator
+KW HERDECKE CUNO MARK E,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,417,170,0.548,5.833,5.833,3.5,24.1,34.2,46.7,RL_operator
+GERSTEINWERK BLOCK F,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,410,170,0.41,5.667,5.667,3.5,24.1,34.2,46.7,RL_operator
+GERSTEINWERK BLOCK G,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,410,170,0.41,5.667,5.667,3.5,24.1,34.2,46.7,RL_operator
+KOELN NIEHL 2,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,405,170,0.54,5.667,5.667,3.5,24.1,34.2,46.7,RL_operator
+HAMM UENTROP BLOCK 10,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,400,160,0.575,5.5,5.5,3.5,24.1,34.2,46.7,RL_operator
+HAMM UENTROP BLOCK 20,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,400,160,0.575,5.5,5.5,3.5,24.1,34.2,46.7,RL_operator
+MAINZ III,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,397,160,0.58,5.5,5.5,3.5,24.1,34.2,46.7,RL_operator
+KW BASF LUDWIGSHAFEN SUED,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,396,160,0.51,5.5,5.5,3.5,24.1,34.2,46.7,RL_operator
+RDK (KARLSRUHE) 4RP,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,378,160,0.497,5.333,5.333,3.5,24.1,34.2,46.7,RL_operator
+KW STAUDINGER 4,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,622,160,0.317,10.367,10.367,5.5,17.1,21.8,29.6,RL_operator
+NUERNBERG FRANKEN 1,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,440,110,0.363,7.333,7.333,5.5,17.1,21.8,29.6,RL_operator
+IRSCHING 3,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,440,110,0.308,7.333,7.333,5.5,17.1,21.8,29.6,RL_operator
+KW HUNTORF CAES GT,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,321,90,0.31,5.35,5.35,5.5,17.1,21.8,29.6,RL_operator
+KW DUISBURG HUCKINGEN BLOCK A,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,303,80,0.363,5.05,5.05,5.5,17.1,21.8,29.6,RL_operator
+KW DUISBURG HUCKINGEN BLOCK B,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,303,80,0.363,5.05,5.05,5.5,17.1,21.8,29.6,RL_operator
+Agg_PP_1,lignite,powerplant_energy_learning,lignite,0.406,425,223,0.35,3.833,3.833,1.65,45.1,73.9,73.2,RL_operator
+Agg_PP_2,lignite,powerplant_energy_learning,lignite,0.406,180,90,0.38,1.6,1.6,1.65,45.1,73.9,73.2,RL_operator
+Agg_PP_3,hard coal,powerplant_energy_learning,hard coal,0.335,492,210,0.42,5.667,5.667,1.3,45.1,73.9,73.2,RL_operator
+Agg_PP_4,hard coal,powerplant_energy_learning,hard coal,0.335,535,230,0.38,6.333,6.333,1.3,45.1,73.9,73.2,RL_operator
+Agg_PP_5,hard coal,powerplant_energy_learning,hard coal,0.335,440,190,0.33,5.333,5.333,1.3,45.1,73.9,73.2,RL_operator
+Agg_PP_6,hard coal,powerplant_energy_learning,hard coal,0.335,512,220,0.36,6.0,6.0,1.3,45.1,73.9,73.2,RL_operator
+Agg_PP_7,hard coal,powerplant_energy_learning,hard coal,0.335,459,211,0.39,5.233,5.233,1.3,45.1,73.9,73.2,RL_operator
+Agg_PP_8,hard coal,powerplant_energy_learning,hard coal,0.335,402,164,0.39,4.583,4.583,1.3,45.1,73.9,73.2,RL_operator
+Agg_PP_9,hard coal,powerplant_energy_learning,hard coal,0.335,237,97,0.39,2.733,2.733,1.3,45.1,73.9,73.2,RL_operator
+Agg_PP_10,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,510,210,0.5,7.167,7.167,3.5,24.1,34.2,46.7,RL_operator
+Agg_PP_11,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,460,200,0.47,6.333,6.333,3.5,24.1,34.2,46.7,RL_operator
+Agg_PP_12,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,566,230,0.51,8.167,8.167,3.5,24.1,34.2,46.7,RL_operator
+Agg_PP_13,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,487,210,0.39,7.0,7.0,3.5,24.1,34.2,46.7,RL_operator
+Agg_PP_14,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,417,190,0.56,5.833,5.833,3.5,24.1,34.2,46.7,RL_operator
+Agg_PP_15,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,454,200,0.5,6.667,6.667,3.5,24.1,34.2,46.7,RL_operator
+Agg_PP_16,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,408,170,0.53,6.017,6.017,3.5,24.1,34.2,46.7,RL_operator
+Agg_PP_17,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,419,170,0.5,5.8,5.8,3.5,24.1,34.2,46.7,RL_operator
+Agg_PP_18,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,442,178,0.5,6.117,6.117,3.5,24.1,34.2,46.7,RL_operator
+Agg_PP_19,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,420,171,0.42,5.833,5.833,3.5,24.1,34.2,46.7,RL_operator
+Agg_PP_20,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,407,167,0.44,5.683,5.683,3.5,24.1,34.2,46.7,RL_operator
+Agg_PP_21,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,43,18,0.45,0.617,0.617,3.5,24.1,34.2,46.7,RL_operator
+Agg_PP_22,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,544,140,0.38,9.067,9.067,5.5,17.1,21.8,29.6,RL_operator
+Agg_PP_23,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,478,130,0.35,7.967,7.967,5.5,17.1,21.8,29.6,RL_operator
+Agg_PP_24,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,400,110,0.33,6.667,6.667,5.5,17.1,21.8,29.6,RL_operator
+Agg_PP_25,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,412,105,0.36,6.867,6.867,5.5,17.1,21.8,29.6,RL_operator
+Agg_PP_26,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,443,113,0.35,7.383,7.383,5.5,17.1,21.8,29.6,RL_operator
+Agg_PP_27,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,411,105,0.35,6.85,6.85,5.5,14.18,17.11,21.99,RL_operator
+Agg_PP_28,open cycle gas turbine,powerplant_energy_learning,natural gas,0.201,353,92,0.35,5.883,5.883,5.5,9.3,9.3,9.3,RL_operator
