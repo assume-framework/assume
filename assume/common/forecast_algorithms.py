@@ -181,36 +181,28 @@ def calculate_naive_price_inelastic(
         calculate_sum_demand(demand_units, exchange_units), index=index
     )
 
-    # 3. Merit-order dispatch
-    # Initialize the price forecast series.
-    price_forecast = pd.Series(index=index, data=0.0)
+    # 3. Merit-order dispatch, vectorized over all time steps (rows)
+    mc = marginal_costs.to_numpy(dtype=float)
+    # sort units by their marginal cost in ascending order per time step
+    order = np.argsort(mc, axis=1)
+    sorted_mc = np.take_along_axis(mc, order, axis=1)
+    sorted_power = np.take_along_axis(power.to_numpy(dtype=float), order, axis=1)
+    # cumulative available power, NaN entries stay NaN like pandas cumsum
+    cumsum_power = np.where(
+        np.isnan(sorted_power), np.nan, np.nancumsum(sorted_power, axis=1)
+    )
+    # the marginal cost of the first unit that meets demand becomes the price
+    meets_demand = cumsum_power >= sum_demand.to_numpy(dtype=float)
+    rows = np.arange(len(mc))
+    prices = sorted_mc[rows, meets_demand.argmax(axis=1)]
 
-    # Loop over each time step
-    for t in index:
-        # Get marginal costs and available power for time t (both are Series indexed by unit)
-        mc_t = marginal_costs.loc[t]
-        power_t = power.loc[t]
-        demand_t = sum_demand.loc[t].item()
+    # if available capacity is insufficient, set the price to max willingness to pay
+    insufficient = ~meets_demand.any(axis=1)
+    prices[insufficient] = [
+        max(unit.price[t] for unit in demand_units) for t in index[insufficient]
+    ]
 
-        # Sort units by their marginal cost in ascending order for time t.
-        sorted_units = mc_t.sort_values().index
-        sorted_mc = mc_t.loc[sorted_units]
-        sorted_power = power_t.loc[sorted_units]
-
-        # Compute the cumulative sum of available power in the sorted order.
-        cumsum_power = sorted_power.cumsum()
-        # Find the first unit where the cumulative available power meets or exceeds demand.
-        matching_units = cumsum_power[cumsum_power >= demand_t]
-        if matching_units.empty:
-            # If available capacity is insufficient, set the price to max willingnes to pay.
-            price = max([unit.price[t] for unit in demand_units])
-        else:
-            # The marginal cost of the first unit that meets demand becomes the price.
-            price = sorted_mc.loc[matching_units.index[0]]
-
-        price_forecast.loc[t] = price
-
-    return price_forecast
+    return pd.Series(prices, index=index)
 
 
 @lru_cache
