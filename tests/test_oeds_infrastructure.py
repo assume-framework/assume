@@ -51,7 +51,8 @@ def test_set_default_params(mock_infrastructure):
     result = mock_infrastructure.set_default_params(df)
 
     assert result["minPower"].iloc[0] == 5000.0
-    assert result["ramp_up"].iloc[0] == 1000.0 / 60
+    assert result["ramp_up"].iloc[0] == 1.0 / 60
+    assert result["ramp_down"].iloc[0] == 1.0 / 60
     assert result["turbineTyp"].iloc[0] == "Dampfturbine"
     assert result["type"].iloc[0] == 2000
 

@@ -205,11 +205,11 @@ class InfrastructureInterface:
         df["minPower"] = df["maxPower"] * 0.5  # MinPower = 1/2 MaxPower
         df["P0"] = df["minPower"] + 0.1
         df["ramp_up"] = (
-            0.1 * df["maxPower"] / 60
-        )  # 10% Change per hour converted to MW/min
+            0.1 * df["maxPower"] / 1e3 / 60
+        )  # 10% change per hour, converted from kW to MW/min
         df["ramp_down"] = (
-            0.1 * df["maxPower"] / 60
-        )  # 10% Change per hour converted to MW/min
+            0.1 * df["maxPower"] / 1e3 / 60
+        )  # 10% change per hour, converted from kW to MW/min
         df["min_down_time"] = 5  # default min stop time 5h
         df["min_operating_time"] = 5  # default min run time 5h
         df["on"] = 1  # on counter --> Plant is on till 1 hour

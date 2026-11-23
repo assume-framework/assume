@@ -49,6 +49,8 @@ from .utils import create_orderbook
         (10, timedelta(minutes=15), 150),
         (10, timedelta(hours=1), 600),
         (-2, timedelta(minutes=15), -30),
+        (10, pd.date_range("2020", periods=2, freq="15min").freq, 150),
+        (10, pd.date_range("2020", periods=2, freq="h").freq, 600),
     ],
 )
 def test_convert_ramp_to_timestep(ramp, simulation_timestep, expected):
