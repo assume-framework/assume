@@ -301,33 +301,23 @@ class FastSeries:
 
     def _data_slice(self, item: slice) -> slice:
         """
-        Convert a slice on the series into a slice on the data array.
+        Convert a datetime slice on the series into a positional slice on the data array.
 
-        Datetime bounds are inclusive and clipped to the index range, like label-based
-        slicing in pandas. Integer bounds are positional, like python slicing.
+        integer or string bounds raise a TypeError, use `iloc` for positional slicing instead.
+        Bounds are inclusive and clipped to the index range, like label-based slicing in pandas.
 
         Raises:
-            TypeError: If the bounds are neither datetimes nor integers, or are mixed.
+            TypeError: If a bound is neither a datetime nor None.
         """
-        bounds = [bound for bound in (item.start, item.stop) if bound is not None]
-        if all(isinstance(bound, datetime) for bound in bounds):
-            start_idx = (
-                max(0, self.index._get_idx_from_date(item.start))
-                if item.start is not None
-                else 0
+        start_idx = 0
+        if item.start is not None:
+            start_idx = max(0, self.index.get_idx_from_date(item.start))
+        stop_idx = len(self.data)
+        if item.stop is not None:
+            stop_idx = max(
+                0, self.index.get_idx_from_date(item.stop, round_up=False) + 1
             )
-            stop_idx = (
-                max(0, self.index._get_idx_from_date(item.stop, round_up=False) + 1)
-                if item.stop is not None
-                else len(self.data)
-            )
-            return slice(start_idx, stop_idx, item.step)
-        if all(isinstance(bound, int | np.integer) for bound in bounds):
-            return item
-        raise TypeError(
-            "FastSeries slices must use datetime or integer bounds, got "
-            f"{type(item.start)} and {type(item.stop)}."
-        )
+        return slice(start_idx, stop_idx, item.step)
 
     def __add__(self, other: int | float | np.ndarray):
         return self._arithmetic_operation(other, "add")
@@ -602,7 +592,7 @@ class FastSeries:
         """
         # 1) compute the "raw" center index
         if isinstance(center, datetime):
-            raw_center = self.index._get_idx_from_date(center)
+            raw_center = self.index.get_idx_from_date(center)
         else:
             raw_center = center
 

@@ -106,12 +106,12 @@ class FastIndex:
         elif isinstance(item, slice):
             # datetime bounds are clipped to the index range like in pandas
             start_idx = (
-                max(0, self._get_idx_from_date(item.start))
+                max(0, self.get_idx_from_date(item.start))
                 if isinstance(item.start, datetime)
                 else item.start or 0
             )
             stop_idx = (
-                max(0, self._get_idx_from_date(item.stop, round_up=False) + 1)
+                max(0, self.get_idx_from_date(item.stop, round_up=False) + 1)
                 if isinstance(item.stop, datetime)
                 else item.stop or len(self._date_list)
             )
@@ -167,7 +167,7 @@ class FastIndex:
             raise KeyError(
                 f"{date} is not aligned with the index frequency {self.freq}"
             )
-        idx = self._get_idx_from_date(date)
+        idx = self.get_idx_from_date(date)
         if idx < 0 or idx >= self._count:
             raise KeyError(
                 f"{date} is outside of the index range {self.start} - {self.end}"
@@ -220,8 +220,8 @@ class FastIndex:
             total_dates = np.arange(self._count) * self._freq_seconds
             self._date_list = [self._start + timedelta(seconds=s) for s in total_dates]
 
-        start_idx = max(0, self._get_idx_from_date(start or self.start))
-        end_idx = max(0, self._get_idx_from_date(end or self.end, round_up=False) + 1)
+        start_idx = max(0, self.get_idx_from_date(start or self.start))
+        end_idx = max(0, self.get_idx_from_date(end or self.end, round_up=False) + 1)
         return self._date_list[start_idx:end_idx]
 
     def as_datetimeindex(self) -> pd.DatetimeIndex:
@@ -237,7 +237,7 @@ class FastIndex:
         return pd.DatetimeIndex(pd.to_datetime(datetimes), name="FastIndex")
 
     @lru_cache(maxsize=1000)
-    def _get_idx_from_date(self, date: datetime, round_up: bool = True) -> int:
+    def get_idx_from_date(self, date: datetime, round_up: bool = True) -> int:
         """
         Convert a datetime to its corresponding index in the range.
 
@@ -253,9 +253,12 @@ class FastIndex:
 
         Raises:
             KeyError: If the input `date` is None.
+            TypeError: If the input `date` is not of type 'datetime'
         """
         if date is None:
             raise KeyError("Date cannot be None. Please provide a valid datetime.")
+        if not isinstance(date, datetime):
+            raise TypeError(f"Expected datetime, got {type(date)}.")
 
         delta_seconds = (date - self.start).total_seconds()
         idx, remainder = divmod(delta_seconds, self.freq_seconds)
@@ -279,7 +282,7 @@ class FastIndex:
         Returns:
             datetime.datetime: The first step at or after ``date``.
         """
-        return self.start + self._get_idx_from_date(date) * self.freq
+        return self.start + self.get_idx_from_date(date) * self.freq
 
     @staticmethod
     def _convert_to_datetime(value: datetime | str) -> datetime:
