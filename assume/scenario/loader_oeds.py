@@ -15,7 +15,6 @@ from dateutil import rrule as rr
 from assume import World
 from assume.common.forecaster import DemandForecaster, PowerplantForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.common.utils import convert_ramp_to_timestep
 from assume.scenario.oeds.infrastructure import InfrastructureInterface
 
 logger = logging.getLogger(__name__)
@@ -377,12 +376,8 @@ def load_oeds(
                         "efficiency": plant["eta"],
                         "technology": fuel_type,
                         "cold_start_cost": plant["start_cost"] * 1e3,
-                        "ramp_up": convert_ramp_to_timestep(
-                            plant["ramp_up"], index.freq
-                        ),
-                        "ramp_down": convert_ramp_to_timestep(
-                            plant["ramp_down"], index.freq
-                        ),
+                        "ramp_up": plant["ramp_up"],  # MW/min
+                        "ramp_down": plant["ramp_down"],  # MW/min
                         "location": (lat, lon),
                         "node": area,
                     },
