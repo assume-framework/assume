@@ -143,16 +143,7 @@ class FastIndex:
         """
         if self.start > date or self.end < date:
             return False
-        return self._is_aligned(date)
-
-    def _is_aligned(self, date: datetime) -> bool:
-        """Check whether a datetime lies exactly on the index grid."""
-        delta_seconds = (date - self.start).total_seconds()
-        remainder = delta_seconds % self.freq_seconds
-        return (
-            remainder <= _ALIGNMENT_EPSILON_SECONDS
-            or self.freq_seconds - remainder <= _ALIGNMENT_EPSILON_SECONDS
-        )
+        return self._locate(date)[1]
 
     def get_position(self, date: datetime) -> int:
         """
@@ -162,12 +153,13 @@ class FastIndex:
 
         Raises:
             KeyError: If the datetime lies outside the index range or is not aligned with the frequency.
+            TypeError: If the input is not a datetime (this includes None).
         """
-        if not self._is_aligned(date):
+        idx, aligned = self._locate(date)
+        if not aligned:
             raise KeyError(
                 f"{date} is not aligned with the index frequency {self.freq}"
             )
-        idx = self.get_idx_from_date(date)
         if idx < 0 or idx >= self._count:
             raise KeyError(
                 f"{date} is outside of the index range {self.start} - {self.end}"
@@ -252,23 +244,34 @@ class FastIndex:
             int: The index of the datetime in the index range.
 
         Raises:
-            KeyError: If the input `date` is None.
-            TypeError: If the input `date` is not of type 'datetime'
+            TypeError: If the input `date` is not a datetime (this includes None).
         """
-        if date is None:
-            raise KeyError("Date cannot be None. Please provide a valid datetime.")
+        idx, aligned = self._locate(date)
+        return idx + 1 if round_up and not aligned else idx
+
+    def _locate(self, date: datetime) -> tuple[int, bool]:
+        """
+        Locate a datetime on the index grid, shared by the lookup methods.
+
+        Returns:
+            tuple[int, bool]: The index of the step at or before ``date`` (or the exact
+            step, within ``_ALIGNMENT_EPSILON_SECONDS``), and whether ``date`` is on the grid.
+
+        Raises:
+            TypeError: If the input `date` is not a datetime (this includes None).
+        """
         if not isinstance(date, datetime):
             raise TypeError(f"Expected datetime, got {type(date)}.")
 
-        delta_seconds = (date - self.start).total_seconds()
-        idx, remainder = divmod(delta_seconds, self.freq_seconds)
+        idx, remainder = divmod(
+            (date - self._start).total_seconds(), self._freq_seconds
+        )
         idx = int(idx)
-
         if remainder <= _ALIGNMENT_EPSILON_SECONDS:
-            return idx
-        if self.freq_seconds - remainder <= _ALIGNMENT_EPSILON_SECONDS:
-            return idx + 1
-        return idx + 1 if round_up else idx
+            return idx, True
+        if self._freq_seconds - remainder <= _ALIGNMENT_EPSILON_SECONDS:
+            return idx + 1, True
+        return idx, False
 
     def align_up(self, date: datetime) -> datetime:
         """
