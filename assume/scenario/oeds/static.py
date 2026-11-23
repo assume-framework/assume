@@ -119,8 +119,8 @@ technical_parameter = {
         0: {
             "maxPower": 100,
             "minPower": 40,
-            "ramp_up": 1, # MW/min
-            "ramp_down": 1, # MW/min
+            "ramp_up": 1,  # MW/min
+            "ramp_down": 1,  # MW/min
             "eta": 36,
             "chi": 0.355,
             "min_down_time": 9,
@@ -132,8 +132,8 @@ technical_parameter = {
         2000: {
             "maxPower": 100,
             "minPower": 33,
-            "ramp_up": 4, # MW/min
-            "ramp_down": 4, # MW/min
+            "ramp_up": 4,  # MW/min
+            "ramp_down": 4,  # MW/min
             "eta": 40,
             "chi": 0.355,
             "min_down_time": 7,
@@ -145,8 +145,8 @@ technical_parameter = {
         2024: {
             "maxPower": 100,
             "minPower": 25,
-            "ramp_up": 6, # MW/min
-            "ramp_down": 6, # MW/min
+            "ramp_up": 6,  # MW/min
+            "ramp_down": 6,  # MW/min
             "eta": 45,
             "chi": 0.355,
             "min_down_time": 5,
@@ -160,8 +160,8 @@ technical_parameter = {
         0: {
             "maxPower": 100,
             "minPower": 40,
-            "ramp_up": 2, # MW/min
-            "ramp_down": 2, # MW/min
+            "ramp_up": 2,  # MW/min
+            "ramp_down": 2,  # MW/min
             "eta": 45,
             "chi": 0.202,
             "min_down_time": 4,
@@ -173,8 +173,8 @@ technical_parameter = {
         2000: {
             "maxPower": 100,
             "minPower": 40,
-            "ramp_up": 4, # MW/min
-            "ramp_down": 4, # MW/min
+            "ramp_up": 4,  # MW/min
+            "ramp_down": 4,  # MW/min
             "eta": 55,
             "chi": 0.202,
             "min_down_time": 3,
@@ -186,8 +186,8 @@ technical_parameter = {
         2024: {
             "maxPower": 100,
             "minPower": 40,
-            "ramp_up": 8, # MW/min
-            "ramp_down": 8, # MW/min
+            "ramp_up": 8,  # MW/min
+            "ramp_down": 8,  # MW/min
             "eta": 65,
             "chi": 0.202,
             "min_down_time": 2,
@@ -201,8 +201,8 @@ technical_parameter = {
         0: {
             "maxPower": 100,
             "minPower": 40,
-            "ramp_up": 8, # MW/min
-            "ramp_down": 8, # MW/min
+            "ramp_up": 8,  # MW/min
+            "ramp_down": 8,  # MW/min
             "eta": 40,
             "chi": 0.202,
             "min_down_time": 4,
@@ -214,8 +214,8 @@ technical_parameter = {
         2000: {
             "maxPower": 100,
             "minPower": 40,
-            "ramp_up": 12, # MW/min
-            "ramp_down": 12, # MW/min
+            "ramp_up": 12,  # MW/min
+            "ramp_down": 12,  # MW/min
             "eta": 45,
             "chi": 0.202,
             "min_down_time": 3,
@@ -227,8 +227,8 @@ technical_parameter = {
         2024: {
             "maxPower": 100,
             "minPower": 40,
-            "ramp_up": 15, # MW/min
-            "ramp_down": 15, # MW/min
+            "ramp_up": 15,  # MW/min
+            "ramp_down": 15,  # MW/min
             "eta": 50,
             "chi": 0.202,
             "min_down_time": 2,
@@ -242,8 +242,8 @@ technical_parameter = {
         0: {
             "maxPower": 100,
             "minPower": 60,
-            "ramp_up": 1.0, # MW/min
-            "ramp_down": 1.0, # MW/min
+            "ramp_up": 1.0,  # MW/min
+            "ramp_down": 1.0,  # MW/min
             "eta": 34,
             "chi": 0.407,
             "min_down_time": 9,
@@ -255,8 +255,8 @@ technical_parameter = {
         2000: {
             "maxPower": 100,
             "minPower": 50,
-            "ramp_up": 2.5, # MW/min
-            "ramp_down": 2.5, # MW/min
+            "ramp_up": 2.5,  # MW/min
+            "ramp_down": 2.5,  # MW/min
             "eta": 40,
             "chi": 0.407,
             "min_down_time": 7,
@@ -268,8 +268,8 @@ technical_parameter = {
         2024: {
             "maxPower": 100,
             "minPower": 40,
-            "ramp_up": 4.0, # MW/min
-            "ramp_down": 4.0, # MW/min
+            "ramp_up": 4.0,  # MW/min
+            "ramp_down": 4.0,  # MW/min
             "eta": 45,
             "chi": 0.407,
             "min_down_time": 5,
@@ -283,8 +283,8 @@ technical_parameter = {
         0: {
             "maxPower": 100,
             "minPower": 50,
-            "ramp_up": 0.5, # MW/min
-            "ramp_down": 0.5, # MW/min
+            "ramp_up": 0.5,  # MW/min
+            "ramp_down": 0.5,  # MW/min
             "eta": 33,
             "chi": 0,
             "min_down_time": 22,
@@ -296,8 +296,8 @@ technical_parameter = {
         2000: {
             "maxPower": 100,
             "minPower": 45,
-            "ramp_up": 0.5, # MW/min
-            "ramp_down": 0.5, # MW/min
+            "ramp_up": 0.5,  # MW/min
+            "ramp_down": 0.5,  # MW/min
             "eta": 35,
             "chi": 0,
             "min_down_time": 22,
@@ -309,8 +309,8 @@ technical_parameter = {
         2024: {
             "maxPower": 100,
             "minPower": 40,
-            "ramp_up": 0.5, # MW/min
-            "ramp_down": 0.5, # MW/min
+            "ramp_up": 0.5,  # MW/min
+            "ramp_down": 0.5,  # MW/min
             "eta": 38,
             "chi": 0,
             "min_down_time": 22,

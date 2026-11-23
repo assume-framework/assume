@@ -29,7 +29,7 @@ def storage_config():
         "efficiency_charge": 0.95,
         "efficiency_discharge": 0.95,
         "initial_soc": 0,
-        "ramp_up": 50/60,
+        "ramp_up": 50 / 60,
         "ramp_down": 0,
         "storage_loss_rate": 0.0,
     }

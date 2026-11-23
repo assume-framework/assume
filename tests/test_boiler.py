@@ -8,8 +8,8 @@ import pandas as pd
 import pyomo.environ as pyo
 import pytest
 
-from assume.units.dst_components import Boiler
 from assume.common.utils import convert_ramp_to_timestep
+from assume.units.dst_components import Boiler
 
 # Define the solver to use
 solver_name = "appsi_highs"  # Replace with the appropriate solver
@@ -29,8 +29,8 @@ def electric_boiler_config():
         "efficiency": 0.85,
         "fuel_type": "electricity",  # Electric fuel type supports operational constraints
         "min_power": 20,
-        "ramp_up": 50/60, # in MW/min
-        "ramp_down": 50/60, # in MW/min
+        "ramp_up": 50 / 60,  # in MW/min
+        "ramp_down": 50 / 60,  # in MW/min
         "min_operating_steps": 2,
         "min_down_steps": 1,
         "initial_operational_status": 1,
@@ -45,8 +45,8 @@ def gas_boiler_config():
         "efficiency": 0.85,
         "fuel_type": "natural_gas",  # Natural gas does not support operational constraints
         "min_power": 0,
-        "ramp_up": 50/60,
-        "ramp_down": 50/60,
+        "ramp_up": 50 / 60,
+        "ramp_down": 50 / 60,
         # Do not set min_operating_steps and min_down_steps for natural_gas
         "initial_operational_status": 1,  # This will be ignored for natural_gas
     }
@@ -60,8 +60,8 @@ def hydrogen_boiler_config():
         "efficiency": 0.85,
         "fuel_type": "hydrogen_gas",
         "min_power": 0,
-        "ramp_up": 50/60,
-        "ramp_down": 50/60  ,
+        "ramp_up": 50 / 60,
+        "ramp_down": 50 / 60,
         "initial_operational_status": 1,
     }
 
@@ -268,8 +268,8 @@ def test_gas_boiler_ramping_constraints(gas_boiler_model, gas_boiler_config):
     model, _ = gas_boiler_model
     simulation_timestep = timedelta(hours=1)
     ramp_up_limit = convert_ramp_to_timestep(
-            gas_boiler_config["ramp_up"], simulation_timestep
-        )
+        gas_boiler_config["ramp_up"], simulation_timestep
+    )
     ramp_down_limit = convert_ramp_to_timestep(
         gas_boiler_config["ramp_down"], simulation_timestep
     )
@@ -535,8 +535,12 @@ def test_hydrogen_boiler_ramping_constraints(
 ):
     model, _ = hydrogen_boiler_model
     simulation_timestep = timedelta(hours=1)
-    ramp_up_limit = convert_ramp_to_timestep(hydrogen_boiler_config["ramp_up"], simulation_timestep)
-    ramp_down_limit = convert_ramp_to_timestep(hydrogen_boiler_config["ramp_down"], simulation_timestep)
+    ramp_up_limit = convert_ramp_to_timestep(
+        hydrogen_boiler_config["ramp_up"], simulation_timestep
+    )
+    ramp_down_limit = convert_ramp_to_timestep(
+        hydrogen_boiler_config["ramp_down"], simulation_timestep
+    )
 
     for t in model.time_steps:
         if t > model.time_steps.first():

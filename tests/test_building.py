@@ -120,8 +120,8 @@ def heat_pump_components():
             "max_power": 10.0,
             "cop": 3.0,
             "min_power": 0.0,
-            "ramp_up": 10.0/60,
-            "ramp_down": 10.0/60,
+            "ramp_up": 10.0 / 60,
+            "ramp_down": 10.0 / 60,
         }
     }
 
@@ -134,8 +134,8 @@ def boiler_components():
             "efficiency": 0.9,
             "fuel_type": "electricity",
             "min_power": 0.0,
-            "ramp_up": 10.0/60,
-            "ramp_down": 10.0/60,
+            "ramp_up": 10.0 / 60,
+            "ramp_down": 10.0 / 60,
         }
     }
 
@@ -152,8 +152,8 @@ def thermal_storage_components():
             "efficiency_charge": 1.0,
             "efficiency_discharge": 1.0,
             "initial_soc": 0.5,
-            "ramp_up": 10.0/60,
-            "ramp_down": 10.0/60,
+            "ramp_up": 10.0 / 60,
+            "ramp_down": 10.0 / 60,
             "storage_loss_rate": 0.0,
         }
     }
@@ -181,8 +181,8 @@ def battery_components():
             "efficiency_charge": 1.0,
             "efficiency_discharge": 1.0,
             "initial_soc": 0.5,
-            "ramp_up": 10.0/60,
-            "ramp_down": 10.0/60,
+            "ramp_up": 10.0 / 60,
+            "ramp_down": 10.0 / 60,
             "storage_loss_rate": 0.0,
         }
     }
@@ -200,8 +200,8 @@ def building_components_with_cs():
             "initial_soc": 0.5,
             "efficiency_charge": 1.0,
             "efficiency_discharge": 1.0,
-            "ramp_up": 10.0/60,
-            "ramp_down": 10.0/60,
+            "ramp_up": 10.0 / 60,
+            "ramp_down": 10.0 / 60,
             "mileage": 1.0,
             "power_flow_directionality": "bidirectional",
         },
@@ -214,23 +214,23 @@ def building_components_with_cs():
             "initial_soc": 0.6,
             "efficiency_charge": 1.0,
             "efficiency_discharge": 1.0,
-            "ramp_up": 8.0/60,
-            "ramp_down": 8.0/60,
+            "ramp_up": 8.0 / 60,
+            "ramp_down": 8.0 / 60,
             "mileage": 1.0,
             "power_flow_directionality": "unidirectional",
         },
         "charging_station_1": {
             "max_power": 10.0,
             "min_power": 0.0,
-            "ramp_up": 10.0/60,
-            "ramp_down": 10.0/60,
+            "ramp_up": 10.0 / 60,
+            "ramp_down": 10.0 / 60,
             "power_flow_directionality": "bidirectional",
         },
         "charging_station_2": {
             "max_power": 8.0,
             "min_power": 0.0,
-            "ramp_up": 8.0/60,
-            "ramp_down": 8.0/60,
+            "ramp_up": 8.0 / 60,
+            "ramp_down": 8.0 / 60,
             "power_flow_directionality": "unidirectional",
         },
     }
@@ -248,8 +248,8 @@ def building_components_without_cs():
             "initial_soc": 0.5,
             "efficiency_charge": 1.0,
             "efficiency_discharge": 1.0,
-            "ramp_up": 10.0/60,
-            "ramp_down": 10.0/60,
+            "ramp_up": 10.0 / 60,
+            "ramp_down": 10.0 / 60,
             "mileage": 1.0,
             "power_flow_directionality": "bidirectional",
         },
@@ -262,8 +262,8 @@ def building_components_without_cs():
             "initial_soc": 0.6,
             "efficiency_charge": 1.0,
             "efficiency_discharge": 1.0,
-            "ramp_up": 8.0/60,
-            "ramp_down": 8.0/60,
+            "ramp_up": 8.0 / 60,
+            "ramp_down": 8.0 / 60,
             "mileage": 1.0,
             "power_flow_directionality": "unidirectional",
         },
@@ -734,8 +734,8 @@ def test_building_ev_profile_keyerror_triggers_fallback(
             "initial_soc": 0.5,
             "efficiency_charge": 1.0,
             "efficiency_discharge": 1.0,
-            "ramp_up": 10.0/60,
-            "ramp_down": 10.0/60,
+            "ramp_up": 10.0 / 60,
+            "ramp_down": 10.0 / 60,
             "mileage": 1.0,
             "power_flow_directionality": "bidirectional",
         }
@@ -782,8 +782,8 @@ def test_building_ev_trip_distance_keyerror_is_optional(
             "initial_soc": 0.5,
             "efficiency_charge": 1.0,
             "efficiency_discharge": 1.0,
-            "ramp_up": 10.0/60,
-            "ramp_down": 10.0/60,
+            "ramp_up": 10.0 / 60,
+            "ramp_down": 10.0 / 60,
             "mileage": 1.0,
             "power_flow_directionality": "bidirectional",
         }
@@ -965,8 +965,8 @@ def test_battery_charges_at_cheap_hours_discharges_at_expensive(time_index):
             "efficiency_charge": 1.0,
             "efficiency_discharge": 1.0,
             "initial_soc": 0.0,  # starts empty
-            "ramp_up": 5.0/60,
-            "ramp_down": 5.0/60,
+            "ramp_up": 5.0 / 60,
+            "ramp_down": 5.0 / 60,
             "storage_loss_rate": 0.0,
         }
     }
@@ -1022,8 +1022,8 @@ def test_battery_arbitrage_reduces_total_cost(time_index):
             "efficiency_charge": 1.0,
             "efficiency_discharge": 1.0,
             "initial_soc": 0.0,
-            "ramp_up": 5.0/60,
-            "ramp_down": 5.0/60,
+            "ramp_up": 5.0 / 60,
+            "ramp_down": 5.0 / 60,
             "storage_loss_rate": 0.0,
         }
     }
@@ -1080,8 +1080,8 @@ def test_ev_bidirectional_v2g_charges_cheap_discharges_expensive(time_index):
             "initial_soc": 0.0,  # starts empty; must charge before discharging
             "efficiency_charge": 1.0,
             "efficiency_discharge": 1.0,
-            "ramp_up": 5.0/60,
-            "ramp_down": 5.0/60,
+            "ramp_up": 5.0 / 60,
+            "ramp_down": 5.0 / 60,
             "storage_loss_rate": 0.0,
             "power_flow_directionality": "bidirectional",
             "mileage": 1.0,  # required when trip_distance is provided
@@ -1133,8 +1133,8 @@ def test_heat_pump_defers_to_cheap_hours_when_thermal_storage_available(time_ind
             "max_power": 5.0,
             "cop": 3.0,
             "min_power": 0.0,
-            "ramp_up": 5.0/60,
-            "ramp_down": 5.0/60,
+            "ramp_up": 5.0 / 60,
+            "ramp_down": 5.0 / 60,
         },
     }
     hp_with_storage = {
@@ -1142,8 +1142,8 @@ def test_heat_pump_defers_to_cheap_hours_when_thermal_storage_available(time_ind
             "max_power": 5.0,
             "cop": 3.0,
             "min_power": 0.0,
-            "ramp_up": 5.0/60,
-            "ramp_down": 5.0/60,
+            "ramp_up": 5.0 / 60,
+            "ramp_down": 5.0 / 60,
         },
         "thermal_storage": {
             "capacity": 50.0,
@@ -1154,8 +1154,8 @@ def test_heat_pump_defers_to_cheap_hours_when_thermal_storage_available(time_ind
             "efficiency_charge": 1.0,
             "efficiency_discharge": 1.0,
             "initial_soc": 0.0,
-            "ramp_up": 15.0/60,
-            "ramp_down": 15.0/60,
+            "ramp_up": 15.0 / 60,
+            "ramp_down": 15.0 / 60,
             "storage_loss_rate": 0.0,
         },
     }
@@ -1444,8 +1444,8 @@ def test_building_raises_error_if_ev_lacks_trip_data(time_index):
             "initial_soc": 0.5,
             "efficiency_charge": 1.0,
             "efficiency_discharge": 1.0,
-            "ramp_up": 10.0/60,
-            "ramp_down": 10.0/60,
+            "ramp_up": 10.0 / 60,
+            "ramp_down": 10.0 / 60,
             "mileage": 1.0,
             "power_flow_directionality": "bidirectional",
         },

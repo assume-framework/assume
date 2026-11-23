@@ -9,8 +9,8 @@ import pandas as pd
 import pyomo.environ as pyo
 import pytest
 
-from assume.units.dst_components import HeatPump
 from assume.common.utils import convert_ramp_to_timestep
+from assume.units.dst_components import HeatPump
 
 # Define the solver to use
 solver_name = "appsi_highs"  # Replace with the appropriate solver
@@ -29,8 +29,8 @@ def heat_pump_config():
         "max_power": 80,
         "cop": 3.5,
         "min_power": 10,
-        "ramp_up": 20/60,
-        "ramp_down": 20/60,
+        "ramp_up": 20 / 60,
+        "ramp_down": 20 / 60,
         "min_operating_steps": 2,
         "min_down_steps": 2,
         "initial_operational_status": 1,  # Assuming it starts as operational
@@ -106,8 +106,12 @@ def test_heat_pump_ramping_constraints(heat_pump_model, heat_pump_config):
     """
     model, _ = heat_pump_model
     simulation_timestep = timedelta(hours=1)
-    ramp_up_limit = convert_ramp_to_timestep(heat_pump_config["ramp_up"], simulation_timestep)
-    ramp_down_limit = convert_ramp_to_timestep(heat_pump_config["ramp_down"], simulation_timestep)
+    ramp_up_limit = convert_ramp_to_timestep(
+        heat_pump_config["ramp_up"], simulation_timestep
+    )
+    ramp_down_limit = convert_ramp_to_timestep(
+        heat_pump_config["ramp_down"], simulation_timestep
+    )
 
     for t in model.time_steps:
         if t > model.time_steps.first():

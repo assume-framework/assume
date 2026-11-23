@@ -18,8 +18,8 @@ def hydrogen_components():
         "electrolyser": {
             "max_power": 100,
             "min_power": 0,
-            "ramp_up": 100/60,
-            "ramp_down": 100/60,
+            "ramp_up": 100 / 60,
+            "ramp_down": 100 / 60,
             "efficiency": 1,
             "min_operating_time": 0,
             "min_down_time": 0,
@@ -32,8 +32,8 @@ def hydrogen_components():
             "efficiency_charge": 0.95,
             "efficiency_discharge": 0.95,
             "initial_soc": 0,
-            "ramp_up": 100/60,
-            "ramp_down": 100/60,
+            "ramp_up": 100 / 60,
+            "ramp_down": 100 / 60,
             "storage_loss_rate": 0.0,
             "final_soc_target": 0.3,  # NEW: ensures attribute for test
         },
@@ -209,8 +209,8 @@ def test_unknown_technology_error():
         "electrolyser": {
             "max_power": 50,
             "min_power": 0,
-            "ramp_up": 10/60,
-            "ramp_down": 10/60,
+            "ramp_up": 10 / 60,
+            "ramp_down": 10 / 60,
             "efficiency": 0.8,
         },
         "unknown_tech": {
@@ -242,8 +242,8 @@ def hydrogen_components_no_storage():
         "electrolyser": {
             "max_power": 100,
             "min_power": 0,
-            "ramp_up": 50/60,
-            "ramp_down": 50/60,
+            "ramp_up": 50 / 60,
+            "ramp_down": 50 / 60,
             "efficiency": 0.7,
             "min_operating_time": 1,
             "min_down_time": 1,
@@ -353,8 +353,8 @@ def test_rolling_horizon_honours_per_timestep_hydrogen_demand():
             "electrolyser": {
                 "max_power": 100,
                 "min_power": 0,
-                "ramp_up": 100/60,
-                "ramp_down": 100/60,
+                "ramp_up": 100 / 60,
+                "ramp_down": 100 / 60,
                 "efficiency": 1,
             }
         },

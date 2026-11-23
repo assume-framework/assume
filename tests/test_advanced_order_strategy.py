@@ -47,7 +47,7 @@ def power_plant() -> PowerPlant:
 
 
 def test_eom_with_blocks(mock_market_config, power_plant):
-    power_plant.ramp_up = 400 # MW/timestep
+    power_plant.ramp_up = 400  # MW/timestep
     product_index = pd.date_range("2023-07-01", periods=24, freq="h")
     strategy = EnergyHeuristicFlexableBlockStrategy()
     mc = mock_market_config
@@ -98,7 +98,7 @@ def test_eom_with_blocks(mock_market_config, power_plant):
 
 
 def test_eom_with_links(mock_market_config, power_plant):
-    power_plant.ramp_up = 400 # MW/timestep
+    power_plant.ramp_up = 400  # MW/timestep
     product_index = pd.date_range("2023-07-01", periods=24, freq="h")
     strategy = EnergyHeuristicFlexableLinkedStrategy()
     mc = mock_market_config

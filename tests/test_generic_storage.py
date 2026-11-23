@@ -32,8 +32,8 @@ def generic_storage_config():
         "efficiency_charge": 0.9,  # Charging efficiency
         "efficiency_discharge": 0.9,  # Discharging efficiency
         "initial_soc": 0,  # Initial SOC
-        "ramp_up": 50/60,  # Maximum ramp-up rate in MW/min
-        "ramp_down": 50/60,  # Maximum ramp-down rate in MW/min
+        "ramp_up": 50 / 60,  # Maximum ramp-up rate in MW/min
+        "ramp_down": 50 / 60,  # Maximum ramp-down rate in MW/min
         "storage_loss_rate": 0.01,  # 1% storage loss per time step
     }
 

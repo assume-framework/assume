@@ -386,7 +386,10 @@ class Boiler:
         # Ramp-up constraint and ramp-down constraints. The first step has no
         # predecessor to decrease from, so ramp_down is skipped there rather than
         # also capping it (ramp_up already limits the rise from a standing start).
-        if self.fuel_type == "natural_gas" and(self.ramp_up is not None or self.ramp_down is not None):
+        if self.fuel_type == "natural_gas" and (
+            self.ramp_up is not None or self.ramp_down is not None
+        ):
+
             @model_block.Constraint(self.time_steps)
             def ramp_up_constraint(b, t):
                 if t == self.time_steps.at(1):
@@ -399,7 +402,9 @@ class Boiler:
                     return pyo.Constraint.Skip
                 return b.natural_gas_in[t - 1] - b.natural_gas_in[t] <= b.ramp_down
 
-        elif self.fuel_type == "hydrogen_gas" and(self.ramp_up is not None or self.ramp_down is not None):
+        elif self.fuel_type == "hydrogen_gas" and (
+            self.ramp_up is not None or self.ramp_down is not None
+        ):
 
             @model_block.Constraint(self.time_steps)
             def ramp_up_constraint(b, t):
@@ -413,7 +418,9 @@ class Boiler:
                     return pyo.Constraint.Skip
                 return b.hydrogen_gas_in[t - 1] - b.hydrogen_gas_in[t] <= b.ramp_down
 
-        elif self.fuel_type == "electricity" and(self.ramp_up is not None or self.ramp_down is not None):
+        elif self.fuel_type == "electricity" and (
+            self.ramp_up is not None or self.ramp_down is not None
+        ):
             add_ramping_constraints(
                 model_block=model_block,
                 time_steps=self.time_steps,
@@ -610,6 +617,7 @@ class GenericStorage:
 
         # Apply ramp-up constraints if ramp_up is specified
         if self.ramp_up is not None:
+
             @model_block.Constraint(self.time_steps)
             def charge_ramp_up_constraint(b, t):
                 if t == self.time_steps.at(1):
@@ -621,7 +629,8 @@ class GenericStorage:
                 if t == self.time_steps.at(1):
                     return b.discharge[t] <= b.ramp_up
                 return b.discharge[t] - b.discharge[t - 1] <= b.ramp_up
-        if  self.ramp_down is not None:
+
+        if self.ramp_down is not None:
             # Apply ramp-down constraints if ramp_down is specified. The first step has no
             # predecessor to decrease from, so it is left uncapped here rather than also
             # bounding it by ramp_down (ramp_up above already caps how fast it can rise
@@ -1946,6 +1955,7 @@ class ChargingStation:
 
         # Ramping: charge
         if self.ramp_up is not None:
+
             @model_block.Constraint(self.time_steps)
             def charge_ramp_up_constraint(b, t):
                 if t == self.time_steps.at(1):
@@ -1964,6 +1974,7 @@ class ChargingStation:
 
         # Ramping: discharge
         if self.ramp_up is not None:
+
             @model_block.Constraint(self.time_steps)
             def discharge_ramp_up_constraint(b, t):
                 if t == self.time_steps.at(1):
@@ -1971,6 +1982,7 @@ class ChargingStation:
                 return b.discharge[t] - b.discharge[t - 1] <= b.ramp_up
 
         if self.ramp_down is not None:
+
             @model_block.Constraint(self.time_steps)
             def discharge_ramp_down_constraint(b, t):
                 if t == self.time_steps.at(1):
@@ -2675,6 +2687,7 @@ class ThermalProcessStage:
                     b.heat_out[t]
                     <= availability_at(self.availability_profile, t) * b.max_heat_out
                 )
+
         if self.ramp_up is not None or self.ramp_down is not None:
             add_ramping_constraints(
                 model_block=model_block,
@@ -2933,6 +2946,7 @@ def add_ramping_constraints(model_block, time_steps, ramped):
 
     # Ramp-up constraint
     if model_block.ramp_up is not None:
+
         @model_block.Constraint(time_steps)
         def ramp_up_constraint(b, t):
             if t == time_steps.at(1):
@@ -2941,6 +2955,7 @@ def add_ramping_constraints(model_block, time_steps, ramped):
 
     # Ramp-down constraint
     if model_block.ramp_down is not None:
+
         @model_block.Constraint(time_steps)
         def ramp_down_constraint(b, t):
             if t == time_steps.at(1):

@@ -9,9 +9,9 @@ import pytest
 
 from assume.common.exceptions import ValidationError
 from assume.common.forecaster import PowerplantForecaster
+from assume.common.utils import convert_ramp_to_timestep
 from assume.strategies.naive_strategies import EnergyNaiveStrategy
 from assume.units import PowerPlant
-from assume.common.utils import convert_ramp_to_timestep
 
 
 @pytest.fixture
@@ -206,7 +206,7 @@ def test_powerplant_feedback(power_plant_1, mock_market_config):
 
 
 def test_powerplant_ramping(power_plant_1):
-    power_plant_1.ramp_down = 100 # MW/timestep
+    power_plant_1.ramp_down = 100  # MW/timestep
     power_plant_1.ramp_up = 200
     power_plant_1.min_operating_time = 3
     power_plant_1.min_down_time = 2
@@ -373,8 +373,8 @@ def test_powerplant_execute_dispatch():
         min_power=50,
         efficiency=0.5,
         fuel_type="lignite",
-        ramp_down=100/60,
-        ramp_up=200/60,
+        ramp_down=100 / 60,
+        ramp_up=200 / 60,
         min_operating_time=3,
         min_down_time=2,
         forecaster=forecaster,

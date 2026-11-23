@@ -103,8 +103,8 @@ def load_pypsa(
                 "node": generator.node,
                 "efficiency": 1,  # do not use generator.efficiency as it is respected in marginal_cost,
                 "fuel_type": generator.carrier,
-                "ramp_up": ramp_up, # MW/timestep
-                "ramp_down": ramp_down, # MW/timestep
+                "ramp_up": ramp_up,  # MW/timestep
+                "ramp_down": ramp_down,  # MW/timestep
                 "min_operating_time": generator.min_up_time or 1,
                 "min_down_time": generator.min_down_time or 1,
             },

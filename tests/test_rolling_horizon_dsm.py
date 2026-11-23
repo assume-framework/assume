@@ -34,8 +34,8 @@ def dsm_components():
         "electrolyser": {
             "max_power": 100,
             "min_power": 0,
-            "ramp_up": 100/60,  # MW/min
-            "ramp_down": 100/60,  # MW/min
+            "ramp_up": 100 / 60,  # MW/min
+            "ramp_down": 100 / 60,  # MW/min
             "min_operating_time": 0,
             "min_down_time": 0,
             "efficiency": 1,
@@ -48,8 +48,8 @@ def dsm_components():
             "max_power": 100,
             "min_power": 0,
             "fuel_type": "hydrogen",
-            "ramp_up": 100/60,  # MW/min
-            "ramp_down": 100/60,  # MW/min
+            "ramp_up": 100 / 60,  # MW/min
+            "ramp_down": 100 / 60,  # MW/min
             "min_operating_time": 0,
             "min_down_time": 0,
         },
@@ -60,8 +60,8 @@ def dsm_components():
             "specific_dri_demand": 1,
             "specific_lime_demand": 1,
             "lime_co2_factor": 0.1,
-            "ramp_up": 100/60,  # MW/min
-            "ramp_down": 100/60,  # MW/min
+            "ramp_up": 100 / 60,  # MW/min
+            "ramp_down": 100 / 60,  # MW/min
             "min_operating_time": 0,
             "min_down_time": 0,
         },

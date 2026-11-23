@@ -24,8 +24,8 @@ def test_minmax():
         node="empty",
     )
 
-    mm.ramp_down = 200/60
-    mm.ramp_up = 400/60
+    mm.ramp_down = 200 / 60
+    mm.ramp_up = 400 / 60
     mm.max_power = 1000
     mm.min_power = 200
 
@@ -129,10 +129,10 @@ def test_minmaxcharge_no_simultaneous_charge_discharge_ramping():
         node="empty",
     )
 
-    mmc.ramp_down_charge = -100/60
-    mmc.ramp_down_discharge = 100/60
-    mmc.ramp_up_charge = -100/60
-    mmc.ramp_up_discharge = 100/60
+    mmc.ramp_down_charge = -100 / 60
+    mmc.ramp_down_discharge = 100 / 60
+    mmc.ramp_up_charge = -100 / 60
+    mmc.ramp_up_discharge = 100 / 60
     mmc.max_power_charge = -1000
     mmc.max_power_discharge = 1000
     mmc.min_power_charge = 0
@@ -163,7 +163,7 @@ def test_minmaxcharge_no_simultaneous_charge_discharge_ramping():
     assert mmc.calculate_ramp_charge(-10, -200, 0) == -110
 
     # check correct behavior of approximated net ramping speed when simultaneous charge and discharge ramping is not allowed
-    mmc.ramp_up_discharge = 50/60
+    mmc.ramp_up_discharge = 50 / 60
     assert mmc.calculate_ramp_discharge(-10, 992, 0) == 65
 
 
@@ -180,10 +180,10 @@ def test_minmaxcharge_simultaneous_charge_discharge_ramping():
         node="empty",
     )
 
-    mmc.ramp_down_charge = -100/60
-    mmc.ramp_down_discharge = 100/60
-    mmc.ramp_up_charge = -100/60
-    mmc.ramp_up_discharge = 100/60
+    mmc.ramp_down_charge = -100 / 60
+    mmc.ramp_down_discharge = 100 / 60
+    mmc.ramp_up_charge = -100 / 60
+    mmc.ramp_up_discharge = 100 / 60
     mmc.max_power_charge = -1000
     mmc.max_power_discharge = 1000
     mmc.min_power_charge = 0
@@ -228,10 +228,10 @@ def test_current_power_commitment_charge_discharge_ramping():
         node="empty",
     )
 
-    mmc.ramp_down_charge = -100/60
-    mmc.ramp_down_discharge = 100/60
-    mmc.ramp_up_charge = -100/60
-    mmc.ramp_up_discharge = 100/60
+    mmc.ramp_down_charge = -100 / 60
+    mmc.ramp_down_discharge = 100 / 60
+    mmc.ramp_up_charge = -100 / 60
+    mmc.ramp_up_discharge = 100 / 60
     mmc.max_power_charge = -1000
     mmc.max_power_discharge = 1000
     mmc.min_power_charge = 0
@@ -315,10 +315,10 @@ def test_switched_ramp_method_call_raises():
         node="empty",
     )
 
-    mmc.ramp_down_charge = -100/60
-    mmc.ramp_down_discharge = 100/60
-    mmc.ramp_up_charge = -100/60
-    mmc.ramp_up_discharge = 100/60
+    mmc.ramp_down_charge = -100 / 60
+    mmc.ramp_down_discharge = 100 / 60
+    mmc.ramp_up_charge = -100 / 60
+    mmc.ramp_up_discharge = 100 / 60
     mmc.max_power_charge = -1000
     mmc.max_power_discharge = 1000
     mmc.simultaneous_charge_discharge_ramping = False
@@ -354,10 +354,10 @@ def test_minmaxcharge_unconstrained():
     mmc.max_power_charge = -1000  # MW
     mmc.max_power_discharge = 1000  # MW
     # ramp constraints
-    mmc.ramp_up_charge = -2000/60
-    mmc.ramp_down_charge = -2000/60
-    mmc.ramp_up_discharge = 2000/60
-    mmc.ramp_down_discharge = 2000/60
+    mmc.ramp_up_charge = -2000 / 60
+    mmc.ramp_down_charge = -2000 / 60
+    mmc.ramp_up_discharge = 2000 / 60
+    mmc.ramp_down_discharge = 2000 / 60
     # min power
     mmc.min_power_charge = -0
     mmc.min_power_discharge = 0
