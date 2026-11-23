@@ -2,11 +2,14 @@
 #
 # SPDX-License-Identifier: MIT
 
+from datetime import timedelta
+
 import pandas as pd
 import pyomo.environ as pyo
 import pytest
 
 from assume.units.dst_components import Boiler
+from assume.common.utils import convert_ramp_to_timestep
 
 # Define the solver to use
 solver_name = "appsi_highs"  # Replace with the appropriate solver
@@ -26,8 +29,8 @@ def electric_boiler_config():
         "efficiency": 0.85,
         "fuel_type": "electricity",  # Electric fuel type supports operational constraints
         "min_power": 20,
-        "ramp_up": 50/60,
-        "ramp_down": 50/60,
+        "ramp_up": 50/60, # in MW/min
+        "ramp_down": 50/60, # in MW/min
         "min_operating_steps": 2,
         "min_down_steps": 1,
         "initial_operational_status": 1,
@@ -75,7 +78,11 @@ def electric_boiler_model(electric_boiler_config, price_profile):
     )
 
     # Initialize the Boiler
-    boiler = Boiler(**electric_boiler_config, time_steps=model.time_steps)
+    boiler = Boiler(
+        **electric_boiler_config,
+        time_steps=model.time_steps,
+        simulation_timestep=timedelta(hours=1),
+    )
     model.boiler = pyo.Block()
     boiler.add_to_model(model, model.boiler)
 
@@ -114,7 +121,11 @@ def gas_boiler_model(gas_boiler_config, price_profile):
     )
 
     # Initialize the Boiler
-    boiler = Boiler(**gas_boiler_config, time_steps=model.time_steps)
+    boiler = Boiler(
+        **gas_boiler_config,
+        time_steps=model.time_steps,
+        simulation_timestep=timedelta(hours=1),
+    )
     model.boiler = pyo.Block()
     boiler.add_to_model(model, model.boiler)
 
@@ -148,7 +159,11 @@ def hydrogen_boiler_model(hydrogen_boiler_config, price_profile):
         model.time_steps, initialize=price_profile.to_dict()
     )
 
-    boiler = Boiler(**hydrogen_boiler_config, time_steps=model.time_steps)
+    boiler = Boiler(
+        **hydrogen_boiler_config,
+        time_steps=model.time_steps,
+        simulation_timestep=timedelta(hours=1),
+    )
     model.boiler = pyo.Block()
     boiler.add_to_model(model, model.boiler)
 
@@ -223,8 +238,13 @@ def test_electric_boiler_ramping_constraints(
     Test that ramp-up and ramp-down constraints are respected for electric boiler.
     """
     model, _ = electric_boiler_model
-    ramp_up_limit = electric_boiler_config["ramp_up"]
-    ramp_down_limit = electric_boiler_config["ramp_down"]
+    simulation_timestep = timedelta(hours=1)
+    ramp_up_limit = convert_ramp_to_timestep(
+        electric_boiler_config["ramp_up"], simulation_timestep
+    )
+    ramp_down_limit = convert_ramp_to_timestep(
+        electric_boiler_config["ramp_down"], simulation_timestep
+    )
 
     for t in model.time_steps:
         if t > model.time_steps.first():
@@ -246,8 +266,13 @@ def test_gas_boiler_ramping_constraints(gas_boiler_model, gas_boiler_config):
     Test that ramp-up and ramp-down constraints are respected for natural gas boiler.
     """
     model, _ = gas_boiler_model
-    ramp_up_limit = gas_boiler_config["ramp_up"]
-    ramp_down_limit = gas_boiler_config["ramp_down"]
+    simulation_timestep = timedelta(hours=1)
+    ramp_up_limit = convert_ramp_to_timestep(
+            gas_boiler_config["ramp_up"], simulation_timestep
+        )
+    ramp_down_limit = convert_ramp_to_timestep(
+        gas_boiler_config["ramp_down"], simulation_timestep
+    )
 
     for t in model.time_steps:
         if t > model.time_steps.first():
@@ -509,8 +534,9 @@ def test_hydrogen_boiler_ramping_constraints(
     hydrogen_boiler_model, hydrogen_boiler_config
 ):
     model, _ = hydrogen_boiler_model
-    ramp_up_limit = hydrogen_boiler_config["ramp_up"]
-    ramp_down_limit = hydrogen_boiler_config["ramp_down"]
+    simulation_timestep = timedelta(hours=1)
+    ramp_up_limit = convert_ramp_to_timestep(hydrogen_boiler_config["ramp_up"], simulation_timestep)
+    ramp_down_limit = convert_ramp_to_timestep(hydrogen_boiler_config["ramp_down"], simulation_timestep)
 
     for t in model.time_steps:
         if t > model.time_steps.first():

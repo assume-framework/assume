@@ -141,18 +141,14 @@ def test_get_power_plant_in_area_cchp_parameters(mock_infrastructure):
         # The aggregated CCHP row should have fuel == 'gas_combined'
         cchp_row = result[result["fuel"] == "gas_combined"].iloc[0]
         assert cchp_row["fuel"] == "gas_combined"
-        # Ramp up for gas_combined (2000) is 4% per min -> 4 / 100 = 0.4 * maxPower
-        # For standard gas (2000), ramp up is 12% per min -> 12 / 100 = 0.12 * maxPower
-        assert cchp_row["ramp_up"] == pytest.approx(
-            cchp_row["maxPower"] * 4.0 / 100
-        )
+        # Ramp up for gas_combined (2000) is 4 MW per min -> 4 / 100 = 0.4 * maxPower
+        # For standard gas (2000), ramp up is 12 MW per min -> 12 / 100 = 0.12 * maxPower
+        assert cchp_row["ramp_up"] == 4.0
 
         # The standalone gas unit (combination=0) should retain fuel == 'gas'
         gas_row = result[result["unitID"] == "SEE1002"].iloc[0]
         assert gas_row["fuel"] == "gas"
-        assert gas_row["ramp_up"] == pytest.approx(
-            gas_row["maxPower"] * 12.0 / 100
-        )
+        assert gas_row["ramp_up"] == 12.0
 
         # No phantom rows or NaNs created
         assert len(result) == 2

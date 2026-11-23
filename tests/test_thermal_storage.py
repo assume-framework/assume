@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: MIT
 
+from datetime import timedelta
+
 import pandas as pd
 import pyomo.environ as pyo
 import pytest
@@ -48,7 +50,10 @@ def short_term_storage_model(storage_config, price_profile):
     )
 
     storage = ThermalStorage(
-        storage_type="short-term", **storage_config, time_steps=model.time_steps
+        storage_type="short-term",
+        **storage_config,
+        time_steps=model.time_steps,
+        simulation_timestep=timedelta(hours=1),
     )
     model.storage = pyo.Block()
     storage.add_to_model(model, model.storage)
@@ -85,6 +90,7 @@ def long_term_storage_model(storage_config, storage_schedule, price_profile):
         storage_schedule_profile=storage_schedule,
         **storage_config,
         time_steps=model.time_steps,
+        simulation_timestep=timedelta(hours=1),
     )
     model.storage = pyo.Block()
     storage.add_to_model(model, model.storage)

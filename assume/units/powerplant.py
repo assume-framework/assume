@@ -13,6 +13,7 @@ from assume.common.base import MinMaxStrategy, SupportsMinMax
 from assume.common.exceptions import ValidationError
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import PowerplantForecaster
+from assume.common.utils import convert_ramp_to_timestep
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +146,19 @@ class PowerPlant(SupportsMinMax):
         self.ramp_down = None if ramp_down == 0 else ramp_down
         self.ramp_up = None if ramp_up == 0 else ramp_up
 
-        # the times are given in hours, but handled in whole time steps of the index.
+        # the ramping rates are given in MW/min, but handled in MW/timestep for the simulation.
+        self.ramp_down = (
+            convert_ramp_to_timestep(self.ramp_down, self.index.freq)
+            if self.ramp_down is not None
+            else None
+        )
+        self.ramp_up = (
+            convert_ramp_to_timestep(self.ramp_up, self.index.freq)
+            if self.ramp_up is not None
+            else None
+        )
+
+        # the operating times are given in hours, but handled in whole time steps of the index.
         # Minimum times are rounded up, start thresholds are rounded down.
         hours_to_steps = timedelta(hours=1) / self.index.freq
 

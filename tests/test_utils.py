@@ -19,6 +19,7 @@ from mango.util.scheduling import RecurrentScheduledTask
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
     aggregate_step_amount,
+    convert_ramp_to_timestep,
     convert_to_rrule_freq,
     datetime2timestamp,
     get_available_products,
@@ -39,6 +40,24 @@ from assume.common.utils import (
 from assume.scenario.loader_csv import make_market_config
 
 from .utils import create_orderbook
+
+
+@pytest.mark.parametrize(
+    ("ramp", "simulation_timestep", "expected"),
+    [
+        (10, timedelta(minutes=1), 10),
+        (10, timedelta(minutes=15), 150),
+        (10, timedelta(hours=1), 600),
+        (-2, timedelta(minutes=15), -30),
+    ],
+)
+def test_convert_ramp_to_timestep(ramp, simulation_timestep, expected):
+    assert convert_ramp_to_timestep(ramp, simulation_timestep) == expected
+
+
+def test_convert_ramp_to_timestep_requires_duration():
+    with pytest.raises(ValueError, match="simulation_timestep is required"):
+        convert_ramp_to_timestep(1, None)
 
 
 def test_convert_rrule():

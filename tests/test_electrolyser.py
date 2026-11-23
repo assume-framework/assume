@@ -2,11 +2,14 @@
 #
 # SPDX-License-Identifier: MIT
 
+from datetime import timedelta
+
 import pandas as pd
 import pyomo.environ as pyo
 import pytest
 
 from assume.units.dst_components import Electrolyser
+from assume.common.utils import convert_ramp_to_timestep
 
 # Define the solver to use
 solver_name = "appsi_highs"  # Replace with the appropriate solver
@@ -45,7 +48,11 @@ def electrolyser_model(electrolyser_config, price_profile):
     )
 
     # Initialize the Electrolyser
-    electrolyser = Electrolyser(**electrolyser_config, time_steps=model.time_steps)
+    electrolyser = Electrolyser(
+        **electrolyser_config,
+        time_steps=model.time_steps,
+        simulation_timestep=timedelta(hours=1),
+    )
     model.electrolyser = pyo.Block()
     electrolyser.add_to_model(model, model.electrolyser)
 
@@ -99,8 +106,9 @@ def test_electrolyser_ramping_constraints(electrolyser_model, electrolyser_confi
     Test that ramp-up and ramp-down constraints are respected.
     """
     model, _ = electrolyser_model
-    ramp_up_limit = electrolyser_config["ramp_up"]
-    ramp_down_limit = electrolyser_config["ramp_down"]
+    simulation_timestep = timedelta(hours=1)
+    ramp_up_limit = convert_ramp_to_timestep(electrolyser_config["ramp_up"], simulation_timestep)
+    ramp_down_limit = convert_ramp_to_timestep(electrolyser_config["ramp_down"], simulation_timestep)
 
     for t in model.time_steps:
         if t > model.time_steps.at(1):

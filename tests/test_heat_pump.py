@@ -3,12 +3,14 @@
 # SPDX-License-Identifier: MIT
 
 import math
+from datetime import timedelta
 
 import pandas as pd
 import pyomo.environ as pyo
 import pytest
 
 from assume.units.dst_components import HeatPump
+from assume.common.utils import convert_ramp_to_timestep
 
 # Define the solver to use
 solver_name = "appsi_highs"  # Replace with the appropriate solver
@@ -47,7 +49,11 @@ def heat_pump_model(heat_pump_config, price_profile):
     )
 
     # Initialize the HeatPump
-    heat_pump = HeatPump(time_steps=model.time_steps, **heat_pump_config)
+    heat_pump = HeatPump(
+        time_steps=model.time_steps,
+        simulation_timestep=timedelta(hours=1),
+        **heat_pump_config,
+    )
     model.heat_pump = pyo.Block()
     heat_pump.add_to_model(model, model.heat_pump)
 
@@ -99,8 +105,9 @@ def test_heat_pump_ramping_constraints(heat_pump_model, heat_pump_config):
     Test that ramp-up and ramp-down constraints are respected.
     """
     model, _ = heat_pump_model
-    ramp_up_limit = heat_pump_config["ramp_up"]
-    ramp_down_limit = heat_pump_config["ramp_down"]
+    simulation_timestep = timedelta(hours=1)
+    ramp_up_limit = convert_ramp_to_timestep(heat_pump_config["ramp_up"], simulation_timestep)
+    ramp_down_limit = convert_ramp_to_timestep(heat_pump_config["ramp_down"], simulation_timestep)
 
     for t in model.time_steps:
         if t > model.time_steps.first():
