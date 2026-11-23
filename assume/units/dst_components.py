@@ -386,45 +386,16 @@ class Boiler:
         # Ramp-up constraint and ramp-down constraints. The first step has no
         # predecessor to decrease from, so ramp_down is skipped there rather than
         # also capping it (ramp_up already limits the rise from a standing start).
-        if self.fuel_type == "natural_gas" and (
-            self.ramp_up is not None or self.ramp_down is not None
-        ):
-
-            @model_block.Constraint(self.time_steps)
-            def ramp_up_constraint(b, t):
-                if t == self.time_steps.at(1):
-                    return b.natural_gas_in[t] <= b.ramp_up
-                return b.natural_gas_in[t] - b.natural_gas_in[t - 1] <= b.ramp_up
-
-            @model_block.Constraint(self.time_steps)
-            def ramp_down_constraint(b, t):
-                if t == self.time_steps.at(1):
-                    return pyo.Constraint.Skip
-                return b.natural_gas_in[t - 1] - b.natural_gas_in[t] <= b.ramp_down
-
-        elif self.fuel_type == "hydrogen_gas" and (
-            self.ramp_up is not None or self.ramp_down is not None
-        ):
-
-            @model_block.Constraint(self.time_steps)
-            def ramp_up_constraint(b, t):
-                if t == self.time_steps.at(1):
-                    return b.hydrogen_gas_in[t] <= b.ramp_up
-                return b.hydrogen_gas_in[t] - b.hydrogen_gas_in[t - 1] <= b.ramp_up
-
-            @model_block.Constraint(self.time_steps)
-            def ramp_down_constraint(b, t):
-                if t == self.time_steps.at(1):
-                    return pyo.Constraint.Skip
-                return b.hydrogen_gas_in[t - 1] - b.hydrogen_gas_in[t] <= b.ramp_down
-
-        elif self.fuel_type == "electricity" and (
-            self.ramp_up is not None or self.ramp_down is not None
-        ):
+        if self.ramp_up is not None or self.ramp_down is not None:
+            ramped = {
+                "electricity": model_block.power_in,
+                "natural_gas": model_block.natural_gas_in,
+                "hydrogen_gas": model_block.hydrogen_gas_in,
+            }[self.fuel_type]
             add_ramping_constraints(
                 model_block=model_block,
                 time_steps=self.time_steps,
-                ramped=model_block.power_in,
+                ramped=ramped,
             )
 
         # Define operational status variable if min operating time, downtime, or min_power is required (for electric boilers)
@@ -2945,7 +2916,7 @@ def add_ramping_constraints(model_block, time_steps, ramped):
     """
 
     # Ramp-up constraint
-    if model_block.ramp_up is not None:
+    if hasattr(model_block, "ramp_up"):
 
         @model_block.Constraint(time_steps)
         def ramp_up_constraint(b, t):
@@ -2954,7 +2925,7 @@ def add_ramping_constraints(model_block, time_steps, ramped):
             return ramped[t] - ramped[t - 1] <= b.ramp_up
 
     # Ramp-down constraint
-    if model_block.ramp_down is not None:
+    if hasattr(model_block, "ramp_down"):
 
         @model_block.Constraint(time_steps)
         def ramp_down_constraint(b, t):

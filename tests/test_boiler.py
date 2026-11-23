@@ -66,6 +66,43 @@ def hydrogen_boiler_config():
     }
 
 
+@pytest.mark.parametrize(
+    ("fuel_type", "ramp_up", "ramp_down", "price_attribute"),
+    [
+        ("natural_gas", 50 / 60, None, "natural_gas_price"),
+        ("natural_gas", None, 50 / 60, "natural_gas_price"),
+        ("hydrogen_gas", 50 / 60, None, "hydrogen_gas_price"),
+        ("hydrogen_gas", None, 50 / 60, "hydrogen_gas_price"),
+    ],
+)
+def test_boiler_one_sided_ramp_constraint_build(
+    fuel_type, ramp_up, ramp_down, price_attribute
+):
+    model = pyo.ConcreteModel()
+    model.time_steps = pyo.Set(initialize=range(3))
+    setattr(model, price_attribute, pyo.Param(model.time_steps, initialize=50))
+
+    boiler = Boiler(
+        max_power=100,
+        efficiency=0.85,
+        time_steps=model.time_steps,
+        fuel_type=fuel_type,
+        ramp_up=ramp_up,
+        ramp_down=ramp_down,
+        simulation_timestep=timedelta(hours=1),
+    )
+    model.boiler = pyo.Block()
+
+    boiler.add_to_model(model, model.boiler)
+
+    if ramp_up is not None:
+        assert hasattr(model.boiler, "ramp_up")
+        assert hasattr(model.boiler, "ramp_up_constraint")
+    if ramp_down is not None:
+        assert hasattr(model.boiler, "ramp_down")
+        assert hasattr(model.boiler, "ramp_down_constraint")
+
+
 # Fixture for creating and solving a Pyomo model with a boiler component (electric)
 @pytest.fixture
 def electric_boiler_model(electric_boiler_config, price_profile):
