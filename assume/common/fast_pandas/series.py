@@ -14,7 +14,6 @@ from assume.common.fast_pandas.indexers import (
     FastSeriesAtIndexer,
     FastSeriesIatIndexer,
     FastSeriesILocIndexer,
-    FastSeriesLocIndexer,
 )
 
 
@@ -125,15 +124,19 @@ class FastSeries:
         """
         return self.data.dtype
 
-    @cached_property
+    @property
     def loc(self):
         """
         Label-based indexing property.
 
+        Returns the series itself, since label-based access is what ``[]`` already does
+        and skipping a forwarding indexer saves a call on this hot path.
+
         Returns:
-            FastSeriesLocIndexer: Indexer for label-based access.
+            FastSeries: The series.
+        TODO: Remove this method since it literally does nothing
         """
-        return FastSeriesLocIndexer(self)
+        return self
 
     @cached_property
     def iloc(self):
