@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 from datetime import datetime, timedelta
+from functools import cached_property
 
 import numpy as np
 import pandas as pd
@@ -124,7 +125,7 @@ class FastSeries:
         """
         return self.data.dtype
 
-    @property
+    @cached_property
     def loc(self):
         """
         Label-based indexing property.
@@ -134,7 +135,7 @@ class FastSeries:
         """
         return FastSeriesLocIndexer(self)
 
-    @property
+    @cached_property
     def iloc(self):
         """
         Integer-based indexing property.
@@ -144,7 +145,7 @@ class FastSeries:
         """
         return FastSeriesILocIndexer(self)
 
-    @property
+    @cached_property
     def at(self):
         """
         Label-based single-item access property.
@@ -154,7 +155,7 @@ class FastSeries:
         """
         return FastSeriesAtIndexer(self)
 
-    @property
+    @cached_property
     def iat(self):
         """
         Integer-based single-item access property.
