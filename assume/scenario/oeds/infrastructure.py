@@ -314,14 +314,8 @@ class InfrastructureInterface:
                 df.at[line, "maxPower"] * tech_params.get("minPower", 0) / 100
             )
             df.at[line, "P0"] = df.at[line, "minPower"]
-            df.at[line, "ramp_up"] = np.round(
-                df.at[line, "maxPower"] * tech_params["ramp_up"] * 60 / 100,
-                2,
-            )
-            df.at[line, "ramp_down"] = np.round(
-                df.at[line, "maxPower"] * tech_params["ramp_down"] * 60 / 100,
-                2,
-            )
+            df.at[line, "ramp_up"] = tech_params["ramp_up"]
+            df.at[line, "ramp_down"] = tech_params["ramp_down"]
             df.at[line, "eta"] = tech_params["eta"] / 100  # convert to percentage
             df.at[line, "chi"] = (
                 tech_params["chi"] / 1e3
