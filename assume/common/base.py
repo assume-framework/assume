@@ -31,9 +31,8 @@ class BaseUnit:
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.
         bidding_strategies (dict[str, BaseStrategy]): The bidding strategies of the unit.
-        index (FastIndex): The index of the unit.
-        node (str, optional): The node of the unit. Defaults to "".
         forecaster (Forecaster, optional): The forecast of the unit. Defaults to None.
+        node (str, optional): The node of the unit. Defaults to "".
         location (tuple[float, float], optional): The location of the unit. Defaults to (0.0, 0.0).
         **kwargs: Additional keyword arguments.
 
@@ -413,10 +412,10 @@ class SupportsMinMax(BaseUnit):
 
         # was off before, but should be on now and min_down_time is not reached
         if requested_power > 0 and op_time < 0 and op_time > -self.min_down_time:
-            power = 0
+            requested_power = 0
         # was on before, but should be off now and min_operating_time is not reached
         elif requested_power == 0 and op_time > 0 and op_time < self.min_operating_time:
-            power = self.min_power
+            requested_power = self.min_power
 
         if requested_power == 0:
             # if less than min_power is required, we run min_power
@@ -426,7 +425,7 @@ class SupportsMinMax(BaseUnit):
         # ramp up constraint
         # max_power + current_power < previous_power + unit.ramp_up
         if self.ramp_up is not None:
-            power = min(
+            requested_power = min(
                 requested_power,
                 previous_power + self.ramp_up - current_power,
                 self.max_power - current_power,
@@ -434,12 +433,12 @@ class SupportsMinMax(BaseUnit):
         # ramp down constraint
         # min_power + current_power > previous_power - unit.ramp_down
         if self.ramp_down is not None:
-            power = max(
+            requested_power = max(
                 requested_power,
                 previous_power - self.ramp_down - current_power,
                 self.min_power - current_power,
             )
-        return power
+        return requested_power
 
     def get_max_lookback_op_time(self) -> int:
         """
