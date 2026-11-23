@@ -249,6 +249,25 @@ class FastIndex:
         idx, aligned = self._locate(date)
         return idx + 1 if round_up and not aligned else idx
 
+    @lru_cache(maxsize=1000)
+    def data_slice(
+        self, start: datetime | None, stop: datetime | None, step: int | None = None
+    ) -> slice:
+        """
+        Convert inclusive datetime bounds into a positional slice, clipped to the index range.
+
+        Raises:
+            TypeError: If a bound is neither a datetime nor None.
+        """
+        start_idx = 0 if start is None else max(0, self.get_idx_from_date(start))
+        stop_idx = (
+            self._count
+            if stop is None
+            else max(0, self.get_idx_from_date(stop, round_up=False) + 1)
+        )
+        return slice(start_idx, stop_idx, step)
+
+    @lru_cache(maxsize=1000)
     def _locate(self, date: datetime) -> tuple[int, bool]:
         """
         Locate a datetime on the index grid, shared by the lookup methods.

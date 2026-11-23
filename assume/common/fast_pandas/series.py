@@ -310,15 +310,7 @@ class FastSeries:
         Raises:
             TypeError: If a bound is neither a datetime nor None.
         """
-        start_idx = 0
-        if item.start is not None:
-            start_idx = max(0, self.index.get_idx_from_date(item.start))
-        stop_idx = len(self.data)
-        if item.stop is not None:
-            stop_idx = max(
-                0, self.index.get_idx_from_date(item.stop, round_up=False) + 1
-            )
-        return slice(start_idx, stop_idx, item.step)
+        return self._index.data_slice(item.start, item.stop, item.step)
 
     def __add__(self, other: int | float | np.ndarray):
         return self._arithmetic_operation(other, "add")
