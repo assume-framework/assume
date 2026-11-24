@@ -363,11 +363,14 @@ class TensorBoardLogger:
         except Exception as e:
             logger.error(f"Unexpected error in update_tensorboard: {e}")
             return
+        finally:
+            self._close()
 
-    def __del__(self):
-        """
-        Deletes the WriteOutput instance.
-        """
-        if hasattr(self, "writer") and self.writer is not None:
+    def _close(self):
+        if self.writer is not None:
             self.writer.flush()
             self.writer.close()
+            self.writer = None
+
+    def __del__(self):
+        self._close()
