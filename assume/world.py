@@ -716,7 +716,7 @@ class World:
 
         for market_id in self.markets.keys():
             if market_participants[market_id] < 2:
-                msg = f"Added market {market_id} has less than two bidding participants ({market_participants[market_id]})."
+                msg = f"Added market {market_id} has less than two bidding unit operators ({market_participants[market_id]})."
                 raise ValueError(msg)
 
         # A Re-Dispatch market can only open if an earlier market closed.

@@ -158,7 +158,7 @@ def test_non_referred_market(world):
 
     world.add_market(market_operator_id="market_operator", market_config=market_config)
 
-    with pytest.raises(ValueError, match="has less than two bidding participants"):
+    with pytest.raises(ValueError, match="has less than two bidding unit operators"):
         world.run()
 
 
@@ -181,7 +181,7 @@ def test_single_participant_market(world):
 
     world.add_market(market_operator_id="market_operator", market_config=market_config)
 
-    with pytest.raises(ValueError, match="has less than two bidding participants"):
+    with pytest.raises(ValueError, match="has less than two bidding unit operators"):
         world.run()
 
 
