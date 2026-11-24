@@ -32,3 +32,12 @@ repos:
           - tomli
         types_or: [python, rst, markdown]
         files: ^(assume|docs|tests)/
+  - repo: local
+    hooks:
+      # ASSUME treats naive datetimes as UTC, these calls treat them as local time
+      # use the helpers from assume.common.utils, mark intended uses with "# tz-ok"
+      - id: no-local-time-conversion
+        name: use datetime2timestamp / timestamp2datetime instead of local time conversions
+        language: pygrep
+        entry: '^(?!.*# tz-ok).*(\.timestamp\(\)|time\.mktime\(|fromtimestamp\((?![^)]*tz=))'
+        files: ^(assume|tests)/.*\.py$

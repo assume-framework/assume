@@ -456,7 +456,7 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         profits are the profits achieved by bidding the capacity of portfolio units at their marginal cost if the
         clearing price is higher than the cost.
 
-        The reward is scaled and stored along with other outputs in the data to support learning.
+        The reward is scaled and finally cached along with comp_profits and tot_profits values to support learning (updating policy based on experiences in buffer and storing data in outputs).
 
         Args
         ----

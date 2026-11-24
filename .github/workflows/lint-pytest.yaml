@@ -87,8 +87,10 @@ jobs:
     if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     env:
-      # run tests outside of UTC to catch naive datetimes being interpreted as local time
-      TZ: Europe/Berlin
+      # run tests in an unusual timezone (UTC+13:45) to catch naive datetimes being
+      # interpreted as local time - no developer works in it, so tests can not be
+      # tuned to it by accident, and the 45 minutes misalign every hourly value
+      TZ: Pacific/Chatham
     strategy:
       fail-fast: false
       matrix:

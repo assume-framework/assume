@@ -295,7 +295,11 @@ class PayAsBidContractRole(MarketRole):
         begin = max(contract["start_time"], begin)
         end -= timedelta(hours=1)
 
-        reply_with = f"{buyer}_{contract['start_time']}"
+        # the reply_with keys must be unique per contract - contracts which share
+        # the same buyer and start time (e.g. cleared in the same auction) would
+        # otherwise overwrite each others futures and be settled with wrong data
+        contract_key = f"{contract['contract']}_{contract['bid_id']}_{buyer}_{seller}_{contract['start_time']}"
+        reply_with = contract_key
         self.futures[reply_with] = asyncio.Future()
         self.context.schedule_instant_message(
             create_acl(
@@ -317,7 +321,7 @@ class PayAsBidContractRole(MarketRole):
         )
 
         if contract["contract"] in contract_needs_market:
-            reply_with_market = f"market_eom_{contract['start_time']}"
+            reply_with_market = f"market_eom_{contract_key}"
             self.futures[reply_with_market] = asyncio.Future()
             self.context.schedule_instant_message(
                 create_acl(
@@ -350,7 +354,7 @@ class PayAsBidContractRole(MarketRole):
             contract, market_series, client_series, begin, end
         )
 
-        in_reply_to = f"{contract['contract']}_{contract['start_time']}"
+        in_reply_to = f"{contract['contract']}_{contract['bid_id']}_{buyer}_{seller}_{contract['start_time']}"
         await self.send_contract_result(buyer_agent, o_buyer, in_reply_to)
         await self.send_contract_result(seller_agent, o_seller, in_reply_to)
 

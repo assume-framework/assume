@@ -168,6 +168,19 @@ class Demand(SupportsMinMax):
         """
         return self.price.at[start]
 
+    def calculate_generation_cost(
+        self, start: datetime, end: datetime, product_type: str
+    ) -> None:
+        """
+        Demand has no generation costs, the procurement is part of the cashflow.
+
+        Args:
+            start (datetime.datetime): The start time for the calculation.
+            end (datetime.datetime): The end time for the calculation.
+            product_type (str): The type of product.
+        """
+        self.outputs[f"{product_type}_generation_costs"].loc[start:end] = 0
+
     def as_dict(self) -> dict:
         """
         Returns the unit as a dictionary.

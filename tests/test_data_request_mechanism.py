@@ -21,6 +21,7 @@ from mango.util.clock import ExternalClock
 from assume.common.forecaster import DemandForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
+from assume.common.utils import datetime2timestamp
 from assume.markets.base_market import MarketRole
 from assume.strategies.naive_strategies import EnergyNaiveStrategy
 from assume.units.demand import Demand
@@ -139,4 +140,4 @@ async def test_request_messages():
         assert content["data"][index[1]] == 100
         assert content["data"][index[2]] == 0
         assert content["data"][index[3]] == 200
-        clock.set_time(end.timestamp() + 1)
+        clock.set_time(datetime2timestamp(end) + 1)

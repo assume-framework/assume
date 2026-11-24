@@ -365,7 +365,8 @@ def calculate_naive_price_elastic(
             cleaned_orderbook.append(bid)
 
         mps = get_available_products(
-            config.market_products, pd.Timestamp(start) - pd.Timedelta("1h")
+            config.market_products,
+            pd.Timestamp(start) - config.market_products[0].first_delivery,
         )
 
         if config.market_mechanism == "pay_as_bid":

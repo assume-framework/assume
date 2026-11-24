@@ -410,6 +410,55 @@ def test_forecast_interface__elastic_demand_complex_clearing(
     assert (price_forecast >= 8.0).all()
     assert (price_forecast <= market_config.maximum_bid_price).all()
 
+    # check that forecast bids align with products when first delivery is 24 hours
+    index_24h = pd.date_range("2019-01-01 08:00", periods=24, freq="h")
+    fast_index_24h = FastIndex(
+        start=index_24h[0], end=index_24h[-1], freq=pd.infer_freq(index_24h)
+    )
+    market_config.market_products = [
+        MarketProduct(pd.Timedelta(hours=1), 24, pd.Timedelta(hours=24))
+    ]
+    units_24h = tuple(forecast_setup["units_elastic_case"])
+
+    def extend_series(series):
+        return FastSeries(
+            index=fast_index_24h,
+            value=np.resize(series.data, len(index_24h)),
+        )
+
+    for unit in units_24h:
+        forecaster = unit.forecaster
+        forecaster.index = fast_index_24h
+        forecaster.availability = extend_series(forecaster.availability)
+        if hasattr(forecaster, "demand"):
+            forecaster.demand = extend_series(forecaster.demand)
+        if hasattr(forecaster, "fuel_prices"):
+            forecaster.fuel_prices = {
+                fuel: extend_series(price)
+                for fuel, price in forecaster.fuel_prices.items()
+            }
+        if hasattr(unit, "marginal_cost"):
+            unit.marginal_cost = extend_series(unit.marginal_cost)
+        if isinstance(getattr(unit, "price", None), FastSeries):
+            unit.price = extend_series(unit.price)
+
+    dsm_forecaster_24h = DsmUnitForecaster(
+        index=fast_index_24h,
+        forecast_registries=get_forecast_registries(),
+    )
+    dsm_forecaster_24h.initialize(
+        units_24h,
+        {"EOM": market_config}.values(),
+        None,
+        None,
+    )
+
+    price_forecast_24h = np.array(list(dsm_forecaster_24h.price["EOM"]))
+    assert len(price_forecast_24h) == 24
+    assert np.isfinite(price_forecast_24h).all()
+    assert (price_forecast_24h >= 8.0).all()
+    assert (price_forecast_24h <= market_config.maximum_bid_price).all()
+
 
 def test_forecast_interface__cache(market_setup, forecast_setup, shared_FastIndex):
     # clear cache uses
