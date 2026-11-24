@@ -329,10 +329,26 @@ class CaseFiles:
         """Check the time series of the study case and how the files fit together."""
         for table in self.series.values():
             table.check()
+        self._check_market_participants()
         self._check_demand()
         self._check_availability()
         self._check_exchanges()
         self._check_fuel_prices()
+
+    def _check_market_participants(self) -> None:
+        """Like World.validate: every market needs at least two bidding unit operators."""
+        # every operator owning a unit bids on all markets (default portfolio strategy)
+        # shortcut: learning units may get renamed operators, not counted here
+        operators: set[str] = set()
+        for key in (*UNIT_FILES, *DSM_FILES):
+            table = self.units.get(key)
+            if table is not None and "unit_operator" in table.df.columns:
+                operators |= set(table.df["unit_operator"].dropna().astype(str))
+        if len(operators) < 2:
+            for market in sorted(self.case.market_ids):
+                self.case.reporter().error(
+                    f"market '{market}' has less than two bidding unit operators ({len(operators)})"
+                )
 
     def _check_demand(self) -> None:
         units, series = self.units.get("demand_units"), self.series.get("demand_df")

@@ -491,6 +491,13 @@ def test_exchange_units_need_exchanges_df(scenario):
     assert "required by exchange_units but missing" in messages(report)
 
 
+def test_market_needs_two_unit_operators(scenario):
+    for name in ("powerplant_units.csv", "demand_units.csv"):
+        edit_df(scenario, name, lambda df: df.__setitem__("unit_operator", "only_one"))
+    report = verify_scenario_folder(scenario, dry_run=False)
+    assert "less than two bidding unit operators (1)" in messages(report)
+
+
 # -- shipped examples -----------------------------------------------------------------------
 @pytest.mark.parametrize(
     "example",
