@@ -70,3 +70,8 @@ The agent outputs a markup multiplier per cost bin per time step. Units are sort
 flexible capacity is bid at ``marginal_cost × markup[bin]``. Inflexible (must-run) generation is always bid at
 marginal cost. The reward signal is the difference between realised profit and a competitive benchmark (all units
 bidding at marginal cost given the price forecast).
+
+.. note::
+   Currently, every unit that uses a learning strategy is assigned to the unit operator ``Operator-RL``, and the
+   ``portfolio_learning`` strategy cannot be combined with unit-level learning strategies in the same simulation.
+   See :ref:`combining_learning_strategies` for details.

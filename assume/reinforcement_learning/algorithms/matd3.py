@@ -257,9 +257,15 @@ class TD3(RLAlgorithm):
 
     def check_strategy_dimensions(self) -> None:
         """
-        Iterate over all learning strategies and check if the dimensions of observations and actions are the same.
-        Also check if the unique observation dimensions are the same. If not, raise a ValueError.
-        This is important for the TD3 algorithm, as it uses a centralized critic that requires consistent dimensions across all agents.
+        Check that all learning strategies have the same dimensions.
+
+        The foresight, the action dimension, the unique observation dimension, the number of time series
+        in the observation and the total observation dimension have to be the same for all learning strategies,
+        as the centralized critics and the replay buffer store the observations and actions of all agents in shared tensors.
+        The dimensions are then stored on the algorithm and used to create the actors and critics.
+
+        Raises:
+            ValueError: If any of the dimensions differs between the learning strategies.
         """
         foresight_list = []
         obs_dim_list = []
@@ -320,8 +326,8 @@ class TD3(RLAlgorithm):
         The created actor networks are associated with each unit strategy and stored as attributes.
 
         Note:
-            The observation dimension need to be the same, due to the centralized criic that all actors share.
-            If you have units with different observation dimensions. They need to have different critics and hence learning roles.
+            All learning strategies need to have the same dimensions, which is ensured by
+            :meth:`check_strategy_dimensions` before this method is called.
 
         """
 
@@ -361,8 +367,8 @@ class TD3(RLAlgorithm):
         This method initializes critic networks for each agent in the reinforcement learning setup.
 
         Note:
-            The observation dimension need to be the same, due to the centralized criic that all actors share.
-            If you have units with different observation dimensions. They need to have different critics and hence learning roles.
+            Each critic gets the observations and actions of all agents as input. Therefore, all learning strategies
+            need to have the same dimensions, which is ensured by :meth:`check_strategy_dimensions` before this method is called.
         """
         n_agents = len(self.learning_role.rl_strats)
 
