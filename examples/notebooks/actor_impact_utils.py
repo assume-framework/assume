@@ -41,6 +41,71 @@ FAMILIES = [
 ]
 YEARS = [2030, 2035, 2040, 2045]
 
+# ---------------------------------------------------------------------------
+# Naming convention for the paper (display only -- folder, file and cache names
+# keep the original spelling). Pathway = Ariadne scenario = "family" folder.
+# ---------------------------------------------------------------------------
+PATHWAY_NAME = {  # English name used in the paper text and tables
+    "technologiemix": "Technology Mix",
+    "fokusstrom": "Electrification Focus",
+    "fokusH2": "Hydrogen Focus",
+    "niedrigenachfrage": "Low Demand",
+    "hohenachfrage": "High Demand",
+    "aktuellepolitiken": "Existing Policies",
+}
+PATHWAY_ABBR = {  # abbreviation used in figures and compact tables
+    "technologiemix": "Mix",
+    "fokusstrom": "Elec",
+    "fokusH2": "H\u2082",
+    "niedrigenachfrage": "LowDem",
+    "hohenachfrage": "HighDem",
+    "aktuellepolitiken": "ExPol",
+}
+# Original German report names (for reference in captions / appendix).
+PATHWAY_GERMAN = {
+    "technologiemix": "Technologiemix",
+    "fokusstrom": "Fokus Elektrifizierung",
+    "fokusH2": "Fokus Wasserstoff",
+    "niedrigenachfrage": "Niedrige Nachfrage",
+    "hohenachfrage": "Hohe Nachfrage",
+    "aktuellepolitiken": "Existierende Politiken",
+}
+# Case-folder prefix -> pathway key (a *_RN case is the risk-neutral decision optimised for that pathway).
+_CASE_PATHWAY = {
+    "AktuellePolitiken": "aktuellepolitiken",
+    "FokusH2": "fokusH2",
+    "FokusStrom": "fokusstrom",
+    "HoheNachfrage": "hohenachfrage",
+    "NachfrageNiedrig": "niedrigenachfrage",
+    "Technologiemix": "technologiemix",
+}
+_WC = {"WCMean": ("Worst-case mean", "Worst-case mean NPV"), "WCTail": ("Worst-case ES", "Worst-case expected shortfall")}
+
+
+def pathway_label(family: str, long: bool = False) -> str:
+    """Paper label of a pathway folder name, e.g. ``fokusH2`` -> ``H\u2082`` (``Hydrogen Focus`` if long)."""
+    return (PATHWAY_NAME if long else PATHWAY_ABBR).get(family, family)
+
+
+def case_label(case: str, long: bool = False) -> str:
+    """Paper label of a behavioural case.
+
+    ``FokusH2_RN`` -> ``RN\u2013H\u2082`` (long: ``Risk-neutral with Hydrogen Focus\u2013weighted beliefs``);
+    ``WCMean`` -> ``Worst-case mean``; ``WCTail`` -> ``Worst-case ES``. A ``_BID`` suffix (price-setter
+    bidding treatment) is shown as `` (PS)`` (long: ``, price-setter``).
+    """
+    base, is_bid = (case[: -len("_BID")], True) if case.endswith("_BID") else (case, False)
+    if base in _WC:
+        text = _WC[base][1 if long else 0]
+    elif base.endswith("_RN") and base[:-3] in _CASE_PATHWAY:
+        key = _CASE_PATHWAY[base[:-3]]
+        text = f"Risk-neutral with {pathway_label(key, True)}\u2013weighted beliefs" if long else f"RN\u2013{pathway_label(key)}"
+    else:
+        return case
+    if is_bid:
+        text += ", price-setter" if long else " (PS)"
+    return text
+
 PRICE_TAKER_CASES = [
     "AktuellePolitiken_RN",
     "FokusH2_RN",

@@ -1,0 +1,9 @@
+case,vol_mean,cost_mean,wind_off,wind_on,solar,order,label,total
+AktuellePolitiken_RN,99.89,5.77,13.2,23.17,36.01,0,RN–ExPol,72.37
+FokusH2_RN,100.26,5.1,13.66,23.8,35.43,1,RN–H₂,72.88
+FokusStrom_RN,100.6,5.67,13.16,23.62,37.43,2,RN–Elec,74.22
+HoheNachfrage_RN,101.94,8.49,12.95,23.05,37.62,3,RN–HighDem,73.61
+NachfrageNiedrig_RN,101.73,9.17,12.48,23.07,37.56,4,RN–LowDem,73.11
+Technologiemix_RN,100.78,8.22,12.65,22.57,37.54,5,RN–Mix,72.76
+WCMean,100.57,5.42,13.97,24.43,36.29,6,Worst-case mean,74.69
+WCTail,100.58,4.37,13.76,24.14,35.78,7,Worst-case ES,73.68

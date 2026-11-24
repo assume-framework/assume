@@ -1,0 +1,193 @@
+case,family,year,redispatch_volume_twh,avg_redispatch_cost,Wind Offshore_curtailment_twh,Wind Onshore_curtailment_twh,Solar PV_curtailment_twh,case_label,case_order,wind_curtail_twh,solar_curtail_twh,up_payment_EURm
+AktuellePolitiken_RN,aktuellepolitiken,2030,13.868,1.891,1.062,4.535,6.535,RN–ExPol,0,5.597,6.535,26.223
+AktuellePolitiken_RN,aktuellepolitiken,2035,42.765,0.973,10.539,11.124,17.189,RN–ExPol,0,21.662,17.189,41.616
+AktuellePolitiken_RN,aktuellepolitiken,2040,44.444,4.44,11.78,10.731,14.97,RN–ExPol,0,22.511,14.97,197.314
+AktuellePolitiken_RN,aktuellepolitiken,2045,77.973,-6.819,10.041,9.937,38.047,RN–ExPol,0,19.978,38.047,-531.706
+AktuellePolitiken_RN,fokusH2,2030,32.394,6.84,5.409,11.942,11.16,RN–ExPol,0,17.351,11.16,221.58
+AktuellePolitiken_RN,fokusH2,2035,111.11,38.342,11.93,20.007,38.315,RN–ExPol,0,31.937,38.315,4260.165
+AktuellePolitiken_RN,fokusH2,2040,285.449,46.654,14.67,38.637,67.346,RN–ExPol,0,53.307,67.346,13317.452
+AktuellePolitiken_RN,fokusH2,2045,174.031,1.674,22.849,36.968,65.323,RN–ExPol,0,59.817,65.323,291.329
+AktuellePolitiken_RN,fokusstrom,2030,33.241,4.626,5.336,12.233,10.804,RN–ExPol,0,17.569,10.804,153.758
+AktuellePolitiken_RN,fokusstrom,2035,89.015,2.66,12.459,22.763,37.766,RN–ExPol,0,35.222,37.766,236.753
+AktuellePolitiken_RN,fokusstrom,2040,117.375,2.009,17.391,27.809,39.704,RN–ExPol,0,45.2,39.704,235.85
+AktuellePolitiken_RN,fokusstrom,2045,138.952,2.347,17.385,38.068,51.816,RN–ExPol,0,55.453,51.816,326.08
+AktuellePolitiken_RN,hohenachfrage,2030,34.563,6.618,5.612,12.282,11.286,RN–ExPol,0,17.894,11.286,228.735
+AktuellePolitiken_RN,hohenachfrage,2035,113.668,2.145,15.492,25.162,43.276,RN–ExPol,0,40.653,43.276,243.833
+AktuellePolitiken_RN,hohenachfrage,2040,154.799,2.299,22.218,36.208,57.937,RN–ExPol,0,58.427,57.937,355.875
+AktuellePolitiken_RN,hohenachfrage,2045,164.268,4.074,17.803,35.795,69.069,RN–ExPol,0,53.598,69.069,669.182
+AktuellePolitiken_RN,niedrigenachfrage,2030,31.188,5.78,5.19,10.834,11.944,RN–ExPol,0,16.024,11.944,180.267
+AktuellePolitiken_RN,niedrigenachfrage,2035,98.723,2.603,15.093,22.494,38.709,RN–ExPol,0,37.587,38.709,256.97
+AktuellePolitiken_RN,niedrigenachfrage,2040,104.993,1.799,19.163,30.475,32.502,RN–ExPol,0,49.638,32.502,188.871
+AktuellePolitiken_RN,niedrigenachfrage,2045,116.89,-4.931,15.507,31.589,39.795,RN–ExPol,0,47.095,39.795,-576.396
+AktuellePolitiken_RN,technologiemix,2030,34.359,5.405,5.646,11.672,11.193,RN–ExPol,0,17.318,11.193,185.716
+AktuellePolitiken_RN,technologiemix,2035,93.996,2.126,14.225,24.331,38.352,RN–ExPol,0,38.556,38.352,199.788
+AktuellePolitiken_RN,technologiemix,2040,136.276,2.204,20.371,34.544,51.157,RN–ExPol,0,54.915,51.157,300.293
+AktuellePolitiken_RN,technologiemix,2045,153.139,2.781,19.556,35.85,60.067,RN–ExPol,0,55.405,60.067,425.929
+FokusH2_RN,aktuellepolitiken,2030,15.849,0.987,1.246,5.804,7.304,RN–H₂,1,7.05,7.304,15.642
+FokusH2_RN,aktuellepolitiken,2035,47.959,0.196,13.499,13.868,17.621,RN–H₂,1,27.367,17.621,9.412
+FokusH2_RN,aktuellepolitiken,2040,46.43,2.657,13.022,13.448,15.216,RN–H₂,1,26.47,15.216,123.341
+FokusH2_RN,aktuellepolitiken,2045,75.132,-4.0,10.162,9.969,35.979,RN–H₂,1,20.131,35.979,-300.537
+FokusH2_RN,fokusH2,2030,32.919,4.393,5.412,11.699,12.22,RN–H₂,1,17.111,12.22,144.613
+FokusH2_RN,fokusH2,2035,110.43,42.682,11.77,19.022,39.298,RN–H₂,1,30.793,39.298,4713.441
+FokusH2_RN,fokusH2,2040,278.286,36.476,16.866,43.28,70.752,RN–H₂,1,60.146,70.752,10150.642
+FokusH2_RN,fokusH2,2045,163.561,2.682,21.852,38.865,65.478,RN–H₂,1,60.717,65.478,438.693
+FokusH2_RN,fokusstrom,2030,33.878,3.22,5.835,12.973,12.032,RN–H₂,1,18.808,12.032,109.083
+FokusH2_RN,fokusstrom,2035,95.434,1.334,14.994,25.947,34.568,RN–H₂,1,40.941,34.568,127.289
+FokusH2_RN,fokusstrom,2040,117.323,1.395,15.554,26.925,32.052,RN–H₂,1,42.479,32.052,163.699
+FokusH2_RN,fokusstrom,2045,141.605,4.003,17.471,37.277,52.013,RN–H₂,1,54.748,52.013,566.859
+FokusH2_RN,hohenachfrage,2030,29.491,3.873,4.933,10.443,10.653,RN–H₂,1,15.376,10.653,114.234
+FokusH2_RN,hohenachfrage,2035,111.024,1.495,17.192,25.387,41.972,RN–H₂,1,42.579,41.972,165.926
+FokusH2_RN,hohenachfrage,2040,152.114,1.027,22.959,36.439,60.045,RN–H₂,1,59.398,60.045,156.249
+FokusH2_RN,hohenachfrage,2045,180.663,3.626,20.791,38.114,72.836,RN–H₂,1,58.905,72.836,655.104
+FokusH2_RN,niedrigenachfrage,2030,35.31,3.222,5.498,12.386,13.894,RN–H₂,1,17.884,13.894,113.755
+FokusH2_RN,niedrigenachfrage,2035,88.792,1.055,14.658,23.53,32.429,RN–H₂,1,38.188,32.429,93.661
+FokusH2_RN,niedrigenachfrage,2040,116.499,0.452,17.599,28.006,26.076,RN–H₂,1,45.605,26.076,52.676
+FokusH2_RN,niedrigenachfrage,2045,117.78,3.444,15.879,32.61,41.846,RN–H₂,1,48.488,41.846,405.627
+FokusH2_RN,technologiemix,2030,30.801,2.749,5.565,11.968,10.481,RN–H₂,1,17.533,10.481,84.681
+FokusH2_RN,technologiemix,2035,95.053,0.587,16.088,24.539,33.343,RN–H₂,1,40.627,33.343,55.763
+FokusH2_RN,technologiemix,2040,140.705,0.657,20.907,33.951,49.811,RN–H₂,1,54.858,49.811,92.487
+FokusH2_RN,technologiemix,2045,149.167,4.092,18.037,34.69,62.384,RN–H₂,1,52.727,62.384,610.454
+FokusStrom_RN,aktuellepolitiken,2030,17.703,2.561,1.14,5.111,8.792,RN–Elec,2,6.251,8.792,45.333
+FokusStrom_RN,aktuellepolitiken,2035,46.446,-1.135,10.386,10.797,20.94,RN–Elec,2,21.183,20.94,-52.697
+FokusStrom_RN,aktuellepolitiken,2040,45.78,5.914,11.246,10.621,16.429,RN–Elec,2,21.867,16.429,270.764
+FokusStrom_RN,aktuellepolitiken,2045,75.03,-2.65,10.086,10.07,35.749,RN–Elec,2,20.156,35.749,-198.828
+FokusStrom_RN,fokusH2,2030,28.662,6.818,4.906,10.542,10.152,RN–Elec,2,15.448,10.152,195.411
+FokusStrom_RN,fokusH2,2035,106.775,46.165,10.448,17.835,32.681,RN–Elec,2,28.283,32.681,4929.273
+FokusStrom_RN,fokusH2,2040,252.741,12.407,18.7,42.88,64.915,RN–Elec,2,61.581,64.915,3135.673
+FokusStrom_RN,fokusH2,2045,164.391,4.605,22.441,38.408,69.993,RN–Elec,2,60.85,69.993,757.037
+FokusStrom_RN,fokusstrom,2030,31.287,6.45,5.272,12.061,10.767,RN–Elec,2,17.333,10.767,201.804
+FokusStrom_RN,fokusstrom,2035,101.107,2.947,13.321,24.183,41.898,RN–Elec,2,37.503,41.898,297.936
+FokusStrom_RN,fokusstrom,2040,131.923,2.169,19.739,33.821,44.972,RN–Elec,2,53.561,44.972,286.094
+FokusStrom_RN,fokusstrom,2045,150.425,3.976,16.524,34.646,55.238,RN–Elec,2,51.17,55.238,598.122
+FokusStrom_RN,hohenachfrage,2030,28.791,9.014,4.364,10.167,10.061,RN–Elec,2,14.532,10.061,259.507
+FokusStrom_RN,hohenachfrage,2035,103.42,3.611,14.972,24.022,41.375,RN–Elec,2,38.994,41.375,373.455
+FokusStrom_RN,hohenachfrage,2040,165.497,2.136,21.181,36.728,63.797,RN–Elec,2,57.909,63.797,353.469
+FokusStrom_RN,hohenachfrage,2045,167.691,5.997,19.169,36.022,72.805,RN–Elec,2,55.19,72.805,1005.708
+FokusStrom_RN,niedrigenachfrage,2030,27.67,6.071,4.256,9.859,10.856,RN–Elec,2,14.115,10.856,167.986
+FokusStrom_RN,niedrigenachfrage,2035,92.939,2.602,13.91,21.304,38.071,RN–Elec,2,35.214,38.071,241.827
+FokusStrom_RN,niedrigenachfrage,2040,122.682,-1.954,18.813,34.439,36.549,RN–Elec,2,53.252,36.549,-239.672
+FokusStrom_RN,niedrigenachfrage,2045,122.908,2.837,15.985,32.596,43.856,RN–Elec,2,48.581,43.856,348.66
+FokusStrom_RN,technologiemix,2030,30.803,6.612,5.236,11.797,10.689,RN–Elec,2,17.034,10.689,203.663
+FokusStrom_RN,technologiemix,2035,108.408,2.588,15.248,25.893,42.739,RN–Elec,2,41.141,42.739,280.531
+FokusStrom_RN,technologiemix,2040,139.862,2.135,19.916,37.065,52.735,RN–Elec,2,56.981,52.735,298.62
+FokusStrom_RN,technologiemix,2045,151.563,4.252,18.661,36.104,62.329,RN–Elec,2,54.765,62.329,644.39
+HoheNachfrage_RN,aktuellepolitiken,2030,14.574,2.704,0.982,4.158,7.282,RN–HighDem,3,5.14,7.282,39.407
+HoheNachfrage_RN,aktuellepolitiken,2035,44.059,1.416,10.505,10.364,19.53,RN–HighDem,3,20.87,19.53,62.382
+HoheNachfrage_RN,aktuellepolitiken,2040,44.785,5.791,11.243,9.709,16.659,RN–HighDem,3,20.952,16.659,259.364
+HoheNachfrage_RN,aktuellepolitiken,2045,74.0,-1.569,10.249,9.869,34.728,RN–HighDem,3,20.117,34.728,-116.076
+HoheNachfrage_RN,fokusH2,2030,31.126,7.746,5.361,10.549,11.843,RN–HighDem,3,15.91,11.843,241.105
+HoheNachfrage_RN,fokusH2,2035,110.244,64.035,10.576,17.408,35.256,RN–HighDem,3,27.984,35.256,7059.554
+HoheNachfrage_RN,fokusH2,2040,286.899,48.58,14.075,36.251,68.656,RN–HighDem,3,50.326,68.656,13937.646
+HoheNachfrage_RN,fokusH2,2045,163.719,3.078,21.639,37.23,68.704,RN–HighDem,3,58.868,68.704,503.961
+HoheNachfrage_RN,fokusstrom,2030,28.061,7.66,4.723,10.174,10.18,RN–HighDem,3,14.897,10.18,214.934
+HoheNachfrage_RN,fokusstrom,2035,98.823,4.912,13.582,24.25,40.137,RN–HighDem,3,37.832,40.137,485.442
+HoheNachfrage_RN,fokusstrom,2040,131.845,2.389,18.16,30.706,43.621,RN–HighDem,3,48.866,43.621,315.03
+HoheNachfrage_RN,fokusstrom,2045,135.46,4.168,16.627,36.785,53.874,RN–HighDem,3,53.413,53.874,564.632
+HoheNachfrage_RN,hohenachfrage,2030,33.49,8.64,5.194,10.47,12.609,RN–HighDem,3,15.664,12.609,289.345
+HoheNachfrage_RN,hohenachfrage,2035,98.823,3.862,13.791,23.465,41.47,RN–HighDem,3,37.256,41.47,381.62
+HoheNachfrage_RN,hohenachfrage,2040,172.448,2.395,22.133,38.11,61.126,RN–HighDem,3,60.243,61.126,413.05
+HoheNachfrage_RN,hohenachfrage,2045,168.501,5.822,18.511,37.163,69.854,RN–HighDem,3,55.675,69.854,981.048
+HoheNachfrage_RN,niedrigenachfrage,2030,25.785,7.736,4.045,7.85,10.999,RN–HighDem,3,11.894,10.999,199.467
+HoheNachfrage_RN,niedrigenachfrage,2035,98.396,1.795,15.216,23.755,39.791,RN–HighDem,3,38.971,39.791,176.669
+HoheNachfrage_RN,niedrigenachfrage,2040,108.745,2.074,19.458,31.388,34.826,RN–HighDem,3,50.846,34.826,225.506
+HoheNachfrage_RN,niedrigenachfrage,2045,139.576,2.593,15.144,33.78,49.422,RN–HighDem,3,48.923,49.422,361.862
+HoheNachfrage_RN,technologiemix,2030,33.268,7.491,4.932,11.03,12.554,RN–HighDem,3,15.962,12.554,249.221
+HoheNachfrage_RN,technologiemix,2035,101.387,3.398,14.598,23.778,39.096,RN–HighDem,3,38.376,39.096,344.486
+HoheNachfrage_RN,technologiemix,2040,148.082,2.488,20.508,37.717,56.327,RN–HighDem,3,58.225,56.327,368.41
+HoheNachfrage_RN,technologiemix,2045,154.566,4.455,19.561,37.19,64.245,RN–HighDem,3,56.751,64.245,688.669
+NachfrageNiedrig_RN,aktuellepolitiken,2030,16.484,1.108,1.116,4.872,7.903,RN–LowDem,4,5.988,7.903,18.26
+NachfrageNiedrig_RN,aktuellepolitiken,2035,47.569,3.201,9.417,10.151,21.794,RN–LowDem,4,19.568,21.794,152.286
+NachfrageNiedrig_RN,aktuellepolitiken,2040,51.004,6.18,11.5,10.633,18.626,RN–LowDem,4,22.133,18.626,315.185
+NachfrageNiedrig_RN,aktuellepolitiken,2045,75.817,-3.946,10.652,9.715,36.249,RN–LowDem,4,20.367,36.249,-299.141
+NachfrageNiedrig_RN,fokusH2,2030,28.187,6.564,4.613,9.783,10.685,RN–LowDem,4,14.397,10.685,185.014
+NachfrageNiedrig_RN,fokusH2,2035,113.933,70.03,11.272,18.965,34.022,RN–LowDem,4,30.236,34.022,7978.692
+NachfrageNiedrig_RN,fokusH2,2040,293.204,51.206,13.292,33.827,65.276,RN–LowDem,4,47.119,65.276,15013.773
+NachfrageNiedrig_RN,fokusH2,2045,171.309,1.978,21.188,38.732,64.977,RN–LowDem,4,59.92,64.977,338.83
+NachfrageNiedrig_RN,fokusstrom,2030,30.028,6.387,4.909,11.764,10.279,RN–LowDem,4,16.673,10.279,191.798
+NachfrageNiedrig_RN,fokusstrom,2035,92.266,4.134,12.066,22.39,38.339,RN–LowDem,4,34.456,38.339,381.446
+NachfrageNiedrig_RN,fokusstrom,2040,125.507,4.176,17.358,32.224,42.783,RN–LowDem,4,49.581,42.783,524.166
+NachfrageNiedrig_RN,fokusstrom,2045,149.616,3.242,16.218,34.32,56.606,RN–LowDem,4,50.538,56.606,485.012
+NachfrageNiedrig_RN,hohenachfrage,2030,30.876,8.562,5.23,10.98,10.383,RN–LowDem,4,16.209,10.383,264.349
+NachfrageNiedrig_RN,hohenachfrage,2035,110.705,6.794,14.761,25.366,42.478,RN–LowDem,4,40.128,42.478,752.116
+NachfrageNiedrig_RN,hohenachfrage,2040,155.931,3.931,20.563,37.012,62.435,RN–LowDem,4,57.575,62.435,613.014
+NachfrageNiedrig_RN,hohenachfrage,2045,166.611,6.508,18.393,36.431,72.28,RN–LowDem,4,54.824,72.28,1084.363
+NachfrageNiedrig_RN,niedrigenachfrage,2030,27.783,6.54,4.083,9.225,11.638,RN–LowDem,4,13.308,11.638,181.711
+NachfrageNiedrig_RN,niedrigenachfrage,2035,95.623,6.349,13.54,21.368,41.432,RN–LowDem,4,34.907,41.432,607.127
+NachfrageNiedrig_RN,niedrigenachfrage,2040,111.304,3.666,18.705,33.636,35.531,RN–LowDem,4,52.341,35.531,408.089
+NachfrageNiedrig_RN,niedrigenachfrage,2045,126.644,2.669,15.811,36.163,46.546,RN–LowDem,4,51.974,46.546,337.994
+NachfrageNiedrig_RN,technologiemix,2030,29.43,6.783,4.922,10.814,9.958,RN–LowDem,4,15.736,9.958,199.614
+NachfrageNiedrig_RN,technologiemix,2035,98.334,5.324,13.332,23.849,41.157,RN–LowDem,4,37.181,41.157,523.512
+NachfrageNiedrig_RN,technologiemix,2040,148.621,3.387,18.465,35.413,56.792,RN–LowDem,4,53.878,56.792,503.34
+NachfrageNiedrig_RN,technologiemix,2045,144.725,5.237,18.18,35.971,63.324,RN–LowDem,4,54.15,63.324,757.921
+Technologiemix_RN,aktuellepolitiken,2030,13.783,0.393,0.872,3.735,6.831,RN–Mix,5,4.607,6.831,5.42
+Technologiemix_RN,aktuellepolitiken,2035,45.411,1.375,10.599,10.658,19.859,RN–Mix,5,21.257,19.859,62.429
+Technologiemix_RN,aktuellepolitiken,2040,42.08,6.056,10.872,9.901,14.607,RN–Mix,5,20.773,14.607,254.857
+Technologiemix_RN,aktuellepolitiken,2045,76.457,-2.273,10.308,9.992,36.64,RN–Mix,5,20.3,36.64,-173.815
+Technologiemix_RN,fokusH2,2030,28.033,8.342,4.646,9.186,10.941,RN–Mix,5,13.832,10.941,233.852
+Technologiemix_RN,fokusH2,2035,122.751,57.369,11.473,18.146,37.909,RN–Mix,5,29.619,37.909,7042.065
+Technologiemix_RN,fokusH2,2040,290.717,48.814,13.85,35.786,67.231,RN–Mix,5,49.636,67.231,14191.141
+Technologiemix_RN,fokusH2,2045,164.697,4.388,23.9,39.227,70.385,RN–Mix,5,63.127,70.385,722.622
+Technologiemix_RN,fokusstrom,2030,28.913,8.163,4.787,10.019,10.315,RN–Mix,5,14.806,10.315,236.016
+Technologiemix_RN,fokusstrom,2035,98.042,2.831,13.508,24.753,39.481,RN–Mix,5,38.261,39.481,277.51
+Technologiemix_RN,fokusstrom,2040,125.573,1.993,18.919,31.902,45.401,RN–Mix,5,50.822,45.401,250.223
+Technologiemix_RN,fokusstrom,2045,130.056,5.973,15.641,33.142,55.363,RN–Mix,5,48.783,55.363,776.806
+Technologiemix_RN,hohenachfrage,2030,31.609,9.196,4.822,9.858,10.784,RN–Mix,5,14.68,10.784,290.676
+Technologiemix_RN,hohenachfrage,2035,96.516,3.266,12.533,23.438,38.773,RN–Mix,5,35.972,38.773,315.229
+Technologiemix_RN,hohenachfrage,2040,165.839,4.349,21.28,35.8,64.116,RN–Mix,5,57.08,64.116,721.2
+Technologiemix_RN,hohenachfrage,2045,174.278,2.708,18.816,35.67,70.762,RN–Mix,5,54.486,70.762,471.975
+Technologiemix_RN,niedrigenachfrage,2030,26.185,7.954,4.058,7.762,11.26,RN–Mix,5,11.82,11.26,208.274
+Technologiemix_RN,niedrigenachfrage,2035,87.038,2.303,12.959,20.808,36.975,RN–Mix,5,33.768,36.975,200.462
+Technologiemix_RN,niedrigenachfrage,2040,110.119,1.893,17.686,31.67,36.364,RN–Mix,5,49.355,36.364,208.41
+Technologiemix_RN,niedrigenachfrage,2045,123.705,2.618,15.234,35.324,46.843,RN–Mix,5,50.558,46.843,323.899
+Technologiemix_RN,technologiemix,2030,30.592,8.152,4.619,10.562,11.791,RN–Mix,5,15.181,11.791,249.378
+Technologiemix_RN,technologiemix,2035,95.754,4.501,12.856,21.658,39.218,RN–Mix,5,34.514,39.218,431.001
+Technologiemix_RN,technologiemix,2040,150.584,2.42,20.379,36.224,55.311,RN–Mix,5,56.602,55.311,364.433
+Technologiemix_RN,technologiemix,2045,159.977,4.518,19.053,36.517,63.789,RN–Mix,5,55.569,63.789,722.702
+WCMean,aktuellepolitiken,2030,19.591,1.048,1.46,6.351,9.273,Worst-case mean,6,7.811,9.273,20.536
+WCMean,aktuellepolitiken,2035,47.685,0.192,13.066,13.863,18.541,Worst-case mean,6,26.929,18.541,9.133
+WCMean,aktuellepolitiken,2040,46.223,2.773,12.405,12.542,16.287,Worst-case mean,6,24.946,16.287,128.177
+WCMean,aktuellepolitiken,2045,77.219,-1.564,10.894,10.412,36.188,Worst-case mean,6,21.307,36.188,-120.807
+WCMean,fokusH2,2030,32.361,4.986,5.21,10.924,12.268,Worst-case mean,6,16.134,12.268,161.35
+WCMean,fokusH2,2035,114.636,44.226,12.552,19.499,38.124,Worst-case mean,6,32.051,38.124,5069.864
+WCMean,fokusH2,2040,241.929,32.376,20.325,47.58,69.482,Worst-case mean,6,67.906,69.482,7832.708
+WCMean,fokusH2,2045,168.051,2.61,22.472,39.795,68.475,Worst-case mean,6,62.267,68.475,438.691
+WCMean,fokusstrom,2030,31.306,3.972,5.528,11.676,10.699,Worst-case mean,6,17.204,10.699,124.335
+WCMean,fokusstrom,2035,93.218,1.692,14.781,24.047,38.239,Worst-case mean,6,38.828,38.239,157.705
+WCMean,fokusstrom,2040,125.079,1.531,16.492,29.577,40.277,Worst-case mean,6,46.069,40.277,191.545
+WCMean,fokusstrom,2045,136.586,3.735,16.484,37.098,50.912,Worst-case mean,6,53.582,50.912,510.116
+WCMean,hohenachfrage,2030,37.001,3.568,6.416,14.539,11.925,Worst-case mean,6,20.956,11.925,132.02
+WCMean,hohenachfrage,2035,106.28,1.008,18.15,27.338,37.144,Worst-case mean,6,45.488,37.144,107.161
+WCMean,hohenachfrage,2040,159.091,1.82,23.12,38.405,64.849,Worst-case mean,6,61.525,64.849,289.469
+WCMean,hohenachfrage,2045,164.549,6.576,18.326,35.451,71.823,Worst-case mean,6,53.778,71.823,1082.108
+WCMean,niedrigenachfrage,2030,35.056,2.924,5.728,11.994,14.1,Worst-case mean,6,17.722,14.1,102.514
+WCMean,niedrigenachfrage,2035,92.937,1.471,15.583,23.341,35.579,Worst-case mean,6,38.925,35.579,136.711
+WCMean,niedrigenachfrage,2040,112.867,0.793,17.361,30.894,29.833,Worst-case mean,6,48.255,29.833,89.547
+WCMean,niedrigenachfrage,2045,120.207,3.316,15.814,36.192,44.121,Worst-case mean,6,52.005,44.121,398.611
+WCMean,technologiemix,2030,35.263,4.055,5.91,12.924,12.228,Worst-case mean,6,18.834,12.228,142.973
+WCMean,technologiemix,2035,115.808,1.605,17.892,25.155,38.076,Worst-case mean,6,43.047,38.076,185.923
+WCMean,technologiemix,2040,148.465,0.743,20.43,32.312,43.54,Worst-case mean,6,52.742,43.54,110.337
+WCMean,technologiemix,2045,152.371,4.531,18.944,34.333,59.045,Worst-case mean,6,53.277,59.045,690.388
+WCTail,aktuellepolitiken,2030,17.938,0.867,1.451,7.141,7.502,Worst-case ES,7,8.592,7.502,15.547
+WCTail,aktuellepolitiken,2035,45.549,0.178,12.333,13.799,16.852,Worst-case ES,7,26.132,16.852,8.109
+WCTail,aktuellepolitiken,2040,46.465,2.523,13.051,12.999,14.992,Worst-case ES,7,26.05,14.992,117.239
+WCTail,aktuellepolitiken,2045,73.493,-2.944,10.363,9.866,34.76,Worst-case ES,7,20.229,34.76,-216.387
+WCTail,fokusH2,2030,31.689,2.782,5.647,12.444,10.542,Worst-case ES,7,18.091,10.542,88.159
+WCTail,fokusH2,2035,96.175,20.728,13.884,22.392,32.772,Worst-case ES,7,36.276,32.772,1993.494
+WCTail,fokusH2,2040,276.901,37.284,17.067,44.302,73.886,Worst-case ES,7,61.369,73.886,10324.021
+WCTail,fokusH2,2045,169.986,2.994,20.582,39.274,68.183,Worst-case ES,7,59.856,68.183,508.94
+WCTail,fokusstrom,2030,29.969,4.534,5.263,10.664,10.819,Worst-case ES,7,15.926,10.819,135.875
+WCTail,fokusstrom,2035,111.532,1.562,17.065,27.309,39.285,Worst-case ES,7,44.374,39.285,174.191
+WCTail,fokusstrom,2040,129.409,0.333,18.102,29.269,35.855,Worst-case ES,7,47.371,35.855,43.133
+WCTail,fokusstrom,2045,151.477,4.195,16.435,34.599,57.268,Worst-case ES,7,51.034,57.268,635.441
+WCTail,hohenachfrage,2030,34.324,4.06,5.84,13.025,11.391,Worst-case ES,7,18.865,11.391,139.343
+WCTail,hohenachfrage,2035,108.228,1.374,17.412,26.723,41.106,Worst-case ES,7,44.135,41.106,148.703
+WCTail,hohenachfrage,2040,170.105,1.676,24.397,39.924,60.864,Worst-case ES,7,64.321,60.864,285.025
+WCTail,hohenachfrage,2045,165.164,4.969,18.161,35.921,72.038,Worst-case ES,7,54.083,72.038,820.656
+WCTail,niedrigenachfrage,2030,32.981,3.568,5.564,11.491,12.473,Worst-case ES,7,17.055,12.473,117.67
+WCTail,niedrigenachfrage,2035,87.025,1.307,14.369,21.74,33.513,Worst-case ES,7,36.109,33.513,113.713
+WCTail,niedrigenachfrage,2040,109.675,1.202,17.225,28.763,27.803,Worst-case ES,7,45.988,27.803,131.866
+WCTail,niedrigenachfrage,2045,122.364,1.636,17.409,34.154,44.746,Worst-case ES,7,51.564,44.746,200.196
+WCTail,technologiemix,2030,35.072,3.889,6.247,13.715,11.631,Worst-case ES,7,19.963,11.631,136.398
+WCTail,technologiemix,2035,96.25,-0.211,16.129,24.487,36.611,Worst-case ES,7,40.616,36.611,-20.261
+WCTail,technologiemix,2040,129.523,1.81,18.478,28.539,43.956,Worst-case ES,7,47.018,43.956,234.429
+WCTail,technologiemix,2045,142.516,4.451,17.689,36.935,59.905,Worst-case ES,7,54.625,59.905,634.356

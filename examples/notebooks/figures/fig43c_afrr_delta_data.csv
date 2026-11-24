@@ -1,0 +1,9 @@
+case,case_label,mean,median,std
+AktuellePolitiken_RN,RN–ExPol,0.409,0.0,8.711
+FokusH2_RN,RN–H₂,0.348,0.0,8.309
+FokusStrom_RN,RN–Elec,1.086,0.0,14.782
+HoheNachfrage_RN,RN–HighDem,0.997,0.0,14.059
+NachfrageNiedrig_RN,RN–LowDem,1.362,0.0,16.779
+Technologiemix_RN,RN–Mix,1.119,0.0,14.789
+WCMean,Worst-case mean,0.358,0.0,8.498
+WCTail,Worst-case ES,0.301,0.0,7.758

@@ -1,0 +1,9 @@
+,lines > 100 % before,worst line before (%),lines > 100 % after,worst line after (%),upward redispatch (GW),downward redispatch (GW),nodes up / down
+RN–ExPol,2,144,0,100,14.37,14.37,16 / 6
+RN–H₂,2,124,0,100,23.51,23.51,22 / 8
+RN–Elec,4,149,0,100,10.81,10.81,14 / 5
+RN–HighDem,2,137,0,100,10.17,10.17,18 / 4
+RN–LowDem,3,152,0,100,8.07,8.07,12 / 3
+RN–Mix,2,133,0,100,10.97,10.97,17 / 4
+Worst-case mean,2,138,0,100,17.46,17.46,19 / 9
+Worst-case ES,3,134,0,100,22.38,22.38,20 / 9

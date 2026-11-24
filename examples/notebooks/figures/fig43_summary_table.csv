@@ -1,0 +1,9 @@
+case_label,DA_delta_mean_EUR_MWh,aFRRneg_delta_mean_EUR_MWh,industrial_share_of_aFRRneg_pct
+RN–ExPol,53.98,0.41,99.1
+RN–H₂,33.88,0.35,82.8
+RN–Elec,70.35,1.09,99.3
+RN–HighDem,68.14,1.0,99.3
+RN–LowDem,74.69,1.36,99.4
+RN–Mix,69.75,1.12,99.3
+Worst-case mean,38.82,0.36,82.8
+Worst-case ES,32.52,0.3,83.3

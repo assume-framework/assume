@@ -1,0 +1,373 @@
+pathway,year,kind,group,value,pathway_folder
+ExPol,2030,generation_GW,Biomass and waste,7.334,aktuellepolitiken
+ExPol,2030,generation_GW,"Gas (CCGT, OCGT, other)",49.537,aktuellepolitiken
+ExPol,2030,generation_GW,Hard coal,5.243,aktuellepolitiken
+ExPol,2030,generation_GW,Hydrogen CHP,0.0,aktuellepolitiken
+ExPol,2030,generation_GW,Lignite,15.281,aktuellepolitiken
+ExPol,2030,generation_GW,Offshore wind,17.3,aktuellepolitiken
+ExPol,2030,generation_GW,Oil,1.558,aktuellepolitiken
+ExPol,2030,generation_GW,Onshore wind,94.5,aktuellepolitiken
+ExPol,2030,generation_GW,Run-of-river hydro,2.771,aktuellepolitiken
+ExPol,2030,generation_GW,Solar PV,215.0,aktuellepolitiken
+ExPol,2030,storage_power_GW,Battery,0.001,aktuellepolitiken
+ExPol,2030,storage_power_GW,Hydro reservoir,0.29,aktuellepolitiken
+ExPol,2030,storage_power_GW,Pumped hydro,7.526,aktuellepolitiken
+ExPol,2030,storage_energy_GWh,Battery,0.005,aktuellepolitiken
+ExPol,2030,storage_energy_GWh,Hydro reservoir,300.0,aktuellepolitiken
+ExPol,2030,storage_energy_GWh,Pumped hydro,39.871,aktuellepolitiken
+ExPol,2035,generation_GW,Biomass and waste,5.235,aktuellepolitiken
+ExPol,2035,generation_GW,"Gas (CCGT, OCGT, other)",69.684,aktuellepolitiken
+ExPol,2035,generation_GW,Hard coal,3.921,aktuellepolitiken
+ExPol,2035,generation_GW,Hydrogen CHP,7.396,aktuellepolitiken
+ExPol,2035,generation_GW,Lignite,13.535,aktuellepolitiken
+ExPol,2035,generation_GW,Offshore wind,40.0,aktuellepolitiken
+ExPol,2035,generation_GW,Oil,1.075,aktuellepolitiken
+ExPol,2035,generation_GW,Onshore wind,94.066,aktuellepolitiken
+ExPol,2035,generation_GW,Run-of-river hydro,2.771,aktuellepolitiken
+ExPol,2035,generation_GW,Solar PV,269.37,aktuellepolitiken
+ExPol,2035,storage_power_GW,Battery,0.007,aktuellepolitiken
+ExPol,2035,storage_power_GW,Hydro reservoir,0.29,aktuellepolitiken
+ExPol,2035,storage_power_GW,Pumped hydro,7.526,aktuellepolitiken
+ExPol,2035,storage_energy_GWh,Battery,0.052,aktuellepolitiken
+ExPol,2035,storage_energy_GWh,Hydro reservoir,300.0,aktuellepolitiken
+ExPol,2035,storage_energy_GWh,Pumped hydro,39.871,aktuellepolitiken
+ExPol,2040,generation_GW,Biomass and waste,2.408,aktuellepolitiken
+ExPol,2040,generation_GW,"Gas (CCGT, OCGT, other)",84.03,aktuellepolitiken
+ExPol,2040,generation_GW,Hard coal,0.296,aktuellepolitiken
+ExPol,2040,generation_GW,Hydrogen CHP,7.794,aktuellepolitiken
+ExPol,2040,generation_GW,Lignite,0.002,aktuellepolitiken
+ExPol,2040,generation_GW,Offshore wind,40.995,aktuellepolitiken
+ExPol,2040,generation_GW,Oil,0.716,aktuellepolitiken
+ExPol,2040,generation_GW,Onshore wind,98.445,aktuellepolitiken
+ExPol,2040,generation_GW,Run-of-river hydro,2.771,aktuellepolitiken
+ExPol,2040,generation_GW,Solar PV,269.455,aktuellepolitiken
+ExPol,2040,storage_power_GW,Battery,1.551,aktuellepolitiken
+ExPol,2040,storage_power_GW,Hydro reservoir,0.29,aktuellepolitiken
+ExPol,2040,storage_power_GW,Pumped hydro,7.526,aktuellepolitiken
+ExPol,2040,storage_energy_GWh,Battery,13.382,aktuellepolitiken
+ExPol,2040,storage_energy_GWh,Hydro reservoir,300.0,aktuellepolitiken
+ExPol,2040,storage_energy_GWh,Pumped hydro,39.871,aktuellepolitiken
+ExPol,2045,generation_GW,Biomass and waste,0.894,aktuellepolitiken
+ExPol,2045,generation_GW,"Gas (CCGT, OCGT, other)",80.482,aktuellepolitiken
+ExPol,2045,generation_GW,Hydrogen CHP,7.781,aktuellepolitiken
+ExPol,2045,generation_GW,Offshore wind,39.921,aktuellepolitiken
+ExPol,2045,generation_GW,Oil,0.605,aktuellepolitiken
+ExPol,2045,generation_GW,Onshore wind,100.898,aktuellepolitiken
+ExPol,2045,generation_GW,Run-of-river hydro,2.771,aktuellepolitiken
+ExPol,2045,generation_GW,Solar PV,300.007,aktuellepolitiken
+ExPol,2045,storage_power_GW,Battery,6.774,aktuellepolitiken
+ExPol,2045,storage_power_GW,Hydro reservoir,0.29,aktuellepolitiken
+ExPol,2045,storage_power_GW,Pumped hydro,7.526,aktuellepolitiken
+ExPol,2045,storage_energy_GWh,Battery,35.965,aktuellepolitiken
+ExPol,2045,storage_energy_GWh,Hydro reservoir,300.0,aktuellepolitiken
+ExPol,2045,storage_energy_GWh,Pumped hydro,39.871,aktuellepolitiken
+H₂,2030,generation_GW,Biomass and waste,7.335,fokusH2
+H₂,2030,generation_GW,"Gas (CCGT, OCGT, other)",43.646,fokusH2
+H₂,2030,generation_GW,Hard coal,5.243,fokusH2
+H₂,2030,generation_GW,Hydrogen CHP,0.0,fokusH2
+H₂,2030,generation_GW,Lignite,15.281,fokusH2
+H₂,2030,generation_GW,Offshore wind,29.3,fokusH2
+H₂,2030,generation_GW,Oil,1.558,fokusH2
+H₂,2030,generation_GW,Onshore wind,111.335,fokusH2
+H₂,2030,generation_GW,Run-of-river hydro,2.771,fokusH2
+H₂,2030,generation_GW,Solar PV,235.0,fokusH2
+H₂,2030,storage_power_GW,Battery,4.205,fokusH2
+H₂,2030,storage_power_GW,Hydro reservoir,0.29,fokusH2
+H₂,2030,storage_power_GW,Pumped hydro,7.526,fokusH2
+H₂,2030,storage_energy_GWh,Battery,36.326,fokusH2
+H₂,2030,storage_energy_GWh,Hydro reservoir,300.0,fokusH2
+H₂,2030,storage_energy_GWh,Pumped hydro,39.871,fokusH2
+H₂,2035,generation_GW,Biomass and waste,5.292,fokusH2
+H₂,2035,generation_GW,"Gas (CCGT, OCGT, other)",50.838,fokusH2
+H₂,2035,generation_GW,Hard coal,3.921,fokusH2
+H₂,2035,generation_GW,Hydrogen CHP,13.458,fokusH2
+H₂,2035,generation_GW,Lignite,13.535,fokusH2
+H₂,2035,generation_GW,Offshore wind,50.0,fokusH2
+H₂,2035,generation_GW,Oil,1.075,fokusH2
+H₂,2035,generation_GW,Onshore wind,143.768,fokusH2
+H₂,2035,generation_GW,Run-of-river hydro,2.771,fokusH2
+H₂,2035,generation_GW,Solar PV,360.998,fokusH2
+H₂,2035,storage_power_GW,Battery,43.105,fokusH2
+H₂,2035,storage_power_GW,Hydro reservoir,0.29,fokusH2
+H₂,2035,storage_power_GW,Pumped hydro,7.526,fokusH2
+H₂,2035,storage_energy_GWh,Battery,277.496,fokusH2
+H₂,2035,storage_energy_GWh,Hydro reservoir,300.0,fokusH2
+H₂,2035,storage_energy_GWh,Pumped hydro,39.871,fokusH2
+H₂,2040,generation_GW,Biomass and waste,2.465,fokusH2
+H₂,2040,generation_GW,"Gas (CCGT, OCGT, other)",60.643,fokusH2
+H₂,2040,generation_GW,Hard coal,0.296,fokusH2
+H₂,2040,generation_GW,Hydrogen CHP,23.789,fokusH2
+H₂,2040,generation_GW,Lignite,0.002,fokusH2
+H₂,2040,generation_GW,Offshore wind,65.0,fokusH2
+H₂,2040,generation_GW,Oil,0.716,fokusH2
+H₂,2040,generation_GW,Onshore wind,157.0,fokusH2
+H₂,2040,generation_GW,Run-of-river hydro,2.771,fokusH2
+H₂,2040,generation_GW,Solar PV,450.128,fokusH2
+H₂,2040,storage_power_GW,Battery,89.31,fokusH2
+H₂,2040,storage_power_GW,Hydro reservoir,0.29,fokusH2
+H₂,2040,storage_power_GW,Pumped hydro,7.526,fokusH2
+H₂,2040,storage_energy_GWh,Battery,417.937,fokusH2
+H₂,2040,storage_energy_GWh,Hydro reservoir,300.0,fokusH2
+H₂,2040,storage_energy_GWh,Pumped hydro,39.871,fokusH2
+H₂,2045,generation_GW,Biomass and waste,0.985,fokusH2
+H₂,2045,generation_GW,"Gas (CCGT, OCGT, other)",57.395,fokusH2
+H₂,2045,generation_GW,Hydrogen CHP,23.988,fokusH2
+H₂,2045,generation_GW,Offshore wind,70.0,fokusH2
+H₂,2045,generation_GW,Oil,0.605,fokusH2
+H₂,2045,generation_GW,Onshore wind,160.0,fokusH2
+H₂,2045,generation_GW,Run-of-river hydro,2.771,fokusH2
+H₂,2045,generation_GW,Solar PV,494.43,fokusH2
+H₂,2045,storage_power_GW,Battery,115.486,fokusH2
+H₂,2045,storage_power_GW,Hydro reservoir,0.29,fokusH2
+H₂,2045,storage_power_GW,Pumped hydro,7.526,fokusH2
+H₂,2045,storage_energy_GWh,Battery,417.934,fokusH2
+H₂,2045,storage_energy_GWh,Hydro reservoir,300.0,fokusH2
+H₂,2045,storage_energy_GWh,Pumped hydro,39.871,fokusH2
+Elec,2030,generation_GW,Biomass and waste,7.336,fokusstrom
+Elec,2030,generation_GW,"Gas (CCGT, OCGT, other)",45.729,fokusstrom
+Elec,2030,generation_GW,Hard coal,5.243,fokusstrom
+Elec,2030,generation_GW,Hydrogen CHP,0.0,fokusstrom
+Elec,2030,generation_GW,Lignite,15.281,fokusstrom
+Elec,2030,generation_GW,Offshore wind,29.3,fokusstrom
+Elec,2030,generation_GW,Oil,1.558,fokusstrom
+Elec,2030,generation_GW,Onshore wind,114.535,fokusstrom
+Elec,2030,generation_GW,Run-of-river hydro,2.771,fokusstrom
+Elec,2030,generation_GW,Solar PV,235.0,fokusstrom
+Elec,2030,storage_power_GW,Battery,3.883,fokusstrom
+Elec,2030,storage_power_GW,Hydro reservoir,0.29,fokusstrom
+Elec,2030,storage_power_GW,Pumped hydro,7.526,fokusstrom
+Elec,2030,storage_energy_GWh,Battery,33.541,fokusstrom
+Elec,2030,storage_energy_GWh,Hydro reservoir,300.0,fokusstrom
+Elec,2030,storage_energy_GWh,Pumped hydro,39.871,fokusstrom
+Elec,2035,generation_GW,Biomass and waste,5.301,fokusstrom
+Elec,2035,generation_GW,"Gas (CCGT, OCGT, other)",50.599,fokusstrom
+Elec,2035,generation_GW,Hard coal,3.921,fokusstrom
+Elec,2035,generation_GW,Hydrogen CHP,16.089,fokusstrom
+Elec,2035,generation_GW,Lignite,13.535,fokusstrom
+Elec,2035,generation_GW,Offshore wind,50.0,fokusstrom
+Elec,2035,generation_GW,Oil,1.075,fokusstrom
+Elec,2035,generation_GW,Onshore wind,144.701,fokusstrom
+Elec,2035,generation_GW,Run-of-river hydro,2.771,fokusstrom
+Elec,2035,generation_GW,Solar PV,372.128,fokusstrom
+Elec,2035,storage_power_GW,Battery,47.082,fokusstrom
+Elec,2035,storage_power_GW,Hydro reservoir,0.29,fokusstrom
+Elec,2035,storage_power_GW,Pumped hydro,7.526,fokusstrom
+Elec,2035,storage_energy_GWh,Battery,298.437,fokusstrom
+Elec,2035,storage_energy_GWh,Hydro reservoir,300.0,fokusstrom
+Elec,2035,storage_energy_GWh,Pumped hydro,39.871,fokusstrom
+Elec,2040,generation_GW,Biomass and waste,2.474,fokusstrom
+Elec,2040,generation_GW,"Gas (CCGT, OCGT, other)",63.853,fokusstrom
+Elec,2040,generation_GW,Hard coal,0.296,fokusstrom
+Elec,2040,generation_GW,Hydrogen CHP,25.02,fokusstrom
+Elec,2040,generation_GW,Lignite,0.002,fokusstrom
+Elec,2040,generation_GW,Offshore wind,65.0,fokusstrom
+Elec,2040,generation_GW,Oil,0.716,fokusstrom
+Elec,2040,generation_GW,Onshore wind,157.0,fokusstrom
+Elec,2040,generation_GW,Run-of-river hydro,2.771,fokusstrom
+Elec,2040,generation_GW,Solar PV,471.044,fokusstrom
+Elec,2040,storage_power_GW,Battery,92.345,fokusstrom
+Elec,2040,storage_power_GW,Hydro reservoir,0.29,fokusstrom
+Elec,2040,storage_power_GW,Pumped hydro,7.526,fokusstrom
+Elec,2040,storage_energy_GWh,Battery,459.141,fokusstrom
+Elec,2040,storage_energy_GWh,Hydro reservoir,300.0,fokusstrom
+Elec,2040,storage_energy_GWh,Pumped hydro,39.871,fokusstrom
+Elec,2045,generation_GW,Biomass and waste,0.996,fokusstrom
+Elec,2045,generation_GW,"Gas (CCGT, OCGT, other)",61.719,fokusstrom
+Elec,2045,generation_GW,Hydrogen CHP,26.62,fokusstrom
+Elec,2045,generation_GW,Offshore wind,64.288,fokusstrom
+Elec,2045,generation_GW,Oil,0.605,fokusstrom
+Elec,2045,generation_GW,Onshore wind,160.0,fokusstrom
+Elec,2045,generation_GW,Run-of-river hydro,2.771,fokusstrom
+Elec,2045,generation_GW,Solar PV,475.987,fokusstrom
+Elec,2045,storage_power_GW,Battery,122.16,fokusstrom
+Elec,2045,storage_power_GW,Hydro reservoir,0.29,fokusstrom
+Elec,2045,storage_power_GW,Pumped hydro,7.526,fokusstrom
+Elec,2045,storage_energy_GWh,Battery,459.117,fokusstrom
+Elec,2045,storage_energy_GWh,Hydro reservoir,300.0,fokusstrom
+Elec,2045,storage_energy_GWh,Pumped hydro,39.871,fokusstrom
+HighDem,2030,generation_GW,Biomass and waste,7.338,hohenachfrage
+HighDem,2030,generation_GW,"Gas (CCGT, OCGT, other)",44.745,hohenachfrage
+HighDem,2030,generation_GW,Hard coal,5.243,hohenachfrage
+HighDem,2030,generation_GW,Hydrogen CHP,0.0,hohenachfrage
+HighDem,2030,generation_GW,Lignite,15.281,hohenachfrage
+HighDem,2030,generation_GW,Offshore wind,29.3,hohenachfrage
+HighDem,2030,generation_GW,Oil,1.558,hohenachfrage
+HighDem,2030,generation_GW,Onshore wind,113.684,hohenachfrage
+HighDem,2030,generation_GW,Run-of-river hydro,2.771,hohenachfrage
+HighDem,2030,generation_GW,Solar PV,235.0,hohenachfrage
+HighDem,2030,storage_power_GW,Battery,5.492,hohenachfrage
+HighDem,2030,storage_power_GW,Hydro reservoir,0.29,hohenachfrage
+HighDem,2030,storage_power_GW,Pumped hydro,7.526,hohenachfrage
+HighDem,2030,storage_energy_GWh,Battery,47.453,hohenachfrage
+HighDem,2030,storage_energy_GWh,Hydro reservoir,300.0,hohenachfrage
+HighDem,2030,storage_energy_GWh,Pumped hydro,39.871,hohenachfrage
+HighDem,2035,generation_GW,Biomass and waste,5.316,hohenachfrage
+HighDem,2035,generation_GW,"Gas (CCGT, OCGT, other)",51.077,hohenachfrage
+HighDem,2035,generation_GW,Hard coal,3.921,hohenachfrage
+HighDem,2035,generation_GW,Hydrogen CHP,17.103,hohenachfrage
+HighDem,2035,generation_GW,Lignite,13.535,hohenachfrage
+HighDem,2035,generation_GW,Offshore wind,50.0,hohenachfrage
+HighDem,2035,generation_GW,Oil,1.075,hohenachfrage
+HighDem,2035,generation_GW,Onshore wind,147.619,hohenachfrage
+HighDem,2035,generation_GW,Run-of-river hydro,2.771,hohenachfrage
+HighDem,2035,generation_GW,Solar PV,378.992,hohenachfrage
+HighDem,2035,storage_power_GW,Battery,45.396,hohenachfrage
+HighDem,2035,storage_power_GW,Hydro reservoir,0.29,hohenachfrage
+HighDem,2035,storage_power_GW,Pumped hydro,7.526,hohenachfrage
+HighDem,2035,storage_energy_GWh,Battery,302.002,hohenachfrage
+HighDem,2035,storage_energy_GWh,Hydro reservoir,300.0,hohenachfrage
+HighDem,2035,storage_energy_GWh,Pumped hydro,39.871,hohenachfrage
+HighDem,2040,generation_GW,Biomass and waste,2.488,hohenachfrage
+HighDem,2040,generation_GW,"Gas (CCGT, OCGT, other)",64.817,hohenachfrage
+HighDem,2040,generation_GW,Hard coal,0.296,hohenachfrage
+HighDem,2040,generation_GW,Hydrogen CHP,30.214,hohenachfrage
+HighDem,2040,generation_GW,Lignite,0.002,hohenachfrage
+HighDem,2040,generation_GW,Offshore wind,65.0,hohenachfrage
+HighDem,2040,generation_GW,Oil,0.716,hohenachfrage
+HighDem,2040,generation_GW,Onshore wind,162.438,hohenachfrage
+HighDem,2040,generation_GW,Run-of-river hydro,2.771,hohenachfrage
+HighDem,2040,generation_GW,Solar PV,500.827,hohenachfrage
+HighDem,2040,storage_power_GW,Battery,98.892,hohenachfrage
+HighDem,2040,storage_power_GW,Hydro reservoir,0.29,hohenachfrage
+HighDem,2040,storage_power_GW,Pumped hydro,7.526,hohenachfrage
+HighDem,2040,storage_energy_GWh,Battery,490.924,hohenachfrage
+HighDem,2040,storage_energy_GWh,Hydro reservoir,300.0,hohenachfrage
+HighDem,2040,storage_energy_GWh,Pumped hydro,39.871,hohenachfrage
+HighDem,2045,generation_GW,Biomass and waste,0.991,hohenachfrage
+HighDem,2045,generation_GW,"Gas (CCGT, OCGT, other)",66.545,hohenachfrage
+HighDem,2045,generation_GW,Hydrogen CHP,32.593,hohenachfrage
+HighDem,2045,generation_GW,Offshore wind,69.135,hohenachfrage
+HighDem,2045,generation_GW,Oil,0.605,hohenachfrage
+HighDem,2045,generation_GW,Onshore wind,160.002,hohenachfrage
+HighDem,2045,generation_GW,Run-of-river hydro,2.771,hohenachfrage
+HighDem,2045,generation_GW,Solar PV,513.974,hohenachfrage
+HighDem,2045,storage_power_GW,Battery,132.872,hohenachfrage
+HighDem,2045,storage_power_GW,Hydro reservoir,0.29,hohenachfrage
+HighDem,2045,storage_power_GW,Pumped hydro,7.526,hohenachfrage
+HighDem,2045,storage_energy_GWh,Battery,493.057,hohenachfrage
+HighDem,2045,storage_energy_GWh,Hydro reservoir,300.0,hohenachfrage
+HighDem,2045,storage_energy_GWh,Pumped hydro,39.871,hohenachfrage
+LowDem,2030,generation_GW,Biomass and waste,7.335,niedrigenachfrage
+LowDem,2030,generation_GW,"Gas (CCGT, OCGT, other)",43.267,niedrigenachfrage
+LowDem,2030,generation_GW,Hard coal,5.243,niedrigenachfrage
+LowDem,2030,generation_GW,Hydrogen CHP,0.0,niedrigenachfrage
+LowDem,2030,generation_GW,Lignite,15.281,niedrigenachfrage
+LowDem,2030,generation_GW,Offshore wind,29.3,niedrigenachfrage
+LowDem,2030,generation_GW,Oil,1.558,niedrigenachfrage
+LowDem,2030,generation_GW,Onshore wind,108.121,niedrigenachfrage
+LowDem,2030,generation_GW,Run-of-river hydro,2.771,niedrigenachfrage
+LowDem,2030,generation_GW,Solar PV,234.999,niedrigenachfrage
+LowDem,2030,storage_power_GW,Battery,1.865,niedrigenachfrage
+LowDem,2030,storage_power_GW,Hydro reservoir,0.29,niedrigenachfrage
+LowDem,2030,storage_power_GW,Pumped hydro,7.526,niedrigenachfrage
+LowDem,2030,storage_energy_GWh,Battery,16.112,niedrigenachfrage
+LowDem,2030,storage_energy_GWh,Hydro reservoir,300.0,niedrigenachfrage
+LowDem,2030,storage_energy_GWh,Pumped hydro,39.871,niedrigenachfrage
+LowDem,2035,generation_GW,Biomass and waste,5.297,niedrigenachfrage
+LowDem,2035,generation_GW,"Gas (CCGT, OCGT, other)",50.817,niedrigenachfrage
+LowDem,2035,generation_GW,Hard coal,3.921,niedrigenachfrage
+LowDem,2035,generation_GW,Hydrogen CHP,11.843,niedrigenachfrage
+LowDem,2035,generation_GW,Lignite,13.535,niedrigenachfrage
+LowDem,2035,generation_GW,Offshore wind,50.0,niedrigenachfrage
+LowDem,2035,generation_GW,Oil,1.075,niedrigenachfrage
+LowDem,2035,generation_GW,Onshore wind,138.736,niedrigenachfrage
+LowDem,2035,generation_GW,Run-of-river hydro,2.771,niedrigenachfrage
+LowDem,2035,generation_GW,Solar PV,356.482,niedrigenachfrage
+LowDem,2035,storage_power_GW,Battery,42.887,niedrigenachfrage
+LowDem,2035,storage_power_GW,Hydro reservoir,0.29,niedrigenachfrage
+LowDem,2035,storage_power_GW,Pumped hydro,7.526,niedrigenachfrage
+LowDem,2035,storage_energy_GWh,Battery,275.525,niedrigenachfrage
+LowDem,2035,storage_energy_GWh,Hydro reservoir,300.0,niedrigenachfrage
+LowDem,2035,storage_energy_GWh,Pumped hydro,39.871,niedrigenachfrage
+LowDem,2040,generation_GW,Biomass and waste,2.469,niedrigenachfrage
+LowDem,2040,generation_GW,"Gas (CCGT, OCGT, other)",62.882,niedrigenachfrage
+LowDem,2040,generation_GW,Hard coal,0.296,niedrigenachfrage
+LowDem,2040,generation_GW,Hydrogen CHP,19.608,niedrigenachfrage
+LowDem,2040,generation_GW,Lignite,0.002,niedrigenachfrage
+LowDem,2040,generation_GW,Offshore wind,65.0,niedrigenachfrage
+LowDem,2040,generation_GW,Oil,0.716,niedrigenachfrage
+LowDem,2040,generation_GW,Onshore wind,157.0,niedrigenachfrage
+LowDem,2040,generation_GW,Run-of-river hydro,2.771,niedrigenachfrage
+LowDem,2040,generation_GW,Solar PV,428.184,niedrigenachfrage
+LowDem,2040,storage_power_GW,Battery,77.017,niedrigenachfrage
+LowDem,2040,storage_power_GW,Hydro reservoir,0.29,niedrigenachfrage
+LowDem,2040,storage_power_GW,Pumped hydro,7.526,niedrigenachfrage
+LowDem,2040,storage_energy_GWh,Battery,384.042,niedrigenachfrage
+LowDem,2040,storage_energy_GWh,Hydro reservoir,300.0,niedrigenachfrage
+LowDem,2040,storage_energy_GWh,Pumped hydro,39.871,niedrigenachfrage
+LowDem,2045,generation_GW,Biomass and waste,1.134,niedrigenachfrage
+LowDem,2045,generation_GW,"Gas (CCGT, OCGT, other)",58.867,niedrigenachfrage
+LowDem,2045,generation_GW,Hydrogen CHP,19.674,niedrigenachfrage
+LowDem,2045,generation_GW,Offshore wind,61.797,niedrigenachfrage
+LowDem,2045,generation_GW,Oil,0.605,niedrigenachfrage
+LowDem,2045,generation_GW,Onshore wind,160.0,niedrigenachfrage
+LowDem,2045,generation_GW,Run-of-river hydro,2.771,niedrigenachfrage
+LowDem,2045,generation_GW,Solar PV,414.611,niedrigenachfrage
+LowDem,2045,storage_power_GW,Battery,96.626,niedrigenachfrage
+LowDem,2045,storage_power_GW,Hydro reservoir,0.29,niedrigenachfrage
+LowDem,2045,storage_power_GW,Pumped hydro,7.526,niedrigenachfrage
+LowDem,2045,storage_energy_GWh,Battery,384.009,niedrigenachfrage
+LowDem,2045,storage_energy_GWh,Hydro reservoir,300.0,niedrigenachfrage
+LowDem,2045,storage_energy_GWh,Pumped hydro,39.871,niedrigenachfrage
+Mix,2030,generation_GW,Biomass and waste,7.336,technologiemix
+Mix,2030,generation_GW,"Gas (CCGT, OCGT, other)",44.928,technologiemix
+Mix,2030,generation_GW,Hard coal,5.243,technologiemix
+Mix,2030,generation_GW,Hydrogen CHP,0.0,technologiemix
+Mix,2030,generation_GW,Lignite,15.281,technologiemix
+Mix,2030,generation_GW,Offshore wind,29.3,technologiemix
+Mix,2030,generation_GW,Oil,1.558,technologiemix
+Mix,2030,generation_GW,Onshore wind,113.465,technologiemix
+Mix,2030,generation_GW,Run-of-river hydro,2.771,technologiemix
+Mix,2030,generation_GW,Solar PV,235.0,technologiemix
+Mix,2030,storage_power_GW,Battery,3.928,technologiemix
+Mix,2030,storage_power_GW,Hydro reservoir,0.29,technologiemix
+Mix,2030,storage_power_GW,Pumped hydro,7.526,technologiemix
+Mix,2030,storage_energy_GWh,Battery,33.938,technologiemix
+Mix,2030,storage_energy_GWh,Hydro reservoir,300.0,technologiemix
+Mix,2030,storage_energy_GWh,Pumped hydro,39.871,technologiemix
+Mix,2035,generation_GW,Biomass and waste,5.302,technologiemix
+Mix,2035,generation_GW,"Gas (CCGT, OCGT, other)",50.749,technologiemix
+Mix,2035,generation_GW,Hard coal,3.921,technologiemix
+Mix,2035,generation_GW,Hydrogen CHP,15.014,technologiemix
+Mix,2035,generation_GW,Lignite,13.535,technologiemix
+Mix,2035,generation_GW,Offshore wind,50.0,technologiemix
+Mix,2035,generation_GW,Oil,1.075,technologiemix
+Mix,2035,generation_GW,Onshore wind,144.592,technologiemix
+Mix,2035,generation_GW,Run-of-river hydro,2.771,technologiemix
+Mix,2035,generation_GW,Solar PV,371.543,technologiemix
+Mix,2035,storage_power_GW,Battery,45.963,technologiemix
+Mix,2035,storage_power_GW,Hydro reservoir,0.29,technologiemix
+Mix,2035,storage_power_GW,Pumped hydro,7.526,technologiemix
+Mix,2035,storage_energy_GWh,Battery,291.667,technologiemix
+Mix,2035,storage_energy_GWh,Hydro reservoir,300.0,technologiemix
+Mix,2035,storage_energy_GWh,Pumped hydro,39.871,technologiemix
+Mix,2040,generation_GW,Biomass and waste,2.473,technologiemix
+Mix,2040,generation_GW,"Gas (CCGT, OCGT, other)",60.716,technologiemix
+Mix,2040,generation_GW,Hard coal,0.296,technologiemix
+Mix,2040,generation_GW,Hydrogen CHP,27.203,technologiemix
+Mix,2040,generation_GW,Lignite,0.002,technologiemix
+Mix,2040,generation_GW,Offshore wind,65.0,technologiemix
+Mix,2040,generation_GW,Oil,0.716,technologiemix
+Mix,2040,generation_GW,Onshore wind,157.207,technologiemix
+Mix,2040,generation_GW,Run-of-river hydro,2.771,technologiemix
+Mix,2040,generation_GW,Solar PV,464.652,technologiemix
+Mix,2040,storage_power_GW,Battery,91.917,technologiemix
+Mix,2040,storage_power_GW,Hydro reservoir,0.29,technologiemix
+Mix,2040,storage_power_GW,Pumped hydro,7.526,technologiemix
+Mix,2040,storage_energy_GWh,Battery,435.979,technologiemix
+Mix,2040,storage_energy_GWh,Hydro reservoir,300.0,technologiemix
+Mix,2040,storage_energy_GWh,Pumped hydro,39.871,technologiemix
+Mix,2045,generation_GW,Biomass and waste,1.005,technologiemix
+Mix,2045,generation_GW,"Gas (CCGT, OCGT, other)",58.664,technologiemix
+Mix,2045,generation_GW,Hydrogen CHP,28.24,technologiemix
+Mix,2045,generation_GW,Offshore wind,64.431,technologiemix
+Mix,2045,generation_GW,Oil,0.605,technologiemix
+Mix,2045,generation_GW,Onshore wind,160.0,technologiemix
+Mix,2045,generation_GW,Run-of-river hydro,2.771,technologiemix
+Mix,2045,generation_GW,Solar PV,468.135,technologiemix
+Mix,2045,storage_power_GW,Battery,117.792,technologiemix
+Mix,2045,storage_power_GW,Hydro reservoir,0.29,technologiemix
+Mix,2045,storage_power_GW,Pumped hydro,7.526,technologiemix
+Mix,2045,storage_energy_GWh,Battery,435.966,technologiemix
+Mix,2045,storage_energy_GWh,Hydro reservoir,300.0,technologiemix
+Mix,2045,storage_energy_GWh,Pumped hydro,39.871,technologiemix

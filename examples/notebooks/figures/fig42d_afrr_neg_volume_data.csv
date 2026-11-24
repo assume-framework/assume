@@ -1,0 +1,65 @@
+case,case_label,year,sector,afrr_neg_MW_mean
+AktuellePolitiken_RN,RN–ExPol,2030,Cement,32733.82
+AktuellePolitiken_RN,RN–ExPol,2030,Steel,1573.93
+AktuellePolitiken_RN,RN–ExPol,2035,Cement,28185.12
+AktuellePolitiken_RN,RN–ExPol,2035,Steel,1149.96
+AktuellePolitiken_RN,RN–ExPol,2040,Cement,29927.72
+AktuellePolitiken_RN,RN–ExPol,2040,Steel,1134.61
+AktuellePolitiken_RN,RN–ExPol,2045,Cement,25394.3
+AktuellePolitiken_RN,RN–ExPol,2045,Steel,11273.06
+FokusH2_RN,RN–H₂,2030,Cement,86.29
+FokusH2_RN,RN–H₂,2030,Steel,1279.99
+FokusH2_RN,RN–H₂,2035,Cement,8.33
+FokusH2_RN,RN–H₂,2035,Steel,826.65
+FokusH2_RN,RN–H₂,2040,Cement,11.39
+FokusH2_RN,RN–H₂,2040,Steel,810.61
+FokusH2_RN,RN–H₂,2045,Cement,25394.3
+FokusH2_RN,RN–H₂,2045,Steel,20515.68
+FokusStrom_RN,RN–Elec,2030,Cement,32733.82
+FokusStrom_RN,RN–Elec,2030,Steel,10192.52
+FokusStrom_RN,RN–Elec,2035,Cement,28185.12
+FokusStrom_RN,RN–Elec,2035,Steel,10040.46
+FokusStrom_RN,RN–Elec,2040,Cement,29927.72
+FokusStrom_RN,RN–Elec,2040,Steel,9913.12
+FokusStrom_RN,RN–Elec,2045,Cement,25394.3
+FokusStrom_RN,RN–Elec,2045,Steel,20890.25
+HoheNachfrage_RN,RN–HighDem,2030,Cement,32733.82
+HoheNachfrage_RN,RN–HighDem,2030,Steel,13961.12
+HoheNachfrage_RN,RN–HighDem,2035,Cement,28185.12
+HoheNachfrage_RN,RN–HighDem,2035,Steel,10040.46
+HoheNachfrage_RN,RN–HighDem,2040,Cement,29927.72
+HoheNachfrage_RN,RN–HighDem,2040,Steel,9913.12
+HoheNachfrage_RN,RN–HighDem,2045,Cement,25394.3
+HoheNachfrage_RN,RN–HighDem,2045,Steel,20890.25
+NachfrageNiedrig_RN,RN–LowDem,2030,Cement,32733.82
+NachfrageNiedrig_RN,RN–LowDem,2030,Steel,10192.52
+NachfrageNiedrig_RN,RN–LowDem,2035,Cement,28185.12
+NachfrageNiedrig_RN,RN–LowDem,2035,Steel,21638.84
+NachfrageNiedrig_RN,RN–LowDem,2040,Cement,29927.72
+NachfrageNiedrig_RN,RN–LowDem,2040,Steel,21143.67
+NachfrageNiedrig_RN,RN–LowDem,2045,Cement,25394.3
+NachfrageNiedrig_RN,RN–LowDem,2045,Steel,20890.25
+Technologiemix_RN,RN–Mix,2030,Cement,32733.82
+Technologiemix_RN,RN–Mix,2030,Steel,13961.12
+Technologiemix_RN,RN–Mix,2035,Cement,28185.12
+Technologiemix_RN,RN–Mix,2035,Steel,10040.46
+Technologiemix_RN,RN–Mix,2040,Cement,29927.72
+Technologiemix_RN,RN–Mix,2040,Steel,9913.12
+Technologiemix_RN,RN–Mix,2045,Cement,25394.3
+Technologiemix_RN,RN–Mix,2045,Steel,20890.25
+WCMean,Worst-case mean,2030,Cement,86.29
+WCMean,Worst-case mean,2030,Steel,1279.99
+WCMean,Worst-case mean,2035,Cement,8.33
+WCMean,Worst-case mean,2035,Steel,826.65
+WCMean,Worst-case mean,2040,Cement,11.39
+WCMean,Worst-case mean,2040,Steel,810.61
+WCMean,Worst-case mean,2045,Cement,25394.3
+WCMean,Worst-case mean,2045,Steel,20515.68
+WCTail,Worst-case ES,2030,Cement,103.13
+WCTail,Worst-case ES,2030,Steel,1279.99
+WCTail,Worst-case ES,2035,Cement,45.23
+WCTail,Worst-case ES,2035,Steel,826.65
+WCTail,Worst-case ES,2040,Cement,51.06
+WCTail,Worst-case ES,2040,Steel,810.61
+WCTail,Worst-case ES,2045,Cement,25394.3
+WCTail,Worst-case ES,2045,Steel,20515.68

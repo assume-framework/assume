@@ -1,0 +1,33 @@
+case,case_label,case_order,quarter,delta
+AktuellePolitiken_RN,RN–ExPol,0,1,1.261
+AktuellePolitiken_RN,RN–ExPol,0,2,0.125
+AktuellePolitiken_RN,RN–ExPol,0,3,0.177
+AktuellePolitiken_RN,RN–ExPol,0,4,0.082
+FokusH2_RN,RN–H₂,1,1,0.979
+FokusH2_RN,RN–H₂,1,2,0.262
+FokusH2_RN,RN–H₂,1,3,0.127
+FokusH2_RN,RN–H₂,1,4,0.03
+FokusStrom_RN,RN–Elec,2,1,2.265
+FokusStrom_RN,RN–Elec,2,2,0.452
+FokusStrom_RN,RN–Elec,2,3,0.726
+FokusStrom_RN,RN–Elec,2,4,0.914
+HoheNachfrage_RN,RN–HighDem,3,1,2.383
+HoheNachfrage_RN,RN–HighDem,3,2,0.605
+HoheNachfrage_RN,RN–HighDem,3,3,0.519
+HoheNachfrage_RN,RN–HighDem,3,4,0.496
+NachfrageNiedrig_RN,RN–LowDem,4,1,2.838
+NachfrageNiedrig_RN,RN–LowDem,4,2,0.468
+NachfrageNiedrig_RN,RN–LowDem,4,3,1.163
+NachfrageNiedrig_RN,RN–LowDem,4,4,0.99
+Technologiemix_RN,RN–Mix,5,1,2.338
+Technologiemix_RN,RN–Mix,5,2,0.677
+Technologiemix_RN,RN–Mix,5,3,0.77
+Technologiemix_RN,RN–Mix,5,4,0.706
+WCMean,Worst-case mean,6,1,0.971
+WCMean,Worst-case mean,6,2,0.133
+WCMean,Worst-case mean,6,3,0.093
+WCMean,Worst-case mean,6,4,0.246
+WCTail,Worst-case ES,7,1,0.975
+WCTail,Worst-case ES,7,2,0.11
+WCTail,Worst-case ES,7,3,0.096
+WCTail,Worst-case ES,7,4,0.029

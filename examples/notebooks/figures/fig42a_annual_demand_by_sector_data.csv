@@ -1,0 +1,129 @@
+sector,case,case_label,year,mean_TWh,min_TWh,max_TWh
+Aviation,AktuellePolitiken_RN,RN–ExPol,2030,0.045,0.045,0.045
+Aviation,AktuellePolitiken_RN,RN–ExPol,2035,0.444,0.444,0.444
+Aviation,AktuellePolitiken_RN,RN–ExPol,2040,1.516,1.516,1.516
+Aviation,AktuellePolitiken_RN,RN–ExPol,2045,3.362,3.362,3.362
+Aviation,FokusH2_RN,RN–H₂,2030,0.061,0.061,0.061
+Aviation,FokusH2_RN,RN–H₂,2035,0.758,0.758,0.758
+Aviation,FokusH2_RN,RN–H₂,2040,1.676,1.676,1.676
+Aviation,FokusH2_RN,RN–H₂,2045,5.028,5.028,5.028
+Aviation,FokusStrom_RN,RN–Elec,2030,0.06,0.06,0.06
+Aviation,FokusStrom_RN,RN–Elec,2035,0.42,0.42,0.42
+Aviation,FokusStrom_RN,RN–Elec,2040,1.264,1.264,1.264
+Aviation,FokusStrom_RN,RN–Elec,2045,2.651,2.651,2.651
+Aviation,HoheNachfrage_RN,RN–HighDem,2030,0.044,0.044,0.044
+Aviation,HoheNachfrage_RN,RN–HighDem,2035,0.389,0.389,0.389
+Aviation,HoheNachfrage_RN,RN–HighDem,2040,1.2,1.2,1.2
+Aviation,HoheNachfrage_RN,RN–HighDem,2045,5.061,5.061,5.061
+Aviation,NachfrageNiedrig_RN,RN–LowDem,2030,0.06,0.06,0.06
+Aviation,NachfrageNiedrig_RN,RN–LowDem,2035,0.408,0.408,0.408
+Aviation,NachfrageNiedrig_RN,RN–LowDem,2040,1.221,1.221,1.221
+Aviation,NachfrageNiedrig_RN,RN–LowDem,2045,2.967,2.967,2.967
+Aviation,Technologiemix_RN,RN–Mix,2030,0.06,0.06,0.06
+Aviation,Technologiemix_RN,RN–Mix,2035,0.432,0.432,0.432
+Aviation,Technologiemix_RN,RN–Mix,2040,1.284,1.284,1.284
+Aviation,Technologiemix_RN,RN–Mix,2045,2.58,2.58,2.58
+Aviation,WCMean,Worst-case mean,2030,0.061,0.061,0.061
+Aviation,WCMean,Worst-case mean,2035,1.187,1.187,1.187
+Aviation,WCMean,Worst-case mean,2040,2.657,2.657,2.657
+Aviation,WCMean,Worst-case mean,2045,4.729,4.729,4.729
+Aviation,WCTail,Worst-case ES,2030,0.061,0.061,0.061
+Aviation,WCTail,Worst-case ES,2035,1.187,1.187,1.187
+Aviation,WCTail,Worst-case ES,2040,2.657,2.657,2.657
+Aviation,WCTail,Worst-case ES,2045,4.729,4.729,4.729
+Cement,AktuellePolitiken_RN,RN–ExPol,2030,89.278,80.772,91.032
+Cement,AktuellePolitiken_RN,RN–ExPol,2035,98.502,88.468,106.028
+Cement,AktuellePolitiken_RN,RN–ExPol,2040,100.999,90.859,114.714
+Cement,AktuellePolitiken_RN,RN–ExPol,2045,105.462,91.284,124.335
+Cement,FokusH2_RN,RN–H₂,2030,0.407,0.167,0.455
+Cement,FokusH2_RN,RN–H₂,2035,0.183,0.168,0.195
+Cement,FokusH2_RN,RN–H₂,2040,0.185,0.166,0.21
+Cement,FokusH2_RN,RN–H₂,2045,105.462,91.284,124.335
+Cement,FokusStrom_RN,RN–Elec,2030,89.278,80.772,91.032
+Cement,FokusStrom_RN,RN–Elec,2035,98.502,88.468,106.028
+Cement,FokusStrom_RN,RN–Elec,2040,100.999,90.859,114.714
+Cement,FokusStrom_RN,RN–Elec,2045,105.462,91.284,124.335
+Cement,HoheNachfrage_RN,RN–HighDem,2030,89.278,80.772,91.032
+Cement,HoheNachfrage_RN,RN–HighDem,2035,98.502,88.468,106.028
+Cement,HoheNachfrage_RN,RN–HighDem,2040,100.999,90.859,114.714
+Cement,HoheNachfrage_RN,RN–HighDem,2045,105.462,91.284,124.335
+Cement,NachfrageNiedrig_RN,RN–LowDem,2030,89.278,80.772,91.032
+Cement,NachfrageNiedrig_RN,RN–LowDem,2035,98.502,88.468,106.028
+Cement,NachfrageNiedrig_RN,RN–LowDem,2040,100.999,90.859,114.714
+Cement,NachfrageNiedrig_RN,RN–LowDem,2045,105.462,91.284,124.335
+Cement,Technologiemix_RN,RN–Mix,2030,89.278,80.772,91.032
+Cement,Technologiemix_RN,RN–Mix,2035,98.502,88.468,106.028
+Cement,Technologiemix_RN,RN–Mix,2040,100.999,90.859,114.714
+Cement,Technologiemix_RN,RN–Mix,2045,105.462,91.284,124.335
+Cement,WCMean,Worst-case mean,2030,0.407,0.167,0.455
+Cement,WCMean,Worst-case mean,2035,0.183,0.168,0.195
+Cement,WCMean,Worst-case mean,2040,0.185,0.166,0.21
+Cement,WCMean,Worst-case mean,2045,105.462,91.284,124.335
+Cement,WCTail,Worst-case ES,2030,0.449,0.167,0.507
+Cement,WCTail,Worst-case ES,2035,0.339,0.168,0.396
+Cement,WCTail,Worst-case ES,2040,0.343,0.166,0.432
+Cement,WCTail,Worst-case ES,2045,105.462,91.284,124.335
+Maritime,AktuellePolitiken_RN,RN–ExPol,2030,0.521,0.521,0.521
+Maritime,AktuellePolitiken_RN,RN–ExPol,2035,4.478,4.478,4.478
+Maritime,AktuellePolitiken_RN,RN–ExPol,2040,10.225,10.225,10.225
+Maritime,AktuellePolitiken_RN,RN–ExPol,2045,15.813,15.813,15.813
+Maritime,FokusH2_RN,RN–H₂,2030,0.704,0.704,0.704
+Maritime,FokusH2_RN,RN–H₂,2035,5.538,5.538,5.538
+Maritime,FokusH2_RN,RN–H₂,2040,9.984,9.984,9.984
+Maritime,FokusH2_RN,RN–H₂,2045,17.11,17.11,17.11
+Maritime,FokusStrom_RN,RN–Elec,2030,0.699,0.699,0.699
+Maritime,FokusStrom_RN,RN–Elec,2035,4.24,4.24,4.24
+Maritime,FokusStrom_RN,RN–Elec,2040,8.879,8.879,8.879
+Maritime,FokusStrom_RN,RN–Elec,2045,13.564,13.564,13.564
+Maritime,HoheNachfrage_RN,RN–HighDem,2030,0.506,0.506,0.506
+Maritime,HoheNachfrage_RN,RN–HighDem,2035,3.979,3.979,3.979
+Maritime,HoheNachfrage_RN,RN–HighDem,2040,8.487,8.487,8.487
+Maritime,HoheNachfrage_RN,RN–HighDem,2045,16.608,16.608,16.608
+Maritime,NachfrageNiedrig_RN,RN–LowDem,2030,0.714,0.714,0.714
+Maritime,NachfrageNiedrig_RN,RN–LowDem,2035,4.125,4.125,4.125
+Maritime,NachfrageNiedrig_RN,RN–LowDem,2040,8.52,8.52,8.52
+Maritime,NachfrageNiedrig_RN,RN–LowDem,2045,13.666,13.666,13.666
+Maritime,Technologiemix_RN,RN–Mix,2030,0.702,0.702,0.702
+Maritime,Technologiemix_RN,RN–Mix,2035,4.367,4.367,4.367
+Maritime,Technologiemix_RN,RN–Mix,2040,9.022,9.022,9.022
+Maritime,Technologiemix_RN,RN–Mix,2045,13.539,13.539,13.539
+Maritime,WCMean,Worst-case mean,2030,0.711,0.711,0.711
+Maritime,WCMean,Worst-case mean,2035,5.783,5.783,5.783
+Maritime,WCMean,Worst-case mean,2040,11.07,11.07,11.07
+Maritime,WCMean,Worst-case mean,2045,15.888,15.888,15.888
+Maritime,WCTail,Worst-case ES,2030,0.711,0.711,0.711
+Maritime,WCTail,Worst-case ES,2035,5.783,5.783,5.783
+Maritime,WCTail,Worst-case ES,2040,11.07,11.07,11.07
+Maritime,WCTail,Worst-case ES,2045,15.888,15.888,15.888
+Steel,AktuellePolitiken_RN,RN–ExPol,2030,4.044,3.0,4.361
+Steel,AktuellePolitiken_RN,RN–ExPol,2035,4.108,2.916,4.721
+Steel,AktuellePolitiken_RN,RN–ExPol,2040,3.988,2.831,4.94
+Steel,AktuellePolitiken_RN,RN–ExPol,2045,53.461,45.873,65.369
+Steel,FokusH2_RN,RN–H₂,2030,3.212,2.375,3.439
+Steel,FokusH2_RN,RN–H₂,2035,2.85,1.998,3.213
+Steel,FokusH2_RN,RN–H₂,2040,2.755,1.942,3.29
+Steel,FokusH2_RN,RN–H₂,2045,96.575,83.558,110.618
+Steel,FokusStrom_RN,RN–Elec,2030,29.877,27.172,30.643
+Steel,FokusStrom_RN,RN–Elec,2035,40.028,36.579,45.0
+Steel,FokusStrom_RN,RN–Elec,2040,39.219,35.42,47.626
+Steel,FokusStrom_RN,RN–Elec,2045,98.422,85.127,112.811
+Steel,HoheNachfrage_RN,RN–HighDem,2030,41.068,37.811,41.962
+Steel,HoheNachfrage_RN,RN–HighDem,2035,40.028,36.579,45.0
+Steel,HoheNachfrage_RN,RN–HighDem,2040,39.219,35.42,47.626
+Steel,HoheNachfrage_RN,RN–HighDem,2045,98.422,85.127,112.811
+Steel,NachfrageNiedrig_RN,RN–LowDem,2030,29.877,27.172,30.643
+Steel,NachfrageNiedrig_RN,RN–LowDem,2035,84.184,79.8,90.24
+Steel,NachfrageNiedrig_RN,RN–LowDem,2040,82.04,74.537,92.737
+Steel,NachfrageNiedrig_RN,RN–LowDem,2045,98.422,85.127,112.811
+Steel,Technologiemix_RN,RN–Mix,2030,41.068,37.811,41.962
+Steel,Technologiemix_RN,RN–Mix,2035,40.028,36.579,45.0
+Steel,Technologiemix_RN,RN–Mix,2040,39.219,35.42,47.626
+Steel,Technologiemix_RN,RN–Mix,2045,98.422,85.127,112.811
+Steel,WCMean,Worst-case mean,2030,3.212,2.375,3.439
+Steel,WCMean,Worst-case mean,2035,2.85,1.998,3.213
+Steel,WCMean,Worst-case mean,2040,2.755,1.942,3.29
+Steel,WCMean,Worst-case mean,2045,96.575,83.558,110.618
+Steel,WCTail,Worst-case ES,2030,3.212,2.375,3.439
+Steel,WCTail,Worst-case ES,2035,2.85,1.998,3.213
+Steel,WCTail,Worst-case ES,2040,2.755,1.942,3.29
+Steel,WCTail,Worst-case ES,2045,96.575,83.558,110.618

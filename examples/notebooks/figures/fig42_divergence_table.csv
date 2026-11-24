@@ -1,0 +1,15 @@
+sector,year,case_a,case_b,delta_TWh,delta_peak_mean,delta_gini
+Steel,2030,RN–ExPol,RN–H₂,0.83,0.015,-0.065
+Steel,2035,RN–ExPol,RN–H₂,1.26,0.017,-0.111
+Steel,2040,RN–ExPol,RN–H₂,1.23,0.012,-0.095
+Steel,2045,RN–H₂,RN–Elec,1.85,-0.0,0.006
+Cement,2030,RN–ExPol,Worst-case ES,88.83,-0.098,-0.093
+Cement,2035,RN–H₂,Worst-case ES,0.16,-0.058,-0.111
+Cement,2040,RN–H₂,Worst-case ES,0.16,-0.059,-0.114
+Aviation,2035,RN–ExPol,RN–H₂,0.31,0.009,-0.046
+Aviation,2040,RN–ExPol,RN–H₂,0.16,0.0,-0.014
+Aviation,2045,RN–H₂,Worst-case mean,0.3,-0.002,0.003
+Maritime,2030,RN–ExPol,RN–Elec,0.18,0.016,-0.02
+Maritime,2035,RN–ExPol,RN–Mix,0.11,0.002,0.011
+Maritime,2040,RN–Elec,RN–Mix,0.14,0.002,0.017
+Maritime,2045,RN–Elec,RN–LowDem,0.1,0.0,0.012

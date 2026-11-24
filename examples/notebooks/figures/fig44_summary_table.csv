@@ -1,0 +1,9 @@
+case_label,up_TWh,wind_curtail_TWh,solar_curtail_TWh,avg_price_EUR_MWh,up_payment_EURm
+RN–ExPol,99.89,36.36,36.01,5.77,893.14
+RN–H₂,100.26,37.46,35.43,5.1,785.95
+RN–Elec,100.6,36.79,37.43,5.67,600.17
+RN–HighDem,101.94,36.0,37.62,8.49,1176.95
+RN–LowDem,101.73,35.55,37.56,9.17,1313.27
+RN–Mix,100.78,35.23,37.54,8.22,1182.78
+Worst-case mean,100.57,38.4,36.29,5.42,749.63
+Worst-case ES,100.58,37.9,35.78,4.37,698.74

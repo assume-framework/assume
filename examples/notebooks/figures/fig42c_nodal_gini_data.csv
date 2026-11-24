@@ -1,0 +1,577 @@
+sector,case,case_label,pathway,year,gini
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,aktuellepolitiken,2030,0.47
+Cement,AktuellePolitiken_RN,RN–ExPol,aktuellepolitiken,2030,0.396
+Steel,AktuellePolitiken_RN,RN–ExPol,aktuellepolitiken,2030,0.341
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,aktuellepolitiken,2035,0.548
+Cement,AktuellePolitiken_RN,RN–ExPol,aktuellepolitiken,2035,0.346
+Steel,AktuellePolitiken_RN,RN–ExPol,aktuellepolitiken,2035,0.341
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,aktuellepolitiken,2040,0.874
+Cement,AktuellePolitiken_RN,RN–ExPol,aktuellepolitiken,2040,0.346
+Steel,AktuellePolitiken_RN,RN–ExPol,aktuellepolitiken,2040,0.342
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,aktuellepolitiken,2045,0.669
+Cement,AktuellePolitiken_RN,RN–ExPol,aktuellepolitiken,2045,0.346
+Steel,AktuellePolitiken_RN,RN–ExPol,aktuellepolitiken,2045,0.399
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,fokusH2,2030,0.47
+Cement,AktuellePolitiken_RN,RN–ExPol,fokusH2,2030,0.389
+Steel,AktuellePolitiken_RN,RN–ExPol,fokusH2,2030,0.299
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,fokusH2,2035,0.61
+Cement,AktuellePolitiken_RN,RN–ExPol,fokusH2,2035,0.343
+Steel,AktuellePolitiken_RN,RN–ExPol,fokusH2,2035,0.306
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,fokusH2,2040,0.525
+Cement,AktuellePolitiken_RN,RN–ExPol,fokusH2,2040,0.344
+Steel,AktuellePolitiken_RN,RN–ExPol,fokusH2,2040,0.315
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,fokusH2,2045,0.61
+Cement,AktuellePolitiken_RN,RN–ExPol,fokusH2,2045,0.342
+Steel,AktuellePolitiken_RN,RN–ExPol,fokusH2,2045,0.381
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,fokusstrom,2030,0.47
+Cement,AktuellePolitiken_RN,RN–ExPol,fokusstrom,2030,0.389
+Steel,AktuellePolitiken_RN,RN–ExPol,fokusstrom,2030,0.299
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,fokusstrom,2035,0.595
+Cement,AktuellePolitiken_RN,RN–ExPol,fokusstrom,2035,0.342
+Steel,AktuellePolitiken_RN,RN–ExPol,fokusstrom,2035,0.299
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,fokusstrom,2040,0.639
+Cement,AktuellePolitiken_RN,RN–ExPol,fokusstrom,2040,0.342
+Steel,AktuellePolitiken_RN,RN–ExPol,fokusstrom,2040,0.299
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,fokusstrom,2045,0.611
+Cement,AktuellePolitiken_RN,RN–ExPol,fokusstrom,2045,0.342
+Steel,AktuellePolitiken_RN,RN–ExPol,fokusstrom,2045,0.382
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,hohenachfrage,2030,0.47
+Cement,AktuellePolitiken_RN,RN–ExPol,hohenachfrage,2030,0.389
+Steel,AktuellePolitiken_RN,RN–ExPol,hohenachfrage,2030,0.296
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,hohenachfrage,2035,0.617
+Cement,AktuellePolitiken_RN,RN–ExPol,hohenachfrage,2035,0.342
+Steel,AktuellePolitiken_RN,RN–ExPol,hohenachfrage,2035,0.281
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,hohenachfrage,2040,0.508
+Cement,AktuellePolitiken_RN,RN–ExPol,hohenachfrage,2040,0.342
+Steel,AktuellePolitiken_RN,RN–ExPol,hohenachfrage,2040,0.273
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,hohenachfrage,2045,0.545
+Cement,AktuellePolitiken_RN,RN–ExPol,hohenachfrage,2045,0.342
+Steel,AktuellePolitiken_RN,RN–ExPol,hohenachfrage,2045,0.384
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,niedrigenachfrage,2030,0.47
+Cement,AktuellePolitiken_RN,RN–ExPol,niedrigenachfrage,2030,0.389
+Steel,AktuellePolitiken_RN,RN–ExPol,niedrigenachfrage,2030,0.3
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,niedrigenachfrage,2035,0.637
+Cement,AktuellePolitiken_RN,RN–ExPol,niedrigenachfrage,2035,0.342
+Steel,AktuellePolitiken_RN,RN–ExPol,niedrigenachfrage,2035,0.299
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,niedrigenachfrage,2040,0.861
+Cement,AktuellePolitiken_RN,RN–ExPol,niedrigenachfrage,2040,0.342
+Steel,AktuellePolitiken_RN,RN–ExPol,niedrigenachfrage,2040,0.297
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,niedrigenachfrage,2045,0.6
+Cement,AktuellePolitiken_RN,RN–ExPol,niedrigenachfrage,2045,0.342
+Steel,AktuellePolitiken_RN,RN–ExPol,niedrigenachfrage,2045,0.385
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,technologiemix,2030,0.47
+Cement,AktuellePolitiken_RN,RN–ExPol,technologiemix,2030,0.389
+Steel,AktuellePolitiken_RN,RN–ExPol,technologiemix,2030,0.299
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,technologiemix,2035,0.647
+Cement,AktuellePolitiken_RN,RN–ExPol,technologiemix,2035,0.342
+Steel,AktuellePolitiken_RN,RN–ExPol,technologiemix,2035,0.299
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,technologiemix,2040,0.49
+Cement,AktuellePolitiken_RN,RN–ExPol,technologiemix,2040,0.342
+Steel,AktuellePolitiken_RN,RN–ExPol,technologiemix,2040,0.298
+Aviation + Maritime,AktuellePolitiken_RN,RN–ExPol,technologiemix,2045,0.61
+Cement,AktuellePolitiken_RN,RN–ExPol,technologiemix,2045,0.342
+Steel,AktuellePolitiken_RN,RN–ExPol,technologiemix,2045,0.381
+Aviation + Maritime,FokusH2_RN,RN–H₂,aktuellepolitiken,2030,0.49
+Cement,FokusH2_RN,RN–H₂,aktuellepolitiken,2030,0.355
+Steel,FokusH2_RN,RN–H₂,aktuellepolitiken,2030,0.466
+Aviation + Maritime,FokusH2_RN,RN–H₂,aktuellepolitiken,2035,0.652
+Cement,FokusH2_RN,RN–H₂,aktuellepolitiken,2035,0.349
+Steel,FokusH2_RN,RN–H₂,aktuellepolitiken,2035,0.538
+Aviation + Maritime,FokusH2_RN,RN–H₂,aktuellepolitiken,2040,0.888
+Cement,FokusH2_RN,RN–H₂,aktuellepolitiken,2040,0.34
+Steel,FokusH2_RN,RN–H₂,aktuellepolitiken,2040,0.538
+Aviation + Maritime,FokusH2_RN,RN–H₂,aktuellepolitiken,2045,0.698
+Cement,FokusH2_RN,RN–H₂,aktuellepolitiken,2045,0.346
+Steel,FokusH2_RN,RN–H₂,aktuellepolitiken,2045,0.439
+Aviation + Maritime,FokusH2_RN,RN–H₂,fokusH2,2030,0.49
+Cement,FokusH2_RN,RN–H₂,fokusH2,2030,0.687
+Steel,FokusH2_RN,RN–H₂,fokusH2,2030,0.408
+Aviation + Maritime,FokusH2_RN,RN–H₂,fokusH2,2035,0.619
+Cement,FokusH2_RN,RN–H₂,fokusH2,2035,0.336
+Steel,FokusH2_RN,RN–H₂,fokusH2,2035,0.483
+Aviation + Maritime,FokusH2_RN,RN–H₂,fokusH2,2040,0.511
+Cement,FokusH2_RN,RN–H₂,fokusH2,2040,0.328
+Steel,FokusH2_RN,RN–H₂,fokusH2,2040,0.497
+Aviation + Maritime,FokusH2_RN,RN–H₂,fokusH2,2045,0.66
+Cement,FokusH2_RN,RN–H₂,fokusH2,2045,0.342
+Steel,FokusH2_RN,RN–H₂,fokusH2,2045,0.427
+Aviation + Maritime,FokusH2_RN,RN–H₂,fokusstrom,2030,0.49
+Cement,FokusH2_RN,RN–H₂,fokusstrom,2030,0.687
+Steel,FokusH2_RN,RN–H₂,fokusstrom,2030,0.408
+Aviation + Maritime,FokusH2_RN,RN–H₂,fokusstrom,2035,0.656
+Cement,FokusH2_RN,RN–H₂,fokusstrom,2035,0.337
+Steel,FokusH2_RN,RN–H₂,fokusstrom,2035,0.472
+Aviation + Maritime,FokusH2_RN,RN–H₂,fokusstrom,2040,0.679
+Cement,FokusH2_RN,RN–H₂,fokusstrom,2040,0.333
+Steel,FokusH2_RN,RN–H₂,fokusstrom,2040,0.472
+Aviation + Maritime,FokusH2_RN,RN–H₂,fokusstrom,2045,0.659
+Cement,FokusH2_RN,RN–H₂,fokusstrom,2045,0.342
+Steel,FokusH2_RN,RN–H₂,fokusstrom,2045,0.427
+Aviation + Maritime,FokusH2_RN,RN–H₂,hohenachfrage,2030,0.49
+Cement,FokusH2_RN,RN–H₂,hohenachfrage,2030,0.687
+Steel,FokusH2_RN,RN–H₂,hohenachfrage,2030,0.398
+Aviation + Maritime,FokusH2_RN,RN–H₂,hohenachfrage,2035,0.683
+Cement,FokusH2_RN,RN–H₂,hohenachfrage,2035,0.333
+Steel,FokusH2_RN,RN–H₂,hohenachfrage,2035,0.449
+Aviation + Maritime,FokusH2_RN,RN–H₂,hohenachfrage,2040,0.566
+Cement,FokusH2_RN,RN–H₂,hohenachfrage,2040,0.338
+Steel,FokusH2_RN,RN–H₂,hohenachfrage,2040,0.438
+Aviation + Maritime,FokusH2_RN,RN–H₂,hohenachfrage,2045,0.63
+Cement,FokusH2_RN,RN–H₂,hohenachfrage,2045,0.342
+Steel,FokusH2_RN,RN–H₂,hohenachfrage,2045,0.388
+Aviation + Maritime,FokusH2_RN,RN–H₂,niedrigenachfrage,2030,0.49
+Cement,FokusH2_RN,RN–H₂,niedrigenachfrage,2030,0.686
+Steel,FokusH2_RN,RN–H₂,niedrigenachfrage,2030,0.409
+Aviation + Maritime,FokusH2_RN,RN–H₂,niedrigenachfrage,2035,0.672
+Cement,FokusH2_RN,RN–H₂,niedrigenachfrage,2035,0.337
+Steel,FokusH2_RN,RN–H₂,niedrigenachfrage,2035,0.471
+Aviation + Maritime,FokusH2_RN,RN–H₂,niedrigenachfrage,2040,0.839
+Cement,FokusH2_RN,RN–H₂,niedrigenachfrage,2040,0.338
+Steel,FokusH2_RN,RN–H₂,niedrigenachfrage,2040,0.467
+Aviation + Maritime,FokusH2_RN,RN–H₂,niedrigenachfrage,2045,0.631
+Cement,FokusH2_RN,RN–H₂,niedrigenachfrage,2045,0.342
+Steel,FokusH2_RN,RN–H₂,niedrigenachfrage,2045,0.429
+Aviation + Maritime,FokusH2_RN,RN–H₂,technologiemix,2030,0.49
+Cement,FokusH2_RN,RN–H₂,technologiemix,2030,0.687
+Steel,FokusH2_RN,RN–H₂,technologiemix,2030,0.408
+Aviation + Maritime,FokusH2_RN,RN–H₂,technologiemix,2035,0.647
+Cement,FokusH2_RN,RN–H₂,technologiemix,2035,0.337
+Steel,FokusH2_RN,RN–H₂,technologiemix,2035,0.472
+Aviation + Maritime,FokusH2_RN,RN–H₂,technologiemix,2040,0.499
+Cement,FokusH2_RN,RN–H₂,technologiemix,2040,0.334
+Steel,FokusH2_RN,RN–H₂,technologiemix,2040,0.47
+Aviation + Maritime,FokusH2_RN,RN–H₂,technologiemix,2045,0.607
+Cement,FokusH2_RN,RN–H₂,technologiemix,2045,0.342
+Steel,FokusH2_RN,RN–H₂,technologiemix,2045,0.427
+Aviation + Maritime,FokusStrom_RN,RN–Elec,aktuellepolitiken,2030,0.49
+Cement,FokusStrom_RN,RN–Elec,aktuellepolitiken,2030,0.396
+Steel,FokusStrom_RN,RN–Elec,aktuellepolitiken,2030,0.543
+Aviation + Maritime,FokusStrom_RN,RN–Elec,aktuellepolitiken,2035,0.569
+Cement,FokusStrom_RN,RN–Elec,aktuellepolitiken,2035,0.346
+Steel,FokusStrom_RN,RN–Elec,aktuellepolitiken,2035,0.451
+Aviation + Maritime,FokusStrom_RN,RN–Elec,aktuellepolitiken,2040,0.885
+Cement,FokusStrom_RN,RN–Elec,aktuellepolitiken,2040,0.346
+Steel,FokusStrom_RN,RN–Elec,aktuellepolitiken,2040,0.451
+Aviation + Maritime,FokusStrom_RN,RN–Elec,aktuellepolitiken,2045,0.694
+Cement,FokusStrom_RN,RN–Elec,aktuellepolitiken,2045,0.346
+Steel,FokusStrom_RN,RN–Elec,aktuellepolitiken,2045,0.428
+Aviation + Maritime,FokusStrom_RN,RN–Elec,fokusH2,2030,0.49
+Cement,FokusStrom_RN,RN–Elec,fokusH2,2030,0.389
+Steel,FokusStrom_RN,RN–Elec,fokusH2,2030,0.524
+Aviation + Maritime,FokusStrom_RN,RN–Elec,fokusH2,2035,0.605
+Cement,FokusStrom_RN,RN–Elec,fokusH2,2035,0.343
+Steel,FokusStrom_RN,RN–Elec,fokusH2,2035,0.435
+Aviation + Maritime,FokusStrom_RN,RN–Elec,fokusH2,2040,0.543
+Cement,FokusStrom_RN,RN–Elec,fokusH2,2040,0.344
+Steel,FokusStrom_RN,RN–Elec,fokusH2,2040,0.44
+Aviation + Maritime,FokusStrom_RN,RN–Elec,fokusH2,2045,0.659
+Cement,FokusStrom_RN,RN–Elec,fokusH2,2045,0.342
+Steel,FokusStrom_RN,RN–Elec,fokusH2,2045,0.416
+Aviation + Maritime,FokusStrom_RN,RN–Elec,fokusstrom,2030,0.49
+Cement,FokusStrom_RN,RN–Elec,fokusstrom,2030,0.389
+Steel,FokusStrom_RN,RN–Elec,fokusstrom,2030,0.524
+Aviation + Maritime,FokusStrom_RN,RN–Elec,fokusstrom,2035,0.578
+Cement,FokusStrom_RN,RN–Elec,fokusstrom,2035,0.342
+Steel,FokusStrom_RN,RN–Elec,fokusstrom,2035,0.431
+Aviation + Maritime,FokusStrom_RN,RN–Elec,fokusstrom,2040,0.641
+Cement,FokusStrom_RN,RN–Elec,fokusstrom,2040,0.342
+Steel,FokusStrom_RN,RN–Elec,fokusstrom,2040,0.431
+Aviation + Maritime,FokusStrom_RN,RN–Elec,fokusstrom,2045,0.635
+Cement,FokusStrom_RN,RN–Elec,fokusstrom,2045,0.342
+Steel,FokusStrom_RN,RN–Elec,fokusstrom,2045,0.417
+Aviation + Maritime,FokusStrom_RN,RN–Elec,hohenachfrage,2030,0.49
+Cement,FokusStrom_RN,RN–Elec,hohenachfrage,2030,0.389
+Steel,FokusStrom_RN,RN–Elec,hohenachfrage,2030,0.524
+Aviation + Maritime,FokusStrom_RN,RN–Elec,hohenachfrage,2035,0.599
+Cement,FokusStrom_RN,RN–Elec,hohenachfrage,2035,0.342
+Steel,FokusStrom_RN,RN–Elec,hohenachfrage,2035,0.437
+Aviation + Maritime,FokusStrom_RN,RN–Elec,hohenachfrage,2040,0.534
+Cement,FokusStrom_RN,RN–Elec,hohenachfrage,2040,0.342
+Steel,FokusStrom_RN,RN–Elec,hohenachfrage,2040,0.434
+Aviation + Maritime,FokusStrom_RN,RN–Elec,hohenachfrage,2045,0.581
+Cement,FokusStrom_RN,RN–Elec,hohenachfrage,2045,0.342
+Steel,FokusStrom_RN,RN–Elec,hohenachfrage,2045,0.377
+Aviation + Maritime,FokusStrom_RN,RN–Elec,niedrigenachfrage,2030,0.49
+Cement,FokusStrom_RN,RN–Elec,niedrigenachfrage,2030,0.389
+Steel,FokusStrom_RN,RN–Elec,niedrigenachfrage,2030,0.524
+Aviation + Maritime,FokusStrom_RN,RN–Elec,niedrigenachfrage,2035,0.607
+Cement,FokusStrom_RN,RN–Elec,niedrigenachfrage,2035,0.342
+Steel,FokusStrom_RN,RN–Elec,niedrigenachfrage,2035,0.43
+Aviation + Maritime,FokusStrom_RN,RN–Elec,niedrigenachfrage,2040,0.874
+Cement,FokusStrom_RN,RN–Elec,niedrigenachfrage,2040,0.342
+Steel,FokusStrom_RN,RN–Elec,niedrigenachfrage,2040,0.429
+Aviation + Maritime,FokusStrom_RN,RN–Elec,niedrigenachfrage,2045,0.673
+Cement,FokusStrom_RN,RN–Elec,niedrigenachfrage,2045,0.342
+Steel,FokusStrom_RN,RN–Elec,niedrigenachfrage,2045,0.418
+Aviation + Maritime,FokusStrom_RN,RN–Elec,technologiemix,2030,0.49
+Cement,FokusStrom_RN,RN–Elec,technologiemix,2030,0.389
+Steel,FokusStrom_RN,RN–Elec,technologiemix,2030,0.524
+Aviation + Maritime,FokusStrom_RN,RN–Elec,technologiemix,2035,0.628
+Cement,FokusStrom_RN,RN–Elec,technologiemix,2035,0.342
+Steel,FokusStrom_RN,RN–Elec,technologiemix,2035,0.431
+Aviation + Maritime,FokusStrom_RN,RN–Elec,technologiemix,2040,0.513
+Cement,FokusStrom_RN,RN–Elec,technologiemix,2040,0.342
+Steel,FokusStrom_RN,RN–Elec,technologiemix,2040,0.43
+Aviation + Maritime,FokusStrom_RN,RN–Elec,technologiemix,2045,0.636
+Cement,FokusStrom_RN,RN–Elec,technologiemix,2045,0.342
+Steel,FokusStrom_RN,RN–Elec,technologiemix,2045,0.416
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,aktuellepolitiken,2030,0.562
+Cement,HoheNachfrage_RN,RN–HighDem,aktuellepolitiken,2030,0.396
+Steel,HoheNachfrage_RN,RN–HighDem,aktuellepolitiken,2030,0.451
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,aktuellepolitiken,2035,0.565
+Cement,HoheNachfrage_RN,RN–HighDem,aktuellepolitiken,2035,0.346
+Steel,HoheNachfrage_RN,RN–HighDem,aktuellepolitiken,2035,0.451
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,aktuellepolitiken,2040,0.887
+Cement,HoheNachfrage_RN,RN–HighDem,aktuellepolitiken,2040,0.346
+Steel,HoheNachfrage_RN,RN–HighDem,aktuellepolitiken,2040,0.451
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,aktuellepolitiken,2045,0.706
+Cement,HoheNachfrage_RN,RN–HighDem,aktuellepolitiken,2045,0.346
+Steel,HoheNachfrage_RN,RN–HighDem,aktuellepolitiken,2045,0.428
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,fokusH2,2030,0.562
+Cement,HoheNachfrage_RN,RN–HighDem,fokusH2,2030,0.389
+Steel,HoheNachfrage_RN,RN–HighDem,fokusH2,2030,0.436
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,fokusH2,2035,0.618
+Cement,HoheNachfrage_RN,RN–HighDem,fokusH2,2035,0.343
+Steel,HoheNachfrage_RN,RN–HighDem,fokusH2,2035,0.435
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,fokusH2,2040,0.529
+Cement,HoheNachfrage_RN,RN–HighDem,fokusH2,2040,0.344
+Steel,HoheNachfrage_RN,RN–HighDem,fokusH2,2040,0.44
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,fokusH2,2045,0.626
+Cement,HoheNachfrage_RN,RN–HighDem,fokusH2,2045,0.342
+Steel,HoheNachfrage_RN,RN–HighDem,fokusH2,2045,0.416
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,fokusstrom,2030,0.562
+Cement,HoheNachfrage_RN,RN–HighDem,fokusstrom,2030,0.389
+Steel,HoheNachfrage_RN,RN–HighDem,fokusstrom,2030,0.436
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,fokusstrom,2035,0.593
+Cement,HoheNachfrage_RN,RN–HighDem,fokusstrom,2035,0.342
+Steel,HoheNachfrage_RN,RN–HighDem,fokusstrom,2035,0.431
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,fokusstrom,2040,0.637
+Cement,HoheNachfrage_RN,RN–HighDem,fokusstrom,2040,0.342
+Steel,HoheNachfrage_RN,RN–HighDem,fokusstrom,2040,0.431
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,fokusstrom,2045,0.687
+Cement,HoheNachfrage_RN,RN–HighDem,fokusstrom,2045,0.342
+Steel,HoheNachfrage_RN,RN–HighDem,fokusstrom,2045,0.417
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,hohenachfrage,2030,0.562
+Cement,HoheNachfrage_RN,RN–HighDem,hohenachfrage,2030,0.389
+Steel,HoheNachfrage_RN,RN–HighDem,hohenachfrage,2030,0.437
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,hohenachfrage,2035,0.61
+Cement,HoheNachfrage_RN,RN–HighDem,hohenachfrage,2035,0.342
+Steel,HoheNachfrage_RN,RN–HighDem,hohenachfrage,2035,0.437
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,hohenachfrage,2040,0.526
+Cement,HoheNachfrage_RN,RN–HighDem,hohenachfrage,2040,0.342
+Steel,HoheNachfrage_RN,RN–HighDem,hohenachfrage,2040,0.434
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,hohenachfrage,2045,0.598
+Cement,HoheNachfrage_RN,RN–HighDem,hohenachfrage,2045,0.342
+Steel,HoheNachfrage_RN,RN–HighDem,hohenachfrage,2045,0.377
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,niedrigenachfrage,2030,0.562
+Cement,HoheNachfrage_RN,RN–HighDem,niedrigenachfrage,2030,0.389
+Steel,HoheNachfrage_RN,RN–HighDem,niedrigenachfrage,2030,0.437
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,niedrigenachfrage,2035,0.634
+Cement,HoheNachfrage_RN,RN–HighDem,niedrigenachfrage,2035,0.342
+Steel,HoheNachfrage_RN,RN–HighDem,niedrigenachfrage,2035,0.43
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,niedrigenachfrage,2040,0.878
+Cement,HoheNachfrage_RN,RN–HighDem,niedrigenachfrage,2040,0.342
+Steel,HoheNachfrage_RN,RN–HighDem,niedrigenachfrage,2040,0.429
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,niedrigenachfrage,2045,0.582
+Cement,HoheNachfrage_RN,RN–HighDem,niedrigenachfrage,2045,0.342
+Steel,HoheNachfrage_RN,RN–HighDem,niedrigenachfrage,2045,0.418
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,technologiemix,2030,0.562
+Cement,HoheNachfrage_RN,RN–HighDem,technologiemix,2030,0.389
+Steel,HoheNachfrage_RN,RN–HighDem,technologiemix,2030,0.436
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,technologiemix,2035,0.642
+Cement,HoheNachfrage_RN,RN–HighDem,technologiemix,2035,0.342
+Steel,HoheNachfrage_RN,RN–HighDem,technologiemix,2035,0.431
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,technologiemix,2040,0.495
+Cement,HoheNachfrage_RN,RN–HighDem,technologiemix,2040,0.342
+Steel,HoheNachfrage_RN,RN–HighDem,technologiemix,2040,0.43
+Aviation + Maritime,HoheNachfrage_RN,RN–HighDem,technologiemix,2045,0.606
+Cement,HoheNachfrage_RN,RN–HighDem,technologiemix,2045,0.342
+Steel,HoheNachfrage_RN,RN–HighDem,technologiemix,2045,0.416
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,aktuellepolitiken,2030,0.493
+Cement,NachfrageNiedrig_RN,RN–LowDem,aktuellepolitiken,2030,0.396
+Steel,NachfrageNiedrig_RN,RN–LowDem,aktuellepolitiken,2030,0.543
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,aktuellepolitiken,2035,0.568
+Cement,NachfrageNiedrig_RN,RN–LowDem,aktuellepolitiken,2035,0.346
+Steel,NachfrageNiedrig_RN,RN–LowDem,aktuellepolitiken,2035,0.389
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,aktuellepolitiken,2040,0.886
+Cement,NachfrageNiedrig_RN,RN–LowDem,aktuellepolitiken,2040,0.346
+Steel,NachfrageNiedrig_RN,RN–LowDem,aktuellepolitiken,2040,0.389
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,aktuellepolitiken,2045,0.678
+Cement,NachfrageNiedrig_RN,RN–LowDem,aktuellepolitiken,2045,0.346
+Steel,NachfrageNiedrig_RN,RN–LowDem,aktuellepolitiken,2045,0.428
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,fokusH2,2030,0.493
+Cement,NachfrageNiedrig_RN,RN–LowDem,fokusH2,2030,0.389
+Steel,NachfrageNiedrig_RN,RN–LowDem,fokusH2,2030,0.524
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,fokusH2,2035,0.611
+Cement,NachfrageNiedrig_RN,RN–LowDem,fokusH2,2035,0.343
+Steel,NachfrageNiedrig_RN,RN–LowDem,fokusH2,2035,0.38
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,fokusH2,2040,0.514
+Cement,NachfrageNiedrig_RN,RN–LowDem,fokusH2,2040,0.344
+Steel,NachfrageNiedrig_RN,RN–LowDem,fokusH2,2040,0.383
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,fokusH2,2045,0.661
+Cement,NachfrageNiedrig_RN,RN–LowDem,fokusH2,2045,0.342
+Steel,NachfrageNiedrig_RN,RN–LowDem,fokusH2,2045,0.416
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,fokusstrom,2030,0.493
+Cement,NachfrageNiedrig_RN,RN–LowDem,fokusstrom,2030,0.389
+Steel,NachfrageNiedrig_RN,RN–LowDem,fokusstrom,2030,0.524
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,fokusstrom,2035,0.583
+Cement,NachfrageNiedrig_RN,RN–LowDem,fokusstrom,2035,0.342
+Steel,NachfrageNiedrig_RN,RN–LowDem,fokusstrom,2035,0.378
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,fokusstrom,2040,0.622
+Cement,NachfrageNiedrig_RN,RN–LowDem,fokusstrom,2040,0.342
+Steel,NachfrageNiedrig_RN,RN–LowDem,fokusstrom,2040,0.378
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,fokusstrom,2045,0.626
+Cement,NachfrageNiedrig_RN,RN–LowDem,fokusstrom,2045,0.342
+Steel,NachfrageNiedrig_RN,RN–LowDem,fokusstrom,2045,0.417
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,hohenachfrage,2030,0.493
+Cement,NachfrageNiedrig_RN,RN–LowDem,hohenachfrage,2030,0.389
+Steel,NachfrageNiedrig_RN,RN–LowDem,hohenachfrage,2030,0.524
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,hohenachfrage,2035,0.604
+Cement,NachfrageNiedrig_RN,RN–LowDem,hohenachfrage,2035,0.342
+Steel,NachfrageNiedrig_RN,RN–LowDem,hohenachfrage,2035,0.356
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,hohenachfrage,2040,0.513
+Cement,NachfrageNiedrig_RN,RN–LowDem,hohenachfrage,2040,0.342
+Steel,NachfrageNiedrig_RN,RN–LowDem,hohenachfrage,2040,0.34
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,hohenachfrage,2045,0.553
+Cement,NachfrageNiedrig_RN,RN–LowDem,hohenachfrage,2045,0.342
+Steel,NachfrageNiedrig_RN,RN–LowDem,hohenachfrage,2045,0.377
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,niedrigenachfrage,2030,0.493
+Cement,NachfrageNiedrig_RN,RN–LowDem,niedrigenachfrage,2030,0.389
+Steel,NachfrageNiedrig_RN,RN–LowDem,niedrigenachfrage,2030,0.524
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,niedrigenachfrage,2035,0.601
+Cement,NachfrageNiedrig_RN,RN–LowDem,niedrigenachfrage,2035,0.342
+Steel,NachfrageNiedrig_RN,RN–LowDem,niedrigenachfrage,2035,0.378
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,niedrigenachfrage,2040,0.873
+Cement,NachfrageNiedrig_RN,RN–LowDem,niedrigenachfrage,2040,0.342
+Steel,NachfrageNiedrig_RN,RN–LowDem,niedrigenachfrage,2040,0.377
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,niedrigenachfrage,2045,0.66
+Cement,NachfrageNiedrig_RN,RN–LowDem,niedrigenachfrage,2045,0.342
+Steel,NachfrageNiedrig_RN,RN–LowDem,niedrigenachfrage,2045,0.418
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,technologiemix,2030,0.493
+Cement,NachfrageNiedrig_RN,RN–LowDem,technologiemix,2030,0.389
+Steel,NachfrageNiedrig_RN,RN–LowDem,technologiemix,2030,0.524
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,technologiemix,2035,0.629
+Cement,NachfrageNiedrig_RN,RN–LowDem,technologiemix,2035,0.342
+Steel,NachfrageNiedrig_RN,RN–LowDem,technologiemix,2035,0.378
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,technologiemix,2040,0.477
+Cement,NachfrageNiedrig_RN,RN–LowDem,technologiemix,2040,0.342
+Steel,NachfrageNiedrig_RN,RN–LowDem,technologiemix,2040,0.378
+Aviation + Maritime,NachfrageNiedrig_RN,RN–LowDem,technologiemix,2045,0.624
+Cement,NachfrageNiedrig_RN,RN–LowDem,technologiemix,2045,0.342
+Steel,NachfrageNiedrig_RN,RN–LowDem,technologiemix,2045,0.416
+Aviation + Maritime,Technologiemix_RN,RN–Mix,aktuellepolitiken,2030,0.489
+Cement,Technologiemix_RN,RN–Mix,aktuellepolitiken,2030,0.396
+Steel,Technologiemix_RN,RN–Mix,aktuellepolitiken,2030,0.451
+Aviation + Maritime,Technologiemix_RN,RN–Mix,aktuellepolitiken,2035,0.571
+Cement,Technologiemix_RN,RN–Mix,aktuellepolitiken,2035,0.346
+Steel,Technologiemix_RN,RN–Mix,aktuellepolitiken,2035,0.451
+Aviation + Maritime,Technologiemix_RN,RN–Mix,aktuellepolitiken,2040,0.887
+Cement,Technologiemix_RN,RN–Mix,aktuellepolitiken,2040,0.346
+Steel,Technologiemix_RN,RN–Mix,aktuellepolitiken,2040,0.451
+Aviation + Maritime,Technologiemix_RN,RN–Mix,aktuellepolitiken,2045,0.676
+Cement,Technologiemix_RN,RN–Mix,aktuellepolitiken,2045,0.346
+Steel,Technologiemix_RN,RN–Mix,aktuellepolitiken,2045,0.428
+Aviation + Maritime,Technologiemix_RN,RN–Mix,fokusH2,2030,0.489
+Cement,Technologiemix_RN,RN–Mix,fokusH2,2030,0.389
+Steel,Technologiemix_RN,RN–Mix,fokusH2,2030,0.436
+Aviation + Maritime,Technologiemix_RN,RN–Mix,fokusH2,2035,0.604
+Cement,Technologiemix_RN,RN–Mix,fokusH2,2035,0.343
+Steel,Technologiemix_RN,RN–Mix,fokusH2,2035,0.435
+Aviation + Maritime,Technologiemix_RN,RN–Mix,fokusH2,2040,0.515
+Cement,Technologiemix_RN,RN–Mix,fokusH2,2040,0.344
+Steel,Technologiemix_RN,RN–Mix,fokusH2,2040,0.44
+Aviation + Maritime,Technologiemix_RN,RN–Mix,fokusH2,2045,0.645
+Cement,Technologiemix_RN,RN–Mix,fokusH2,2045,0.342
+Steel,Technologiemix_RN,RN–Mix,fokusH2,2045,0.416
+Aviation + Maritime,Technologiemix_RN,RN–Mix,fokusstrom,2030,0.489
+Cement,Technologiemix_RN,RN–Mix,fokusstrom,2030,0.389
+Steel,Technologiemix_RN,RN–Mix,fokusstrom,2030,0.436
+Aviation + Maritime,Technologiemix_RN,RN–Mix,fokusstrom,2035,0.575
+Cement,Technologiemix_RN,RN–Mix,fokusstrom,2035,0.342
+Steel,Technologiemix_RN,RN–Mix,fokusstrom,2035,0.431
+Aviation + Maritime,Technologiemix_RN,RN–Mix,fokusstrom,2040,0.628
+Cement,Technologiemix_RN,RN–Mix,fokusstrom,2040,0.342
+Steel,Technologiemix_RN,RN–Mix,fokusstrom,2040,0.431
+Aviation + Maritime,Technologiemix_RN,RN–Mix,fokusstrom,2045,0.599
+Cement,Technologiemix_RN,RN–Mix,fokusstrom,2045,0.342
+Steel,Technologiemix_RN,RN–Mix,fokusstrom,2045,0.417
+Aviation + Maritime,Technologiemix_RN,RN–Mix,hohenachfrage,2030,0.489
+Cement,Technologiemix_RN,RN–Mix,hohenachfrage,2030,0.389
+Steel,Technologiemix_RN,RN–Mix,hohenachfrage,2030,0.437
+Aviation + Maritime,Technologiemix_RN,RN–Mix,hohenachfrage,2035,0.597
+Cement,Technologiemix_RN,RN–Mix,hohenachfrage,2035,0.342
+Steel,Technologiemix_RN,RN–Mix,hohenachfrage,2035,0.437
+Aviation + Maritime,Technologiemix_RN,RN–Mix,hohenachfrage,2040,0.505
+Cement,Technologiemix_RN,RN–Mix,hohenachfrage,2040,0.342
+Steel,Technologiemix_RN,RN–Mix,hohenachfrage,2040,0.434
+Aviation + Maritime,Technologiemix_RN,RN–Mix,hohenachfrage,2045,0.53
+Cement,Technologiemix_RN,RN–Mix,hohenachfrage,2045,0.342
+Steel,Technologiemix_RN,RN–Mix,hohenachfrage,2045,0.377
+Aviation + Maritime,Technologiemix_RN,RN–Mix,niedrigenachfrage,2030,0.489
+Cement,Technologiemix_RN,RN–Mix,niedrigenachfrage,2030,0.389
+Steel,Technologiemix_RN,RN–Mix,niedrigenachfrage,2030,0.437
+Aviation + Maritime,Technologiemix_RN,RN–Mix,niedrigenachfrage,2035,0.61
+Cement,Technologiemix_RN,RN–Mix,niedrigenachfrage,2035,0.342
+Steel,Technologiemix_RN,RN–Mix,niedrigenachfrage,2035,0.43
+Aviation + Maritime,Technologiemix_RN,RN–Mix,niedrigenachfrage,2040,0.872
+Cement,Technologiemix_RN,RN–Mix,niedrigenachfrage,2040,0.342
+Steel,Technologiemix_RN,RN–Mix,niedrigenachfrage,2040,0.429
+Aviation + Maritime,Technologiemix_RN,RN–Mix,niedrigenachfrage,2045,0.634
+Cement,Technologiemix_RN,RN–Mix,niedrigenachfrage,2045,0.342
+Steel,Technologiemix_RN,RN–Mix,niedrigenachfrage,2045,0.418
+Aviation + Maritime,Technologiemix_RN,RN–Mix,technologiemix,2030,0.489
+Cement,Technologiemix_RN,RN–Mix,technologiemix,2030,0.389
+Steel,Technologiemix_RN,RN–Mix,technologiemix,2030,0.436
+Aviation + Maritime,Technologiemix_RN,RN–Mix,technologiemix,2035,0.629
+Cement,Technologiemix_RN,RN–Mix,technologiemix,2035,0.342
+Steel,Technologiemix_RN,RN–Mix,technologiemix,2035,0.431
+Aviation + Maritime,Technologiemix_RN,RN–Mix,technologiemix,2040,0.477
+Cement,Technologiemix_RN,RN–Mix,technologiemix,2040,0.342
+Steel,Technologiemix_RN,RN–Mix,technologiemix,2040,0.43
+Aviation + Maritime,Technologiemix_RN,RN–Mix,technologiemix,2045,0.566
+Cement,Technologiemix_RN,RN–Mix,technologiemix,2045,0.342
+Steel,Technologiemix_RN,RN–Mix,technologiemix,2045,0.416
+Aviation + Maritime,WCMean,Worst-case mean,aktuellepolitiken,2030,0.402
+Cement,WCMean,Worst-case mean,aktuellepolitiken,2030,0.355
+Steel,WCMean,Worst-case mean,aktuellepolitiken,2030,0.466
+Aviation + Maritime,WCMean,Worst-case mean,aktuellepolitiken,2035,0.633
+Cement,WCMean,Worst-case mean,aktuellepolitiken,2035,0.349
+Steel,WCMean,Worst-case mean,aktuellepolitiken,2035,0.538
+Aviation + Maritime,WCMean,Worst-case mean,aktuellepolitiken,2040,0.888
+Cement,WCMean,Worst-case mean,aktuellepolitiken,2040,0.34
+Steel,WCMean,Worst-case mean,aktuellepolitiken,2040,0.538
+Aviation + Maritime,WCMean,Worst-case mean,aktuellepolitiken,2045,0.688
+Cement,WCMean,Worst-case mean,aktuellepolitiken,2045,0.346
+Steel,WCMean,Worst-case mean,aktuellepolitiken,2045,0.439
+Aviation + Maritime,WCMean,Worst-case mean,fokusH2,2030,0.402
+Cement,WCMean,Worst-case mean,fokusH2,2030,0.687
+Steel,WCMean,Worst-case mean,fokusH2,2030,0.408
+Aviation + Maritime,WCMean,Worst-case mean,fokusH2,2035,0.612
+Cement,WCMean,Worst-case mean,fokusH2,2035,0.336
+Steel,WCMean,Worst-case mean,fokusH2,2035,0.483
+Aviation + Maritime,WCMean,Worst-case mean,fokusH2,2040,0.537
+Cement,WCMean,Worst-case mean,fokusH2,2040,0.328
+Steel,WCMean,Worst-case mean,fokusH2,2040,0.497
+Aviation + Maritime,WCMean,Worst-case mean,fokusH2,2045,0.652
+Cement,WCMean,Worst-case mean,fokusH2,2045,0.342
+Steel,WCMean,Worst-case mean,fokusH2,2045,0.427
+Aviation + Maritime,WCMean,Worst-case mean,fokusstrom,2030,0.402
+Cement,WCMean,Worst-case mean,fokusstrom,2030,0.687
+Steel,WCMean,Worst-case mean,fokusstrom,2030,0.408
+Aviation + Maritime,WCMean,Worst-case mean,fokusstrom,2035,0.698
+Cement,WCMean,Worst-case mean,fokusstrom,2035,0.337
+Steel,WCMean,Worst-case mean,fokusstrom,2035,0.472
+Aviation + Maritime,WCMean,Worst-case mean,fokusstrom,2040,0.695
+Cement,WCMean,Worst-case mean,fokusstrom,2040,0.333
+Steel,WCMean,Worst-case mean,fokusstrom,2040,0.472
+Aviation + Maritime,WCMean,Worst-case mean,fokusstrom,2045,0.667
+Cement,WCMean,Worst-case mean,fokusstrom,2045,0.342
+Steel,WCMean,Worst-case mean,fokusstrom,2045,0.427
+Aviation + Maritime,WCMean,Worst-case mean,hohenachfrage,2030,0.402
+Cement,WCMean,Worst-case mean,hohenachfrage,2030,0.687
+Steel,WCMean,Worst-case mean,hohenachfrage,2030,0.398
+Aviation + Maritime,WCMean,Worst-case mean,hohenachfrage,2035,0.673
+Cement,WCMean,Worst-case mean,hohenachfrage,2035,0.333
+Steel,WCMean,Worst-case mean,hohenachfrage,2035,0.449
+Aviation + Maritime,WCMean,Worst-case mean,hohenachfrage,2040,0.551
+Cement,WCMean,Worst-case mean,hohenachfrage,2040,0.338
+Steel,WCMean,Worst-case mean,hohenachfrage,2040,0.438
+Aviation + Maritime,WCMean,Worst-case mean,hohenachfrage,2045,0.618
+Cement,WCMean,Worst-case mean,hohenachfrage,2045,0.342
+Steel,WCMean,Worst-case mean,hohenachfrage,2045,0.388
+Aviation + Maritime,WCMean,Worst-case mean,niedrigenachfrage,2030,0.402
+Cement,WCMean,Worst-case mean,niedrigenachfrage,2030,0.686
+Steel,WCMean,Worst-case mean,niedrigenachfrage,2030,0.409
+Aviation + Maritime,WCMean,Worst-case mean,niedrigenachfrage,2035,0.678
+Cement,WCMean,Worst-case mean,niedrigenachfrage,2035,0.337
+Steel,WCMean,Worst-case mean,niedrigenachfrage,2035,0.471
+Aviation + Maritime,WCMean,Worst-case mean,niedrigenachfrage,2040,0.839
+Cement,WCMean,Worst-case mean,niedrigenachfrage,2040,0.338
+Steel,WCMean,Worst-case mean,niedrigenachfrage,2040,0.467
+Aviation + Maritime,WCMean,Worst-case mean,niedrigenachfrage,2045,0.625
+Cement,WCMean,Worst-case mean,niedrigenachfrage,2045,0.342
+Steel,WCMean,Worst-case mean,niedrigenachfrage,2045,0.429
+Aviation + Maritime,WCMean,Worst-case mean,technologiemix,2030,0.402
+Cement,WCMean,Worst-case mean,technologiemix,2030,0.687
+Steel,WCMean,Worst-case mean,technologiemix,2030,0.408
+Aviation + Maritime,WCMean,Worst-case mean,technologiemix,2035,0.638
+Cement,WCMean,Worst-case mean,technologiemix,2035,0.337
+Steel,WCMean,Worst-case mean,technologiemix,2035,0.472
+Aviation + Maritime,WCMean,Worst-case mean,technologiemix,2040,0.51
+Cement,WCMean,Worst-case mean,technologiemix,2040,0.334
+Steel,WCMean,Worst-case mean,technologiemix,2040,0.47
+Aviation + Maritime,WCMean,Worst-case mean,technologiemix,2045,0.614
+Cement,WCMean,Worst-case mean,technologiemix,2045,0.342
+Steel,WCMean,Worst-case mean,technologiemix,2045,0.427
+Aviation + Maritime,WCTail,Worst-case ES,aktuellepolitiken,2030,0.402
+Cement,WCTail,Worst-case ES,aktuellepolitiken,2030,0.355
+Steel,WCTail,Worst-case ES,aktuellepolitiken,2030,0.466
+Aviation + Maritime,WCTail,Worst-case ES,aktuellepolitiken,2035,0.633
+Cement,WCTail,Worst-case ES,aktuellepolitiken,2035,0.349
+Steel,WCTail,Worst-case ES,aktuellepolitiken,2035,0.538
+Aviation + Maritime,WCTail,Worst-case ES,aktuellepolitiken,2040,0.888
+Cement,WCTail,Worst-case ES,aktuellepolitiken,2040,0.34
+Steel,WCTail,Worst-case ES,aktuellepolitiken,2040,0.538
+Aviation + Maritime,WCTail,Worst-case ES,aktuellepolitiken,2045,0.688
+Cement,WCTail,Worst-case ES,aktuellepolitiken,2045,0.346
+Steel,WCTail,Worst-case ES,aktuellepolitiken,2045,0.439
+Aviation + Maritime,WCTail,Worst-case ES,fokusH2,2030,0.402
+Cement,WCTail,Worst-case ES,fokusH2,2030,0.701
+Steel,WCTail,Worst-case ES,fokusH2,2030,0.408
+Aviation + Maritime,WCTail,Worst-case ES,fokusH2,2035,0.612
+Cement,WCTail,Worst-case ES,fokusH2,2035,0.59
+Steel,WCTail,Worst-case ES,fokusH2,2035,0.483
+Aviation + Maritime,WCTail,Worst-case ES,fokusH2,2040,0.537
+Cement,WCTail,Worst-case ES,fokusH2,2040,0.565
+Steel,WCTail,Worst-case ES,fokusH2,2040,0.497
+Aviation + Maritime,WCTail,Worst-case ES,fokusH2,2045,0.652
+Cement,WCTail,Worst-case ES,fokusH2,2045,0.342
+Steel,WCTail,Worst-case ES,fokusH2,2045,0.427
+Aviation + Maritime,WCTail,Worst-case ES,fokusstrom,2030,0.402
+Cement,WCTail,Worst-case ES,fokusstrom,2030,0.7
+Steel,WCTail,Worst-case ES,fokusstrom,2030,0.408
+Aviation + Maritime,WCTail,Worst-case ES,fokusstrom,2035,0.698
+Cement,WCTail,Worst-case ES,fokusstrom,2035,0.606
+Steel,WCTail,Worst-case ES,fokusstrom,2035,0.472
+Aviation + Maritime,WCTail,Worst-case ES,fokusstrom,2040,0.695
+Cement,WCTail,Worst-case ES,fokusstrom,2040,0.606
+Steel,WCTail,Worst-case ES,fokusstrom,2040,0.472
+Aviation + Maritime,WCTail,Worst-case ES,fokusstrom,2045,0.667
+Cement,WCTail,Worst-case ES,fokusstrom,2045,0.342
+Steel,WCTail,Worst-case ES,fokusstrom,2045,0.427
+Aviation + Maritime,WCTail,Worst-case ES,hohenachfrage,2030,0.402
+Cement,WCTail,Worst-case ES,hohenachfrage,2030,0.701
+Steel,WCTail,Worst-case ES,hohenachfrage,2030,0.398
+Aviation + Maritime,WCTail,Worst-case ES,hohenachfrage,2035,0.673
+Cement,WCTail,Worst-case ES,hohenachfrage,2035,0.607
+Steel,WCTail,Worst-case ES,hohenachfrage,2035,0.449
+Aviation + Maritime,WCTail,Worst-case ES,hohenachfrage,2040,0.551
+Cement,WCTail,Worst-case ES,hohenachfrage,2040,0.613
+Steel,WCTail,Worst-case ES,hohenachfrage,2040,0.438
+Aviation + Maritime,WCTail,Worst-case ES,hohenachfrage,2045,0.618
+Cement,WCTail,Worst-case ES,hohenachfrage,2045,0.342
+Steel,WCTail,Worst-case ES,hohenachfrage,2045,0.388
+Aviation + Maritime,WCTail,Worst-case ES,niedrigenachfrage,2030,0.402
+Cement,WCTail,Worst-case ES,niedrigenachfrage,2030,0.7
+Steel,WCTail,Worst-case ES,niedrigenachfrage,2030,0.409
+Aviation + Maritime,WCTail,Worst-case ES,niedrigenachfrage,2035,0.678
+Cement,WCTail,Worst-case ES,niedrigenachfrage,2035,0.605
+Steel,WCTail,Worst-case ES,niedrigenachfrage,2035,0.471
+Aviation + Maritime,WCTail,Worst-case ES,niedrigenachfrage,2040,0.839
+Cement,WCTail,Worst-case ES,niedrigenachfrage,2040,0.61
+Steel,WCTail,Worst-case ES,niedrigenachfrage,2040,0.467
+Aviation + Maritime,WCTail,Worst-case ES,niedrigenachfrage,2045,0.625
+Cement,WCTail,Worst-case ES,niedrigenachfrage,2045,0.342
+Steel,WCTail,Worst-case ES,niedrigenachfrage,2045,0.429
+Aviation + Maritime,WCTail,Worst-case ES,technologiemix,2030,0.402
+Cement,WCTail,Worst-case ES,technologiemix,2030,0.701
+Steel,WCTail,Worst-case ES,technologiemix,2030,0.408
+Aviation + Maritime,WCTail,Worst-case ES,technologiemix,2035,0.638
+Cement,WCTail,Worst-case ES,technologiemix,2035,0.606
+Steel,WCTail,Worst-case ES,technologiemix,2035,0.472
+Aviation + Maritime,WCTail,Worst-case ES,technologiemix,2040,0.51
+Cement,WCTail,Worst-case ES,technologiemix,2040,0.609
+Steel,WCTail,Worst-case ES,technologiemix,2040,0.47
+Aviation + Maritime,WCTail,Worst-case ES,technologiemix,2045,0.614
+Cement,WCTail,Worst-case ES,technologiemix,2045,0.342
+Steel,WCTail,Worst-case ES,technologiemix,2045,0.427

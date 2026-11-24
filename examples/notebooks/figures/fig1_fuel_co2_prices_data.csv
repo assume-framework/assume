@@ -1,0 +1,163 @@
+pathway,year,carrier,mean,p05,p95,min,max,hours,pathway_folder
+ExPol,2030,co2,-0.01,-0.01,-0.01,-0.01,-0.01,8760,aktuellepolitiken
+ExPol,2030,natural gas,24.01,24.01,24.01,24.01,24.01,8760,aktuellepolitiken
+ExPol,2030,hard coal,6.22,6.22,6.22,6.22,6.22,8760,aktuellepolitiken
+ExPol,2030,lignite,3.31,3.31,3.31,3.31,3.31,8760,aktuellepolitiken
+ExPol,2030,oil,65.66,65.66,65.66,65.66,65.66,8760,aktuellepolitiken
+ExPol,2030,biomass,71.04,71.04,71.04,71.04,71.04,8760,aktuellepolitiken
+ExPol,2030,hydrogen,57.9,56.78,58.84,56.58,161.88,8760,aktuellepolitiken
+ExPol,2035,co2,-0.01,-0.01,-0.01,-0.01,-0.01,8760,aktuellepolitiken
+ExPol,2035,natural gas,23.85,23.85,23.85,23.85,23.85,8760,aktuellepolitiken
+ExPol,2035,hard coal,6.27,6.27,6.27,6.27,6.27,8760,aktuellepolitiken
+ExPol,2035,lignite,3.31,3.31,3.31,3.31,3.31,8760,aktuellepolitiken
+ExPol,2035,oil,56.91,56.91,56.91,56.91,56.91,8760,aktuellepolitiken
+ExPol,2035,biomass,76.37,76.37,76.37,76.37,76.37,8760,aktuellepolitiken
+ExPol,2035,hydrogen,41.83,38.59,47.99,38.42,383.42,8760,aktuellepolitiken
+ExPol,2040,co2,-0.01,-0.01,-0.01,-0.01,-0.01,8760,aktuellepolitiken
+ExPol,2040,natural gas,23.67,23.67,23.67,23.67,23.67,8760,aktuellepolitiken
+ExPol,2040,hard coal,6.31,6.31,6.31,6.31,6.31,8760,aktuellepolitiken
+ExPol,2040,lignite,3.31,3.31,3.31,3.31,3.31,8760,aktuellepolitiken
+ExPol,2040,oil,43.96,43.96,43.96,43.96,43.96,8760,aktuellepolitiken
+ExPol,2040,biomass,53.43,53.43,53.43,53.43,53.43,8760,aktuellepolitiken
+ExPol,2040,hydrogen,41.72,34.64,57.19,34.58,719.34,8760,aktuellepolitiken
+ExPol,2045,co2,-0.01,-0.01,-0.01,-0.01,-0.01,8760,aktuellepolitiken
+ExPol,2045,natural gas,23.9,23.9,23.9,23.9,23.9,8760,aktuellepolitiken
+ExPol,2045,hard coal,6.36,6.36,6.36,6.36,6.36,8760,aktuellepolitiken
+ExPol,2045,oil,44.59,44.59,44.59,44.59,44.59,8760,aktuellepolitiken
+ExPol,2045,biomass,42.03,42.03,42.03,42.03,42.03,8760,aktuellepolitiken
+ExPol,2045,hydrogen,41.97,36.23,56.97,36.13,142.85,8760,aktuellepolitiken
+H₂,2030,co2,169.65,169.65,169.65,169.65,169.65,8760,fokusH2
+H₂,2030,natural gas,24.65,24.65,24.65,24.65,24.65,8760,fokusH2
+H₂,2030,hard coal,6.22,6.22,6.22,6.22,6.22,8760,fokusH2
+H₂,2030,lignite,3.28,3.27,3.31,3.27,3.31,8760,fokusH2
+H₂,2030,oil,86.86,86.86,86.86,86.86,86.86,8760,fokusH2
+H₂,2030,biomass,76.63,76.63,76.63,76.63,76.63,8760,fokusH2
+H₂,2030,hydrogen,86.6,81.96,88.94,79.23,691.31,8760,fokusH2
+H₂,2035,co2,454.61,453.62,456.32,453.14,456.43,8760,fokusH2
+H₂,2035,natural gas,27.48,27.48,27.48,27.48,27.48,8760,fokusH2
+H₂,2035,hard coal,6.27,6.27,6.27,6.27,6.27,8760,fokusH2
+H₂,2035,lignite,3.27,3.26,3.3,3.26,3.31,8760,fokusH2
+H₂,2035,oil,176.21,176.21,176.21,176.21,176.21,8760,fokusH2
+H₂,2035,biomass,104.33,104.33,104.33,104.33,104.33,8760,fokusH2
+H₂,2035,hydrogen,115.49,103.23,142.93,103.14,165.87,8760,fokusH2
+H₂,2040,co2,441.89,440.77,443.07,440.58,443.07,8760,fokusH2
+H₂,2040,natural gas,28.06,28.06,28.06,28.06,28.06,8760,fokusH2
+H₂,2040,hard coal,6.31,6.31,6.31,6.31,6.31,8760,fokusH2
+H₂,2040,lignite,3.25,3.24,3.27,3.24,3.31,8760,fokusH2
+H₂,2040,oil,188.11,188.11,188.11,188.11,188.11,8760,fokusH2
+H₂,2040,biomass,107.56,107.56,107.56,107.56,107.56,8760,fokusH2
+H₂,2040,hydrogen,112.17,105.33,139.23,101.82,348.03,8760,fokusH2
+H₂,2045,co2,366.16,366.16,366.16,366.16,366.16,8760,fokusH2
+H₂,2045,natural gas,26.79,26.79,26.79,26.79,26.79,8760,fokusH2
+H₂,2045,hard coal,6.36,6.36,6.36,6.36,6.36,8760,fokusH2
+H₂,2045,oil,139.32,139.32,139.32,139.32,139.32,8760,fokusH2
+H₂,2045,biomass,82.26,82.26,82.26,82.26,82.26,8760,fokusH2
+H₂,2045,hydrogen,91.57,85.78,123.02,85.65,368.12,8760,fokusH2
+Elec,2030,co2,165.47,165.47,165.47,165.47,165.47,8760,fokusstrom
+Elec,2030,natural gas,24.61,24.61,24.61,24.61,24.61,8760,fokusstrom
+Elec,2030,hard coal,6.21,6.21,6.21,6.21,6.21,8760,fokusstrom
+Elec,2030,lignite,3.28,3.27,3.31,3.27,3.31,8760,fokusstrom
+Elec,2030,oil,85.73,85.73,85.73,85.73,85.73,8760,fokusstrom
+Elec,2030,biomass,76.71,76.71,76.71,76.71,76.71,8760,fokusstrom
+Elec,2030,hydrogen,85.37,82.23,87.62,80.63,139.38,8760,fokusstrom
+Elec,2035,co2,493.26,493.26,493.26,493.26,493.26,8760,fokusstrom
+Elec,2035,natural gas,27.42,27.42,27.42,27.42,27.42,8760,fokusstrom
+Elec,2035,hard coal,6.27,6.27,6.27,6.27,6.27,8760,fokusstrom
+Elec,2035,lignite,3.27,3.26,3.29,3.26,3.31,8760,fokusstrom
+Elec,2035,oil,174.22,174.22,174.22,174.22,174.22,8760,fokusstrom
+Elec,2035,biomass,104.51,104.51,104.51,104.51,104.51,8760,fokusstrom
+Elec,2035,hydrogen,113.57,101.56,140.91,99.58,171.32,8760,fokusstrom
+Elec,2040,co2,530.68,530.68,530.68,530.68,530.68,8760,fokusstrom
+Elec,2040,natural gas,27.94,27.94,27.94,27.94,27.94,8760,fokusstrom
+Elec,2040,hard coal,6.31,6.31,6.31,6.31,6.31,8760,fokusstrom
+Elec,2040,lignite,3.26,3.25,3.28,3.25,3.31,8760,fokusstrom
+Elec,2040,oil,184.13,184.13,184.13,184.13,184.13,8760,fokusstrom
+Elec,2040,biomass,105.14,105.14,105.14,105.14,105.14,8760,fokusstrom
+Elec,2040,hydrogen,110.04,102.49,124.15,97.92,418.79,8760,fokusstrom
+Elec,2045,co2,386.36,386.36,386.36,386.36,386.36,8760,fokusstrom
+Elec,2045,natural gas,27.01,27.01,27.01,27.01,27.01,8760,fokusstrom
+Elec,2045,hard coal,6.36,6.36,6.36,6.36,6.36,8760,fokusstrom
+Elec,2045,oil,146.57,146.57,146.57,146.57,146.57,8760,fokusstrom
+Elec,2045,biomass,85.88,85.88,85.88,85.88,85.88,8760,fokusstrom
+Elec,2045,hydrogen,95.6,89.3,125.69,89.24,422.82,8760,fokusstrom
+HighDem,2030,co2,177.57,177.57,177.57,177.57,177.57,8760,hohenachfrage
+HighDem,2030,natural gas,24.71,24.71,24.71,24.71,24.71,8760,hohenachfrage
+HighDem,2030,hard coal,6.22,6.22,6.22,6.22,6.22,8760,hohenachfrage
+HighDem,2030,lignite,3.28,3.27,3.31,3.27,3.31,8760,hohenachfrage
+HighDem,2030,oil,89.0,89.0,89.0,89.0,89.0,8760,hohenachfrage
+HighDem,2030,biomass,78.14,78.14,78.14,78.14,78.14,8760,hohenachfrage
+HighDem,2030,hydrogen,88.73,85.83,91.08,83.48,134.38,8760,hohenachfrage
+HighDem,2035,co2,508.06,508.06,508.06,508.06,508.06,8760,hohenachfrage
+HighDem,2035,natural gas,27.54,27.54,27.54,27.54,27.54,8760,hohenachfrage
+HighDem,2035,hard coal,6.27,6.27,6.27,6.27,6.27,8760,hohenachfrage
+HighDem,2035,lignite,3.27,3.26,3.29,3.26,3.31,8760,hohenachfrage
+HighDem,2035,oil,178.23,178.23,178.23,178.23,178.23,8760,hohenachfrage
+HighDem,2035,biomass,105.81,105.81,105.81,105.81,105.81,8760,hohenachfrage
+HighDem,2035,hydrogen,115.48,104.06,143.23,100.81,172.35,8760,hohenachfrage
+HighDem,2040,co2,562.76,562.76,562.76,562.76,562.76,8760,hohenachfrage
+HighDem,2040,natural gas,28.21,28.21,28.21,28.21,28.21,8760,hohenachfrage
+HighDem,2040,hard coal,6.31,6.31,6.31,6.31,6.31,8760,hohenachfrage
+HighDem,2040,lignite,3.26,3.25,3.28,3.25,3.31,8760,hohenachfrage
+HighDem,2040,oil,192.82,192.82,192.82,192.82,192.82,8760,hohenachfrage
+HighDem,2040,biomass,114.58,114.58,114.58,114.58,114.58,8760,hohenachfrage
+HighDem,2040,hydrogen,111.93,103.95,134.41,101.06,336.7,8760,hohenachfrage
+HighDem,2045,co2,414.17,414.17,414.17,414.17,414.17,8760,hohenachfrage
+HighDem,2045,natural gas,27.19,27.19,27.19,27.19,27.19,8760,hohenachfrage
+HighDem,2045,hard coal,6.36,6.36,6.36,6.36,6.36,8760,hohenachfrage
+HighDem,2045,oil,152.32,152.32,152.32,152.32,152.32,8760,hohenachfrage
+HighDem,2045,biomass,91.64,91.64,91.64,91.64,91.64,8760,hohenachfrage
+HighDem,2045,hydrogen,98.53,91.88,130.29,91.77,403.84,8760,hohenachfrage
+LowDem,2030,co2,142.74,142.74,142.74,142.74,142.74,8760,niedrigenachfrage
+LowDem,2030,natural gas,24.43,24.43,24.43,24.43,24.43,8760,niedrigenachfrage
+LowDem,2030,hard coal,6.21,6.21,6.21,6.21,6.21,8760,niedrigenachfrage
+LowDem,2030,lignite,3.29,3.27,3.31,3.27,3.31,8760,niedrigenachfrage
+LowDem,2030,oil,79.57,79.57,79.57,79.57,79.57,8760,niedrigenachfrage
+LowDem,2030,biomass,73.61,73.61,73.61,73.61,73.61,8760,niedrigenachfrage
+LowDem,2030,hydrogen,79.22,76.84,81.45,75.77,129.76,8760,niedrigenachfrage
+LowDem,2035,co2,466.88,466.88,466.88,466.88,466.88,8760,niedrigenachfrage
+LowDem,2035,natural gas,27.21,27.21,27.21,27.21,27.21,8760,niedrigenachfrage
+LowDem,2035,hard coal,6.27,6.27,6.27,6.27,6.27,8760,niedrigenachfrage
+LowDem,2035,lignite,3.27,3.26,3.29,3.26,3.31,8760,niedrigenachfrage
+LowDem,2035,oil,167.07,167.07,167.07,167.07,167.07,8760,niedrigenachfrage
+LowDem,2035,biomass,102.34,102.34,102.34,102.34,102.34,8760,niedrigenachfrage
+LowDem,2035,hydrogen,113.29,100.81,140.19,100.77,162.05,8760,niedrigenachfrage
+LowDem,2040,co2,517.38,517.38,517.38,517.38,517.38,8760,niedrigenachfrage
+LowDem,2040,natural gas,27.83,27.83,27.83,27.83,27.83,8760,niedrigenachfrage
+LowDem,2040,hard coal,6.31,6.31,6.31,6.31,6.31,8760,niedrigenachfrage
+LowDem,2040,lignite,3.25,3.25,3.28,3.24,3.31,8760,niedrigenachfrage
+LowDem,2040,oil,180.53,180.53,180.53,180.53,180.53,8760,niedrigenachfrage
+LowDem,2040,biomass,102.42,102.42,102.42,102.42,102.42,8760,niedrigenachfrage
+LowDem,2040,hydrogen,108.34,101.23,134.61,98.06,405.97,8760,niedrigenachfrage
+LowDem,2045,co2,340.52,340.52,340.52,340.52,340.52,8760,niedrigenachfrage
+LowDem,2045,natural gas,26.58,26.58,26.58,26.58,26.58,8760,niedrigenachfrage
+LowDem,2045,hard coal,6.36,6.36,6.36,6.36,6.36,8760,niedrigenachfrage
+LowDem,2045,oil,132.38,132.38,132.38,132.38,132.38,8760,niedrigenachfrage
+LowDem,2045,biomass,74.31,74.31,74.31,74.31,74.31,8760,niedrigenachfrage
+LowDem,2045,hydrogen,91.44,85.51,121.67,85.43,140.83,8760,niedrigenachfrage
+Mix,2030,co2,167.84,167.84,167.84,167.84,167.84,8760,technologiemix
+Mix,2030,natural gas,24.63,24.63,24.63,24.63,24.63,8760,technologiemix
+Mix,2030,hard coal,6.22,6.22,6.22,6.22,6.22,8760,technologiemix
+Mix,2030,lignite,3.29,3.27,3.31,3.27,3.31,8760,technologiemix
+Mix,2030,oil,86.37,86.37,86.37,86.37,86.37,8760,technologiemix
+Mix,2030,biomass,76.68,76.68,76.68,76.68,76.68,8760,technologiemix
+Mix,2030,hydrogen,86.07,83.08,88.16,81.35,136.14,8760,technologiemix
+Mix,2035,co2,497.53,497.53,497.53,497.53,497.53,8760,technologiemix
+Mix,2035,natural gas,27.46,27.46,27.46,27.46,27.46,8760,technologiemix
+Mix,2035,hard coal,6.27,6.27,6.27,6.27,6.27,8760,technologiemix
+Mix,2035,lignite,3.27,3.26,3.29,3.26,3.31,8760,technologiemix
+Mix,2035,oil,175.37,175.37,175.37,175.37,175.37,8760,technologiemix
+Mix,2035,biomass,104.5,104.5,104.5,104.5,104.5,8760,technologiemix
+Mix,2035,hydrogen,114.74,102.47,141.88,99.24,166.28,8760,technologiemix
+Mix,2040,co2,543.53,543.53,543.53,543.53,543.53,8760,technologiemix
+Mix,2040,natural gas,28.05,28.05,28.05,28.05,28.05,8760,technologiemix
+Mix,2040,hard coal,6.31,6.31,6.31,6.31,6.31,8760,technologiemix
+Mix,2040,lignite,3.26,3.25,3.28,3.25,3.31,8760,technologiemix
+Mix,2040,oil,187.61,187.61,187.61,187.61,187.61,8760,technologiemix
+Mix,2040,biomass,108.58,108.58,108.58,108.58,108.58,8760,technologiemix
+Mix,2040,hydrogen,110.63,103.9,136.6,100.46,298.24,8760,technologiemix
+Mix,2045,co2,397.68,397.68,397.68,397.68,397.68,8760,technologiemix
+Mix,2045,natural gas,27.05,27.05,27.05,27.05,27.05,8760,technologiemix
+Mix,2045,hard coal,6.36,6.36,6.36,6.36,6.36,8760,technologiemix
+Mix,2045,oil,147.86,147.86,147.86,147.86,147.86,8760,technologiemix
+Mix,2045,biomass,85.7,85.7,85.7,85.7,85.7,8760,technologiemix
+Mix,2045,hydrogen,96.84,90.96,126.87,90.91,362.83,8760,technologiemix
