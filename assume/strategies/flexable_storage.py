@@ -206,8 +206,11 @@ class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
 
     For every product the strategy submits:
 
-    - ``volume``: the currently cleared (signed) dispatch (``+`` discharge,
-      ``-`` charge) around which redispatch is applied.
+    - ``volume``: the grid baseline around which redispatch is applied - what the
+      storage can actually run of its cleared (signed) dispatch (``+`` discharge,
+      ``-`` charge). It equals the cleared dispatch unless that is not
+      SOC-feasible; then the grid model sees the real injection and the shortfall
+      is covered by other units.
     - ``max_power`` / ``min_power``: the **state-of-charge aware** discharge
       (``>= 0``) and charge (``<= 0``) bounds, so a near-empty battery offers
       little additional discharge and a near-full one little additional charge.
@@ -264,7 +267,9 @@ class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
         # SOC path along the current (day-ahead) schedule for the whole redispatch
         # window, computed by the storage itself. It respects the SOC limits and treats
         # hours without a cleared schedule as idle.
-        soc_path = unit.calculate_soc_path(product_tuples[0][0], product_tuples[-1][1])
+        soc_path, runnable = unit.calculate_soc_path(
+            product_tuples[0][0], product_tuples[-1][1]
+        )
 
         # static nameplate power span; guarantees the fixed baseline d/p_nom stays
         # within [-1, 1] and the per-unit up/down potential does not clip early
@@ -284,25 +289,18 @@ class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
         for product in product_tuples:
             start, end = product[0], product[1]
 
-            # Committed (pre-SoC-clip) dispatch (+ discharge, - charge). The redispatch
-            # balances against the volume the energy market cleared and the generators
-            # were dispatched for. energy_committed is recorded in set_dispatch_plan.
-            current_power = unit.outputs["energy_committed"].at[start]
+            # Grid baseline (+ discharge, - charge): what the storage can actually run
+            # of its DA plan. Equal to the plan unless the DA schedule is infeasible;
+            # then the grid model sees the real injection, and the shortfall against
+            # the plan is covered by other units instead of being hidden.
+            current_power = runnable[start]
 
             # Absolute power range at the SOC at the start of this product (SOC limits
-            # applied to the absolute power, CRM reservations kept free).
-            min_power_abs, max_power_abs = unit.calculate_redispatch_power_bounds(
-                start, soc_path[start]
+            # applied to the absolute power, CRM reservations kept free). The clearing
+            # derives up = max_power - volume and down = volume - min_power from it.
+            max_power_charge, max_power_discharge = (
+                unit.calculate_redispatch_power_bounds(start, soc_path[start])
             )
-
-            # The clearing computes up = max_power - volume and down = volume -
-            # min_power with volume = the committed dispatch. What is physically
-            # possible is measured from the schedule the unit actually follows
-            # (outputs["energy"], equal to the committed one unless the DA schedule
-            # was infeasible), so the bounds are shifted accordingly.
-            executed_power = unit.outputs["energy"].at[start]
-            max_power_discharge = current_power + (max_power_abs - executed_power)
-            max_power_charge = current_power + (min_power_abs - executed_power)
 
             # Energy head-room at the END of this product along the SOC path. The
             # clearing uses it to bound the CUMULATIVE redispatch energy, see

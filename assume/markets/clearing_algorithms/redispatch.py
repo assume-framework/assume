@@ -197,12 +197,14 @@ class RedispatchMarketRole(MarketRole):
 
         # 3. Energy information of storage units (sent in their bids). A storage
         # without it could be over-committed, so it gets no redispatch head-room.
+        # rows aligned to the network snapshots: same sorted start times as p_set
+        snapshot_starts = volume_pivot.index
         storage_bids = {
             field: orderbook_df.pivot(
                 index="start_time", columns="unit_id", values=field
             )
+            .reindex(index=snapshot_starts, columns=storage_cols)
             .reset_index(drop=True)
-            .reindex(columns=storage_cols)
             if field in orderbook_df
             else pd.DataFrame(np.nan, index=p_set.index, columns=storage_cols)
             for field in [
@@ -247,11 +249,15 @@ class RedispatchMarketRole(MarketRole):
 
         # 5. storage: the redispatch energy over all snapshots may not exceed what
         # the storage holds; the constraint is built by the Storage unit
-        dt = (orderbook_df["end_time"] - orderbook_df["start_time"]).iloc[0]
+        # duration of every snapshot (products may differ in length)
+        ends = orderbook_df.groupby("start_time")["end_time"].max()
+        duration_hours = [
+            (ends[start] - start).total_seconds() / 3600 for start in snapshot_starts
+        ]
         extra_functionality = Storage.redispatch_soc_callback(
             storage_ids=storage_cols.difference(blocked),
             storage_bids=storage_bids,
-            duration_hours=dt.total_seconds() / 3600,
+            duration_hours=duration_hours,
         )
 
         # run linear powerflow
