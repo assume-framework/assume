@@ -510,10 +510,13 @@ storage_units_df = pd.DataFrame(
         "node": ["S"],
         "max_power_discharge": [500.0],
         "max_power_charge": [-500.0],
+        "capacity": [2000.0],
+        "efficiency_charge": [1.0],
+        "efficiency_discharge": [1.0],
     }
 ).set_index("name")
 
-STORAGE_P_NOM = 500.0 - (-500.0)  # full power span used as p_nom
+STORAGE_P_NOM = 500.0 - (-500.0)  # full power span sent in the bids
 
 
 @pytest.fixture
@@ -527,28 +530,70 @@ def grid_data_with_storage():
     }
 
 
+def storage_bid(start, end, volume, **fields):
+    """
+    A complete redispatch bid of the southern storage (see the storage strategy).
+    Capacity, SOC limits and efficiencies come from the grid data.
+    """
+    bid = {
+        "start_time": start,
+        "end_time": end,
+        "only_hours": None,
+        "unit_id": "storage_S",
+        "bid_id": f"storage_S_{start}",
+        "volume": volume,
+        "min_power": -500.0,
+        "max_power": 500.0,
+        "p_nom": STORAGE_P_NOM,
+        "price": 20.0,
+        "price_discharge": 20.0,
+        "price_charge": 15.0,
+        "stored_energy_value": 20.0,
+        "soc": 0.5,
+        "node": "S",
+    }
+    bid.update(fields)
+    return bid
+
+
+def unit_bid(start, end, unit_id, node, volume, price, min_power=0.0, max_power=1000.0):
+    return {
+        "start_time": start,
+        "end_time": end,
+        "only_hours": None,
+        "unit_id": unit_id,
+        "bid_id": f"{unit_id}_{start}",
+        "volume": volume,
+        "min_power": min_power,
+        "max_power": max_power,
+        "p_nom": 1000.0,
+        "price": price,
+        "node": node,
+    }
+
+
 def test_initialization_with_storage(
     simple_redispatch_market_config, grid_data_with_storage
 ):
-    """Storage adds a fixed + up + down generator triple to the redispatch network."""
+    """Storage is a PyPSA StorageUnit, not a set of generators."""
     mc = simple_redispatch_market_config
     mc.param_dict["grid_data"] = grid_data_with_storage
     rmr = RedispatchMarketRole(mc)
 
-    # generators*3 + nodes*2 backups + storages*3
-    expected_num_generators = (
-        len(storage_generators) * 3 + len(nodes) * 2 + len(storage_units_df) * 3
-    )
-    assert len(rmr.network.generators) == expected_num_generators
+    # generators*3 + nodes*2 backups, no storage generators
+    assert len(rmr.network.generators) == len(storage_generators) * 3 + len(nodes) * 2
+    assert list(rmr.network.storage_units.index) == ["storage_S"]
+    assert rmr.network.storage_units.at["storage_S", "bus"] == "S"
 
 
 @pytest.mark.parametrize(
-    "storage_baseline, gen_cleared, expected_storage_volume, expected_gen_volume",
+    "storage_baseline, gen_cleared, expected_volume, expected_price",
     [
-        # idle storage discharges 200 MW upward; northern gen backs down 200 MW
-        (0.0, 300.0, 200.0, -200.0),
-        # charging storage (-100) swings up by 300 MW (stops charging + discharges 200)
-        (-100.0, 400.0, 300.0, -300.0),
+        # idle storage discharges 200 MW more; settled at the discharge price
+        (0.0, 300.0, 200.0, 20.0),
+        # charging storage (-100) stops charging (charge price 15) and discharges
+        # 200 MW (discharge price 20): (100 * 15 + 200 * 20) / 300
+        (-100.0, 400.0, 300.0, (100 * 15 + 200 * 20) / 300),
     ],
 )
 def test_redispatch_with_storage(
@@ -556,8 +601,8 @@ def test_redispatch_with_storage(
     grid_data_with_storage,
     storage_baseline,
     gen_cleared,
-    expected_storage_volume,
-    expected_gen_volume,
+    expected_volume,
+    expected_price,
 ):
     market_config = simple_redispatch_market_config
     market_config.param_dict["grid_data"] = grid_data_with_storage
@@ -568,71 +613,29 @@ def test_redispatch_with_storage(
     start, end = products[0][0], products[0][1]
 
     orderbook = [
-        {
-            "start_time": start,
-            "end_time": end,
-            "only_hours": None,
-            "unit_id": "gen_N",
-            "bid_id": "gen_N_1",
-            "volume": gen_cleared,
-            "min_power": 0.0,
-            "max_power": 1000.0,
-            "p_nom": 1000.0,
-            "price": 10.0,
-            "node": "N",
-        },
-        {
-            "start_time": start,
-            "end_time": end,
-            "only_hours": None,
-            "unit_id": "dem_S",
-            "bid_id": "dem_S_1",
-            "volume": -300.0,
-            "min_power": 0.0,
-            "max_power": -1000.0,
-            "p_nom": 1000.0,
-            "price": 3000.0,
-            "node": "S",
-        },
-        {
-            "start_time": start,
-            "end_time": end,
-            "only_hours": None,
-            "unit_id": "storage_S",
-            "bid_id": "storage_S_1",
-            "volume": storage_baseline,
-            "min_power": -500.0,  # SoC-aware charge bound (negative)
-            "max_power": 500.0,  # SoC-aware discharge bound (positive)
-            "p_nom": STORAGE_P_NOM,
-            "price": 20.0,
-            # plenty of stored energy and room: only the power limits bind here
-            "energy_discharge_headroom": 1000.0,
-            "energy_charge_headroom": 1000.0,
-            "efficiency_charge": 1.0,
-            "efficiency_discharge": 1.0,
-            "node": "S",
-        },
+        unit_bid(start, end, "gen_N", "N", gen_cleared, 10.0),
+        unit_bid(start, end, "dem_S", "S", -300.0, 3000.0, max_power=-1000.0),
+        storage_bid(start, end, storage_baseline),
     ]
 
     rmr = RedispatchMarketRole(market_config)
     accepted_orders, _, meta, flows = rmr.clear(orderbook, products)
-
     accepted = {o["unit_id"]: o for o in accepted_orders}
 
-    # the storage is redispatched upward (discharge) to relieve the congestion ...
-    assert "storage_S" in accepted
-    assert accepted["storage_S"]["accepted_volume"] == pytest.approx(
-        expected_storage_volume, abs=1e-1
-    )
-    assert accepted["storage_S"]["accepted_price"] == pytest.approx(20.0)
+    storage = accepted["storage_S"]
+    assert storage["accepted_volume"] == pytest.approx(expected_volume, abs=1e-1)
+    assert storage["accepted_price"] == pytest.approx(expected_price, abs=1e-3)
     # ... while the cheap northern generator is redispatched downward
     assert accepted["gen_N"]["accepted_volume"] == pytest.approx(
-        expected_gen_volume, abs=1e-1
+        -expected_volume, abs=1e-1
     )
     # upward and downward redispatch balance out
     assert sum(o["accepted_volume"] for o in accepted_orders) == pytest.approx(
         0.0, abs=1e-1
     )
+    # the storage redispatch is part of the meta data of its bus
+    meta_s = next(m for m in meta if m["node"] == "S")
+    assert meta_s["supply_volume"] == pytest.approx(expected_volume, abs=1e-1)
     # congestion is resolved: the final flow respects the line rating
     flows_df = pd.Series(flows).unstack()
     assert (
@@ -640,17 +643,146 @@ def test_redispatch_with_storage(
     )
 
 
-def test_redispatch_storage_energy_limit(simple_redispatch_market_config):
-    """
-    The storage may not deliver more redispatch energy over the horizon than it
-    holds. Every hour needs 200 MW of upward redispatch in the south, the storage
-    offers 500 MW per hour but holds only 300 MWh, so it must stop at 300 MWh and
-    the expensive southern generator has to cover the rest.
-    """
-    n_hours = 4
-    energy_available = 300.0  # MWh above min_soc
+# The four moves of a storage around its day-ahead schedule. Storage at bus
+# "node", 200 MWh with 100 MWh stored, 100 MW, efficiencies 0.9, value of the
+# stored energy 54 EUR/MWh (reference price 60, "sell"): price_discharge 60,
+# price_charge 48.6. The line N -> S carries 100 MW; every case needs 20 MW of
+# redispatch. gen_N is must-run where the storage has to go down.
+FOUR_CASES = [
+    # name, node, schedule, gen_N, gen_N min, load S, move, volume, price
+    ("discharge_less", "N", 50.0, 70.0, 70.0, 120.0, -20.0, 60.0),
+    ("discharge_more", "S", 50.0, 120.0, 0.0, 170.0, 20.0, 60.0),
+    ("charge_less", "S", -50.0, 120.0, 0.0, 70.0, 20.0, 48.6),
+    ("charge_more", "N", -50.0, 170.0, 170.0, 120.0, -20.0, 48.6),
+]
 
+
+def clear_four_case(market_config, node, schedule, gen_n, gen_n_min, load_s):
+    market_config.param_dict["grid_data"] = {
+        "buses": nodes,
+        "lines": storage_lines,
+        "generators": pd.DataFrame(
+            {
+                "name": ["gen_N", "gen_S"],
+                "node": ["N", "S"],
+                "marginal_cost": [10.0, 100.0],
+                "max_power": [1000.0, 1000.0],
+            }
+        ).set_index("name"),
+        "loads": storage_demand,
+        "storage_units": storage_units_df.assign(
+            node=node,
+            max_power_discharge=100.0,
+            max_power_charge=-100.0,
+            capacity=200.0,
+            efficiency_charge=0.9,
+            efficiency_discharge=0.9,
+        ),
+    }
+    start = datetime(2005, 6, 1, 1)
+    end = start + timedelta(hours=1)
+    orderbook = [
+        unit_bid(start, end, "gen_N", "N", gen_n, 10.0, min_power=gen_n_min),
+        unit_bid(start, end, "gen_S", "S", 0.0, 100.0),
+        unit_bid(start, end, "dem_S", "S", -load_s, 3000.0, max_power=-1000.0),
+        storage_bid(
+            start,
+            end,
+            schedule,
+            node=node,
+            min_power=-100.0,
+            max_power=100.0,
+            price=60.0,
+            price_discharge=60.0,
+            price_charge=48.6,
+            stored_energy_value=54.0,
+        ),
+    ]
+    rmr = RedispatchMarketRole(market_config)
+    accepted_orders, _, _, _ = rmr.clear(orderbook, [(start, end, None)])
+    return {o["unit_id"]: o for o in accepted_orders}
+
+
+@pytest.mark.parametrize(
+    "move, node, schedule, gen_n, gen_n_min, load_s, volume, price", FOUR_CASES
+)
+def test_storage_moves_are_settled_cost_neutral(
+    simple_redispatch_market_config,
+    move,
+    node,
+    schedule,
+    gen_n,
+    gen_n_min,
+    load_s,
+    volume,
+    price,
+):
+    """
+    Every move is settled at its own price, and the payment equals the value of
+    the stored energy the storage gains or loses: it ends up neither better nor
+    worse off.
+    """
+    accepted = clear_four_case(
+        simple_redispatch_market_config, node, schedule, gen_n, gen_n_min, load_s
+    )
+    storage = accepted["storage_S"]
+    assert storage["accepted_volume"] == pytest.approx(volume, abs=1e-3)
+    assert storage["accepted_price"] == pytest.approx(price, abs=1e-3)
+
+    # change of the stored energy (MWh) caused by the move, valued at 54 EUR/MWh
+    if move.startswith("discharge"):
+        stored = -volume / 0.9
+    else:
+        stored = -volume * 0.9
+    cashflow = storage["accepted_price"] * storage["accepted_volume"]
+    assert cashflow + stored * 54.0 == pytest.approx(0.0, abs=1e-2)
+
+
+def test_storage_bid_without_charge_price_uses_its_price(
+    simple_redispatch_market_config, grid_data_with_storage
+):
+    """
+    A storage strategy may send one price: the clearing then uses it for both
+    directions. The charging storage (-100) stops charging and discharges 200 MW,
+    all settled at 20.
+    """
     market_config = simple_redispatch_market_config
+    market_config.param_dict["grid_data"] = grid_data_with_storage
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(market_config.market_products, next_opening)
+    start, end = products[0][0], products[0][1]
+    bid = storage_bid(start, end, -100.0)
+    del bid["price_charge"], bid["price_discharge"]
+    orderbook = [
+        unit_bid(start, end, "gen_N", "N", 400.0, 10.0),
+        unit_bid(start, end, "dem_S", "S", -300.0, 3000.0, max_power=-1000.0),
+        bid,
+    ]
+    accepted_orders, _, _, _ = RedispatchMarketRole(market_config).clear(
+        orderbook, products
+    )
+    storage = next(o for o in accepted_orders if o["unit_id"] == "storage_S")
+    assert storage["accepted_volume"] == pytest.approx(300.0, abs=1e-1)
+    assert storage["accepted_price"] == pytest.approx(20.0, abs=1e-3)
+
+
+def test_storage_downward_moves_do_not_redispatch_beyond_the_congestion(
+    simple_redispatch_market_config,
+):
+    """
+    Downward storage moves cost nothing in the optimisation, so the optimiser has
+    no reason to charge a storage more than the congestion needs: here the
+    flexible cheap plant is turned down instead (its refund makes it the cheaper
+    option), and the storage keeps its schedule.
+    """
+    accepted = clear_four_case(
+        simple_redispatch_market_config, "N", -50.0, 170.0, 0.0, 120.0
+    )
+    assert "storage_S" not in accepted
+    assert accepted["gen_N"]["accepted_volume"] == pytest.approx(-20.0, abs=1e-3)
+
+
+def four_hour_market(market_config, n_hours, storage_units):
     market_config.market_products = [
         MarketProduct(timedelta(hours=1), n_hours, timedelta(hours=1))
     ]
@@ -666,137 +798,127 @@ def test_redispatch_storage_energy_limit(simple_redispatch_market_config):
             }
         ).set_index("name"),
         "loads": storage_demand,
-        "storage_units": storage_units_df.assign(
-            efficiency_charge=1.0, efficiency_discharge=1.0
-        ),
+        "storage_units": storage_units,
     }
-
     next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
-    products = get_available_products(market_config.market_products, next_opening)
+    return get_available_products(market_config.market_products, next_opening)
+
+
+def total_by_unit(accepted_orders):
+    volume = {}
+    for o in accepted_orders:
+        hours = (o["end_time"] - o["start_time"]).total_seconds() / 3600
+        volume[o["unit_id"]] = (
+            volume.get(o["unit_id"], 0.0) + o["accepted_volume"] * hours
+        )
+    return volume
+
+
+@pytest.mark.parametrize(
+    "efficiency_discharge, min_soc, expected",
+    [
+        # 300 MWh stored above min_soc, no losses
+        (1.0, 0.0, 300.0),
+        # 300 MWh inside the storage give 270 MWh at the grid
+        (0.9, 0.0, 270.0),
+        # min_soc 0.05 of 2000 MWh keeps 100 MWh: 200 MWh can be used
+        (1.0, 0.05, 200.0),
+    ],
+)
+def test_redispatch_storage_energy_limit(
+    simple_redispatch_market_config, efficiency_discharge, min_soc, expected
+):
+    """
+    The storage may not deliver more redispatch energy over the horizon than it
+    holds. Every hour needs 200 MW of upward redispatch in the south, the storage
+    offers 500 MW per hour but holds only 300 MWh (inside the storage), so the
+    expensive southern generator has to cover the rest. The state of charge uses
+    the exact discharge efficiency and the lower SOC limit.
+    """
+    n_hours = 4
+    market_config = simple_redispatch_market_config
+    storages = storage_units_df.assign(
+        efficiency_discharge=efficiency_discharge, min_soc=min_soc
+    )
+    products = four_hour_market(market_config, n_hours, storages)
+    soc = 300.0 / 2000.0  # 300 MWh inside the storage
 
     orderbook = []
     for start, end, _ in products:
-        common = {"start_time": start, "end_time": end, "only_hours": None}
         orderbook += [
-            {
-                **common,
-                "unit_id": "gen_N",
-                "bid_id": f"gen_N_{start}",
-                "volume": 300.0,
-                "min_power": 0.0,
-                "max_power": 1000.0,
-                "p_nom": 1000.0,
-                "price": 10.0,
-                "node": "N",
-            },
-            {
-                **common,
-                "unit_id": "gen_S",
-                "bid_id": f"gen_S_{start}",
-                "volume": 0.0,
-                "min_power": 0.0,
-                "max_power": 1000.0,
-                "p_nom": 1000.0,
-                "price": 100.0,
-                "node": "S",
-            },
-            {
-                **common,
-                "unit_id": "dem_S",
-                "bid_id": f"dem_S_{start}",
-                "volume": -300.0,
-                "min_power": 0.0,
-                "max_power": -1000.0,
-                "p_nom": 1000.0,
-                "price": 3000.0,
-                "node": "S",
-            },
-            {
-                **common,
-                "unit_id": "storage_S",
-                "bid_id": f"storage_S_{start}",
-                "volume": 0.0,
-                "min_power": -500.0,
-                "max_power": 500.0,
-                "p_nom": STORAGE_P_NOM,
-                "price": 20.0,
-                # idle baseline -> head-room stays constant over the horizon
-                "energy_discharge_headroom": energy_available,
-                "energy_charge_headroom": 1000.0,
-                "efficiency_charge": 1.0,
-                "efficiency_discharge": 1.0,
-                "node": "S",
-            },
+            unit_bid(start, end, "gen_N", "N", 300.0, 10.0),
+            unit_bid(start, end, "gen_S", "S", 0.0, 100.0),
+            unit_bid(start, end, "dem_S", "S", -300.0, 3000.0, max_power=-1000.0),
+            storage_bid(start, end, 0.0, soc=soc),
         ]
 
     rmr = RedispatchMarketRole(market_config)
     accepted_orders, _, _, _ = rmr.clear(orderbook, products)
+    volume = total_by_unit(accepted_orders)
 
-    volume = {}
-    for o in accepted_orders:
-        volume[o["unit_id"]] = volume.get(o["unit_id"], 0.0) + o["accepted_volume"]
-
-    # without the energy constraint the cheap storage would deliver 4 x 200 MWh
-    assert volume["storage_S"] == pytest.approx(energy_available, abs=1e-1)
-    assert volume["gen_S"] == pytest.approx(
-        n_hours * 200.0 - energy_available, abs=1e-1
-    )
+    assert volume["storage_S"] == pytest.approx(expected, abs=1e-1)
+    assert volume["gen_S"] == pytest.approx(n_hours * 200.0 - expected, abs=1e-1)
     assert volume["gen_N"] == pytest.approx(-n_hours * 200.0, abs=1e-1)
 
 
-def test_redispatch_storage_without_headroom_is_blocked(
-    simple_redispatch_market_config, grid_data_with_storage, caplog
+def test_redispatch_storage_charges_back_what_it_delivered(
+    simple_redispatch_market_config,
 ):
-    """A storage bid without energy headroom must not be redispatched at all."""
+    """
+    The state of charge links the snapshots: an empty storage can only deliver in
+    hour 2 what redispatch lets it charge in hour 1. Hour 1 has the opposite
+    congestion (too much in the south), hour 2 needs 200 MW more in the south.
+    Charging in hour 1 (covered by gen_N at 10) and discharging in hour 2 (20) is
+    cheaper than gen_S (100), so the storage charges the full 200 MWh in hour 1 -
+    more than the 50 MW the congestion of hour 1 needs.
+    """
+    market_config = simple_redispatch_market_config
+    products = four_hour_market(market_config, 2, storage_units_df)
+    (t1, e1, _), (t2, e2, _) = products
+    orderbook = [
+        # hour 1: southern surplus of 150 MW flows north over the 100 MW line
+        unit_bid(t1, e1, "gen_N", "N", 0.0, 10.0),
+        unit_bid(t1, e1, "gen_S", "S", 450.0, 100.0, min_power=450.0),
+        unit_bid(t1, e1, "dem_S", "S", -300.0, 3000.0, max_power=-1000.0),
+        storage_bid(t1, e1, 0.0, soc=0.0),
+        # hour 2: northern supply of 300 MW for the south
+        unit_bid(t2, e2, "gen_N", "N", 300.0, 10.0),
+        unit_bid(t2, e2, "gen_S", "S", 0.0, 100.0),
+        unit_bid(t2, e2, "dem_S", "S", -300.0, 3000.0, max_power=-1000.0),
+        storage_bid(t2, e2, 0.0, soc=0.0),
+    ]
+    rmr = RedispatchMarketRole(market_config)
+    accepted_orders, _, _, _ = rmr.clear(orderbook, products)
+    storage = {
+        o["start_time"]: o for o in accepted_orders if o["unit_id"] == "storage_S"
+    }
+    # hour 1: charge 200 MW more (downward), hour 2: discharge 200 MW more
+    assert storage[t1]["accepted_volume"] == pytest.approx(-200.0, abs=1e-1)
+    # the storage delivers exactly what it charged in hour 1
+    assert storage[t2]["accepted_volume"] == pytest.approx(200.0, abs=1e-1)
+
+
+def test_redispatch_storage_without_soc_raises(
+    simple_redispatch_market_config, grid_data_with_storage
+):
+    """A storage bid without state of charge cannot be modelled: clear() stops."""
     market_config = simple_redispatch_market_config
     market_config.param_dict["grid_data"] = grid_data_with_storage
 
     next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
     products = get_available_products(market_config.market_products, next_opening)
-    common = {"start_time": products[0][0], "end_time": products[0][1]}
-    common["only_hours"] = None
+    start, end = products[0][0], products[0][1]
+    bid = storage_bid(start, end, -50.0)
+    del bid["soc"]
     orderbook = [
-        {
-            **common,
-            "unit_id": "gen_N",
-            "bid_id": "gen_N_1",
-            "volume": 300.0,
-            "min_power": 0.0,
-            "max_power": 1000.0,
-            "p_nom": 1000.0,
-            "price": 10.0,
-            "node": "N",
-        },
-        {
-            **common,
-            "unit_id": "dem_S",
-            "bid_id": "dem_S_1",
-            "volume": -300.0,
-            "min_power": 0.0,
-            "max_power": -1000.0,
-            "p_nom": 1000.0,
-            "price": 3000.0,
-            "node": "S",
-        },
-        {
-            **common,
-            "unit_id": "storage_S",
-            "bid_id": "storage_S_1",
-            "volume": 0.0,
-            "min_power": -500.0,
-            "max_power": 500.0,
-            "p_nom": STORAGE_P_NOM,
-            "price": 20.0,
-            "node": "S",
-        },
+        unit_bid(start, end, "gen_N", "N", 350.0, 10.0),
+        unit_bid(start, end, "dem_S", "S", -300.0, 3000.0, max_power=-1000.0),
+        bid,
     ]
 
     rmr = RedispatchMarketRole(market_config)
-    with caplog.at_level("WARNING"):
-        accepted_orders, _, _, _ = rmr.clear(orderbook, products)
-
-    assert "redispatch is blocked" in caplog.text
-    assert "storage_S" not in {o["unit_id"] for o in accepted_orders}
+    with pytest.raises(ValueError, match="needs 'soc'"):
+        rmr.clear(orderbook, products)
 
 
 def test_redispatch_storage_energy_limit_with_different_durations(
@@ -804,8 +926,8 @@ def test_redispatch_storage_energy_limit_with_different_durations(
 ):
     """
     Products of different length: 1 h and then 2 h. The storage holds 30 MWh, so
-    up_0 * 1 h + up_1 * 2 h must not exceed 30 MWh. Using one duration for all
-    snapshots would let it deliver 20 MWh + 10 MW * 2 h = 40 MWh.
+    redispatch_0 * 1 h + redispatch_1 * 2 h must not exceed 30 MWh. Using one
+    duration for all snapshots would let it deliver 20 MWh + 10 MW * 2 h = 40 MWh.
     """
     energy_available = 30.0
     market_config = simple_redispatch_market_config
@@ -834,65 +956,17 @@ def test_redispatch_storage_energy_limit_with_different_durations(
     ]
     orderbook = []
     for start, end, _ in products:
-        common = {"start_time": start, "end_time": end, "only_hours": None}
         orderbook += [
-            {
-                **common,
-                "unit_id": "gen_N",
-                "bid_id": f"gen_N_{start}",
-                "volume": 120.0,
-                "min_power": 0.0,
-                "max_power": 1000.0,
-                "p_nom": 1000.0,
-                "price": 10.0,
-                "node": "N",
-            },
-            {
-                **common,
-                "unit_id": "gen_S",
-                "bid_id": f"gen_S_{start}",
-                "volume": 0.0,
-                "min_power": 0.0,
-                "max_power": 1000.0,
-                "p_nom": 1000.0,
-                "price": 100.0,
-                "node": "S",
-            },
-            {
-                **common,
-                "unit_id": "dem_S",
-                "bid_id": f"dem_S_{start}",
-                "volume": -120.0,
-                "min_power": 0.0,
-                "max_power": -1000.0,
-                "p_nom": 1000.0,
-                "price": 3000.0,
-                "node": "S",
-            },
-            {
-                **common,
-                "unit_id": "storage_S",
-                "bid_id": f"storage_S_{start}",
-                "volume": 0.0,
-                "min_power": -500.0,
-                "max_power": 500.0,
-                "p_nom": STORAGE_P_NOM,
-                "price": 20.0,
-                "energy_discharge_headroom": energy_available,
-                "energy_charge_headroom": 1000.0,
-                "efficiency_charge": 1.0,
-                "efficiency_discharge": 1.0,
-                "node": "S",
-            },
+            unit_bid(start, end, "gen_N", "N", 120.0, 10.0),
+            unit_bid(start, end, "gen_S", "S", 0.0, 100.0),
+            unit_bid(start, end, "dem_S", "S", -120.0, 3000.0, max_power=-1000.0),
+            storage_bid(start, end, 0.0, soc=energy_available / 2000.0),
         ]
 
     rmr = RedispatchMarketRole(market_config)
     accepted_orders, _, _, _ = rmr.clear(orderbook, products)
 
-    energy = sum(
-        o["accepted_volume"] * (o["end_time"] - o["start_time"]).total_seconds() / 3600
-        for o in accepted_orders
-        if o["unit_id"] == "storage_S"
-    )
     # 20 MW of congestion in both products: the storage gives exactly its 30 MWh
-    assert energy == pytest.approx(energy_available, abs=1e-1)
+    assert total_by_unit(accepted_orders)["storage_S"] == pytest.approx(
+        energy_available, abs=1e-1
+    )
