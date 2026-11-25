@@ -5,6 +5,7 @@
 import logging
 from datetime import timedelta
 
+import pandas as pd
 import pypsa
 from dateutil import rrule as rr
 
@@ -89,11 +90,17 @@ def load_pypsa(
         # ramps in PyPSA are per unit of the nominal power p_nom (which becomes max_power in ASSUME) and per snapshot
         # we convert to MW/min here by dividing through the PyPSA network_timesteps timedelta
         ramp_up = (
-            generator.ramp_limit_up * max_power / (index.freq.total_seconds() / 60)
+            generator.ramp_limit_up
+            * max_power
+            / (pd.Timedelta(index.freq).total_seconds() / 60)
         )
         ramp_down = (
-            generator.ramp_limit_down * max_power / (index.freq.total_seconds() / 60)
+            generator.ramp_limit_down
+            * max_power
+            / (pd.Timedelta(index.freq).total_seconds() / 60)
         )
+        ramp_up = None if pd.isna(ramp_up) else ramp_up
+        ramp_down = None if pd.isna(ramp_down) else ramp_down
         world.add_unit(
             generator.name,
             unit_type,
