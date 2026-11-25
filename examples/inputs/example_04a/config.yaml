@@ -74,7 +74,7 @@ nodal_case:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: nodal
+      market_mechanism: nodal_clearing
       additional_fields:
         - node
         - min_power
@@ -106,11 +106,12 @@ zonal_case:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: pay_as_clear_complex
+      market_mechanism: complex_clearing
       additional_fields:
         - bid_type
         - node
       param_dict:
+        pricing_mechanism: pay_as_clear
         network_path: .
         solver: glpk
         zones_identifier: zone_id
