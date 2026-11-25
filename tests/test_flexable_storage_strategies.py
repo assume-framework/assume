@@ -587,7 +587,6 @@ def test_redispatch_storage_price_forecast_fallback(market_prices, expected_pric
         ("charge_more", -1.0, 0.9),
     ],
 )
-@pytest.mark.parametrize("storage", [False], indirect=True)
 def test_opportunity_cost_prices_are_cost_neutral(
     mock_market_config, storage, move, grid_mwh, stored_mwh
 ):
@@ -612,7 +611,6 @@ def test_opportunity_cost_prices_are_cost_neutral(
     assert payment + stored_mwh * value - running_cost == pytest.approx(0.0)
 
 
-@pytest.mark.parametrize("storage", [False], indirect=True)
 def test_heuristic_redispatch_bids_one_price(mock_market_config, storage):
     """
     The heuristic strategy sends the same bid as the opportunity-cost strategy,
