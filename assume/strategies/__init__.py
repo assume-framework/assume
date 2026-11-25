@@ -14,10 +14,11 @@ from assume.strategies.flexable import (
     CapacityHeuristicBalancingPosStrategy,
 )
 from assume.strategies.flexable_storage import (
-    StorageEnergyHeuristicFlexableStrategy,
-    StorageEnergyHeuristicRedispatchStrategy,
     StorageCapacityHeuristicBalancingNegStrategy,
     StorageCapacityHeuristicBalancingPosStrategy,
+    StorageEnergyHeuristicFlexableStrategy,
+    StorageEnergyHeuristicRedispatchStrategy,
+    StorageEnergyOpportunityCostRedispatchStrategy,
 )
 from assume.strategies.naive_strategies import (
     DsmEnergyOptimizationStrategy,
@@ -77,6 +78,7 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "powerplant_capacity_heuristic_balancing_pos": CapacityHeuristicBalancingPosStrategy,
     "storage_energy_heuristic_flexable": StorageEnergyHeuristicFlexableStrategy,
     "storage_energy_heuristic_redispatch": StorageEnergyHeuristicRedispatchStrategy,
+    "storage_energy_opportunity_cost_redispatch": StorageEnergyOpportunityCostRedispatchStrategy,
     "storage_capacity_heuristic_balancing_neg": StorageCapacityHeuristicBalancingNegStrategy,
     "storage_capacity_heuristic_balancing_pos": StorageCapacityHeuristicBalancingPosStrategy,
     "household_capacity_heuristic_balancing_pos": DsmCapacityHeuristicBalancingStrategy,
