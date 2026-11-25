@@ -35,7 +35,7 @@ log = logging.getLogger(__name__)
 
 def is_elastic_demand(unit, market_config=None) -> bool:
     """
-    Checks whether a unit as an elastic demand.
+    Checks whether a unit is an elastic demand.
 
     .. note::
         There is currently not a clear flag whether some demand is elastic.
@@ -141,21 +141,22 @@ def calculate_exchange_volume(exchange_units: list[Exchange]):
 
 
 @lru_cache
-def calculate_naive_price_inelastic(
+def calculate_naive_price_simple(
     index: ForecastIndex,
     units: list[BaseUnit],
     config: MarketConfig,
 ) -> dict[str, ForecastSeries]:
     """
-    Forecast market clearing prices using a merit-order stack against inelastic demand.
+    Forecast market clearing prices using a fast merit-order stack against demand bids, similar to SimpleClearing.
 
     Storages and DSM units are ignored in this calculation.
 
     Steps:
         1. **Sort units** by type, keeping only those with a bidding strategy for the market.
         2. **Build supply and demand curves** — compute per-unit marginal costs and
-           available power, then sum demand (including exchange volumes) for each timestep.
-        3. **Merit-order dispatch** — clear the supply against the summed demand with
+            available power, then sum inelastic demand (including exchange volumes) and create
+            individual elastic demand bids for each timestep.
+        3. **Merit-order dispatch** — clear the supply and demand bids with
            :func:`clear_merit_order` for each timestep. The marginal unit's cost sets the price,
            or the highest willingness to pay of the demand units if capacity is insufficient.
     """
@@ -166,6 +167,12 @@ def calculate_naive_price_inelastic(
     powerplants_units, demand_units, exchange_units, _, _ = sort_units(
         units, config.market_id
     )
+    elastic_demand_units = [
+        unit for unit in demand_units if is_elastic_demand(unit, config)
+    ]
+    inelastic_demand_units = [
+        unit for unit in demand_units if unit not in elastic_demand_units
+    ]
 
     # 2. Build supply and demand curves
     # shape: (index_len, num_pp_units)
@@ -174,45 +181,94 @@ def calculate_naive_price_inelastic(
     ).T
     supply_volume = calculate_max_power(powerplants_units).to_numpy().T
 
-    # The demand is a single bid of the summed demand (incl. exchanges)
+    # The inelastic demand is a single bid of the summed demand (incl. exchanges)
     # at the highest willingness to pay of the demand units.
     # shape: (index_len,)
-    demand_price = np.max(
-        [np.broadcast_to(unit.price, len(index)) for unit in demand_units], axis=0
-    )
-    demand_volume = calculate_sum_demand(demand_units, exchange_units)
+    if inelastic_demand_units:
+        inelastic_demand_price = np.max(
+            [
+                np.broadcast_to(unit.price, len(index))
+                for unit in inelastic_demand_units
+            ],
+            axis=0,
+        )
+        inelastic_demand_volume = calculate_sum_demand(inelastic_demand_units, exchange_units)
+    else:
+        inelastic_demand_price = np.zeros(len(index))
+        inelastic_demand_volume = np.zeros(len(index))
+
+    # The elastic demand bids several bids at each timestep, but the bids do not change from timestep to timestep.
+    elastic_demand_bids = []
+    elastic_demand_prices = np.array([], dtype=float)
+    elastic_demand_volumes = np.array([], dtype=float)
+    if len(elastic_demand_units) > 0:
+        start = config.opening_hours[0]
+        end = start + config.market_products[0].duration
+        market_id = config.market_id
+        product_tuples = {(start, end, None)}
+
+        for unit in elastic_demand_units:
+            elastic_demand_bids.extend(
+                unit.bidding_strategies[market_id].calculate_bids(
+                    unit,
+                    config,
+                    product_tuples=product_tuples,
+                )
+            )
+
+        # sort all bids by price descending
+        all_bids = (
+            pd.DataFrame(elastic_demand_bids)
+            .sort_values(by="price", ascending=False)
+            .reset_index(drop=True)
+        )
+
+        elastic_demand_prices = all_bids["price"].to_numpy(dtype=float)
+        elastic_demand_volumes = np.abs(
+            all_bids["volume"].to_numpy(dtype=float)
+        )
 
     # 3. Merit-order dispatch
     prices = np.zeros(len(index))
     for t in range(len(index)):
-        if demand_volume[t] <= 0:
+        demand_prices = elastic_demand_prices
+        demand_volumes = elastic_demand_volumes
+        if inelastic_demand_units and inelastic_demand_volume[t] > 0:
+            demand_prices = np.concatenate(
+                (demand_prices, [inelastic_demand_price[t]])
+            )
+            demand_volumes = np.concatenate(
+                (demand_volumes, [inelastic_demand_volume[t]])
+            )
+
+        if not np.any(demand_volumes > 0):
             # without demand (e.g. imports exceed the demand) the cheapest unit sets the price
             prices[t] = supply_price[t].min()
             continue
-        # the demand price sets the price if the capacity is insufficient
+
         prices[t], _, accepted_demand = clear_merit_order(
             supply_price[t],
             supply_volume[t],
-            demand_price[t : t + 1],
-            demand_volume[t : t + 1],
+            demand_prices,
+            demand_volumes,
         )
-        if accepted_demand[0] == 0:
+        if not np.any(accepted_demand > 0):
             # no unit is cheaper than the willingness to pay, so nothing is traded
-            prices[t] = demand_price[t]
+            prices[t] = demand_prices.max()
 
     return pd.Series(prices, index=index)
 
 
 @lru_cache
-def calculate_naive_price_elastic(
+def calculate_naive_price_using_market_mechanism(
     index: ForecastIndex,
     units: list[BaseUnit],
     config: MarketConfig,
-    elastic_demand_units: list[Demand],
 ) -> dict[str, ForecastSeries]:
     """
-    Forecast market clearing prices with price-elastic demand via pay-as-clear matching.
-
+    Forecast market clearing prices using the same market mechanism as the market,
+    the price forecast is requested for (e.g. pay_as_clear, pay_as_bid or complex_clearing).
+    
     Storages and DSM units are ignored in this calculation.
 
     Steps:
@@ -220,9 +276,9 @@ def calculate_naive_price_elastic(
            demand bids from elastic demand units for the first product interval.
         2. **Build supply and demand curves** — compute per-unit marginal costs and
            available power, then sum inelastic demand (including exchange volumes).
-        3. **Pay-as-clear dispatch** — for each timestep, assemble an orderbook from
+        3. **Clearing** — for each timestep, assemble an orderbook from
            supply offers, elastic demand bids, and the inelastic demand block, then
-           clear via ``PayAsClearRole`` to obtain the equilibrium price.
+           clear via the ClearingRole defined in the config.
     """
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
@@ -232,6 +288,9 @@ def calculate_naive_price_elastic(
     elastic_demand_bids = []
     # 1. Sort units by type and filter for units with bidding strategy for the given market_id
     powerplants_units, demand_units, exchange_units, _, _ = sort_units(units, market_id)
+    elastic_demand_units = [
+        unit for unit in demand_units if is_elastic_demand(unit, config)
+    ]
     inelastic_demand_units = [
         unit for unit in demand_units if unit not in elastic_demand_units
     ]
@@ -251,14 +310,17 @@ def calculate_naive_price_elastic(
         )
 
     # sort all bids by price descending
-    all_bids = (
-        pd.DataFrame(elastic_demand_bids)
-        .sort_values(by="price", ascending=False)
-        .reset_index(drop=True)
-    )
-
-    elastic_demand_prices = all_bids["price"]
-    elastic_demand_volumes = all_bids["volume"]
+    if elastic_demand_bids:
+        all_bids = (
+            pd.DataFrame(elastic_demand_bids)
+            .sort_values(by="price", ascending=False)
+            .reset_index(drop=True)
+        )
+        elastic_demand_prices = all_bids["price"]
+        elastic_demand_volumes = all_bids["volume"]
+    else:
+        elastic_demand_prices = pd.Series(dtype=float)
+        elastic_demand_volumes = pd.Series(dtype=float)
 
     # 2. Build supply and demand curves
     # Calculate marginal costs for each unit and time step.
@@ -274,15 +336,24 @@ def calculate_naive_price_elastic(
 
     # Process the inelastic demand.
     # Filter demand units with a bidding strategy and sum their forecasts for each time step.
-    sum_demand = pd.DataFrame(
-        calculate_sum_demand(demand_units, exchange_units), index=index
-    )
+    if inelastic_demand_units:
+        sum_demand = pd.DataFrame(
+            calculate_sum_demand(inelastic_demand_units, exchange_units), index=index
+        )
+    else:
+        sum_demand = pd.DataFrame(0, index=index, columns=[0])
 
     # 3. Pay-as-clear dispatch
     # Initialize the price forecast series.
     price_forecast = pd.Series(index=index, data=0.0)
 
-    # clear the market forecast including elastic demand bids using the PayAsClearRole
+    # clear the market forecast including elastic demand bids using the clearing mechanism defined in the config
+    if config.market_mechanism == "pay_as_bid":
+        # the forecast price is the volume-weighted average price of matched orders of each timestep
+        mechanism = PayAsBidRole(config)
+    elif config.market_mechanism == "complex_clearing":
+        mechanism = ComplexClearingRole(config)
+
     for t in index:
         # get the supply offers (marginal cost and available power) for time t
         mc_t = marginal_costs.loc[t]
@@ -295,7 +366,7 @@ def calculate_naive_price_elastic(
                 "start_time": start,
                 "end_time": end,
                 "only_hours": None,
-                "node": "node0",
+                "node": mechanism.nodes[0], # take one node of the grid data
                 "price": mc_t,
                 "volume": power_t,
                 "bid_type": "SB",
@@ -312,7 +383,7 @@ def calculate_naive_price_elastic(
                 "start_time": start,
                 "end_time": end,
                 "only_hours": None,
-                "node": "node0",
+                "node": mechanism.nodes[0], # take one node of the grid data
                 "price": elastic_demand_prices,
                 "volume": elastic_demand_volumes,
                 "bid_type": "SB",
@@ -335,7 +406,7 @@ def calculate_naive_price_elastic(
                     "start_time": start,
                     "end_time": end,
                     "only_hours": None,
-                    "node": "node0",
+                    "node": mechanism.nodes[0], # take one node of the grid data
                     "price": inelastic_price_bid,
                     "volume": -demand_t,
                     "bid_type": "SB",
@@ -359,17 +430,6 @@ def calculate_naive_price_elastic(
             pd.Timestamp(start) - config.market_products[0].first_delivery,
         )
 
-        if config.market_mechanism == "pay_as_bid":
-            # the forecast price is the volume-weighted average price of matched orders of each timestep
-            mechanism = PayAsBidRole(config)
-        elif config.market_mechanism == "pay_as_clear":
-            mechanism = PayAsClearRole(config)
-        elif config.market_mechanism == "complex_clearing":
-            mechanism = ComplexClearingRole(config)
-        else:
-            raise ValueError(
-                f"Invalid market mechanism {config.param_dict.get('market_mechanism')}."
-            )
 
         _, _, meta, _ = mechanism.clear(cleaned_orderbook, mps)
         price_forecast.loc[t] = meta[0]["price"]
@@ -384,20 +444,27 @@ def calculate_naive_price(
     config: MarketConfig,
     preprocess_information=None,
 ):
-    """Calculates elastic or inelastic naive price forecast depending on demand unit types."""
-    # 1. Sort units by type and filter for units with bidding strategy for the given market_id
-    _, demand_units, _, _, _ = sort_units(units, config.market_id)
+    """Calculates a naive price forecast (disregarding Storage and DSM units).
+    The used method depends on the market mechanism of the market the price forecast
+    is requested for, defined in config."""
+    if config.market_mechanism == "pay_as_clear":
+        return calculate_naive_price_simple(index, units, config)
 
-    elastic_demand_units = {
-        unit.id: unit for unit in demand_units if is_elastic_demand(unit, config)
-    }
-
-    if len(elastic_demand_units) > 0:
-        return calculate_naive_price_elastic(
-            index, units, config, elastic_demand_units.values()
+    if config.market_mechanism in ["redispatch", "CRM_pos", "CRM_neg"]:
+        log.warning(
+            "Price forecast for market mechanism '%s' is not implemented yet; "
+            "returning zeros.",
+            config.market_mechanism,
         )
+        return pd.Series(index=index, data=0.0)
 
-    return calculate_naive_price_inelastic(index, units, config)
+    if config.market_mechanism in ['pay_as_bid', 'complex_clearing']:
+        return calculate_naive_price_using_market_mechanism(index, units, config)
+    
+    else:
+        raise ValueError(
+            f"Invalid market mechanism {config.param_dict.get('market_mechanism')}."
+        )
 
 
 @lru_cache

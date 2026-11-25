@@ -14,7 +14,8 @@ from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecast_algorithms import (
     calculate_naive_congestion_signal,
     calculate_naive_price,
-    calculate_naive_price_inelastic,
+    calculate_naive_price_simple,
+    calculate_naive_price_using_market_mechanism,
     calculate_naive_renewable_utilisation,
     calculate_naive_residual_load,
     get_forecast_registries,
@@ -466,7 +467,8 @@ def test_forecast_interface__cache(market_setup, forecast_setup, shared_FastInde
     calculate_naive_residual_load.cache_clear()
     calculate_naive_congestion_signal.cache_clear()
     calculate_naive_renewable_utilisation.cache_clear()
-    calculate_naive_price_inelastic.cache_clear()
+    calculate_naive_price_simple.cache_clear()
+    calculate_naive_price_using_market_mechanism.cache_clear()
 
     mock_dsm_forecaster = forecast_setup["mock_dsm_forecaster"]
 
@@ -513,9 +515,9 @@ def test_forecast_interface__cache(market_setup, forecast_setup, shared_FastInde
     assert calculate_naive_renewable_utilisation.cache_info().hits == n - 1
     assert calculate_naive_renewable_utilisation.cache_info().misses == 1
 
-    # NOTE: only missed once & no hits due to lru_cache also on calculate_naive_price
-    assert calculate_naive_price_inelastic.cache_info().hits == 0
-    assert calculate_naive_price_inelastic.cache_info().misses == 1
+    # NOTE: only missed once & no hits due to lru_cache also on calculate_naive_price_simple
+    assert calculate_naive_price_simple.cache_info().hits == 0
+    assert calculate_naive_price_simple.cache_info().misses == 1
 
 
 def test_units_operator_forecaster__matches_unit_forecasts(
@@ -615,7 +617,7 @@ def test_naive_forecast__exchange_imports_are_supply(index, shared_FastIndex):
     )
     units = (*plants, demand, exchange)
 
-    price = calculate_naive_price_inelastic(shared_FastIndex, units, market_config)
+    price = calculate_naive_price_simple(shared_FastIndex, units, market_config)
     residual_load = calculate_naive_residual_load(
         shared_FastIndex, units, market_config
     )
