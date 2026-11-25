@@ -53,16 +53,8 @@ class HeatPump:
         self.cop = cop
         self.time_steps = time_steps
         self.min_power = min_power
-        self.ramp_up = (
-            convert_ramp_to_timestep(ramp_up, simulation_timestep)
-            if ramp_up is not None
-            else None
-        )
-        self.ramp_down = (
-            convert_ramp_to_timestep(ramp_down, simulation_timestep)
-            if ramp_down is not None
-            else None
-        )
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
         self.min_operating_steps = min_operating_steps
         self.min_down_steps = min_down_steps
         self.initial_operational_status = initial_operational_status
@@ -210,16 +202,8 @@ class Boiler:
         self.time_steps = time_steps
         self.fuel_type = fuel_type
         self.min_power = min_power
-        self.ramp_up = (
-            convert_ramp_to_timestep(ramp_up, simulation_timestep)
-            if ramp_up is not None
-            else None
-        )
-        self.ramp_down = (
-            convert_ramp_to_timestep(ramp_down, simulation_timestep)
-            if ramp_down is not None
-            else None
-        )
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
         self.min_operating_steps = min_operating_steps
         self.min_down_steps = min_down_steps
         self.initial_operational_status = initial_operational_status
@@ -479,16 +463,8 @@ class GenericStorage:
         self.efficiency_charge = efficiency_charge
         self.efficiency_discharge = efficiency_discharge
         self.initial_soc = initial_soc
-        self.ramp_up = (
-            convert_ramp_to_timestep(ramp_up, simulation_timestep)
-            if ramp_up is not None
-            else max_power_charge
-        )
-        self.ramp_down = (
-            convert_ramp_to_timestep(ramp_down, simulation_timestep)
-            if ramp_down is not None
-            else max_power_charge
-        )
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
         self.storage_loss_rate = storage_loss_rate
         self.kwargs = kwargs
 
@@ -935,16 +911,8 @@ class Electrolyser:
         self.efficiency = efficiency
         self.time_steps = time_steps
         self.min_power = min_power
-        self.ramp_up = (
-            convert_ramp_to_timestep(ramp_up, simulation_timestep)
-            if ramp_up is not None
-            else None
-        )
-        self.ramp_down = (
-            convert_ramp_to_timestep(ramp_down, simulation_timestep)
-            if ramp_down is not None
-            else None
-        )
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
         self.min_operating_steps = min_operating_steps
         self.min_down_steps = min_down_steps
         self.initial_operational_status = initial_operational_status
@@ -1105,16 +1073,8 @@ class DRIPlant:
         self.min_power = min_power
         self.fuel_type = fuel_type
         self.time_steps = time_steps
-        self.ramp_up = (
-            convert_ramp_to_timestep(ramp_up, simulation_timestep)
-            if ramp_up is not None
-            else max_power
-        )
-        self.ramp_down = (
-            convert_ramp_to_timestep(ramp_down, simulation_timestep)
-            if ramp_down is not None
-            else max_power
-        )
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
         self.min_operating_steps = min_operating_steps
         self.min_down_steps = min_down_steps
         self.initial_operational_status = initial_operational_status
@@ -1158,7 +1118,7 @@ class DRIPlant:
                 - `dri_output_constraint[t]`: Links DRI output to fuel (hydrogen or natural gas) consumption.
                 - `electricity_consumption_constraint[t]`: Ensures that electricity consumption is proportional to DRI output.
                 - `iron_ore_constraint[t]`: Links iron ore input to DRI output.
-                - `ramp_up_constraint[t]`: Limits the ramp-up rate per of power input.
+                - `ramp_up_constraint[t]`: Limits the ramp-up rate of power input.
                 - `ramp_down_constraint[t]`: Limits the ramp-down rate of power input.
                 - `min_operating_time_constraint[t]`: Ensures the DRI plant operates for a minimum duration.
                 - `min_downtime_constraint[t]`: Ensures the DRI plant remains off for a minimum duration between operations.
@@ -1367,16 +1327,8 @@ class ElectricArcFurnace:
         self.specific_lime_demand = specific_lime_demand
         self.lime_co2_factor = lime_co2_factor
         self.time_steps = time_steps
-        self.ramp_up = (
-            convert_ramp_to_timestep(ramp_up, simulation_timestep)
-            if ramp_up is not None
-            else None
-        )
-        self.ramp_down = (
-            convert_ramp_to_timestep(ramp_down, simulation_timestep)
-            if ramp_down is not None
-            else None
-        )
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
         self.min_operating_steps = min_operating_steps
         self.min_down_steps = min_down_steps
         self.initial_operational_status = initial_operational_status
@@ -1807,9 +1759,9 @@ class ChargingStation:
     min_power : float, default 0.0
         Minimum non-zero operating power, if used.
     ramp_up : float | None
-        Max increase in power in Mw/min. Defaults to None (no ramp constraint).
+        Max increase in power in MW/min. Defaults to None (no ramp constraint).
     ramp_down : float | None
-        Max decrease in powerin MW/min. Defaults to None (no ramp constraint).
+        Max decrease in power in MW/min. Defaults to None (no ramp constraint).
     availability_profile : pd.Series | None
         Optional availability profile.
     power_flow_directionality : str, default "unidirectional"
@@ -1831,16 +1783,8 @@ class ChargingStation:
         self.time_steps = time_steps
         self.max_power = max_power
         self.min_power = min_power
-        self.ramp_up = (
-            convert_ramp_to_timestep(ramp_up, simulation_timestep)
-            if ramp_up is not None
-            else None
-        )
-        self.ramp_down = (
-            convert_ramp_to_timestep(ramp_down, simulation_timestep)
-            if ramp_down is not None
-            else None
-        )
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
         self.availability_profile = availability_profile
         self.power_flow_directionality = power_flow_directionality.lower()
         self.kwargs = kwargs
@@ -2215,7 +2159,7 @@ class GrindingMill:
         min_power (float, optional): Minimum allowable power input to the mill. Defaults to 0.0.
         efficiency (float, optional): Mass ratio of material output to material input.
             Defaults to 1.0 (no mass losses).
-        ramp_up (float, optional): Maximum allowed increase in power input in Mw/min. Defaults to None (no ramp constraint).
+        ramp_up (float, optional): Maximum allowed increase in power input in MW/min. Defaults to None (no ramp constraint).
         ramp_down (float, optional): Maximum allowed decrease in power input in MW/min. Defaults to None (no ramp constraint).
         min_operating_steps (int, optional): Minimum number of consecutive time steps the
             mill must operate once started. Defaults to 0.
@@ -2247,16 +2191,8 @@ class GrindingMill:
         self.efficiency = efficiency
         self.specific_electricity_consumption = specific_electricity_consumption
         self.time_steps = time_steps
-        self.ramp_up = (
-            convert_ramp_to_timestep(ramp_up, simulation_timestep)
-            if ramp_up is not None
-            else None
-        )
-        self.ramp_down = (
-            convert_ramp_to_timestep(ramp_down, simulation_timestep)
-            if ramp_down is not None
-            else None
-        )
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
         self.min_operating_steps = int(min_operating_steps)
         self.min_down_steps = int(min_down_steps)
         self.initial_operational_status = initial_operational_status
@@ -2397,8 +2333,8 @@ class ThermalProcessStage:
         eta_fossil (float, optional): Efficiency of the burner (fossil or hydrogen). Defaults to 0.90.
         fossil_ng_share (float, optional): Share of natural gas in the fossil fuel mix (1.0 = only gas, 0.0 = only coal). Defaults to 1.0.
         max_power (float, optional): Cap on the electric heating power (MW_el). Defaults to ``max_heat_out / eta_electric``.
-        ramp_up (float, optional): Maximum increase in thermal output in Mw/min. Defaults to None (no ramp constraint).
-        ramp_down (float, optional): Maximum decrease in thermal output in Mw/min. Defaults to None (no ramp constraint).
+        ramp_up (float, optional): Maximum increase in thermal output in MW/min. Defaults to None (no ramp constraint).
+        ramp_down (float, optional): Maximum decrease in thermal output in MW/min. Defaults to None (no ramp constraint).
         ng_co2_factor (float, optional): Emissions of natural gas (t CO2/MWh_th). Defaults to 0.202.
         coal_co2_factor (float, optional): Emissions of coal (t CO2/MWh_th). Defaults to 0.341.
         min_operating_steps (int, optional): Minimum number of consecutive operating steps. Defaults to 0.
@@ -2463,16 +2399,8 @@ class ThermalProcessStage:
         self.max_power = (
             max_heat_out / max(eta_electric, 1e-6) if max_power is None else max_power
         )
-        self.ramp_up = (
-            convert_ramp_to_timestep(ramp_up, simulation_timestep)
-            if ramp_up is not None
-            else None
-        )
-        self.ramp_down = (
-            convert_ramp_to_timestep(ramp_down, simulation_timestep)
-            if ramp_down is not None
-            else None
-        )
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
 
         self.ng_co2_factor = ng_co2_factor
         self.coal_co2_factor = coal_co2_factor
