@@ -81,14 +81,14 @@ def test_required_file_missing(scenario):
 
 def test_unused_file_is_warned_about(scenario):
     (scenario / "fuel_prices_df.csv").rename(scenario / "fuel_price_df.csv")
-    (scenario / "notes.txt").write_text("not read by ASSUME")
-    (scenario / "notes.txt.license").write_text("license files are fine")
+    (scenario / "notes.txt").write_text("non-csv files are fine")
+    (scenario / "fuel_prices_df.csv.license").write_text("license files are fine")
     report = verify_scenario_folder(scenario, dry_run=False)
     warnings = messages(report, "warning")
     assert "fuel_price_df.csv: is not used" in warnings
     assert "did you mean 'fuel_prices_df.csv'" in warnings
-    assert "notes.txt: is not used" in warnings
     assert "license" not in warnings
+    assert "notes.txt" not in warnings
 
 
 def test_renamed_file_in_config_is_used(scenario):

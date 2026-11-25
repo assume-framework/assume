@@ -34,6 +34,7 @@ def verify(folder: Path, severity: str = "error") -> str:
     return "\n".join(str(i) for i in report.issues if i.severity == severity)
 
 
+@pytest.mark.require_network  # redispatch/nodal_clearing need pypsa
 def test_valid_grid(grid):
     assert verify(grid) == ""
 
