@@ -105,15 +105,19 @@ def add_redispatch_storages(
 
     Storage is a special case: unlike a power plant it can be pushed both ways
     around its cleared dispatch (discharge more / charge less as well as charge
-    more / discharge less). It is therefore modelled - analogous to
-    :func:`add_redispatch_generators` - as a fixed-dispatch generator plus an
-    upward and a downward redispatch generator, but with a **bidirectional**
-    baseline (the fixed dispatch may be negative, i.e. charging).
+    more / discharge less), and every move changes its state of charge. It is
+    therefore modelled as a PyPSA ``StorageUnit``: ``p_dispatch`` and ``p_store``
+    are free around the cleared schedule and the state of charge follows them with
+    the exact charge and discharge efficiencies.
 
-    The nominal power is the full power span
-    ``max_power_discharge - max_power_charge`` (``max_power_charge`` is negative,
-    so this adds). This keeps the fixed baseline within ``[-1, 1]`` per unit and
-    ensures the up/down redispatch potential does not clip prematurely.
+    The static attributes come from the grid data: capacity (``max_hours``),
+    ``max_soc`` and the efficiencies. What changes per clearing - the schedule,
+    the power range and the state of charge at the start - is set by the
+    redispatch clearing from the storages' bids.
+
+    ``p_nom`` is the larger of the discharge and charge power, so that both
+    ``p_max_pu`` (discharge) and ``p_min_pu`` (charge, negative) stay within
+    ``[-1, 1]``.
 
     The per-bus backup generators added by :func:`add_redispatch_generators`
     already cover the storage buses, so no additional backups are added here.
@@ -122,53 +126,32 @@ def add_redispatch_storages(
         network (pypsa.Network): the pypsa network to which the storages are added
         storages (pandas.DataFrame): the storage units dataframe
     """
-    zeros = pd.DataFrame(
-        np.zeros((len(network.snapshots), len(storages.index))),
-        index=network.snapshots,
-        columns=storages.index,
-    )
+    max_discharge = storages["max_power_discharge"].astype(float)
+    max_charge = storages["max_power_charge"].astype(float)
+    p_nom = np.maximum(max_discharge, -max_charge)
+    p_nom = p_nom.where(p_nom > 0, 1.0)
 
-    # full power span used as nominal power for the storage redispatch generators
-    p_nom = storages["max_power_discharge"] - storages["max_power_charge"]
+    def column(name, default):
+        if name in storages:
+            return storages[name].fillna(default).astype(float)
+        return pd.Series(default, index=storages.index, dtype=float)
 
-    # add storages and their cleared (bidirectional) dispatch as Generator.
-    # The actual fixed dispatch is set later in redispatch.py by
-    # p_min_pu=p_max_pu=cleared_dispatch/p_nom, allowing a negative (charging) baseline.
+    capacity = column("capacity", 0.0)
+    max_soc = column("max_soc", 1.0)
+
     network.add(
-        "Generator",
+        "StorageUnit",
         name=storages.index,
         bus=storages["node"],  # bus to which the storage is connected to
         p_nom=p_nom,
-        p_set=zeros,
-        p_min_pu=zeros,
-        p_max_pu=zeros,
-        sign=1,
-    )
-
-    # add upward redispatch generators (discharge more / charge less)
-    network.add(
-        "Generator",
-        name=storages.index,
-        suffix="_up",
-        bus=storages["node"],
-        p_nom=p_nom,
-        p_min_pu=zeros,
-        p_max_pu=zeros + 1,
-        marginal_cost=zeros,
-        sign=1,
-    )
-
-    # add downward redispatch generators (charge more / discharge less)
-    network.add(
-        "Generator",
-        name=storages.index,
-        suffix="_down",
-        bus=storages["node"],
-        p_nom=p_nom,
-        p_min_pu=zeros,
-        p_max_pu=zeros + 1,
-        marginal_cost=zeros,
-        sign=-1,
+        p_max_pu=max_discharge / p_nom,
+        p_min_pu=max_charge / p_nom,
+        max_hours=capacity * max_soc / p_nom,
+        efficiency_store=column("efficiency_charge", 1.0),
+        efficiency_dispatch=column("efficiency_discharge", 1.0),
+        state_of_charge_initial=0.0,
+        cyclic_state_of_charge=False,
+        marginal_cost=0.0,
     )
 
 
@@ -261,6 +244,24 @@ def calculate_network_meta(network, product: MarketProduct, i: int):
             )
         else:
             dispatch_for_bus = pd.Series(dtype=float)
+
+        # storage units: redispatch = dispatch after clearing minus the schedule
+        # (p_set), signed like the generators (+ upward, - downward)
+        storages_connected_to_bus = network.storage_units.index[
+            network.storage_units.bus == bus
+        ]
+        if len(storages_connected_to_bus) > 0 and not network.storage_units_t.p.empty:
+            storage_redispatch = (
+                network.storage_units_t.p.reindex(
+                    columns=storages_connected_to_bus, fill_value=0.0
+                ).iloc[i]
+                - network.storage_units_t.p_set.reindex(
+                    columns=storages_connected_to_bus, fill_value=0.0
+                ).iloc[i]
+            )
+            dispatch_for_bus = pd.concat(
+                [dispatch_for_bus, storage_redispatch.fillna(0.0)]
+            )
 
         supply_volume = dispatch_for_bus[dispatch_for_bus > 0].sum()
         demand_volume = -dispatch_for_bus[dispatch_for_bus < 0].sum()
