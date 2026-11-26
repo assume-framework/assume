@@ -49,8 +49,10 @@ Where those two curves in a price over power plot meet, the market is cleared fo
 All supply orders with a price below and all demand orders above are accepted.
 Where the price is equal, only partial volume is accepted.
 
-The :code:`PayAsBidRole` clears the market in the same manner as the pay-as-clear mechanism, but the accepted_price is
-the price of the supply order for both the demand order and the supply orders that meet this demand.
+The :code:`PayAsBidRole` accepts the same volumes as the pay-as-clear mechanism, but there is no uniform price.
+Each accepted supply order receives its own bid price.
+Each accepted demand order pays the price of the most expensive supply order serving it,
+i.e. the supply order covering the last unit of its volume in the merit order.
 
 Complex clearing
 =================

@@ -14,7 +14,8 @@ Upcoming Release
 
 
 **Improvements:**
-  - **Shared array-based pay-as-clear kernel**: The merit-order matching of ``PayAsClearRole`` was moved into the standalone function ``clear_merit_order`` in ``assume.markets.clearing_algorithms.simple``, which works on numpy arrays of bid prices and volumes and returns the clearing price and the accepted volumes. ``PayAsClearRole`` only does the orderbook bookkeeping around it. The naive inelastic price forecast (``price_naive_forecast``) now uses the same kernel instead of its own merit-order implementation, so forecast and market clearing follow the same rules. Both the market clearing and the naive price forecast are considerably faster.
+  - **Shared array-based merit-order kernel**: The merit-order matching of ``PayAsClearRole`` and ``PayAsBidRole`` was moved into the standalone function ``clear_merit_order`` in ``assume.markets.clearing_algorithms.simple``, which works on numpy arrays of bid prices and volumes and returns the clearing price and the accepted volumes. Both roles only do the orderbook bookkeeping and pricing around it. The naive price forecast uses the same kernel, so forecast and market clearing follow the same rules. Both the market clearing and the naive price forecast are considerably faster and need less memory.
+  - **Single naive price forecast**: ``price_naive_forecast`` (``calculate_naive_price``) no longer distinguishes between elastic and inelastic demand. ``calculate_naive_price_elastic`` and ``calculate_naive_price_inelastic`` were removed. All units bid their own prices: power plants offer at marginal cost, each inelastic demand bids its own price (instead of the highest price of all demand units), elastic demands bid their bidding strategy's bids, and exchanges offer imports at ``price_import`` and bid exports at ``price_export`` (instead of being netted with the demand). For ``pay_as_bid`` markets the forecast is the volume-weighted average price of the accepted supply, otherwise the clearing price. All other market mechanisms (e.g. ``complex_clearing``, ``nodal_clearing``) are forecasted with the same merit order, so block orders, linked orders and grid constraints are not considered, which is logged as info.
 
 
 **Documentation:**
@@ -26,11 +27,12 @@ Upcoming Release
 
 **Bug Fixes:**
   - **Compare Scenarios dashboard: bid difference panels** (#787): "Accepted Bid Prices Difference" and "Accepted Bid Volume Difference" compared the selected simulation with itself and always showed 0. They now compare ``simulation`` with ``simulation_comp``.
-  - **Consistent clearing price in** ``PayAsClearRole``: The last accepted supply bid sets the clearing price. Only if the first demand bid that is not fully served would pay more, e.g. during supply scarcity, this demand bid sets the price, so that no bid is paradoxically accepted or rejected. Price ties are traded, maximising the accepted volume, and are broken randomly using ``np.random`` (seeded by the simulation seed). This can slightly change clearing prices compared to previous versions.
-
+  - **Consistent clearing price in** ``PayAsClearRole``: The last accepted supply bid sets the clearing price. Only if the first demand bid that is not fully served would pay more, e.g. during supply scarcity, this demand bid sets the price. Price ties are traded, maximising the accepted volume, and are broken randomly using ``np.random`` (seeded by the simulation seed). This can slightly change clearing prices compared to previous versions.
+  - **Consistent clearing in** ``PayAsBidRole``: The accepted volumes are the same as for ``PayAsClearRole``, including the handling of price ties. Accepted supply orders receive their own price, accepted demand orders pay the price of the most expensive supply order serving them. This can slightly change the accepted volumes compared to previous versions.
+  - **Naive price forecast with elastic demand**: The forecast no longer fails for markets with grid data (non-existing default node ``node0``), and exchanges are no longer ignored if all demand units are elastic.
 
 0.7.0 - (11th November 2026)
-=========================
+============================
 
 **License:**
   - **ASSUME is now licensed under the MIT License** instead of the GNU Affero General Public License v3.0 (AGPL-3.0-or-later). The SPDX headers, the package metadata and the documentation have been updated accordingly. The code of conduct, which is adapted from the Contributor Covenant, is licensed under CC-BY-4.0.

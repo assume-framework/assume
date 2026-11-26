@@ -330,7 +330,9 @@ def calculate_naive_congestion_signal(
 ) -> dict[str, ForecastSeries]:
     """
     Compute per-node congestion severity signals from net load and line capacities.
+
     Node congestion forecast resembles::
+
         max(line congestion of connected lines)
         with line congestion = (demand - supply) / line capacity
 

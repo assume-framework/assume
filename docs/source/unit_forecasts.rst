@@ -156,7 +156,7 @@ Price forecast algorithms:
      - Description
    * - Naive (default)
      - ``price_naive_forecast``
-     - Merit-order dispatch against demand (excl. storages and DSM units) for all timesteps. Automatically uses elastic or inelastic clearing depending on demand unit types. Columns in ``forecast_df`` take precedence over calculated values.
+     - Merit-order clearing of the units' own bids for all timesteps (excl. storages and DSM units): power plants at marginal cost, demands at their price (elastic demands with their bids), exchanges at their import and export prices. For ``pay_as_bid`` markets the volume-weighted average price of the accepted supply, otherwise the clearing price. Other market mechanisms (e.g. ``complex_clearing``) are forecasted the same way, without block orders and grid constraints. Columns in ``forecast_df`` take precedence over calculated values.
    * - Keep
      - ``price_keep_given``
      - Keeps the forecast series provided at instantiation unchanged.
