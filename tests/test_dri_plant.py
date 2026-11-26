@@ -2,10 +2,13 @@
 #
 # SPDX-License-Identifier: MIT
 
+from datetime import timedelta
+
 import pandas as pd
 import pyomo.environ as pyo
 import pytest
 
+from assume.common.utils import convert_ramp_to_timestep
 from assume.units.dst_components import DRIPlant
 
 # Define the solver to use
@@ -29,8 +32,8 @@ def dri_plant_config():
         "max_power": 50,
         "min_power": 10,  # Changed from 0 to 10 to test min_power constraints
         "fuel_type": "natural_gas",
-        "ramp_up": 50,
-        "ramp_down": 50,
+        "ramp_up": 50 / 60,
+        "ramp_down": 50 / 60,
         "min_operating_steps": 2,
         "min_down_steps": 2,
         "initial_operational_status": 1,
@@ -53,7 +56,11 @@ def dri_plant_model(dri_plant_config, price_profile):
     model.co2_price = pyo.Param(model.time_steps, initialize=30)
 
     # Initialize the DRIPlant
-    dri_plant = DRIPlant(**dri_plant_config, time_steps=model.time_steps)
+    dri_plant = DRIPlant(
+        **dri_plant_config,
+        time_steps=model.time_steps,
+        simulation_timestep=timedelta(hours=1),
+    )
     model.dri_plant = pyo.Block()
     dri_plant.add_to_model(model, model.dri_plant)
 
@@ -104,8 +111,13 @@ def test_dri_plant_ramping_constraints(dri_plant_model, dri_plant_config):
     Test that ramp-up and ramp-down constraints are respected.
     """
     model, _ = dri_plant_model
-    ramp_up_limit = dri_plant_config["ramp_up"]
-    ramp_down_limit = dri_plant_config["ramp_down"]
+    simulation_timestep = timedelta(hours=1)
+    ramp_up_limit = convert_ramp_to_timestep(
+        dri_plant_config["ramp_up"], simulation_timestep
+    )
+    ramp_down_limit = convert_ramp_to_timestep(
+        dri_plant_config["ramp_down"], simulation_timestep
+    )
 
     for t in model.time_steps:
         if t > model.time_steps.at(1):

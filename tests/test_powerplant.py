@@ -9,6 +9,7 @@ import pytest
 
 from assume.common.exceptions import ValidationError
 from assume.common.forecaster import PowerplantForecaster
+from assume.common.utils import convert_ramp_to_timestep
 from assume.strategies.naive_strategies import EnergyNaiveStrategy
 from assume.units import PowerPlant
 
@@ -114,6 +115,28 @@ def test_init_function(power_plant_1, power_plant_2, power_plant_3):
     assert (power_plant_3.marginal_cost == pd.Series(40, index)).all()
 
 
+def test_powerplant_ramp_is_converted_once_for_sub_hourly_index():
+    index = pd.date_range("2022-01-01", periods=4, freq="15min")
+    forecaster = PowerplantForecaster(
+        index,
+        availability=1,
+        fuel_prices={"lignite": 10},
+    )
+    power_plant = PowerPlant(
+        id="test_pp",
+        unit_operator="test_operator",
+        technology="hard coal",
+        bidding_strategies={"EOM": EnergyNaiveStrategy()},
+        forecaster=forecaster,
+        max_power=100,
+        ramp_up=1,
+        ramp_down=2,
+    )
+
+    assert power_plant.ramp_up == 15
+    assert power_plant.ramp_down == 30
+
+
 def test_reset_function(power_plant_1):
     # Expected series with zero values
     expected_series = pd.Series(
@@ -205,7 +228,7 @@ def test_powerplant_feedback(power_plant_1, mock_market_config):
 
 
 def test_powerplant_ramping(power_plant_1):
-    power_plant_1.ramp_down = 100
+    power_plant_1.ramp_down = 100  # MW/timestep
     power_plant_1.ramp_up = 200
     power_plant_1.min_operating_time = 3
     power_plant_1.min_down_time = 2
@@ -372,8 +395,8 @@ def test_powerplant_execute_dispatch():
         min_power=50,
         efficiency=0.5,
         fuel_type="lignite",
-        ramp_down=100,
-        ramp_up=200,
+        ramp_down=100 / 60,
+        ramp_up=200 / 60,
         min_operating_time=3,
         min_down_time=2,
         forecaster=forecaster,
@@ -714,8 +737,8 @@ def _make_start_cost_plant(freq: str = "h", periods: int = 40, **kwargs) -> Powe
         additional_cost=0,
         fuel_type="lignite",
         emission_factor=0,
-        ramp_down=500,
-        ramp_up=500,
+        ramp_down=convert_ramp_to_timestep(500, forecaster.index.freq),
+        ramp_up=convert_ramp_to_timestep(500, forecaster.index.freq),
         forecaster=forecaster,
         **params,
     )

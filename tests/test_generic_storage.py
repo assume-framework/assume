@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: MIT
 
+from datetime import timedelta
+
 import pandas as pd
 import pyomo.environ as pyo
 import pytest
@@ -30,8 +32,8 @@ def generic_storage_config():
         "efficiency_charge": 0.9,  # Charging efficiency
         "efficiency_discharge": 0.9,  # Discharging efficiency
         "initial_soc": 0,  # Initial SOC
-        "ramp_up": 50,  # Maximum ramp-up rate in MW
-        "ramp_down": 50,  # Maximum ramp-down rate in MW
+        "ramp_up": 50 / 60,  # Maximum ramp-up rate in MW/min
+        "ramp_down": 50 / 60,  # Maximum ramp-down rate in MW/min
         "storage_loss_rate": 0.01,  # 1% storage loss per time step
     }
 
@@ -48,7 +50,11 @@ def generic_storage_model(generic_storage_config, price_profile):
     )
 
     # Initialize the GenericStorage
-    storage = GenericStorage(**generic_storage_config, time_steps=model.time_steps)
+    storage = GenericStorage(
+        **generic_storage_config,
+        time_steps=model.time_steps,
+        simulation_timestep=timedelta(hours=1),
+    )
     model.storage = pyo.Block()
     storage.add_to_model(model, model.storage)
 

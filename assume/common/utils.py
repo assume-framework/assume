@@ -1196,3 +1196,25 @@ def load_index_file(file_name: Path, index: pd.DatetimeIndex):
         return None
 
     return df.loc[index]
+
+
+def convert_ramp_to_timestep(
+    ramp: float | None, simulation_timestep: timedelta | pd.DateOffset | None
+) -> float | None:
+    """
+    Convert a ramp value in MW/min to the change allowed for one simulation timestep.
+
+    Args:
+        ramp (float | None): The ramp value in MW/min to convert. None means no ramp constraint.
+        simulation_timestep (timedelta | pd.DateOffset | None): The simulation timestep duration; required for conversion.
+
+    Returns:
+        float | None: The allowed change in MW for one simulation timestep, or None if ramp is None.
+    """
+    if ramp is None:
+        return None
+    if simulation_timestep is None:
+        raise ValueError(
+            "simulation_timestep is required to convert a ramp rate from MW/min."
+        )
+    return ramp * pd.Timedelta(simulation_timestep).total_seconds() / 60

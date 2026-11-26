@@ -8,6 +8,38 @@ Power Plant Units
 
 The :class:`~assume.units.powerplant.PowerPlant` unit models a generator that feeds power into the grid between ``min_power`` and ``max_power``.
 
+General Definitions
+-------------------
+
+This page defines the parameterisation and explains how different limits change powerplant behavior.
+Throughout the code and this page, the same sign convention is used everywhere:
+
+- **Feeding electricity to the grid is positive.** It is bounded between ``min_power`` and
+  ``max_power`` (both ``>= 0``).
+- A power of ``0`` means the unit is idle.
+
+On top of the minimum and maximum power output limits, the unit has **ramping constraints** that limit how much the power
+output is allowed to change in one minute. The MW/min ramps are internally converted to simulation timesteps:
+
+- ``ramp_up`` / ``ramp_down`` (both ``>= 0``): the maximum increase/decrease of the power in MW/min.
+
+Because a unit can be active on several markets in the same time step, every ramping check distinguishes between three power values:
+
+- **Previous power**: the power the unit was dispatched at in the *previous* time step (``previous_power``).
+- **Current power**: the power already committed/sold on *other* markets for the *same* time step (``current_power``).
+- **Requested power**: the bid being checked for a *new* market product (``requested_power`` / ``requested_power``). This always answers the question "what do I want to offer on *this* market right now?" -- it is a standalone power level for this one market, **not** a delta relative to ``current_power`` and **not** the combined total across all markets.
+
+Ramping (and the max-/min power limits) are always checked on the *combination* of ``current_power`` and the requested power, because that combination is what the unit physically has to deliver. The function then returns the **feasible bid**: the largest/smallest power level for *this* market that keeps ``current_power + feasible_bid`` within what the unit can actually ramp to and what the min/max power limits are. That feasible bid is, again, a value for this one market -- ``current_power`` is only used internally to net the check, it is never added into the returned number.
+
+
+Ramping Behaviour
+------------------
+
+Ramping is evaluated by
+:meth:`~assume.common.base.SupportsMinMax.calculate_ramp` in
+:class:`~assume.common.base.SupportsMinMax`. The method takes ``previous_power``, ``requested_power`` and ``current_power`` and returns the power level that is actually feasible given the ramping constraints.
+
+
 Start-up Costs and Operating Times
 ----------------------------------
 

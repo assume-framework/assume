@@ -3,9 +3,12 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+from datetime import timedelta
 
 import pandas as pd
 import pyomo.environ as pyo
+
+from assume.common.utils import convert_ramp_to_timestep
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +25,10 @@ class HeatPump:
         max_power (float): Maximum allowable power input to the heat pump.
         cop (float): Coefficient of performance of the heat pump, i.e., the ratio of heat output to power input.
         time_steps (list[int]): A list of time steps over which the heat pump operates.
+        simulation_timestep (timedelta | None): The simulation interval, required when a ramp rate is provided.
         min_power (float, optional): Minimum allowable power input to the heat pump. Defaults to 0.0.
-        ramp_up (float, optional): Maximum allowed increase in power input per time step. Defaults to `max_power` if not provided.
-        ramp_down (float, optional): Maximum allowed decrease in power input per time step. Defaults to `max_power` if not provided.
+        ramp_up (float, optional): Maximum allowed increase in power input in MW/min. Defaults to None (no ramp constraint).
+        ramp_down (float, optional): Maximum allowed decrease in power input in MW/min. Defaults to None (no ramp constraint).
         min_operating_steps (int, optional): Minimum number of consecutive time steps the heat pump must operate once it starts. Defaults to 0 (no restriction).
         min_down_steps (int, optional): Minimum number of consecutive time steps the heat pump must remain off after being shut down. Defaults to 0 (no restriction).
     """
@@ -40,6 +44,7 @@ class HeatPump:
         min_operating_steps: int = 0,
         min_down_steps: int = 0,
         initial_operational_status: int = 1,
+        simulation_timestep: timedelta | None = None,
         **kwargs,
     ):
         super().__init__()
@@ -48,8 +53,8 @@ class HeatPump:
         self.cop = cop
         self.time_steps = time_steps
         self.min_power = min_power
-        self.ramp_up = max_power if ramp_up is None else ramp_up
-        self.ramp_down = max_power if ramp_down is None else ramp_down
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
         self.min_operating_steps = min_operating_steps
         self.min_down_steps = min_down_steps
         self.initial_operational_status = initial_operational_status
@@ -102,8 +107,10 @@ class HeatPump:
         model_block.max_power = pyo.Param(initialize=self.max_power)
         model_block.min_power = pyo.Param(initialize=self.min_power)
         model_block.cop = pyo.Param(initialize=self.cop)
-        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
-        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        if self.ramp_up is not None:
+            model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        if self.ramp_down is not None:
+            model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
         model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
         model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
         model_block.initial_operational_status = pyo.Param(
@@ -130,11 +137,12 @@ class HeatPump:
             return b.operating_cost[t] == b.power_in[t] * model.electricity_price[t]
 
         # Ramp-up constraint and ramp-down constraints
-        add_ramping_constraints(
-            model_block=model_block,
-            time_steps=self.time_steps,
-            ramped=model_block.power_in,
-        )
+        if self.ramp_up is not None or self.ramp_down is not None:
+            add_ramping_constraints(
+                model_block=model_block,
+                time_steps=self.time_steps,
+                ramped=model_block.power_in,
+            )
 
         # Define additional variables and constraints for startup/shutdown and operational status
         if (
@@ -162,10 +170,11 @@ class Boiler:
         max_power (float): Maximum allowable power input to the boiler.
         efficiency (float): Efficiency of the boiler, defined as the ratio of heat output to power input (or fuel input).
         time_steps (list[int]): A list of time steps over which the boiler operates.
+        simulation_timestep (timedelta | None): The simulation interval, required when a ramp rate is provided.
         fuel_type (str, optional): Type of fuel used by the boiler ('electricity' or 'natural_gas'). Defaults to 'electricity'.
         min_power (float, optional): Minimum allowable power input to the boiler. Defaults to 0.0.
-        ramp_up (float, optional): Maximum allowed increase in power input per time step. Defaults to `max_power` if not provided.
-        ramp_down (float, optional): Maximum allowed decrease in power input per time step. Defaults to `max_power` if not provided.
+        ramp_up (float, optional): Maximum allowed increase in power input in MW/min. Defaults to None (no ramp constraint).
+        ramp_down (float, optional): Maximum allowed decrease in power input in MW/min. Defaults to None (no ramp constraint).
         min_operating_steps (int, optional): Minimum number of consecutive time steps the boiler must operate once started. Defaults to 0.
         min_down_steps (int, optional): Minimum number of consecutive time steps the boiler must remain off after being shut down. Defaults to 0.
         initial_operational_status (int, optional): The initial operational status of the boiler (0 for off, 1 for on). Defaults to 1.
@@ -183,6 +192,7 @@ class Boiler:
         min_operating_steps: int = 0,
         min_down_steps: int = 0,
         initial_operational_status: int = 1,
+        simulation_timestep: timedelta | None = None,
         **kwargs,
     ):
         super().__init__()
@@ -192,8 +202,8 @@ class Boiler:
         self.time_steps = time_steps
         self.fuel_type = fuel_type
         self.min_power = min_power
-        self.ramp_up = max_power if ramp_up is None else ramp_up
-        self.ramp_down = max_power if ramp_down is None else ramp_down
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
         self.min_operating_steps = min_operating_steps
         self.min_down_steps = min_down_steps
         self.initial_operational_status = initial_operational_status
@@ -268,8 +278,10 @@ class Boiler:
         model_block.max_power = pyo.Param(initialize=self.max_power)
         model_block.min_power = pyo.Param(initialize=self.min_power)
         model_block.efficiency = pyo.Param(initialize=self.efficiency)
-        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
-        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        if self.ramp_up is not None:
+            model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        if self.ramp_down is not None:
+            model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
         model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
         model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
         model_block.initial_operational_status = pyo.Param(
@@ -358,39 +370,16 @@ class Boiler:
         # Ramp-up constraint and ramp-down constraints. The first step has no
         # predecessor to decrease from, so ramp_down is skipped there rather than
         # also capping it (ramp_up already limits the rise from a standing start).
-        if self.fuel_type == "natural_gas":
-
-            @model_block.Constraint(self.time_steps)
-            def ramp_up_constraint(b, t):
-                if t == self.time_steps.at(1):
-                    return b.natural_gas_in[t] <= b.ramp_up
-                return b.natural_gas_in[t] - b.natural_gas_in[t - 1] <= b.ramp_up
-
-            @model_block.Constraint(self.time_steps)
-            def ramp_down_constraint(b, t):
-                if t == self.time_steps.at(1):
-                    return pyo.Constraint.Skip
-                return b.natural_gas_in[t - 1] - b.natural_gas_in[t] <= b.ramp_down
-
-        elif self.fuel_type == "hydrogen_gas":
-
-            @model_block.Constraint(self.time_steps)
-            def ramp_up_constraint(b, t):
-                if t == self.time_steps.at(1):
-                    return b.hydrogen_gas_in[t] <= b.ramp_up
-                return b.hydrogen_gas_in[t] - b.hydrogen_gas_in[t - 1] <= b.ramp_up
-
-            @model_block.Constraint(self.time_steps)
-            def ramp_down_constraint(b, t):
-                if t == self.time_steps.at(1):
-                    return pyo.Constraint.Skip
-                return b.hydrogen_gas_in[t - 1] - b.hydrogen_gas_in[t] <= b.ramp_down
-
-        elif self.fuel_type == "electricity":
+        if self.ramp_up is not None or self.ramp_down is not None:
+            ramped = {
+                "electricity": model_block.power_in,
+                "natural_gas": model_block.natural_gas_in,
+                "hydrogen_gas": model_block.hydrogen_gas_in,
+            }[self.fuel_type]
             add_ramping_constraints(
                 model_block=model_block,
                 time_steps=self.time_steps,
-                ramped=model_block.power_in,
+                ramped=ramped,
             )
 
         # Define operational status variable if min operating time, downtime, or min_power is required (for electric boilers)
@@ -422,6 +411,7 @@ class GenericStorage:
 
     Args:
         capacity (float): Energy storage capacity of the storage unit.
+        simulation_timestep (timedelta | None): The simulation interval, required when a ramp rate is provided.
         min_soc (float, optional): Minimum allowable state of charge (SOC). Defaults to 0.0.
         max_soc (float, optional): Maximum allowable state of charge (SOC). Defaults to 1.0.
         max_power_charge (float, optional): Maximum charging power of the storage unit. Defaults to `capacity` if not provided.
@@ -429,8 +419,8 @@ class GenericStorage:
         efficiency_charge (float, optional): Efficiency of the charging process. Defaults to 1.0.
         efficiency_discharge (float, optional): Efficiency of the discharging process. Defaults to 1.0.
         initial_soc (float, optional): Initial state of charge as a fraction of `capacity`. Defaults to 1.0.
-        ramp_up (float, optional): Maximum allowed increase in charging/discharging power per time step. Defaults to None (no ramp constraint).
-        ramp_down (float, optional): Maximum allowed decrease in charging/discharging power per time step. Defaults to None (no ramp constraint).
+        ramp_up (float, optional): Maximum allowed increase in charging/discharging power in MW/min. Defaults to None (no ramp constraint).
+        ramp_down (float, optional): Maximum allowed decrease in charging/discharging power in MW/min. Defaults to None (no ramp constraint).
         storage_loss_rate (float, optional): Fraction of energy lost per time step due to storage inefficiencies. Defaults to 0.0.
     """
 
@@ -448,6 +438,7 @@ class GenericStorage:
         ramp_up: float | None = None,
         ramp_down: float | None = None,
         storage_loss_rate: float = 0.0,
+        simulation_timestep: timedelta | None = None,
         **kwargs,
     ):
         super().__init__()
@@ -472,8 +463,8 @@ class GenericStorage:
         self.efficiency_charge = efficiency_charge
         self.efficiency_discharge = efficiency_discharge
         self.initial_soc = initial_soc
-        self.ramp_up = max_power_charge if ramp_up is None else ramp_up
-        self.ramp_down = max_power_charge if ramp_down is None else ramp_down
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
         self.storage_loss_rate = storage_loss_rate
         self.kwargs = kwargs
 
@@ -493,8 +484,8 @@ class GenericStorage:
                 - `efficiency_charge`: Charging efficiency.
                 - `efficiency_discharge`: Discharging efficiency.
                 - `initial_soc`: Initial state of charge.
-                - `ramp_up`: Maximum allowed ramp-up rate for charging and discharging.
-                - `ramp_down`: Maximum allowed ramp-down rate for charging and discharging.
+                - `ramp_up`: Maximum allowed ramp-up rate for charging and discharging per timestep.
+                - `ramp_down`: Maximum allowed ramp-down rate for charging and discharging per timestep.
                 - `storage_loss_rate`: Fraction of energy lost during storage.
 
             - **Variables**:
@@ -527,8 +518,10 @@ class GenericStorage:
         model_block.efficiency_discharge = pyo.Param(
             initialize=self.efficiency_discharge
         )
-        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
-        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        if self.ramp_up is not None:
+            model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        if self.ramp_down is not None:
+            model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
         model_block.initial_soc = pyo.Param(initialize=self.initial_soc)
         model_block.storage_loss_rate = pyo.Param(initialize=self.storage_loss_rate)
 
@@ -570,33 +563,36 @@ class GenericStorage:
             )
 
         # Apply ramp-up constraints if ramp_up is specified
-        @model_block.Constraint(self.time_steps)
-        def charge_ramp_up_constraint(b, t):
-            if t == self.time_steps.at(1):
-                return b.charge[t] <= b.ramp_up
-            return b.charge[t] - b.charge[t - 1] <= b.ramp_up
+        if self.ramp_up is not None:
 
-        @model_block.Constraint(self.time_steps)
-        def discharge_ramp_up_constraint(b, t):
-            if t == self.time_steps.at(1):
-                return b.discharge[t] <= b.ramp_up
-            return b.discharge[t] - b.discharge[t - 1] <= b.ramp_up
+            @model_block.Constraint(self.time_steps)
+            def charge_ramp_up_constraint(b, t):
+                if t == self.time_steps.at(1):
+                    return b.charge[t] <= b.ramp_up
+                return b.charge[t] - b.charge[t - 1] <= b.ramp_up
 
-        # Apply ramp-down constraints if ramp_down is specified. The first step has no
-        # predecessor to decrease from, so it is left uncapped here rather than also
-        # bounding it by ramp_down (ramp_up above already caps how fast it can rise
-        # from a standing start).
-        @model_block.Constraint(self.time_steps)
-        def charge_ramp_down_constraint(b, t):
-            if t == self.time_steps.at(1):
-                return pyo.Constraint.Skip
-            return b.charge[t - 1] - b.charge[t] <= b.ramp_down
+            @model_block.Constraint(self.time_steps)
+            def discharge_ramp_up_constraint(b, t):
+                if t == self.time_steps.at(1):
+                    return b.discharge[t] <= b.ramp_up
+                return b.discharge[t] - b.discharge[t - 1] <= b.ramp_up
 
-        @model_block.Constraint(self.time_steps)
-        def discharge_ramp_down_constraint(b, t):
-            if t == self.time_steps.at(1):
-                return pyo.Constraint.Skip
-            return b.discharge[t - 1] - b.discharge[t] <= b.ramp_down
+        if self.ramp_down is not None:
+            # Apply ramp-down constraints if ramp_down is specified. The first step has no
+            # predecessor to decrease from, so it is left uncapped here rather than also
+            # bounding it by ramp_down (ramp_up above already caps how fast it can rise
+            # from a standing start).
+            @model_block.Constraint(self.time_steps)
+            def charge_ramp_down_constraint(b, t):
+                if t == self.time_steps.at(1):
+                    return pyo.Constraint.Skip
+                return b.charge[t - 1] - b.charge[t] <= b.ramp_down
+
+            @model_block.Constraint(self.time_steps)
+            def discharge_ramp_down_constraint(b, t):
+                if t == self.time_steps.at(1):
+                    return pyo.Constraint.Skip
+                return b.discharge[t - 1] - b.discharge[t] <= b.ramp_down
 
         return model_block
 
@@ -886,9 +882,10 @@ class Electrolyser:
         max_power (float): The rated power capacity of the electrolyser.
         efficiency (float): The efficiency of the electrolysis process (0-1).
         time_steps (list[int]): A list of time steps over which the electrolyser operates.
+        simulation_timestep (timedelta | None): The simulation interval, required when a ramp rate is provided.
         min_power (float): The minimum power required for operation.
-        ramp_up (float, optional): The maximum rate at which the electrolyser can increase its power output. Defaults to `max_power`.
-        ramp_down (float, optional): The maximum rate at which the electrolyser can decrease its power output. Defaults to `max_power`.
+        ramp_up (float, optional): The maximum rate in MW/min at which the electrolyser can increase its power output. Defaults to None (no ramp constraint)..
+        ramp_down (float, optional): The maximum rate at which the electrolyser can decrease its power output. Defaults to None (no ramp constraint).
         min_operating_steps (int, optional): The minimum number of steps the electrolyser must operate continuously. Defaults to 1.
         min_down_steps (int, optional): The minimum number of downtime steps required between operating cycles. Defaults to 1.
         initial_operational_status (int, optional): The initial operational status of the electrolyser (0 for off, 1 for on). Defaults to 1.
@@ -905,6 +902,7 @@ class Electrolyser:
         min_operating_steps: int = 1,
         min_down_steps: int = 1,
         initial_operational_status: int = 1,
+        simulation_timestep: timedelta | None = None,
         **kwargs,
     ):
         super().__init__()
@@ -913,8 +911,8 @@ class Electrolyser:
         self.efficiency = efficiency
         self.time_steps = time_steps
         self.min_power = min_power
-        self.ramp_up = max_power if ramp_up is None else ramp_up
-        self.ramp_down = max_power if ramp_down is None else ramp_down
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
         self.min_operating_steps = min_operating_steps
         self.min_down_steps = min_down_steps
         self.initial_operational_status = initial_operational_status
@@ -931,8 +929,8 @@ class Electrolyser:
                 - `max_power`: Maximum allowable power input.
                 - `efficiency`: Efficiency of the electrolyser.
                 - `min_power`: Minimum allowable power input.
-                - `ramp_up`: Maximum ramp-up rate.
-                - `ramp_down`: Maximum ramp-down rate.
+                - `ramp_up`: Maximum ramp-up rate in MW/timestep.
+                - `ramp_down`: Maximum ramp-down rate in MW/timestep.
                 - `min_operating_steps`: Minimum operating time.
                 - `min_down_steps`: Minimum downtime between operating cycles.
                 - `initial_operational_status`: Initial operational status of the electrolyser.
@@ -967,8 +965,10 @@ class Electrolyser:
         model_block.max_power = pyo.Param(initialize=self.max_power)
         model_block.efficiency = pyo.Param(initialize=self.efficiency)
         model_block.min_power = pyo.Param(initialize=self.min_power)
-        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
-        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        if self.ramp_up is not None:
+            model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        if self.ramp_down is not None:
+            model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
         model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
         model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
         model_block.initial_operational_status = pyo.Param(
@@ -995,11 +995,12 @@ class Electrolyser:
             return b.operating_cost[t] == b.power_in[t] * model.electricity_price[t]
 
         # Ramp-up constraint and ramp-down constraints
-        add_ramping_constraints(
-            model_block=model_block,
-            time_steps=self.time_steps,
-            ramped=model_block.power_in,
-        )
+        if self.ramp_up is not None or self.ramp_down is not None:
+            add_ramping_constraints(
+                model_block=model_block,
+                time_steps=self.time_steps,
+                ramped=model_block.power_in,
+            )
 
         # Define additional variables and constraints for startup/shutdown and operational status
         if (
@@ -1032,8 +1033,9 @@ class DRIPlant:
         min_power (float): The minimum power required for operation.
         fuel_type (str): The type of fuel used by the DRI plant ("hydrogen", "natural_gas", "both").
         time_steps (list[int]): A list of time steps over which the DRI plant operates.
-        ramp_up (float, optional): The maximum rate at which the DRI plant can increase its power output.
-        ramp_down (float, optional): The maximum rate at which the DRI plant can decrease its power output.
+        simulation_timestep (timedelta | None): The simulation interval, required when a ramp rate is provided.
+        ramp_up (float, optional): The maximum rate in MW/min at which the DRI plant can increase its power output. Defaults to None (no ramp constraint).
+        ramp_down (float, optional): The maximum rate in MW/min at which the DRI plant can decrease its power output. Defaults to None (no ramp constraint).
         min_operating_steps (int, optional): The minimum number of steps the DRI plant must operate continuously. Defaults to 0.
         min_down_steps (int, optional): The minimum number of downtime steps required between operating cycles. Defaults to 0.
         initial_operational_status (int, optional): The initial operational status of the DRI plant (0 for off, 1 for on). Defaults to 1.
@@ -1056,6 +1058,7 @@ class DRIPlant:
         min_down_steps: int = 0,
         initial_operational_status: int = 1,
         natural_gas_co2_factor: float = 0.5,
+        simulation_timestep: timedelta | None = None,
         **kwargs,
     ):
         super().__init__()
@@ -1070,8 +1073,8 @@ class DRIPlant:
         self.min_power = min_power
         self.fuel_type = fuel_type
         self.time_steps = time_steps
-        self.ramp_up = max_power if ramp_up is None else ramp_up
-        self.ramp_down = max_power if ramp_down is None else ramp_down
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
         self.min_operating_steps = min_operating_steps
         self.min_down_steps = min_down_steps
         self.initial_operational_status = initial_operational_status
@@ -1091,8 +1094,8 @@ class DRIPlant:
                 - `specific_iron_ore_consumption`: Iron ore consumption per ton of DRI.
                 - `max_power`: Maximum allowable power input.
                 - `min_power`: Minimum allowable power input.
-                - `ramp_up`: Maximum ramp-up rate.
-                - `ramp_down`: Maximum ramp-down rate.
+                - `ramp_up`: Maximum ramp-up rate per timestep.
+                - `ramp_down`: Maximum ramp-down rate per timestep.
                 - `min_operating_steps`: Minimum operating time.
                 - `min_down_steps`: Minimum downtime between operating cycles.
                 - `initial_operational_status`: Initial operational status of the DRI plant.
@@ -1161,8 +1164,10 @@ class DRIPlant:
 
         model_block.max_power = pyo.Param(initialize=self.max_power)
         model_block.min_power = pyo.Param(initialize=self.min_power)
-        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
-        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        if self.ramp_up is not None:
+            model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        if self.ramp_down is not None:
+            model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
         model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
         model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
         model_block.initial_operational_status = pyo.Param(
@@ -1252,11 +1257,12 @@ class DRIPlant:
             return b.operating_cost[t] == operating_cost
 
         # Ramp-up constraint and ramp-down constraints
-        add_ramping_constraints(
-            model_block=model_block,
-            time_steps=self.time_steps,
-            ramped=model_block.power_in,
-        )
+        if self.ramp_up is not None or self.ramp_down is not None:
+            add_ramping_constraints(
+                model_block=model_block,
+                time_steps=self.time_steps,
+                ramped=model_block.power_in,
+            )
 
         # Define additional variables and constraints for startup/shutdown and operational status
         if (
@@ -1287,8 +1293,9 @@ class ElectricArcFurnace:
         specific_lime_demand (float): The specific demand for lime in the electric arc furnace (in tons per ton of steel produced).
         lime_co2_factor (float): The CO2 emission factor for lime production (in ton/MWh).
         time_steps (list[int]): A list of time steps over which the EAF operates.
-        ramp_up (float, optional): The ramp-up rate of the electric arc furnace. Defaults to `max_power`.
-        ramp_down (float, optional): The ramp-down rate of the electric arc furnace. Defaults to `max_power`.
+        simulation_timestep (timedelta | None): The simulation interval, required when a ramp rate is provided.
+        ramp_up (float, optional): The ramp-up rate in MW/min of the electric arc furnace. Defaults to None (no ramp constraint).
+        ramp_down (float, optional): The ramp-down rate in MW/min of the electric arc furnace. Defaults to None (no ramp constraint).
         min_operating_steps (int, optional): The minimum number of steps the EAF must operate continuously. Defaults to 0.
         min_down_steps (int, optional): The minimum number of downtime steps required between operating cycles. Defaults to 0.
         initial_operational_status (int, optional): The initial operational status of the EAF (0 for off, 1 for on). Defaults to 1.
@@ -1308,6 +1315,7 @@ class ElectricArcFurnace:
         min_operating_steps: int = 0,
         min_down_steps: int = 0,
         initial_operational_status: int = 1,
+        simulation_timestep: timedelta | None = None,
         **kwargs,
     ):
         super().__init__()
@@ -1319,8 +1327,8 @@ class ElectricArcFurnace:
         self.specific_lime_demand = specific_lime_demand
         self.lime_co2_factor = lime_co2_factor
         self.time_steps = time_steps
-        self.ramp_up = max_power if ramp_up is None else ramp_up
-        self.ramp_down = max_power if ramp_down is None else ramp_down
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
         self.min_operating_steps = min_operating_steps
         self.min_down_steps = min_down_steps
         self.initial_operational_status = initial_operational_status
@@ -1340,8 +1348,8 @@ class ElectricArcFurnace:
                 - `specific_dri_demand`: DRI demand per ton of steel produced.
                 - `specific_lime_demand`: Lime demand per ton of steel produced.
                 - `lime_co2_factor`: CO2 emission factor for lime production.
-                - `ramp_up`: Maximum ramp-up rate.
-                - `ramp_down`: Maximum ramp-down rate.
+                - `ramp_up`: Maximum ramp-up rate in MW/timestep.
+                - `ramp_down`: Maximum ramp-down rate in MW/timestep.
                 - `min_operating_steps`: Minimum operating time.
                 - `min_down_steps`: Minimum downtime between operating cycles.
                 - `initial_operational_status`: Initial operational status of the EAF.
@@ -1390,8 +1398,10 @@ class ElectricArcFurnace:
 
         model_block.max_power = pyo.Param(initialize=self.max_power)
         model_block.min_power = pyo.Param(initialize=self.min_power)
-        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
-        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        if self.ramp_up is not None:
+            model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        if self.ramp_down is not None:
+            model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
         model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
         model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
         model_block.initial_operational_status = pyo.Param(
@@ -1445,11 +1455,12 @@ class ElectricArcFurnace:
             )
 
         # Ramp-up constraint and ramp-down constraints
-        add_ramping_constraints(
-            model_block=model_block,
-            time_steps=self.time_steps,
-            ramped=model_block.power_in,
-        )
+        if self.ramp_up is not None or self.ramp_down is not None:
+            add_ramping_constraints(
+                model_block=model_block,
+                time_steps=self.time_steps,
+                ramped=model_block.power_in,
+            )
 
         # Define additional variables and constraints for startup/shutdown and operational status
         if (
@@ -1482,6 +1493,8 @@ class ElectricVehicle(GenericStorage):
         Battery energy capacity [same energy unit as charge/discharge integration].
     time_steps : list[int]
         Optimisation time steps.
+    simulation_timestep : timedelta | None
+        Simulation interval, required when a ramp rate is provided.
     availability_profile : pd.Series | None
         1 when vehicle is connected/available at the charging location, 0 otherwise.
     max_power_charge : float
@@ -1499,9 +1512,9 @@ class ElectricVehicle(GenericStorage):
     initial_soc : float, default 1.0
         Initial SOC in fraction of capacity.
     ramp_up : float | None
-        Max increase in charge/discharge power between consecutive steps.
+        Max increase in charge/discharge power in MW/min. Defaults to None (no ramp constraint).
     ramp_down : float | None
-        Max decrease in charge/discharge power between consecutive steps.
+        Max decrease in charge/discharge power in MW/min. Defaults to None (no ramp constraint).
     charging_profile : pd.Series | None
         Optional fixed charging profile.
     storage_loss_rate : float, default 0.0
@@ -1739,14 +1752,16 @@ class ChargingStation:
     ----------
     time_steps : list[int]
         Optimisation time steps.
+    simulation_timestep : timedelta | None
+        Simulation interval, required when a ramp rate is provided.
     max_power : float
         Maximum charging/discharging power.
     min_power : float, default 0.0
         Minimum non-zero operating power, if used.
     ramp_up : float | None
-        Max increase in power between steps.
+        Max increase in power in MW/min. Defaults to None (no ramp constraint).
     ramp_down : float | None
-        Max decrease in power between steps.
+        Max decrease in power in MW/min. Defaults to None (no ramp constraint).
     availability_profile : pd.Series | None
         Optional availability profile.
     power_flow_directionality : str, default "unidirectional"
@@ -1762,13 +1777,14 @@ class ChargingStation:
         ramp_down: float | None = None,
         availability_profile: pd.Series | None = None,
         power_flow_directionality: str = "unidirectional",
+        simulation_timestep: timedelta | None = None,
         **kwargs,
     ):
         self.time_steps = time_steps
         self.max_power = max_power
         self.min_power = min_power
-        self.ramp_up = max_power if ramp_up is None else ramp_up
-        self.ramp_down = max_power if ramp_down is None else ramp_down
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
         self.availability_profile = availability_profile
         self.power_flow_directionality = power_flow_directionality.lower()
         self.kwargs = kwargs
@@ -1786,8 +1802,10 @@ class ChargingStation:
         # Parameters
         model_block.max_power = pyo.Param(initialize=self.max_power)
         model_block.min_power = pyo.Param(initialize=self.min_power)
-        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
-        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        if self.ramp_up is not None:
+            model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        if self.ramp_down is not None:
+            model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
 
         # Variables
         # In this convention:
@@ -1851,33 +1869,40 @@ class ChargingStation:
                 return b.discharge[t] >= b.min_power * (1 - b.charging_mode[t])
 
         # Ramping: charge
-        @model_block.Constraint(self.time_steps)
-        def charge_ramp_up_constraint(b, t):
-            if t == self.time_steps.at(1):
-                return b.charge[t] <= b.ramp_up
-            return b.charge[t] - b.charge[t - 1] <= b.ramp_up
+        if self.ramp_up is not None:
 
-        # The first step has no predecessor to decrease from, so ramp_down is skipped
-        # there rather than also capping it (ramp_up above already limits how fast it
-        # can rise from a standing start).
-        @model_block.Constraint(self.time_steps)
-        def charge_ramp_down_constraint(b, t):
-            if t == self.time_steps.at(1):
-                return pyo.Constraint.Skip
-            return b.charge[t - 1] - b.charge[t] <= b.ramp_down
+            @model_block.Constraint(self.time_steps)
+            def charge_ramp_up_constraint(b, t):
+                if t == self.time_steps.at(1):
+                    return b.charge[t] <= b.ramp_up
+                return b.charge[t] - b.charge[t - 1] <= b.ramp_up
+
+        if self.ramp_down is not None:
+            # The first step has no predecessor to decrease from, so ramp_down is skipped
+            # there rather than also capping it (ramp_up above already limits how fast it
+            # can rise from a standing start).
+            @model_block.Constraint(self.time_steps)
+            def charge_ramp_down_constraint(b, t):
+                if t == self.time_steps.at(1):
+                    return pyo.Constraint.Skip
+                return b.charge[t - 1] - b.charge[t] <= b.ramp_down
 
         # Ramping: discharge
-        @model_block.Constraint(self.time_steps)
-        def discharge_ramp_up_constraint(b, t):
-            if t == self.time_steps.at(1):
-                return b.discharge[t] <= b.ramp_up
-            return b.discharge[t] - b.discharge[t - 1] <= b.ramp_up
+        if self.ramp_up is not None:
 
-        @model_block.Constraint(self.time_steps)
-        def discharge_ramp_down_constraint(b, t):
-            if t == self.time_steps.at(1):
-                return pyo.Constraint.Skip
-            return b.discharge[t - 1] - b.discharge[t] <= b.ramp_down
+            @model_block.Constraint(self.time_steps)
+            def discharge_ramp_up_constraint(b, t):
+                if t == self.time_steps.at(1):
+                    return b.discharge[t] <= b.ramp_up
+                return b.discharge[t] - b.discharge[t - 1] <= b.ramp_up
+
+        if self.ramp_down is not None:
+
+            @model_block.Constraint(self.time_steps)
+            def discharge_ramp_down_constraint(b, t):
+                if t == self.time_steps.at(1):
+                    return pyo.Constraint.Skip
+                return b.discharge[t - 1] - b.discharge[t] <= b.ramp_down
 
         return model_block
 
@@ -2130,13 +2155,12 @@ class GrindingMill:
         specific_electricity_consumption (float): Electricity consumption per tonne of
             material output (MWh/t).
         time_steps (list[int]): A list of time steps over which the mill operates.
+        simulation_timestep (timedelta | None): The simulation interval, required when a ramp rate is provided.
         min_power (float, optional): Minimum allowable power input to the mill. Defaults to 0.0.
         efficiency (float, optional): Mass ratio of material output to material input.
             Defaults to 1.0 (no mass losses).
-        ramp_up (float, optional): Maximum allowed increase in power input per time step.
-            Defaults to `max_power`.
-        ramp_down (float, optional): Maximum allowed decrease in power input per time step.
-            Defaults to `max_power`.
+        ramp_up (float, optional): Maximum allowed increase in power input in MW/min. Defaults to None (no ramp constraint).
+        ramp_down (float, optional): Maximum allowed decrease in power input in MW/min. Defaults to None (no ramp constraint).
         min_operating_steps (int, optional): Minimum number of consecutive time steps the
             mill must operate once started. Defaults to 0.
         min_down_steps (int, optional): Minimum number of consecutive time steps the mill
@@ -2157,6 +2181,7 @@ class GrindingMill:
         min_operating_steps: int = 0,
         min_down_steps: int = 0,
         initial_operational_status: int = 1,
+        simulation_timestep: timedelta | None = None,
         **kwargs,
     ):
         super().__init__()
@@ -2166,8 +2191,8 @@ class GrindingMill:
         self.efficiency = efficiency
         self.specific_electricity_consumption = specific_electricity_consumption
         self.time_steps = time_steps
-        self.ramp_up = max_power if ramp_up is None else ramp_up
-        self.ramp_down = max_power if ramp_down is None else ramp_down
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
         self.min_operating_steps = int(min_operating_steps)
         self.min_down_steps = int(min_down_steps)
         self.initial_operational_status = initial_operational_status
@@ -2210,8 +2235,10 @@ class GrindingMill:
         model_block.specific_electricity_consumption = pyo.Param(
             initialize=self.specific_electricity_consumption
         )
-        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
-        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        if self.ramp_up is not None:
+            model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        if self.ramp_down is not None:
+            model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
         model_block.min_operating_steps = pyo.Param(
             initialize=self.min_operating_steps, within=pyo.NonNegativeIntegers
         )
@@ -2257,11 +2284,12 @@ class GrindingMill:
             return b.operating_cost[t] == b.power_in[t] * model.electricity_price[t]
 
         # Ramp-up and ramp-down constraints
-        add_ramping_constraints(
-            model_block=model_block,
-            time_steps=self.time_steps,
-            ramped=model_block.power_in,
-        )
+        if self.ramp_up is not None or self.ramp_down is not None:
+            add_ramping_constraints(
+                model_block=model_block,
+                time_steps=self.time_steps,
+                ramped=model_block.power_in,
+            )
 
         # Define additional variables and constraints for startup/shutdown and operational status
         if (
@@ -2297,6 +2325,7 @@ class ThermalProcessStage:
         max_heat_out (float): Maximum thermal output of the stage (MW_th).
         specific_heat_demand (float): Thermal energy per tonne of throughput (MWh_th/t).
         time_steps (list[int]): A list of time steps over which the stage operates.
+        simulation_timestep (timedelta | None): The simulation interval, required when a ramp rate is provided.
         min_heat_out (float, optional): Minimum thermal output while the stage is on (MW_th). Defaults to 0.0.
         specific_electricity_aux (float, optional): Auxiliary electricity per tonne of throughput (MWh_el/t). Defaults to 0.0.
         fuel_type (str, optional): Firing mode, see above. Defaults to ``"electricity"``.
@@ -2304,8 +2333,8 @@ class ThermalProcessStage:
         eta_fossil (float, optional): Efficiency of the burner (fossil or hydrogen). Defaults to 0.90.
         fossil_ng_share (float, optional): Share of natural gas in the fossil fuel mix (1.0 = only gas, 0.0 = only coal). Defaults to 1.0.
         max_power (float, optional): Cap on the electric heating power (MW_el). Defaults to ``max_heat_out / eta_electric``.
-        ramp_up (float, optional): Maximum increase in thermal output per time step. Defaults to `max_heat_out`.
-        ramp_down (float, optional): Maximum decrease in thermal output per time step. Defaults to `max_heat_out`.
+        ramp_up (float, optional): Maximum increase in thermal output in MW/min. Defaults to None (no ramp constraint).
+        ramp_down (float, optional): Maximum decrease in thermal output in MW/min. Defaults to None (no ramp constraint).
         ng_co2_factor (float, optional): Emissions of natural gas (t CO2/MWh_th). Defaults to 0.202.
         coal_co2_factor (float, optional): Emissions of coal (t CO2/MWh_th). Defaults to 0.341.
         min_operating_steps (int, optional): Minimum number of consecutive operating steps. Defaults to 0.
@@ -2339,6 +2368,7 @@ class ThermalProcessStage:
         min_down_steps: int = 0,
         initial_operational_status: int = 1,
         availability_profile=None,
+        simulation_timestep: timedelta | None = None,
         **kwargs,
     ):
         super().__init__()
@@ -2369,8 +2399,8 @@ class ThermalProcessStage:
         self.max_power = (
             max_heat_out / max(eta_electric, 1e-6) if max_power is None else max_power
         )
-        self.ramp_up = max_heat_out if ramp_up is None else ramp_up
-        self.ramp_down = max_heat_out if ramp_down is None else ramp_down
+        self.ramp_up = convert_ramp_to_timestep(ramp_up, simulation_timestep)
+        self.ramp_down = convert_ramp_to_timestep(ramp_down, simulation_timestep)
 
         self.ng_co2_factor = ng_co2_factor
         self.coal_co2_factor = coal_co2_factor
@@ -2423,8 +2453,10 @@ class ThermalProcessStage:
             initialize=self.fossil_ng_share, within=pyo.UnitInterval
         )
         model_block.max_power = pyo.Param(initialize=self.max_power)
-        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
-        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        if self.ramp_up is not None:
+            model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        if self.ramp_down is not None:
+            model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
         model_block.ng_co2_factor = pyo.Param(initialize=self.ng_co2_factor)
         model_block.coal_co2_factor = pyo.Param(initialize=self.coal_co2_factor)
         model_block.min_operating_steps = pyo.Param(
@@ -2555,11 +2587,12 @@ class ThermalProcessStage:
                     <= availability_at(self.availability_profile, t) * b.max_heat_out
                 )
 
-        add_ramping_constraints(
-            model_block=model_block,
-            time_steps=self.time_steps,
-            ramped=model_block.heat_out,
-        )
+        if self.ramp_up is not None or self.ramp_down is not None:
+            add_ramping_constraints(
+                model_block=model_block,
+                time_steps=self.time_steps,
+                ramped=model_block.heat_out,
+            )
 
         if (
             self.min_operating_steps > 1
@@ -2811,18 +2844,22 @@ def add_ramping_constraints(model_block, time_steps, ramped):
     """
 
     # Ramp-up constraint
-    @model_block.Constraint(time_steps)
-    def ramp_up_constraint(b, t):
-        if t == time_steps.at(1):
-            return ramped[t] <= b.ramp_up
-        return ramped[t] - ramped[t - 1] <= b.ramp_up
+    if hasattr(model_block, "ramp_up"):
+
+        @model_block.Constraint(time_steps)
+        def ramp_up_constraint(b, t):
+            if t == time_steps.at(1):
+                return ramped[t] <= b.ramp_up
+            return ramped[t] - ramped[t - 1] <= b.ramp_up
 
     # Ramp-down constraint
-    @model_block.Constraint(time_steps)
-    def ramp_down_constraint(b, t):
-        if t == time_steps.at(1):
-            return pyo.Constraint.Skip
-        return ramped[t - 1] - ramped[t] <= b.ramp_down
+    if hasattr(model_block, "ramp_down"):
+
+        @model_block.Constraint(time_steps)
+        def ramp_down_constraint(b, t):
+            if t == time_steps.at(1):
+                return pyo.Constraint.Skip
+            return ramped[t - 1] - ramped[t] <= b.ramp_down
 
     return model_block
 

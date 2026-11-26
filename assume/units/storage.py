@@ -12,6 +12,7 @@ from assume.common.base import SupportsMinMaxCharge
 from assume.common.exceptions import ValidationError
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import UnitForecaster
+from assume.common.utils import convert_ramp_to_timestep
 
 logger = logging.getLogger(__name__)
 EPS = 1e-4
@@ -37,10 +38,10 @@ class Storage(SupportsMinMaxCharge):
         efficiency_discharge (float): The efficiency of the storage unit while discharging.
         additional_cost_charge (float, optional): Additional costs associated with power consumption, in EUR/MWh. Defaults to 0.
         additional_cost_discharge (float, optional): Additional costs associated with power generation, in EUR/MWh. Defaults to 0.
-        ramp_up_charge (float): The ramp up rate of charging the storage unit in MW/15 minutes (negative value).
-        ramp_down_charge (float): The ramp down rate of charging the storage unit in MW/15 minutes (negative value).
-        ramp_up_discharge (float): The ramp up rate of discharging the storage unit in MW/15 minutes.
-        ramp_down_discharge (float): The ramp down rate of discharging the storage unit in MW/15 minutes.
+        ramp_up_charge (float): The ramp up rate of charging the storage unit in MW/min (negative value).
+        ramp_down_charge (float): The ramp down rate of charging the storage unit in MW/min (negative value).
+        ramp_up_discharge (float): The ramp up rate of discharging the storage unit in MW/min.
+        ramp_down_discharge (float): The ramp down rate of discharging the storage unit in MW/min.
         simultaneous_charge_discharge_ramping (bool): Defines if ramping limits can be used on both sides simultaneously. Defaults to False.
         hot_start_cost (float): The hot start cost of the storage unit in €/MW.
         warm_start_cost (float): The warm start cost of the storage unit in €/MW.
@@ -235,10 +236,17 @@ class Storage(SupportsMinMaxCharge):
                 id=self.id,
                 field="ramp_down_discharge",
             )
-        self.ramp_up_charge = ramp_up_charge
-        self.ramp_down_charge = ramp_down_charge
-        self.ramp_up_discharge = ramp_up_discharge
-        self.ramp_down_discharge = ramp_down_discharge
+
+        self.ramp_up_charge = convert_ramp_to_timestep(ramp_up_charge, self.index.freq)
+        self.ramp_down_charge = convert_ramp_to_timestep(
+            ramp_down_charge, self.index.freq
+        )
+        self.ramp_up_discharge = convert_ramp_to_timestep(
+            ramp_up_discharge, self.index.freq
+        )
+        self.ramp_down_discharge = convert_ramp_to_timestep(
+            ramp_down_discharge, self.index.freq
+        )
         self.simultaneous_charge_discharge_ramping = (
             simultaneous_charge_discharge_ramping
         )

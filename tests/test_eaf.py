@@ -2,10 +2,13 @@
 #
 # SPDX-License-Identifier: MIT
 
+from datetime import timedelta
+
 import pandas as pd
 import pyomo.environ as pyo
 import pytest
 
+from assume.common.utils import convert_ramp_to_timestep
 from assume.units.dst_components import ElectricArcFurnace
 
 # Define the solver to use
@@ -28,8 +31,8 @@ def eaf_config():
         "specific_dri_demand": 1,
         "specific_lime_demand": 0.05,
         "lime_co2_factor": 0.1,
-        "ramp_up": 50,
-        "ramp_down": 50,
+        "ramp_up": 50 / 60,
+        "ramp_down": 50 / 60,
         "min_operating_steps": 2,
         "min_down_steps": 2,
         "initial_operational_status": 1,
@@ -51,7 +54,11 @@ def eaf_model(eaf_config, price_profile):
     model.lime_price = pyo.Param(model.time_steps, initialize=20)
 
     # Initialize the Electric Arc Furnace
-    eaf = ElectricArcFurnace(**eaf_config, time_steps=model.time_steps)
+    eaf = ElectricArcFurnace(
+        **eaf_config,
+        time_steps=model.time_steps,
+        simulation_timestep=timedelta(hours=1),
+    )
     model.eaf = pyo.Block()
     eaf.add_to_model(model, model.eaf)
 
@@ -104,8 +111,11 @@ def test_eaf_ramping_constraints(eaf_model, eaf_config):
     Test that ramp-up and ramp-down constraints are respected.
     """
     model, _ = eaf_model
-    ramp_up_limit = eaf_config["ramp_up"]
-    ramp_down_limit = eaf_config["ramp_down"]
+    simulation_timestep = timedelta(hours=1)
+    ramp_up_limit = convert_ramp_to_timestep(eaf_config["ramp_up"], simulation_timestep)
+    ramp_down_limit = convert_ramp_to_timestep(
+        eaf_config["ramp_down"], simulation_timestep
+    )
 
     for t in model.time_steps:
         if t > model.time_steps.at(1):

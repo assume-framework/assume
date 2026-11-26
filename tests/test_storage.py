@@ -28,10 +28,10 @@ def storage_unit() -> Storage:
         capacity=1000,
         efficiency_charge=0.9,
         efficiency_discharge=0.95,
-        ramp_down_charge=-50,
-        ramp_down_discharge=50,
-        ramp_up_charge=-60,
-        ramp_up_discharge=60,
+        ramp_down_charge=-50 / 60,
+        ramp_down_discharge=50 / 60,
+        ramp_up_charge=-60 / 60,
+        ramp_up_discharge=60 / 60,
         additional_cost_charge=3,
         additional_cost_discharge=4,
         additional_cost=1,
@@ -417,7 +417,7 @@ def test_net_ramping_constraint_one_ramp_undefined(storage_unit):
     )  # both ramps are undefined, so we can ramp up charge to -100
 
     # 1.3 ramp_up_charge undefined
-    storage_unit.ramp_down_discharge = 50
+    storage_unit.ramp_down_discharge = 50  # in MW/timestep
     adjusted_charge = storage_unit.calculate_ramp_charge(0.5, 30, -100, 0)
     assert (
         adjusted_charge == -100
@@ -425,7 +425,7 @@ def test_net_ramping_constraint_one_ramp_undefined(storage_unit):
 
     # case2 discharging -> charging
     # 2.1 ramp_down_charge undefined
-    storage_unit.ramp_up_charge = -60
+    storage_unit.ramp_up_charge = -60  # in MW/timestep
     storage_unit.ramp_down_charge = None
     adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, -90, 100, 0)
     assert (
@@ -440,7 +440,7 @@ def test_net_ramping_constraint_one_ramp_undefined(storage_unit):
     )  # both ramps are undefined, so we can ramp up discharge to 100
 
     # 2.3 ramp_up_discharge undefined
-    storage_unit.ramp_down_charge = -50
+    storage_unit.ramp_down_charge = -50  # in MW/timestep
     adjusted_discharge = storage_unit.calculate_ramp_discharge(0.5, -40, 100, 0)
     assert (
         adjusted_discharge == 100
@@ -781,27 +781,27 @@ def test_initialising_invalid_storages():
         d = param_dict.copy()
         d["efficiency_discharge"] = 1.1
         Storage(**d)
-    with pytest.raises(ValueError, match="ramp_up_charge=10 must be <= 0 for unit id"):
+    with pytest.raises(ValueError, match="ramp_up_charge=0.1 must be <= 0 for unit id"):
         d = param_dict.copy()
-        d["ramp_up_charge"] = 10
+        d["ramp_up_charge"] = 0.1
         Storage(**d)
     with pytest.raises(
-        ValueError, match="ramp_down_charge=10 must be <= 0 for unit id"
+        ValueError, match="ramp_down_charge=0.1 must be <= 0 for unit id"
     ):
         d = param_dict.copy()
-        d["ramp_down_charge"] = 10
+        d["ramp_down_charge"] = 0.1
         Storage(**d)
     with pytest.raises(
-        ValueError, match="ramp_up_discharge=-10 must be >= 0 for unit id"
+        ValueError, match="ramp_up_discharge=-0.1 must be >= 0 for unit id"
     ):
         d = param_dict.copy()
-        d["ramp_up_discharge"] = -10
+        d["ramp_up_discharge"] = -0.1
         Storage(**d)
     with pytest.raises(
-        ValueError, match="ramp_down_discharge=-10 must be >= 0 for unit id"
+        ValueError, match="ramp_down_discharge=-0.1 must be >= 0 for unit id"
     ):
         d = param_dict.copy()
-        d["ramp_down_discharge"] = -10
+        d["ramp_down_discharge"] = -0.1
         Storage(**d)
     with pytest.raises(
         ValueError, match="min_operating_time=-10 must be >= 0 for unit id"

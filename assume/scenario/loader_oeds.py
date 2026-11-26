@@ -376,8 +376,8 @@ def load_oeds(
                         "efficiency": plant["eta"],
                         "technology": fuel_type,
                         "cold_start_cost": plant["start_cost"] * 1e3,
-                        "ramp_up": plant["ramp_up"],
-                        "ramp_down": plant["ramp_down"],
+                        "ramp_up": plant["ramp_up"],  # MW/min
+                        "ramp_down": plant["ramp_down"],  # MW/min
                         "location": (lat, lon),
                         "node": area,
                     },

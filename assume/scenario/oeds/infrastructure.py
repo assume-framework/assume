@@ -204,8 +204,12 @@ class InfrastructureInterface:
         # df["maxPower"] is Rated Power [kW]
         df["minPower"] = df["maxPower"] * 0.5  # MinPower = 1/2 MaxPower
         df["P0"] = df["minPower"] + 0.1
-        df["ramp_up"] = 0.1 * df["maxPower"]  # 10% Change per hour
-        df["ramp_down"] = 0.1 * df["maxPower"]  # 10% Change per hour
+        df["ramp_up"] = (
+            0.1 * df["maxPower"] / 1e3 / 60
+        )  # 10% change per hour, converted from kW to MW/min
+        df["ramp_down"] = (
+            0.1 * df["maxPower"] / 1e3 / 60
+        )  # 10% change per hour, converted from kW to MW/min
         df["min_down_time"] = 5  # default min stop time 5h
         df["min_operating_time"] = 5  # default min run time 5h
         df["on"] = 1  # on counter --> Plant is on till 1 hour
@@ -314,14 +318,8 @@ class InfrastructureInterface:
                 df.at[line, "maxPower"] * tech_params.get("minPower", 0) / 100
             )
             df.at[line, "P0"] = df.at[line, "minPower"]
-            df.at[line, "ramp_up"] = np.round(
-                df.at[line, "maxPower"] * tech_params["ramp_up"] * 60 / 100,
-                2,
-            )
-            df.at[line, "ramp_down"] = np.round(
-                df.at[line, "maxPower"] * tech_params["ramp_down"] * 60 / 100,
-                2,
-            )
+            df.at[line, "ramp_up"] = tech_params["ramp_up"]
+            df.at[line, "ramp_down"] = tech_params["ramp_down"]
             df.at[line, "eta"] = tech_params["eta"] / 100  # convert to percentage
             df.at[line, "chi"] = (
                 tech_params["chi"] / 1e3

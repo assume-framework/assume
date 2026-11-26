@@ -30,13 +30,13 @@ The SOC is kept within ``min_soc`` and ``max_soc``. How far the unit can charge 
 
 
 On top of the SOC-based limits, the unit has **ramping constraints** that limit how much the power
-output is allowed to change from one time step to the next:
+output is allowed to change in one minute. The MW/min ramps are internally converted to simulation timesteps:
 
-- ``ramp_up_discharge`` / ``ramp_down_discharge`` (both ``>= 0``): the maximum increase/decrease of the discharging power per time step.
-- ``ramp_up_charge`` / ``ramp_down_charge`` (both ``<= 0``): the maximum increase/decrease of the charging power per time step (recall that charging power is negative, so "ramping up the charge"
+- ``ramp_up_discharge`` / ``ramp_down_discharge`` (both ``>= 0``): the maximum increase/decrease of the discharging power in MW/min.
+- ``ramp_up_charge`` / ``ramp_down_charge`` (both ``<= 0``): the maximum increase/decrease of the charging power in MW/min (recall that charging power is negative, so "ramping up the charge"
   means becoming more negative).
 
-The figure below illustrates these four quantities as the maximum reach of a single time step. On the left, a unit starting from the same ``previous_power`` can ramp up towards discharging or towards charging within one step -- ``ramp_up_discharge`` and ``ramp_up_charge`` are the two (independent) distances it can cover in either direction. On the right, two different starting points (one already discharging near its maximum, one already charging near its maximum) both ramp *down* towards the same ``current_power`` -- ``ramp_down_discharge`` and ``ramp_down_charge`` are how far each of them can move towards that point within one step.
+The figure below illustrates these four quantities as the maximum reach of a single simulation timestep. On the left, a unit starting from the same ``previous_power`` can ramp up towards discharging or towards charging within one simulation timestep -- ``ramp_up_discharge`` and ``ramp_up_charge`` are the two (independent) distances it can cover in either direction. On the right, two different starting points (one already discharging near its maximum, one already charging near its maximum) both ramp *down* towards the same ``current_power`` -- ``ramp_down_discharge`` and ``ramp_down_charge`` are how far each of them can move towards that point within one step.
 
 .. image:: img/Storage_Ramp_Directions.webp
     :align: center

@@ -13,6 +13,7 @@ from assume.common.base import MinMaxStrategy, SupportsMinMax
 from assume.common.exceptions import ValidationError
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import PowerplantForecaster
+from assume.common.utils import convert_ramp_to_timestep
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +35,8 @@ class PowerPlant(SupportsMinMax):
         partial_load_eff (bool, optional): Does the efficiency vary at part loads? Defaults to False.
         fuel_type (str, optional): The type of fuel used by the power plant for power generation. Defaults to "others".
         emission_factor (float, optional): The emission factor associated with the power plant's fuel type (tons of CO2 emissions per MWh). Defaults to 0.0.
-        ramp_up (Union[float, None], optional): The ramp-up rate of the power plant, indicating how quickly it can increase power output. Defaults to None.
-        ramp_down (Union[float, None], optional): The ramp-down rate of the power plant, indicating how quickly it can decrease power output. Defaults to None.
+        ramp_up (Union[float, None], optional): The ramp-up rate (positive, in MW/min) of the power plant, indicating how quickly it can increase power output. Defaults to None.
+        ramp_down (Union[float, None], optional): The ramp-down rate (positive, in MW/min) of the power plant, indicating how quickly it can decrease power output. Defaults to None.
         hot_start_cost (float, optional): The cost of a hot start, where the power plant is restarted after a recent shutdown. Defaults to 0.
         warm_start_cost (float, optional): The cost of a warm start, where the power plant is restarted after a moderate downtime. Defaults to 0.
         cold_start_cost (float, optional): The cost of a cold start, where the power plant is restarted after a prolonged downtime. Defaults to 0.
@@ -145,7 +146,11 @@ class PowerPlant(SupportsMinMax):
         self.ramp_down = None if ramp_down == 0 else ramp_down
         self.ramp_up = None if ramp_up == 0 else ramp_up
 
-        # the times are given in hours, but handled in whole time steps of the index.
+        # the ramping rates are given in MW/min, but handled in MW/timestep for the simulation.
+        self.ramp_down = convert_ramp_to_timestep(self.ramp_down, self.index.freq)
+        self.ramp_up = convert_ramp_to_timestep(self.ramp_up, self.index.freq)
+
+        # the operating times are given in hours, but handled in whole time steps of the index.
         # Minimum times are rounded up, start thresholds are rounded down.
         hours_to_steps = timedelta(hours=1) / self.index.freq
 

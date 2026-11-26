@@ -160,6 +160,7 @@ class DSMFlex:
 
             component_instance = component_class(
                 time_steps=self.model.time_steps,
+                simulation_timestep=self.index.freq,
                 **component_data,
             )
 

@@ -24,62 +24,87 @@ def test_minmax():
         node="empty",
     )
 
-    mm.ramp_down = 200
-    mm.ramp_up = 400
+    mm.ramp_down = 200  # MW/timestep
+    mm.ramp_up = 400  # MW/timestep
     mm.max_power = 1000
     mm.min_power = 200
 
     # stay turned off
-    assert mm.calculate_ramp(op_time=1, previous_power=0, power=0, current_power=0) == 0
+    assert (
+        mm.calculate_ramp(
+            op_time=1, previous_power=0, requested_power=0, current_power=0
+        )
+        == 0
+    )
     # ramp up only possible to min_power
     assert (
-        mm.calculate_ramp(op_time=1, previous_power=0, power=190, current_power=0)
+        mm.calculate_ramp(
+            op_time=1, previous_power=0, requested_power=190, current_power=0
+        )
         == 200
     )
     # ramp up 400
     assert (
-        mm.calculate_ramp(op_time=1, previous_power=0, power=1200, current_power=0)
+        mm.calculate_ramp(
+            op_time=1, previous_power=0, requested_power=1200, current_power=0
+        )
         == 400
     )
     # should not ramp up, if max_power already sold
     assert (
-        mm.calculate_ramp(op_time=1, previous_power=0, power=800, current_power=400)
+        mm.calculate_ramp(
+            op_time=1, previous_power=0, requested_power=800, current_power=400
+        )
         == 0
     )
     # ramp up to 800
     assert (
-        mm.calculate_ramp(op_time=1, previous_power=400, power=1200, current_power=0)
+        mm.calculate_ramp(
+            op_time=1, previous_power=400, requested_power=1200, current_power=0
+        )
         == 800
     )
     # ramp up to max_power
     assert (
-        mm.calculate_ramp(op_time=1, previous_power=800, power=1200, current_power=0)
+        mm.calculate_ramp(
+            op_time=1, previous_power=800, requested_power=1200, current_power=0
+        )
         == mm.max_power
     )
     # can't sell more if already sold
     assert (
-        mm.calculate_ramp(op_time=1, previous_power=800, power=1200, current_power=1000)
+        mm.calculate_ramp(
+            op_time=1, previous_power=800, requested_power=1200, current_power=1000
+        )
         == 0
     )
 
     # reduce output
     assert (
-        mm.calculate_ramp(op_time=1, previous_power=1000, power=800, current_power=0)
+        mm.calculate_ramp(
+            op_time=1, previous_power=1000, requested_power=800, current_power=0
+        )
         == 800
     )
     # use float
     assert (
-        mm.calculate_ramp(op_time=1, previous_power=800, power=753.2, current_power=0)
+        mm.calculate_ramp(
+            op_time=1, previous_power=800, requested_power=753.2, current_power=0
+        )
         == 753.2
     )
     # check ramp down constraint
     assert (
-        mm.calculate_ramp(op_time=1, previous_power=800, power=500, current_power=0)
+        mm.calculate_ramp(
+            op_time=1, previous_power=800, requested_power=500, current_power=0
+        )
         == 600
     )
 
     assert (
-        mm.calculate_ramp(op_time=1, previous_power=800, power=500, current_power=0)
+        mm.calculate_ramp(
+            op_time=1, previous_power=800, requested_power=500, current_power=0
+        )
         == 600
     )
     # check min_operating_time constraint
@@ -90,12 +115,14 @@ def test_minmax():
 
     assert op_time == 1
     assert (
-        mm.calculate_ramp(op_time=op_time, previous_power=200, power=0, current_power=0)
+        mm.calculate_ramp(
+            op_time=op_time, previous_power=200, requested_power=0, current_power=0
+        )
         == 200
     )
     assert (
         mm.calculate_ramp(
-            op_time=op_time, previous_power=200, power=400, current_power=0
+            op_time=op_time, previous_power=200, requested_power=400, current_power=0
         )
         == 400
     )
@@ -107,11 +134,15 @@ def test_minmax():
 
     assert op_time == -1
     assert (
-        mm.calculate_ramp(op_time=op_time, previous_power=0, power=400, current_power=0)
+        mm.calculate_ramp(
+            op_time=op_time, previous_power=0, requested_power=400, current_power=0
+        )
         == 0
     )
     assert (
-        mm.calculate_ramp(op_time=op_time, previous_power=0, power=0, current_power=0)
+        mm.calculate_ramp(
+            op_time=op_time, previous_power=0, requested_power=0, current_power=0
+        )
         == 0
     )
 
@@ -129,10 +160,10 @@ def test_minmaxcharge_no_simultaneous_charge_discharge_ramping():
         node="empty",
     )
 
-    mmc.ramp_down_charge = -100
-    mmc.ramp_down_discharge = 100
-    mmc.ramp_up_charge = -100
-    mmc.ramp_up_discharge = 100
+    mmc.ramp_down_charge = -100  # MW/timestep
+    mmc.ramp_down_discharge = 100  # MW/timestep
+    mmc.ramp_up_charge = -100  # MW/timestep
+    mmc.ramp_up_discharge = 100  # MW/timestep
     mmc.max_power_charge = -1000
     mmc.max_power_discharge = 1000
     mmc.min_power_charge = 0
@@ -163,7 +194,7 @@ def test_minmaxcharge_no_simultaneous_charge_discharge_ramping():
     assert mmc.calculate_ramp_charge(-10, -200, 0) == -110
 
     # check correct behavior of approximated net ramping speed when simultaneous charge and discharge ramping is not allowed
-    mmc.ramp_up_discharge = 50
+    mmc.ramp_up_discharge = 50  # MW/timestep
     assert mmc.calculate_ramp_discharge(-10, 992, 0) == 65
 
 
@@ -180,10 +211,10 @@ def test_minmaxcharge_simultaneous_charge_discharge_ramping():
         node="empty",
     )
 
-    mmc.ramp_down_charge = -100
-    mmc.ramp_down_discharge = 100
-    mmc.ramp_up_charge = -100
-    mmc.ramp_up_discharge = 100
+    mmc.ramp_down_charge = -100  # MW/timestep
+    mmc.ramp_down_discharge = 100  # MW/timestep
+    mmc.ramp_up_charge = -100  # MW/timestep
+    mmc.ramp_up_discharge = 100  # MW/timestep
     mmc.max_power_charge = -1000
     mmc.max_power_discharge = 1000
     mmc.min_power_charge = 0
@@ -228,10 +259,10 @@ def test_current_power_commitment_charge_discharge_ramping():
         node="empty",
     )
 
-    mmc.ramp_down_charge = -100
-    mmc.ramp_down_discharge = 100
-    mmc.ramp_up_charge = -100
-    mmc.ramp_up_discharge = 100
+    mmc.ramp_down_charge = -100  # MW/timestep
+    mmc.ramp_down_discharge = 100  # MW/timestep
+    mmc.ramp_up_charge = -100  # MW/timestep
+    mmc.ramp_up_discharge = 100  # MW/timestep
     mmc.max_power_charge = -1000
     mmc.max_power_discharge = 1000
     mmc.min_power_charge = 0
@@ -315,10 +346,10 @@ def test_switched_ramp_method_call_raises():
         node="empty",
     )
 
-    mmc.ramp_down_charge = -100
-    mmc.ramp_down_discharge = 100
-    mmc.ramp_up_charge = -100
-    mmc.ramp_up_discharge = 100
+    mmc.ramp_down_charge = -100 / 60
+    mmc.ramp_down_discharge = 100 / 60
+    mmc.ramp_up_charge = -100 / 60
+    mmc.ramp_up_discharge = 100 / 60
     mmc.max_power_charge = -1000
     mmc.max_power_discharge = 1000
     mmc.simultaneous_charge_discharge_ramping = False
@@ -354,10 +385,10 @@ def test_minmaxcharge_unconstrained():
     mmc.max_power_charge = -1000  # MW
     mmc.max_power_discharge = 1000  # MW
     # ramp constraints
-    mmc.ramp_up_charge = -2000
-    mmc.ramp_down_charge = -2000
-    mmc.ramp_up_discharge = 2000
-    mmc.ramp_down_discharge = 2000
+    mmc.ramp_up_charge = -2000  # MW/timestep
+    mmc.ramp_down_charge = -2000  # MW/timestep
+    mmc.ramp_up_discharge = 2000  # MW/timestep
+    mmc.ramp_down_discharge = 2000  # MW/timestep
     # min power
     mmc.min_power_charge = -0
     mmc.min_power_discharge = 0
