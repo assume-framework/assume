@@ -243,6 +243,50 @@ def test_market_pay_as_bid_supply_scarcity():
     assert accepted[2]["volume"] == 100
     assert accepted[2]["accepted_volume"] == 100
     assert accepted[2]["price"] == 100
+    # demand pays the price of the most expensive supply serving it
+    assert accepted[0]["accepted_price"] == 100
+    assert accepted[1]["accepted_price"] == 50
+    assert accepted[2]["accepted_price"] == 100
+
+
+def test_market_pay_as_bid_demand_price():
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
+    products = get_available_products(
+        simple_dayahead_auction_config.market_products, next_opening
+    )
+    assert len(products) == 1
+
+    """
+    Create Orderbook with constant order volumes and prices:
+        - dem1: volume = -150, price = 3000
+        - dem2: volume = -50, price = 70
+        - gen1: volume = 100, price = 10
+        - gen2: volume = 100, price = 50
+        - gen3: volume = 100, price = 80
+    gen1 serves the first 100MW of dem1, gen2 serves the remaining 50MW of dem1 and dem2.
+    gen3 is too expensive for dem2 and rejected.
+    Supply receives its own price: gen1 10€, gen2 50€.
+    Demand pays the price of the supply serving its last MW: dem1 50€, dem2 50€.
+    """
+    orderbook = extend_orderbook(products, -150, 3000)
+    orderbook = extend_orderbook(products, -50, 70, orderbook)
+    orderbook = extend_orderbook(products, 100, 10, orderbook)
+    orderbook = extend_orderbook(products, 100, 50, orderbook)
+    orderbook = extend_orderbook(products, 100, 80, orderbook)
+
+    pay_as_bid_auction_config = copy.copy(simple_dayahead_auction_config)
+    pay_as_bid_auction_config.market_mechanism = "pay_as_bid"
+    mr = PayAsBidRole(pay_as_bid_auction_config)
+    accepted, rejected, meta, flows = mr.clear(orderbook, products)
+
+    prices = {order["price"]: order["accepted_price"] for order in accepted}
+    volumes = {order["price"]: order["accepted_volume"] for order in accepted}
+    assert prices == {3000: 50, 70: 50, 10: 10, 50: 50}
+    assert volumes == {3000: -150, 70: -50, 10: 100, 50: 100}
+    assert [order["price"] for order in rejected] == [80]
+    assert meta[0]["price"] == (100 * 10 + 100 * 50) / 200
 
 
 def test_clear_merit_order_on_arrays():

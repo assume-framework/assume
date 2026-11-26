@@ -13,13 +13,7 @@ import pandas as pd
 from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecaster import ForecastIndex, ForecastSeries
 from assume.common.market_objects import MarketConfig, is_renewable
-from assume.common.utils import get_available_products
-from assume.markets.clearing_algorithms.complex_clearing import ComplexClearingRole
-from assume.markets.clearing_algorithms.simple import (
-    PayAsBidRole,
-    PayAsClearRole,
-    clear_merit_order,
-)
+from assume.markets.clearing_algorithms.simple import clear_merit_order
 from assume.strategies import EnergyHeuristicElasticStrategy
 from assume.units.demand import Demand
 from assume.units.dsm_load_shift import DSMFlex
@@ -140,301 +134,16 @@ def calculate_exchange_volume(exchange_units: list[Exchange]):
     return sum_demand
 
 
-@lru_cache
-def calculate_naive_price_simple(
-    index: ForecastIndex,
-    units: list[BaseUnit],
-    config: MarketConfig,
-) -> dict[str, ForecastSeries]:
+def _stack_bids(series: list, length: int) -> np.ndarray:
     """
-    Forecast market clearing prices using a fast merit-order stack against demand bids, similar to SimpleClearing.
+    Stacks per-bid scalars or time series to an array of shape (length, num_bids).
 
-    Storages and DSM units are ignored in this calculation.
-
-    Steps:
-        1. **Sort units** by type, keeping only those with a bidding strategy for the market.
-        2. **Build supply and demand curves** — compute per-unit marginal costs and
-            available power, then sum inelastic demand (including exchange volumes) and create
-            individual elastic demand bids for each timestep.
-        3. **Merit-order dispatch** — clear the supply and demand bids with
-           :func:`clear_merit_order` for each timestep. The marginal unit's cost sets the price,
-           or the highest willingness to pay of the demand units if capacity is insufficient.
+    The array is filled row-contiguous, so that the bids of a timestep can be read without copying.
     """
-    if isinstance(index, FastIndex):
-        index = index.as_datetimeindex()
-
-    # 1. Sort units by type and filter for units with bidding strategy for the given market_id
-    powerplants_units, demand_units, exchange_units, _, _ = sort_units(
-        units, config.market_id
-    )
-    elastic_demand_units = [
-        unit for unit in demand_units if is_elastic_demand(unit, config)
-    ]
-    inelastic_demand_units = [
-        unit for unit in demand_units if unit not in elastic_demand_units
-    ]
-
-    # 2. Build supply and demand curves
-    # shape: (index_len, num_pp_units)
-    supply_price = np.array(
-        [np.broadcast_to(unit.marginal_cost, len(index)) for unit in powerplants_units]
-    ).T
-    supply_volume = calculate_max_power(powerplants_units).to_numpy().T
-
-    # The inelastic demand is a single bid of the summed demand (incl. exchanges)
-    # at the highest willingness to pay of the demand units.
-    # shape: (index_len,)
-    if inelastic_demand_units:
-        inelastic_demand_price = np.max(
-            [
-                np.broadcast_to(unit.price, len(index))
-                for unit in inelastic_demand_units
-            ],
-            axis=0,
-        )
-        inelastic_demand_volume = calculate_sum_demand(inelastic_demand_units, exchange_units)
-    else:
-        inelastic_demand_price = np.zeros(len(index))
-        inelastic_demand_volume = np.zeros(len(index))
-
-    # The elastic demand bids several bids at each timestep, but the bids do not change from timestep to timestep.
-    elastic_demand_bids = []
-    elastic_demand_prices = np.array([], dtype=float)
-    elastic_demand_volumes = np.array([], dtype=float)
-    if len(elastic_demand_units) > 0:
-        start = config.opening_hours[0]
-        end = start + config.market_products[0].duration
-        market_id = config.market_id
-        product_tuples = {(start, end, None)}
-
-        for unit in elastic_demand_units:
-            elastic_demand_bids.extend(
-                unit.bidding_strategies[market_id].calculate_bids(
-                    unit,
-                    config,
-                    product_tuples=product_tuples,
-                )
-            )
-
-        # sort all bids by price descending
-        all_bids = (
-            pd.DataFrame(elastic_demand_bids)
-            .sort_values(by="price", ascending=False)
-            .reset_index(drop=True)
-        )
-
-        elastic_demand_prices = all_bids["price"].to_numpy(dtype=float)
-        elastic_demand_volumes = np.abs(
-            all_bids["volume"].to_numpy(dtype=float)
-        )
-
-    # 3. Merit-order dispatch
-    prices = np.zeros(len(index))
-    for t in range(len(index)):
-        demand_prices = elastic_demand_prices
-        demand_volumes = elastic_demand_volumes
-        if inelastic_demand_units and inelastic_demand_volume[t] > 0:
-            demand_prices = np.concatenate(
-                (demand_prices, [inelastic_demand_price[t]])
-            )
-            demand_volumes = np.concatenate(
-                (demand_volumes, [inelastic_demand_volume[t]])
-            )
-
-        if not np.any(demand_volumes > 0):
-            # without demand (e.g. imports exceed the demand) the cheapest unit sets the price
-            prices[t] = supply_price[t].min()
-            continue
-
-        prices[t], _, accepted_demand = clear_merit_order(
-            supply_price[t],
-            supply_volume[t],
-            demand_prices,
-            demand_volumes,
-        )
-        if not np.any(accepted_demand > 0):
-            # no unit is cheaper than the willingness to pay, so nothing is traded
-            prices[t] = demand_prices.max()
-
-    return pd.Series(prices, index=index)
-
-
-@lru_cache
-def calculate_naive_price_using_market_mechanism(
-    index: ForecastIndex,
-    units: list[BaseUnit],
-    config: MarketConfig,
-) -> dict[str, ForecastSeries]:
-    """
-    Forecast market clearing prices using the same market mechanism as the market,
-    the price forecast is requested for (e.g. pay_as_clear, pay_as_bid or complex_clearing).
-    
-    Storages and DSM units are ignored in this calculation.
-
-    Steps:
-        1. **Sort units and collect elastic bids** — classify units by type and compute
-           demand bids from elastic demand units for the first product interval.
-        2. **Build supply and demand curves** — compute per-unit marginal costs and
-           available power, then sum inelastic demand (including exchange volumes).
-        3. **Clearing** — for each timestep, assemble an orderbook from
-           supply offers, elastic demand bids, and the inelastic demand block, then
-           clear via the ClearingRole defined in the config.
-    """
-    if isinstance(index, FastIndex):
-        index = index.as_datetimeindex()
-
-    market_id = config.market_id
-
-    elastic_demand_bids = []
-    # 1. Sort units by type and filter for units with bidding strategy for the given market_id
-    powerplants_units, demand_units, exchange_units, _, _ = sort_units(units, market_id)
-    elastic_demand_units = [
-        unit for unit in demand_units if is_elastic_demand(unit, config)
-    ]
-    inelastic_demand_units = [
-        unit for unit in demand_units if unit not in elastic_demand_units
-    ]
-
-    start = config.opening_hours[0]
-    end = start + config.market_products[0].duration
-
-    product_tuples = {(start, end, None)}
-
-    for unit in elastic_demand_units:
-        elastic_demand_bids.extend(
-            unit.bidding_strategies[market_id].calculate_bids(
-                unit,
-                config,
-                product_tuples=product_tuples,
-            )
-        )
-
-    # sort all bids by price descending
-    if elastic_demand_bids:
-        all_bids = (
-            pd.DataFrame(elastic_demand_bids)
-            .sort_values(by="price", ascending=False)
-            .reset_index(drop=True)
-        )
-        elastic_demand_prices = all_bids["price"]
-        elastic_demand_volumes = all_bids["volume"]
-    else:
-        elastic_demand_prices = pd.Series(dtype=float)
-        elastic_demand_volumes = pd.Series(dtype=float)
-
-    # 2. Build supply and demand curves
-    # Calculate marginal costs for each unit and time step.
-    # The resulting DataFrame has rows = time steps and columns = units.
-    # shape: (index_len, num_pp_units)
-    marginal_costs = pd.DataFrame(
-        [unit.marginal_cost for unit in powerplants_units]
-    ).T.set_index(index)
-
-    # Compute available power for each unit at each time step.
-    # shape: (index_len, num_pp_units)
-    power = calculate_max_power(powerplants_units).T.set_index(index)
-
-    # Process the inelastic demand.
-    # Filter demand units with a bidding strategy and sum their forecasts for each time step.
-    if inelastic_demand_units:
-        sum_demand = pd.DataFrame(
-            calculate_sum_demand(inelastic_demand_units, exchange_units), index=index
-        )
-    else:
-        sum_demand = pd.DataFrame(0, index=index, columns=[0])
-
-    # 3. Pay-as-clear dispatch
-    # Initialize the price forecast series.
-    price_forecast = pd.Series(index=index, data=0.0)
-
-    # clear the market forecast including elastic demand bids using the clearing mechanism defined in the config
-    if config.market_mechanism == "pay_as_bid":
-        # the forecast price is the volume-weighted average price of matched orders of each timestep
-        mechanism = PayAsBidRole(config)
-    elif config.market_mechanism == "complex_clearing":
-        mechanism = ComplexClearingRole(config)
-
-    for t in index:
-        # get the supply offers (marginal cost and available power) for time t
-        mc_t = marginal_costs.loc[t]
-        power_t = power.loc[t]
-        start = t
-        end = start + pd.Timedelta(config.market_products[0].duration)
-
-        supply_offers = pd.DataFrame(
-            {
-                "start_time": start,
-                "end_time": end,
-                "only_hours": None,
-                "node": mechanism.nodes[0], # take one node of the grid data
-                "price": mc_t,
-                "volume": power_t,
-                "bid_type": "SB",
-                "bid_id": [f"{unit.id}_{t}" for unit in powerplants_units],
-            }
-        )
-
-        # shape of sum_demand: (time_steps, 1)
-        demand_t = sum_demand.loc[t][0]
-
-        # get the demand bids
-        demand_bids = pd.DataFrame(
-            {
-                "start_time": start,
-                "end_time": end,
-                "only_hours": None,
-                "node": mechanism.nodes[0], # take one node of the grid data
-                "price": elastic_demand_prices,
-                "volume": elastic_demand_volumes,
-                "bid_type": "SB",
-                "bid_id": [
-                    f"elastic_demand_{t}_{i}" for i in range(len(elastic_demand_prices))
-                ],
-            }
-        )
-
-        # create an orderbook containing all supply offers and demand bids
-        orderbook = []
-        orderbook.extend(supply_offers.to_dict("records"))
-        orderbook.extend(demand_bids.to_dict("records"))
-        if demand_t > 0 and len(inelastic_demand_units) > 0:
-            inelastic_price_bid = max(
-                [unit.price[t] for unit in inelastic_demand_units]
-            )
-            orderbook.append(
-                {
-                    "start_time": start,
-                    "end_time": end,
-                    "only_hours": None,
-                    "node": mechanism.nodes[0], # take one node of the grid data
-                    "price": inelastic_price_bid,
-                    "volume": -demand_t,
-                    "bid_type": "SB",
-                    "bid_id": f"{inelastic_demand_units[0].id}_{t}",
-                }
-            )
-
-        cleaned_orderbook = []
-        for bid in orderbook:
-            if isinstance(bid["volume"], dict):
-                if all(volume == 0 for volume in bid["volume"].values()):
-                    continue
-            elif bid["volume"] == 0:
-                continue
-            for field in config.additional_fields:
-                bid.setdefault(field, None)
-            cleaned_orderbook.append(bid)
-
-        mps = get_available_products(
-            config.market_products,
-            pd.Timestamp(start) - config.market_products[0].first_delivery,
-        )
-
-
-        _, _, meta, _ = mechanism.clear(cleaned_orderbook, mps)
-        price_forecast.loc[t] = meta[0]["price"]
-
-    return price_forecast
+    bids = np.empty((length, len(series)))
+    for k, s in enumerate(series):
+        bids[:, k] = np.asarray(s, dtype=float)
+    return bids
 
 
 @lru_cache
@@ -443,28 +152,121 @@ def calculate_naive_price(
     units: list[BaseUnit],
     config: MarketConfig,
     preprocess_information=None,
-):
-    """Calculates a naive price forecast (disregarding Storage and DSM units).
-    The used method depends on the market mechanism of the market the price forecast
-    is requested for, defined in config."""
-    if config.market_mechanism == "pay_as_clear":
-        return calculate_naive_price_simple(index, units, config)
+) -> ForecastSeries:
+    """
+    Naive price forecast with a merit order of the units' own bids, cleared like
+    :class:`~assume.markets.clearing_algorithms.simple.PayAsClearRole` and
+    :class:`~assume.markets.clearing_algorithms.simple.PayAsBidRole` with
+    :func:`~assume.markets.clearing_algorithms.simple.clear_merit_order`.
 
-    if config.market_mechanism in ["redispatch", "CRM_pos", "CRM_neg"]:
-        log.warning(
-            "Price forecast for market mechanism '%s' is not implemented yet; "
-            "returning zeros.",
+    Storages and DSM units are ignored in this calculation. Every market mechanism is forecasted
+    this way, so for other mechanisms (e.g. complex_clearing or nodal_clearing) block orders,
+    linked orders and grid constraints are not considered. Such markets can register their own
+    price forecast instead.
+
+    Bids at each timestep:
+        - **power plants** offer their available power at marginal cost,
+        - **exchanges** offer their imports at ``price_import`` and bid their exports at ``price_export``,
+        - **inelastic demands** bid their forecasted demand at their price,
+        - **elastic demands** bid the bids of their bidding strategy for the first product,
+          which are the same for every timestep.
+
+    For ``pay_as_bid`` the forecast price is the volume-weighted average price of the accepted
+    supply, otherwise the clearing price. If nothing is traded, the highest willingness to pay
+    sets the price. Without any demand, the cheapest supply sets the price.
+    """
+    if config.market_mechanism not in ("pay_as_clear", "pay_as_bid"):
+        log.info(
+            "Price forecast for market '%s' (%s) uses a merit order of simple bids, "
+            "block orders and grid constraints are not considered.",
+            config.market_id,
             config.market_mechanism,
         )
-        return pd.Series(index=index, data=0.0)
 
-    if config.market_mechanism in ['pay_as_bid', 'complex_clearing']:
-        return calculate_naive_price_using_market_mechanism(index, units, config)
-    
-    else:
-        raise ValueError(
-            f"Invalid market mechanism {config.param_dict.get('market_mechanism')}."
+    if isinstance(index, FastIndex):
+        index = index.as_datetimeindex()
+    n = len(index)
+
+    # 1. Sort units by type and filter for units with bidding strategy for the given market_id
+    powerplant_units, demand_units, exchange_units, _, _ = sort_units(
+        units, config.market_id
+    )
+    elastic_demand_units = [u for u in demand_units if is_elastic_demand(u, config)]
+    inelastic_demand_units = [
+        u for u in demand_units if not is_elastic_demand(u, config)
+    ]
+
+    # 2. Build the bids, shape: (index_len, num_bids)
+    supply_price = _stack_bids(
+        [unit.marginal_cost for unit in powerplant_units]
+        + [unit.price_import for unit in exchange_units],
+        n,
+    )
+    supply_volume = _stack_bids(
+        [unit.max_power * unit.forecaster.availability for unit in powerplant_units]
+        + [unit.volume_import for unit in exchange_units],
+        n,
+    )
+    demand_price = _stack_bids(
+        [unit.price for unit in inelastic_demand_units]
+        + [unit.price_export for unit in exchange_units],
+        n,
+    )
+    demand_volume = np.abs(
+        _stack_bids(
+            [unit.forecaster.demand for unit in inelastic_demand_units]
+            + [unit.volume_export for unit in exchange_units],
+            n,
         )
+    )
+
+    if elastic_demand_units:
+        start = config.opening_hours[0]
+        end = start + config.market_products[0].duration
+        product_tuples = [(start, end, None)]
+        elastic_bids = [
+            bid
+            for unit in elastic_demand_units
+            for bid in unit.bidding_strategies[config.market_id].calculate_bids(
+                unit, config, product_tuples=product_tuples
+            )
+        ]
+        demand_price = np.hstack(
+            [demand_price, _stack_bids([bid["price"] for bid in elastic_bids], n)]
+        )
+        demand_volume = np.hstack(
+            [
+                demand_volume,
+                np.abs(_stack_bids([bid["volume"] for bid in elastic_bids], n)),
+            ]
+        )
+
+    # 3. Merit-order dispatch
+    pay_as_bid = config.market_mechanism == "pay_as_bid"
+    prices = np.zeros(n)
+    for t in range(n):
+        offered = supply_volume[t] > 0
+        demanded = demand_volume[t] > 0
+        if not demanded.any():
+            # without demand (e.g. imports exceed the demand) the cheapest supply sets the price
+            prices[t] = supply_price[t][offered].min() if offered.any() else 0.0
+            continue
+
+        clear_price, supply_accepted, demand_accepted = clear_merit_order(
+            supply_price[t],
+            supply_volume[t],
+            demand_price[t],
+            demand_volume[t],
+        )
+        if not demand_accepted.any():
+            # no supply is cheaper than the willingness to pay, so nothing is traded
+            prices[t] = demand_price[t][demanded].max()
+        elif pay_as_bid:
+            prices[t] = supply_accepted @ supply_price[t] / supply_accepted.sum()
+        else:
+            prices[t] = clear_price
+
+    return pd.Series(prices, index=index)
 
 
 @lru_cache
