@@ -137,3 +137,4 @@ Therefore, the net redispatch cost is evaluated using signed accepted redispatch
 where :math:`V^{accepted}_{o}` is the signed accepted redispatch volume and :math:`P^{accepted}_{o}` is the corresponding accepted redispatch price.
 
 Positive accepted volumes correspond to upward redispatch, while negative accepted volumes correspond to downward redispatch.
+An overview of all sign conventions used in ASSUME is given on the :doc:`conventions` page.

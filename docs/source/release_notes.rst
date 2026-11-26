@@ -12,11 +12,22 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+
 **Improvements:**
   - **Shared array-based pay-as-clear kernel**: The merit-order matching of ``PayAsClearRole`` was moved into the standalone function ``clear_merit_order`` in ``assume.markets.clearing_algorithms.simple``, which works on numpy arrays of bid prices and volumes and returns the clearing price and the accepted volumes. ``PayAsClearRole`` only does the orderbook bookkeeping around it. The naive inelastic price forecast (``price_naive_forecast``) now uses the same kernel instead of its own merit-order implementation, so forecast and market clearing follow the same rules. Both the market clearing and the naive price forecast are considerably faster.
 
+
+**Documentation:**
+  - **Conventions page** (#944): New page that collects the conventions used in ASSUME, i.e. that naive datetimes are UTC (and which helpers to use instead of ``datetime.timestamp()``, ``datetime.fromtimestamp()`` and ``rrule``), that timestamps label the start of a time step, the definition of the state of charge and the sign conventions of trades, storages, redispatch and ramps.
+  - **Combining learning strategies** (#900, #901): Documented that all learning strategies of a simulation need the same foresight, action and observation dimensions, listed the dimensions of the built-in learning strategies, and documented that all learning units are assigned to ``Operator-RL``, so ``portfolio_learning`` cannot be combined with unit-level learning strategies yet.
+  - **Learning config** (#672): Fixed the documented default of ``replay_buffer_size`` (50000), explained the difference between ``exploration_noise_std`` and ``noise_sigma``, and added typical ranges for ``learning_rate``, ``gamma`` and ``tau``.
+  - **Runtime and memory of learning** (#886): Added rough runtime and memory figures for trainings with different numbers of learning agents on CPU and GPU.
+
+
 **Bug Fixes:**
+  - **Compare Scenarios dashboard: bid difference panels** (#787): "Accepted Bid Prices Difference" and "Accepted Bid Volume Difference" compared the selected simulation with itself and always showed 0. They now compare ``simulation`` with ``simulation_comp``.
   - **Consistent clearing price in** ``PayAsClearRole``: The last accepted supply bid sets the clearing price. Only if the first demand bid that is not fully served would pay more, e.g. during supply scarcity, this demand bid sets the price, so that no bid is paradoxically accepted or rejected. Price ties are traded, maximising the accepted volume, and are broken randomly using ``np.random`` (seeded by the simulation seed). This can slightly change clearing prices compared to previous versions.
+
 
 0.7.0 - (11th November 2026)
 =========================
