@@ -147,16 +147,8 @@ class PowerPlant(SupportsMinMax):
         self.ramp_up = None if ramp_up == 0 else ramp_up
 
         # the ramping rates are given in MW/min, but handled in MW/timestep for the simulation.
-        self.ramp_down = (
-            convert_ramp_to_timestep(self.ramp_down, self.index.freq)
-            if self.ramp_down is not None
-            else None
-        )
-        self.ramp_up = (
-            convert_ramp_to_timestep(self.ramp_up, self.index.freq)
-            if self.ramp_up is not None
-            else None
-        )
+        self.ramp_down = convert_ramp_to_timestep(self.ramp_down, self.index.freq)
+        self.ramp_up = convert_ramp_to_timestep(self.ramp_up, self.index.freq)
 
         # the operating times are given in hours, but handled in whole time steps of the index.
         # Minimum times are rounded up, start thresholds are rounded down.

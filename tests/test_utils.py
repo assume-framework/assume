@@ -62,6 +62,11 @@ def test_convert_ramp_to_timestep_requires_duration():
         convert_ramp_to_timestep(1, None)
 
 
+@pytest.mark.parametrize("simulation_timestep", [timedelta(minutes=15), None])
+def test_convert_ramp_to_timestep_none_means_no_ramp(simulation_timestep):
+    assert convert_ramp_to_timestep(None, simulation_timestep) is None
+
+
 def test_convert_rrule():
     freq, interval = convert_to_rrule_freq("1h")
     assert freq == rr.HOURLY

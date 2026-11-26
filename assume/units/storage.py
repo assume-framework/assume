@@ -237,25 +237,15 @@ class Storage(SupportsMinMaxCharge):
                 field="ramp_down_discharge",
             )
 
-        self.ramp_up_charge = (
-            convert_ramp_to_timestep(ramp_up_charge, self.index.freq)
-            if ramp_up_charge is not None
-            else None
+        self.ramp_up_charge = convert_ramp_to_timestep(ramp_up_charge, self.index.freq)
+        self.ramp_down_charge = convert_ramp_to_timestep(
+            ramp_down_charge, self.index.freq
         )
-        self.ramp_down_charge = (
-            convert_ramp_to_timestep(ramp_down_charge, self.index.freq)
-            if ramp_down_charge is not None
-            else None
+        self.ramp_up_discharge = convert_ramp_to_timestep(
+            ramp_up_discharge, self.index.freq
         )
-        self.ramp_up_discharge = (
-            convert_ramp_to_timestep(ramp_up_discharge, self.index.freq)
-            if ramp_up_discharge is not None
-            else None
-        )
-        self.ramp_down_discharge = (
-            convert_ramp_to_timestep(ramp_down_discharge, self.index.freq)
-            if ramp_down_discharge is not None
-            else None
+        self.ramp_down_discharge = convert_ramp_to_timestep(
+            ramp_down_discharge, self.index.freq
         )
         self.simultaneous_charge_discharge_ramping = (
             simultaneous_charge_discharge_ramping
