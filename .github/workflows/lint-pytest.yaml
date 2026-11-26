@@ -74,7 +74,7 @@ jobs:
         cache-dependency-path: '**/pyproject.toml'
     - name: Run Jupyter notebooks
       run: |
-        pip install -e .
+        pip install -e .[all]
         pip install jupyter
         cd examples/notebooks
         jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=60 --output output.ipynb 01_minimal_manual_example.ipynb
