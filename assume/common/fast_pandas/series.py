@@ -16,6 +16,9 @@ from assume.common.fast_pandas.indexers import (
     FastSeriesILocIndexer,
 )
 
+# built once: a `list | pd.Index | ...` union inside isinstance is rebuilt on every call
+_LIST_LIKE = (list, pd.Index, pd.DatetimeIndex, np.ndarray, pd.Series)
+
 
 class FastSeries:
     """
@@ -195,12 +198,12 @@ class FastSeries:
             TypeError: If the index type is unsupported.
             KeyError: If dates are outside of the index range or not aligned with the frequency.
         """
-        if isinstance(item, slice):
+        # datetime first, it is the hot path
+        if isinstance(item, datetime):
+            return self.data[self.index.get_position(item)]
+        elif isinstance(item, slice):
             return self.data[self._data_slice(item)]
-
-        elif isinstance(
-            item, (list | pd.Index | pd.DatetimeIndex | np.ndarray | pd.Series)
-        ):
+        elif isinstance(item, _LIST_LIKE):
             # Handle list-like datetime-based inputs
             dates = self._convert_to_datetime_array(item)
             delta_seconds = np.array(
@@ -224,10 +227,6 @@ class FastSeries:
             # Handle string input
             date = pd.to_datetime(item).to_pydatetime()
             return self.data[self.index.get_position(date)]
-
-        elif isinstance(item, datetime):
-            # Handle datetime input
-            return self.data[self.index.get_position(item)]
 
         else:
             raise TypeError(
@@ -253,7 +252,15 @@ class FastSeries:
             ValueError: If lengths of indices and values do not match.
             KeyError: If dates are outside of the index range or not aligned with the frequency.
         """
-        if isinstance(item, slice):
+        # single datetime or string first, it is the hot path
+        if isinstance(item, datetime):
+            idx = self.index.get_position(item)
+            self.data[idx] = value
+        elif isinstance(item, str):
+            date = pd.to_datetime(item).to_pydatetime()
+            idx = self.index.get_position(date)
+            self.data[idx] = value
+        elif isinstance(item, slice):
             data_slice = self._data_slice(item)
 
             # Assign values to the slice
@@ -265,9 +272,7 @@ class FastSeries:
                     f"Length of values ({len(value)}) does not match slice length ({slice_length})."
                 )
 
-        elif isinstance(
-            item, (list | pd.Index | pd.DatetimeIndex | np.ndarray | pd.Series)
-        ):
+        elif isinstance(item, _LIST_LIKE):
             if (
                 len(item) == len(self.data)
                 and item[0] == self.index.start
@@ -288,14 +293,6 @@ class FastSeries:
                     for i in item:
                         start = self.index.get_position(i)
                         self.data[start] = value
-
-        elif isinstance(item, datetime | str):
-            # Handle single datetime or string
-            date = (
-                pd.to_datetime(item).to_pydatetime() if isinstance(item, str) else item
-            )
-            idx = self.index.get_position(date)
-            self.data[idx] = value
 
         else:
             raise TypeError(
