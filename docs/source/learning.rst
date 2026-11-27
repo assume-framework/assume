@@ -172,6 +172,136 @@ based on global information. The following graph shows the information flow.
 The learning role orchestrates this learning process. It initializes the training process, handles the algorithms and manages the experiences gained in a buffer.
 You can read more about the different algorithms and the learning role in :doc:`learning_algorithm`.
 
+.. _learning_runtime:
+
+Runtime and Memory Requirements
+=====================================
+
+How long a training takes and how much memory it needs depends mainly on the number of learning agents, as each agent has its own
+actor and critic, and each critic gets the observations and actions of all agents as input. The following numbers give a rough
+idea of what to expect. They are taken from a benchmark (see `#886 <https://github.com/assume-framework/assume/issues/886>`_
+for the full results) and depend strongly on the release, the hardware and the scenario. Therefore, use them only as an estimate of the order of magnitude.
+
+The benchmark is based on example ``03a`` with a varying number of learning power plants (N), one simulated month per episode,
+``batch_size: 128``, ``train_freq: 10h`` and ``gradient_steps: 1``. Each value is the mean of three runs. The runs consisted of 5 episodes of
+initial experience collection and 7 training episodes, and the runtimes are projected to a training with 100 episodes.
+
+Runtimes are given in seconds, memory in GB.
+
+.. list-table::
+   :header-rows: 1
+
+   * - N
+     - CPU exploration
+     - CPU learning
+     - CPU evaluation
+     - GPU exploration
+     - GPU learning
+     - GPU evaluation
+     - host RAM (CPU run)
+     - host RAM (GPU run)
+     - GPU VRAM
+   * - 1
+     - 3.6
+     - 4.2
+     - 6.2
+     - 2.9
+     - 3.7
+     - 5.0
+     - 0.69
+     - 1.64
+     - 0.07
+   * - 10
+     - 6.8
+     - 12.2
+     - 12.8
+     - 6.3
+     - 12.5
+     - 12.9
+     - 0.85
+     - 1.77
+     - 0.11
+   * - 20
+     - 10.1
+     - 20.6
+     - 22.2
+     - 9.9
+     - 22.4
+     - 23.8
+     - 1.01
+     - 1.81
+     - 0.16
+   * - 21
+     - 10.4
+     - 29.8
+     - 23.7
+     - 10.1
+     - 25.2
+     - 25.5
+     - 1.29
+     - 1.86
+     - 0.31
+   * - 50
+     - 27.4
+     - 113.3
+     - 86.3
+     - 20.3
+     - 55.7
+     - 67.6
+     - 2.01
+     - 2.28
+     - 0.76
+   * - 51
+     - 20.6
+     - 162.3
+     - 64.3
+     - 20.7
+     - 60.7
+     - 66.9
+     - 3.61
+     - 2.43
+     - 2.13
+   * - 143
+     - 53.0
+     - 542.4
+     - 215.6
+     - 53.7
+     - 172.9
+     - 231.0
+     - 11.03
+     - 4.77
+     - 8.14
+   * - 256
+     - 93.3
+     - 1503.4
+     - 446.6
+     - 98.4
+     - 315.7
+     - 429.5
+     - 24.38
+     - 7.24
+     - 19.13
+   * - 512
+     - 181.6\*
+     - 4161.6\*
+     - 6598.2\*
+     - 202.6
+     - 662.4
+     - 841.7
+     - 69.42
+     - 22.88
+     - 60.32
+
+\* only one run, as two of the three CPU runs with 512 agents ran into a timeout.
+
+From these results, we can draw the following conclusions:
+
+- The exploration time hardly depends on the device, as no networks are trained during exploration.
+- For more than about 20 agents, training on a GPU is faster than on a CPU, and the advantage grows with the number of agents.
+- The runtime and memory jump between 20 and 21 as well as between 50 and 51 agents, because the critic gets more and larger hidden
+  layers at these numbers of agents (see ``CriticTD3`` in ``assume/reinforcement_learning/neural_network_architecture.py``).
+- Memory and runtime grow roughly predictably with the number of agents.
+
 The Learning Results in ASSUME
 =====================================
 

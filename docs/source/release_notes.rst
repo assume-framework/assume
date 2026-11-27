@@ -12,6 +12,12 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**Documentation:**
+  - **Conventions page** (#944): New page that collects the conventions used in ASSUME, i.e. that naive datetimes are UTC (and which helpers to use instead of ``datetime.timestamp()``, ``datetime.fromtimestamp()`` and ``rrule``), that timestamps label the start of a time step, the definition of the state of charge and the sign conventions of trades, storages, redispatch and ramps.
+  - **Combining learning strategies** (#900, #901): Documented that all learning strategies of a simulation need the same foresight, action and observation dimensions, listed the dimensions of the built-in learning strategies, and documented that all learning units are assigned to ``Operator-RL``, so ``portfolio_learning`` cannot be combined with unit-level learning strategies yet.
+  - **Learning config** (#672): Fixed the documented default of ``replay_buffer_size`` (50000), explained the difference between ``exploration_noise_std`` and ``noise_sigma``, and added typical ranges for ``learning_rate``, ``gamma`` and ``tau``.
+  - **Runtime and memory of learning** (#886): Added rough runtime and memory figures for trainings with different numbers of learning agents on CPU and GPU.
+
 **Bug Fixes:**
   - **Compare Scenarios dashboard: bid difference panels** (#787): "Accepted Bid Prices Difference" and "Accepted Bid Volume Difference" compared the selected simulation with itself and always showed 0. They now compare ``simulation`` with ``simulation_comp``.
 

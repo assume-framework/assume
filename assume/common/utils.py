@@ -534,8 +534,11 @@ def adjust_unit_operator_for_learning(
     unit_operator_id: str,
 ):
     """
-    Check if any of the bidding strategies are learning strategies.
-    And change the unit operator to RL if learning strategies are found.
+    Check if any of the bidding strategies of a unit are learning strategies.
+    If so, the unit is assigned to the unit operator "Operator-RL" instead of the given one.
+
+    This happens if a learning strategy is used for any of the markets of the unit, so the unit is no longer
+    handled by its original unit operator on any market!
 
     Args:
         bidding_strategies (dict[str, str]): The bidding strategies for the unit.
