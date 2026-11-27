@@ -149,6 +149,9 @@ storage_capacity_heuristic_balancing_neg      CRM_neg             Analogous to :
                                                                   energy CRM.
 storage_capacity_heuristic_balancing_pos      CRM_pos             Analogous to :code:`storage_energy_heuristic_flexable`, but bids either on the positive capacity CRM or
                                                                   energy CRM.
+storage_energy_heuristic_redispatch           redispatch          Bids a storage unit on the redispatch market around what it can run of its cleared schedule, with
+                                                                  its power limits and state of charge. Three prices from the EOM price P and the best EOM price F
+                                                                  later that day: discharge more max(P, F), discharge less F, charge less or more eta_c * eta_d * F.
 ============================================  ==================  ==================================================================================================================
 
 Heuristic method API references:
@@ -163,6 +166,7 @@ Heuristic method API references:
 - :py:meth:`assume.strategies.flexable_storage.StorageEnergyHeuristicFlexableStrategy`
 - :py:meth:`assume.strategies.flexable_storage.StorageCapacityHeuristicBalancingNegStrategy`
 - :py:meth:`assume.strategies.flexable_storage.StorageCapacityHeuristicBalancingPosStrategy`
+- :py:meth:`assume.strategies.naive_strategies.StorageEnergyHeuristicRedispatchStrategy`
 
 Optimization
 ------------
