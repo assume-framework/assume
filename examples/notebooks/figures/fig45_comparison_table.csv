@@ -33,23 +33,23 @@ RN–ExPol − RN–H₂,2035,wind_curtail_twh,Wind curtailment (TWh),-2.48,-5.7
 RN–ExPol − RN–H₂,2035,solar_curtail_twh,Solar curtailment (TWh),2.396,-0.984,6.28,7.264,6,2
 RN–ExPol − RN–H₂,2035,up_payment_eurm,Gross upward payment (EUR M),12.272,-453.276,163.308,616.584,6,1
 RN–ExPol − RN–H₂,2035,payment_per_up_eur_mwh,Payment per upward MWh (EUR/MWh),0.25,-4.341,1.548,5.889,6,1
-RN–ExPol − RN–H₂,2040,demand_total_twh,Total actor demand (TWh),101.672,91.421,115.913,24.493,6,0
-RN–ExPol − RN–H₂,2040,demand_steel_twh,Steel demand (TWh),1.226,0.888,1.644,0.756,6,0
-RN–ExPol − RN–H₂,2040,demand_cement_twh,Cement demand (TWh),100.37,90.452,114.189,23.737,6,0
-RN–ExPol − RN–H₂,2040,demand_avmar_twh,AV+MAR demand (TWh),0.076,0.051,0.081,0.03,6,0
-RN–ExPol − RN–H₂,2040,da_delta_eur_mwh,DA price Δ vs baseline (EUR/MWh),43.269,5.782,187.383,181.601,6,0
-RN–ExPol − RN–H₂,2040,da_delta_eur_mwh_cut500,"DA price Δ vs baseline, |Δ|≤500 (EUR/MWh)",11.904,0.035,23.064,23.029,6,0
-RN–ExPol − RN–H₂,2040,afrr_neg_delta_eur_mwh,aFRR-neg price Δ vs baseline (EUR/MWh),0.281,0.141,0.35,0.209,6,0
-RN–ExPol − RN–H₂,2040,afrr_neg_delta_eur_mwh_cut500,"aFRR-neg price Δ, |Δ|≤500 (EUR/MWh)",0.281,0.141,0.35,0.209,6,0
-RN–ExPol − RN–H₂,2040,afrr_neg_industrial_share,Industrial share of aFRR-neg cleared,0.326,0.118,0.559,0.441,6,0
-RN–ExPol − RN–H₂,2040,afrr_neg_system_twh,aFRR-neg system cleared (TWh),44.056,19.726,99.118,79.391,6,0
-RN–ExPol − RN–H₂,2040,afrr_neg_steel_twh,aFRR-neg steel cleared (TWh),0.471,0.104,1.236,1.132,6,0
-RN–ExPol − RN–H₂,2040,afrr_neg_cement_twh,aFRR-neg cement cleared (TWh),43.584,19.623,97.882,78.259,6,0
-RN–ExPol − RN–H₂,2040,redispatch_up_twh,Upward redispatch (TWh),-1.337,-11.506,7.163,18.669,6,3
-RN–ExPol − RN–H₂,2040,wind_curtail_twh,Wind curtailment (TWh),-0.826,-6.839,4.033,10.872,6,3
-RN–ExPol − RN–H₂,2040,solar_curtail_twh,Solar curtailment (TWh),1.611,-3.406,7.652,11.057,6,3
-RN–ExPol − RN–H₂,2040,up_payment_eurm,Gross upward payment (EUR M),642.76,72.151,3166.809,3094.659,6,0
-RN–ExPol − RN–H₂,2040,payment_per_up_eur_mwh,Payment per upward MWh (EUR/MWh),2.79,0.614,10.179,9.565,6,0
+RN–ExPol − RN–H₂,2040,demand_total_twh,Total actor demand (TWh),100.622,91.421,115.913,24.493,3,0
+RN–ExPol − RN–H₂,2040,demand_steel_twh,Steel demand (TWh),1.235,0.888,1.644,0.756,3,0
+RN–ExPol − RN–H₂,2040,demand_cement_twh,Cement demand (TWh),99.306,90.452,114.189,23.737,3,0
+RN–ExPol − RN–H₂,2040,demand_avmar_twh,AV+MAR demand (TWh),0.081,0.081,0.081,0.0,3,0
+RN–ExPol − RN–H₂,2040,da_delta_eur_mwh,DA price Δ vs baseline (EUR/MWh),16.033,5.782,23.445,17.663,3,0
+RN–ExPol − RN–H₂,2040,da_delta_eur_mwh_cut500,"DA price Δ vs baseline, |Δ|≤500 (EUR/MWh)",15.884,5.782,23.064,17.282,3,0
+RN–ExPol − RN–H₂,2040,afrr_neg_delta_eur_mwh,aFRR-neg price Δ vs baseline (EUR/MWh),0.234,0.141,0.345,0.204,3,0
+RN–ExPol − RN–H₂,2040,afrr_neg_delta_eur_mwh_cut500,"aFRR-neg price Δ, |Δ|≤500 (EUR/MWh)",0.234,0.141,0.345,0.204,3,0
+RN–ExPol − RN–H₂,2040,afrr_neg_industrial_share,Industrial share of aFRR-neg cleared,0.348,0.118,0.559,0.441,3,0
+RN–ExPol − RN–H₂,2040,afrr_neg_system_twh,aFRR-neg system cleared (TWh),48.014,19.726,99.118,79.391,3,0
+RN–ExPol − RN–H₂,2040,afrr_neg_steel_twh,aFRR-neg steel cleared (TWh),0.515,0.104,1.236,1.132,3,0
+RN–ExPol − RN–H₂,2040,afrr_neg_cement_twh,aFRR-neg cement cleared (TWh),47.498,19.623,97.882,78.259,3,0
+RN–ExPol − RN–H₂,2040,redispatch_up_twh,Upward redispatch (TWh),-3.602,-11.506,2.685,14.191,3,1
+RN–ExPol − RN–H₂,2040,wind_curtail_twh,Wind curtailment (TWh),-0.299,-3.959,4.033,7.992,3,1
+RN–ExPol − RN–H₂,2040,solar_curtail_twh,Solar curtailment (TWh),1.358,-2.108,6.426,8.534,3,2
+RN–ExPol − RN–H₂,2040,up_payment_eurm,Gross upward payment (EUR M),136.598,73.972,199.626,125.654,3,0
+RN–ExPol − RN–H₂,2040,payment_per_up_eur_mwh,Payment per upward MWh (EUR/MWh),1.467,1.272,1.783,0.511,3,0
 RN–ExPol − RN–H₂,2045,demand_total_twh,Total actor demand (TWh),-45.942,-48.078,-40.512,7.566,6,0
 RN–ExPol − RN–H₂,2045,demand_steel_twh,Steel demand (TWh),-42.986,-45.122,-37.556,7.566,6,0
 RN–ExPol − RN–H₂,2045,demand_cement_twh,Cement demand (TWh),0.0,0.0,0.0,0.0,6,0
@@ -101,23 +101,23 @@ RN–LowDem − RN–Elec,2035,wind_curtail_twh,Wind curtailment (TWh),-0.974,-3
 RN–LowDem − RN–Elec,2035,solar_curtail_twh,Solar curtailment (TWh),0.253,-3.559,3.362,6.921,6,2
 RN–LowDem − RN–Elec,2035,up_payment_eurm,Gross upward payment (EUR M),720.809,83.51,3049.419,2965.908,6,0
 RN–LowDem − RN–Elec,2035,payment_per_up_eur_mwh,Payment per upward MWh (EUR/MWh),6.509,1.187,23.865,22.677,6,0
-RN–LowDem − RN–Elec,2040,demand_total_twh,Total actor demand (TWh),42.264,38.588,44.584,5.996,6,0
-RN–LowDem − RN–Elec,2040,demand_steel_twh,Steel demand (TWh),42.594,38.989,44.984,5.996,6,0
-RN–LowDem − RN–Elec,2040,demand_cement_twh,Cement demand (TWh),0.063,0.0,0.38,0.38,6,0
-RN–LowDem − RN–Elec,2040,demand_avmar_twh,AV+MAR demand (TWh),-0.394,-0.401,-0.359,0.041,6,0
-RN–LowDem − RN–Elec,2040,da_delta_eur_mwh,DA price Δ vs baseline (EUR/MWh),-1.113,-40.878,11.213,52.092,6,5
-RN–LowDem − RN–Elec,2040,da_delta_eur_mwh_cut500,"DA price Δ vs baseline, |Δ|≤500 (EUR/MWh)",9.527,2.652,24.378,21.725,6,0
-RN–LowDem − RN–Elec,2040,afrr_neg_delta_eur_mwh,aFRR-neg price Δ vs baseline (EUR/MWh),0.272,-1.23,1.173,2.402,6,2
-RN–LowDem − RN–Elec,2040,afrr_neg_delta_eur_mwh_cut500,"aFRR-neg price Δ, |Δ|≤500 (EUR/MWh)",0.272,-1.23,1.173,2.402,6,2
-RN–LowDem − RN–Elec,2040,afrr_neg_industrial_share,Industrial share of aFRR-neg cleared,0.002,0.001,0.003,0.002,6,0
-RN–LowDem − RN–Elec,2040,afrr_neg_system_twh,aFRR-neg system cleared (TWh),16.501,4.563,40.203,35.64,6,0
-RN–LowDem − RN–Elec,2040,afrr_neg_steel_twh,aFRR-neg steel cleared (TWh),16.394,4.563,40.203,35.64,6,0
-RN–LowDem − RN–Elec,2040,afrr_neg_cement_twh,aFRR-neg cement cleared (TWh),0.133,-0.006,0.803,0.809,6,2
-RN–LowDem − RN–Elec,2040,redispatch_up_twh,Upward redispatch (TWh),4.514,-11.378,40.463,51.841,6,3
-RN–LowDem − RN–Elec,2040,wind_curtail_twh,Wind curtailment (TWh),-3.754,-14.461,0.266,14.727,6,1
-RN–LowDem − RN–Elec,2040,solar_curtail_twh,Solar curtailment (TWh),0.341,-2.189,4.057,6.247,6,3
-RN–LowDem − RN–Elec,2040,up_payment_eurm,Gross upward payment (EUR M),2212.103,44.421,11878.099,11833.678,6,0
-RN–LowDem − RN–Elec,2040,payment_per_up_eur_mwh,Payment per upward MWh (EUR/MWh),8.29,0.265,38.799,38.534,6,0
+RN–LowDem − RN–Elec,2040,demand_total_twh,Total actor demand (TWh),41.588,38.588,44.584,5.996,3,0
+RN–LowDem − RN–Elec,2040,demand_steel_twh,Steel demand (TWh),41.988,38.989,44.984,5.996,3,0
+RN–LowDem − RN–Elec,2040,demand_cement_twh,Cement demand (TWh),0.0,0.0,0.0,0.0,3,0
+RN–LowDem − RN–Elec,2040,demand_avmar_twh,AV+MAR demand (TWh),-0.401,-0.401,-0.401,0.0,3,0
+RN–LowDem − RN–Elec,2040,da_delta_eur_mwh,DA price Δ vs baseline (EUR/MWh),7.002,2.652,11.213,8.561,3,0
+RN–LowDem − RN–Elec,2040,da_delta_eur_mwh_cut500,"DA price Δ vs baseline, |Δ|≤500 (EUR/MWh)",6.742,2.652,11.152,8.5,3,0
+RN–LowDem − RN–Elec,2040,afrr_neg_delta_eur_mwh,aFRR-neg price Δ vs baseline (EUR/MWh),0.579,0.282,0.898,0.616,3,0
+RN–LowDem − RN–Elec,2040,afrr_neg_delta_eur_mwh_cut500,"aFRR-neg price Δ, |Δ|≤500 (EUR/MWh)",0.579,0.282,0.898,0.616,3,0
+RN–LowDem − RN–Elec,2040,afrr_neg_industrial_share,Industrial share of aFRR-neg cleared,0.002,0.001,0.003,0.002,3,0
+RN–LowDem − RN–Elec,2040,afrr_neg_system_twh,aFRR-neg system cleared (TWh),17.929,4.563,40.203,35.64,3,0
+RN–LowDem − RN–Elec,2040,afrr_neg_steel_twh,aFRR-neg steel cleared (TWh),17.931,4.563,40.203,35.64,3,0
+RN–LowDem − RN–Elec,2040,afrr_neg_cement_twh,aFRR-neg cement cleared (TWh),-0.002,-0.006,0.0,0.006,3,0
+RN–LowDem − RN–Elec,2040,redispatch_up_twh,Upward redispatch (TWh),-5.24,-11.378,5.224,16.602,3,1
+RN–LowDem − RN–Elec,2040,wind_curtail_twh,Wind curtailment (TWh),-0.327,-0.912,0.266,1.177,3,1
+RN–LowDem − RN–Elec,2040,solar_curtail_twh,Solar curtailment (TWh),-0.061,-1.362,2.197,3.559,3,1
+RN–LowDem − RN–Elec,2040,up_payment_eurm,Gross upward payment (EUR M),317.242,44.421,647.761,603.34,3,0
+RN–LowDem − RN–Elec,2040,payment_per_up_eur_mwh,Payment per upward MWh (EUR/MWh),2.56,0.265,5.62,5.355,3,0
 RN–LowDem − RN–Elec,2045,demand_total_twh,Total actor demand (TWh),0.417,0.417,0.417,0.0,6,0
 RN–LowDem − RN–Elec,2045,demand_steel_twh,Steel demand (TWh),0.0,0.0,0.0,0.0,6,0
 RN–LowDem − RN–Elec,2045,demand_cement_twh,Cement demand (TWh),0.0,0.0,0.0,0.0,6,0
@@ -169,23 +169,23 @@ Worst-case mean − Worst-case ES,2035,wind_curtail_twh,Wind curtailment (TWh),-
 Worst-case mean − Worst-case ES,2035,solar_curtail_twh,Solar curtailment (TWh),0.928,-3.962,5.353,9.314,6,2
 Worst-case mean − Worst-case ES,2035,up_payment_eurm,Gross upward payment (EUR M),541.425,-41.542,3076.37,3117.912,6,2
 Worst-case mean − Worst-case ES,2035,payment_per_up_eur_mwh,Payment per upward MWh (EUR/MWh),4.209,-0.366,23.498,23.864,6,1
-Worst-case mean − Worst-case ES,2040,demand_total_twh,Total actor demand (TWh),-0.171,-0.228,0.0,0.228,6,0
-Worst-case mean − Worst-case ES,2040,demand_steel_twh,Steel demand (TWh),-0.002,-0.012,0.0,0.012,6,0
-Worst-case mean − Worst-case ES,2040,demand_cement_twh,Cement demand (TWh),-0.157,-0.221,0.0,0.221,6,0
-Worst-case mean − Worst-case ES,2040,demand_avmar_twh,AV+MAR demand (TWh),-0.012,-0.07,0.0,0.07,6,0
-Worst-case mean − Worst-case ES,2040,da_delta_eur_mwh,DA price Δ vs baseline (EUR/MWh),4.71,-8.924,31.35,40.274,6,2
-Worst-case mean − Worst-case ES,2040,da_delta_eur_mwh_cut500,"DA price Δ vs baseline, |Δ|≤500 (EUR/MWh)",-4.565,-24.652,3.068,27.721,6,3
-Worst-case mean − Worst-case ES,2040,afrr_neg_delta_eur_mwh,aFRR-neg price Δ vs baseline (EUR/MWh),0.0,0.0,0.0,0.0,6,0
-Worst-case mean − Worst-case ES,2040,afrr_neg_delta_eur_mwh_cut500,"aFRR-neg price Δ, |Δ|≤500 (EUR/MWh)",0.0,0.0,0.0,0.0,6,0
-Worst-case mean − Worst-case ES,2040,afrr_neg_industrial_share,Industrial share of aFRR-neg cleared,-0.016,-0.032,0.0,0.032,6,0
-Worst-case mean − Worst-case ES,2040,afrr_neg_system_twh,aFRR-neg system cleared (TWh),-0.058,-0.145,0.0,0.145,6,0
-Worst-case mean − Worst-case ES,2040,afrr_neg_steel_twh,aFRR-neg steel cleared (TWh),-0.0,-0.001,0.0,0.001,6,1
-Worst-case mean − Worst-case ES,2040,afrr_neg_cement_twh,aFRR-neg cement cleared (TWh),-0.058,-0.142,0.0,0.142,6,0
-Worst-case mean − Worst-case ES,2040,redispatch_up_twh,Upward redispatch (TWh),-4.737,-34.972,18.942,53.914,6,2
-Worst-case mean − Worst-case ES,2040,wind_curtail_twh,Wind curtailment (TWh),1.554,-2.796,6.537,9.333,6,3
-Worst-case mean − Worst-case ES,2040,solar_curtail_twh,Solar curtailment (TWh),1.152,-4.404,4.422,8.826,6,2
-Worst-case mean − Worst-case ES,2040,up_payment_eurm,Gross upward payment (EUR M),-415.655,-2491.313,148.411,2639.724,6,3
-Worst-case mean − Worst-case ES,2040,payment_per_up_eur_mwh,Payment per upward MWh (EUR/MWh),-0.799,-4.908,1.198,6.106,6,3
+Worst-case mean − Worst-case ES,2040,demand_total_twh,Total actor demand (TWh),-0.134,-0.221,0.0,0.221,3,0
+Worst-case mean − Worst-case ES,2040,demand_steel_twh,Steel demand (TWh),0.0,0.0,0.0,0.0,3,0
+Worst-case mean − Worst-case ES,2040,demand_cement_twh,Cement demand (TWh),-0.134,-0.221,0.0,0.221,3,0
+Worst-case mean − Worst-case ES,2040,demand_avmar_twh,AV+MAR demand (TWh),0.0,0.0,0.0,0.0,3,0
+Worst-case mean − Worst-case ES,2040,da_delta_eur_mwh,DA price Δ vs baseline (EUR/MWh),1.009,-0.441,3.068,3.508,3,1
+Worst-case mean − Worst-case ES,2040,da_delta_eur_mwh_cut500,"DA price Δ vs baseline, |Δ|≤500 (EUR/MWh)",1.009,-0.441,3.068,3.509,3,1
+Worst-case mean − Worst-case ES,2040,afrr_neg_delta_eur_mwh,aFRR-neg price Δ vs baseline (EUR/MWh),0.0,0.0,0.0,0.0,3,0
+Worst-case mean − Worst-case ES,2040,afrr_neg_delta_eur_mwh_cut500,"aFRR-neg price Δ, |Δ|≤500 (EUR/MWh)",0.0,0.0,0.0,0.0,3,0
+Worst-case mean − Worst-case ES,2040,afrr_neg_industrial_share,Industrial share of aFRR-neg cleared,-0.017,-0.032,0.0,0.032,3,0
+Worst-case mean − Worst-case ES,2040,afrr_neg_system_twh,aFRR-neg system cleared (TWh),-0.032,-0.053,0.0,0.053,3,0
+Worst-case mean − Worst-case ES,2040,afrr_neg_steel_twh,aFRR-neg steel cleared (TWh),-0.0,-0.0,0.0,0.0,3,0
+Worst-case mean − Worst-case ES,2040,afrr_neg_cement_twh,aFRR-neg cement cleared (TWh),-0.032,-0.053,0.0,0.053,3,0
+Worst-case mean − Worst-case ES,2040,redispatch_up_twh,Upward redispatch (TWh),-2.688,-11.013,3.192,14.205,3,1
+Worst-case mean − Worst-case ES,2040,wind_curtail_twh,Wind curtailment (TWh),-0.544,-2.796,2.267,5.063,3,1
+Worst-case mean − Worst-case ES,2040,solar_curtail_twh,Solar curtailment (TWh),2.437,1.294,3.986,2.691,3,0
+Worst-case mean − Worst-case ES,2040,up_payment_eurm,Gross upward payment (EUR M),-8.979,-42.32,10.937,53.257,3,2
+Worst-case mean − Worst-case ES,2040,payment_per_up_eur_mwh,Payment per upward MWh (EUR/MWh),-0.005,-0.409,0.25,0.659,3,2
 Worst-case mean − Worst-case ES,2045,demand_total_twh,Total actor demand (TWh),0.0,0.0,0.0,0.0,6,0
 Worst-case mean − Worst-case ES,2045,demand_steel_twh,Steel demand (TWh),0.0,0.0,0.0,0.0,6,0
 Worst-case mean − Worst-case ES,2045,demand_cement_twh,Cement demand (TWh),0.0,0.0,0.0,0.0,6,0
