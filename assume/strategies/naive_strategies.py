@@ -3,7 +3,14 @@
 # SPDX-License-Identifier: MIT
 
 
-from assume.common.base import MinMaxStrategy, SupportsMinMax
+from datetime import datetime
+
+from assume.common.base import (
+    MinMaxChargeStrategy,
+    MinMaxStrategy,
+    SupportsMinMax,
+    SupportsMinMaxCharge,
+)
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 
 
@@ -328,6 +335,131 @@ class EnergyNaiveRedispatchStrategy(MinMaxStrategy):
             # update previous power for the next iteration
             previous_power = current_power
 
+        return bids
+
+
+class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
+    """
+    Redispatch strategy for storage units with a price for every direction.
+
+    A storage can be pushed both ways around its cleared position: discharge more
+    or charge less (upward), charge more or discharge less (downward). For every
+    product the bid carries:
+
+    - ``volume``: what the storage can run of its cleared dispatch at the state of
+      charge from :meth:`get_soc` (``+`` discharge, ``-`` charge),
+    - ``max_power`` / ``min_power``: the discharge (``>= 0``) and charge (``<= 0``)
+      limits without the capacity reserved on other markets (the clearing models
+      the state of charge),
+    - ``soc``: the state of charge (fraction) at the start of the product,
+    - ``node``: where the storage is connected,
+    - ``price_discharge``: per MWh discharged more (the TSO pays),
+    - ``price_discharge_less``: per MWh discharged less (the storage pays),
+    - ``price_charge``: per MWh charged less (the TSO pays) or more (the storage
+      pays),
+    - ``reference_price``: the EOM price of the time step
+      (:meth:`reference_price`); the clearing uses it as floor for the upward and
+      as cap for the downward prices in the optimisation,
+    - ``price``: repeats ``price_discharge`` for mechanisms that read one price.
+
+    The prices follow what a move changes in the storage's later sale, so that a
+    call leaves it neither better nor worse off (cost-based redispatch, Section
+    13a EnWG). With ``P`` the reference price of the time step (EOM) and ``F`` the
+    highest reference price in the rest of the day (``P`` in the last time step):
+
+    - discharge more: ``price_discharge = max(P, F)``, the best sale it gives up,
+    - discharge less: ``price_discharge_less = F``, it sells the kept energy later,
+    - charge less / more: ``price_charge = efficiency_charge * efficiency_discharge
+      * F``, the later sale of the energy it does not get / gets.
+
+    Variable costs are not added: the moves shift energy in time, so the costs
+    occur either way.
+    """
+
+    def reference_price(self, unit: SupportsMinMaxCharge, start: datetime) -> float:
+        """
+        Price the storage got on the EOM for the time step starting at ``start``
+        (cost-based redispatch).
+
+        Redispatch clears after the EOM, so when the redispatch bids are made
+        ``outputs["energy_accepted_price"]`` still holds the EOM result. In time
+        steps where the storage had no EOM result (no accepted price and no
+        dispatch), the EOM price forecast of that time step is used.
+        """
+        accepted_price = unit.outputs["energy_accepted_price"].at[start]
+        if accepted_price != 0 or unit.outputs["energy"].at[start] != 0:
+            return accepted_price
+        forecast = unit.forecaster.price
+        if "EOM" in forecast:
+            return forecast["EOM"].at[start]
+        return accepted_price
+
+    def calculate_redispatch_prices(
+        self, unit: SupportsMinMaxCharge, start: datetime
+    ) -> dict:
+        """
+        Prices of the storage's redispatch moves in the product starting at
+        ``start`` (EUR/MWh): ``price_discharge``, ``price_discharge_less``,
+        ``price_charge`` and ``reference_price``.
+        """
+        reference = self.reference_price(unit, start)
+        end_of_day = datetime.combine(start.date(), datetime.max.time())
+        rest_of_day = unit.index.get_date_list(start + unit.index.freq, end_of_day)
+        future = max(
+            (self.reference_price(unit, t) for t in rest_of_day), default=reference
+        )
+        return {
+            "price_discharge": max(reference, future),
+            "price_discharge_less": future,
+            "price_charge": unit.efficiency_charge * unit.efficiency_discharge * future,
+            "reference_price": reference,
+        }
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMaxCharge,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Takes information from a storage unit and defines how it participates
+        in the redispatch market.
+
+        Args:
+            unit (SupportsMinMaxCharge): The unit that is dispatched.
+            market_config (MarketConfig): The market configuration.
+            product_tuples (list[Product]): List of product tuples.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Orderbook: One bid per product with the fields listed in the class
+            docstring.
+        """
+        bids = []
+        for start, end, only_hours in product_tuples:
+            # SOC at the start of the product (ensure_soc) and what the storage can
+            # run of its schedule there; time steps without a schedule are idle
+            soc = unit.get_soc(start)
+            planned = unit.outputs["energy"].at[start] if start in unit.index else 0.0
+            min_power, max_power = unit.calculate_redispatch_power_limits(start)
+            prices = self.calculate_redispatch_prices(unit, start)
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": only_hours,
+                    "price": prices["price_discharge"],
+                    **prices,
+                    "volume": unit.calculate_feasible_power(planned, soc),
+                    "max_power": max_power,
+                    "min_power": min_power,
+                    "soc": soc,
+                    "node": unit.node,
+                }
+            )
+
+        # keep zero-volume bids: an idle storage is a valid redispatch resource
         return bids
 
 

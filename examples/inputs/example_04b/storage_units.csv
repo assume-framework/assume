@@ -1,0 +1,3 @@
+name,technology,bidding_EOM,bidding_redispatch,bidding_nodal,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_soc,max_soc,initial_soc,capacity,additional_cost_charge,additional_cost_discharge,node,unit_operator
+storage_west,PSPP,storage_energy_heuristic_flexable,storage_energy_heuristic_redispatch,storage_energy_heuristic_flexable,-10,10,0.9,0.9,0,1,0.5,40,0,0,west,Operator 1
+storage_north,PSPP,storage_energy_heuristic_flexable,storage_energy_heuristic_redispatch,storage_energy_heuristic_flexable,-10,10,0.9,0.9,0,1,0.5,40,0,0,north,Operator 1

@@ -11,12 +11,14 @@ import pypsa
 from assume.common.grid_utils import (
     add_redispatch_generators,
     add_redispatch_loads,
+    add_redispatch_storages,
     calculate_network_meta,
     get_supported_solver_linopy,
     read_pypsa_grid,
 )
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.markets.base_market import MarketRole
+from assume.units.storage import Storage
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +71,15 @@ class RedispatchMarketRole(MarketRole):
             network=self.network,
             loads=self.grid_data["loads"],
         )
+
+        # storage units are optional; they participate in redispatch as PyPSA
+        # StorageUnits with their own state of charge
+        storage_units = self.grid_data.get("storage_units")
+        if storage_units is not None and not storage_units.empty:
+            add_redispatch_storages(
+                network=self.network,
+                storages=storage_units,
+            )
 
         self.solver_name = get_supported_solver_linopy(
             marketconfig.param_dict.get("solver_name", "highs")
@@ -144,24 +155,36 @@ class RedispatchMarketRole(MarketRole):
         price_pivot.reset_index(inplace=True, drop=True)
         p_nom_pivot.reset_index(inplace=True, drop=True)
 
-        # Generators and loads from the grid data
+        # Generators, loads and storage units from the grid data
         generator_names = self.grid_data["generators"].index
         load_names = self.grid_data["loads"].index
+        storage_units = self.grid_data.get("storage_units")
+        storage_names = (
+            storage_units.index if storage_units is not None else pd.Index([])
+        )
 
         gen_cols = p_set.columns.intersection(generator_names)
         load_cols = p_set.columns.intersection(load_names)
+        storage_cols = p_set.columns.intersection(storage_names)
 
-        # 1. Fixed generator dispatch
-        gen_p_set = p_set[gen_cols].copy()
+        # duration of every snapshot (products may differ in length); it weights the
+        # costs and the state of charge of the storage units
+        snapshot_starts = volume_pivot.index
+        ends = orderbook_df.groupby("start_time")["end_time"].max()
+        duration_hours = [
+            (ends[start] - start).total_seconds() / 3600 for start in snapshot_starts
+        ]
+        redispatch_network.snapshot_weightings.loc[:, "objective"] = duration_hours
+        redispatch_network.snapshot_weightings.loc[:, "stores"] = duration_hours
 
-        redispatch_network.generators_t.p_set = gen_p_set.reindex(
+        # 1. Fixed dispatch of the power plants: a fixed baseline (the cleared
+        # dispatch) plus "_up" and "_down" generators
+        flex_p_set = p_set[gen_cols].copy()
+        redispatch_network.generators_t.p_set = flex_p_set.reindex(
             index=redispatch_network.snapshots, columns=gen_cols, fill_value=0.0
         )
-
-        p_nom = p_nom_pivot[gen_cols].copy()
-
-        p_set_pu = gen_p_set.div(p_nom.where(p_nom != 0, np.inf)).clip(lower=0, upper=1)
-
+        p_nom = p_nom_pivot[gen_cols].where(p_nom_pivot[gen_cols] != 0, np.inf)
+        p_set_pu = flex_p_set.div(p_nom).clip(lower=0, upper=1)
         redispatch_network.generators_t.p_min_pu.update(p_set_pu)
         redispatch_network.generators_t.p_max_pu.update(p_set_pu)
 
@@ -175,35 +198,86 @@ class RedispatchMarketRole(MarketRole):
             fill_value=0.0,
         )
 
-        # 3. Redispatch flexibility only for power plants
-        # Upward redispatch capacity:
-        # Possible maximum upwards generation : availability * max_power - market_cleared_capacity (no incorporation of ramping constraints yet)
-        p_max_pu_up = (
-            (max_power_pivot[gen_cols] - gen_p_set)
-            .div(p_nom.where(p_nom != 0, np.inf))
-            .clip(lower=0, upper=1)
-        )
-
-        # Downward redispatch capacity:
-        # Possible maximum downward generation : market_cleared_capacity - min_power (no incorporation of ramping constraints yet)
-        p_max_pu_down = (
-            (gen_p_set - min_power_pivot[gen_cols])
-            .div(p_nom.where(p_nom != 0, np.inf))
-            .clip(lower=0, upper=1)
-        )
-        costs = price_pivot[gen_cols]
-
+        # 3. Redispatch flexibility of the power plants (no ramping constraints yet)
+        # up: max_power - cleared dispatch; down: cleared dispatch - min_power
+        max_power = max_power_pivot[gen_cols]
+        min_power = min_power_pivot[gen_cols]
+        p_max_pu_up = (max_power - flex_p_set).div(p_nom).clip(lower=0, upper=1)
+        p_max_pu_down = (flex_p_set - min_power).div(p_nom).clip(lower=0, upper=1)
         redispatch_network.generators_t.p_max_pu.update(p_max_pu_up.add_suffix("_up"))
-
         redispatch_network.generators_t.p_max_pu.update(
             p_max_pu_down.add_suffix("_down")
         )
 
+        # Reducing a power plant's output refunds its costs (-price)
+        costs = price_pivot[gen_cols]
         redispatch_network.generators_t.marginal_cost.update(costs.add_suffix("_up"))
-
         redispatch_network.generators_t.marginal_cost.update(
-            costs.add_suffix("_down") * (-1)
+            (-costs).add_suffix("_down")
         )
+
+        # 4. Storage units: PyPSA StorageUnits around their schedule. p_nom,
+        # max_hours (capacity * max_soc) and the efficiencies are already set from
+        # the grid data (add_redispatch_storages); the bids add the schedule, the
+        # power range, the SOC at the start and the prices. The bid "price" is the
+        # discharge price, "price_charge" the charge price (default: "price").
+        storage_callback = None
+        storage_prices = None
+        if len(storage_cols) > 0:
+            storage_bids = orderbook_df[orderbook_df["unit_id"].isin(storage_cols)]
+            if "soc" not in storage_bids or storage_bids["soc"].isna().any():
+                raise ValueError(
+                    f"Market '{self.marketconfig.market_id}': every storage bid "
+                    "needs 'soc' (see StorageEnergyHeuristicRedispatchStrategy)."
+                )
+            soc_pivot = orderbook_df.pivot(
+                index="start_time", columns="unit_id", values="soc"
+            ).reset_index(drop=True)
+            # a price the strategy does not send falls back to its single price;
+            # without a reference price, downward moves save nothing
+            defaults = {
+                "price_discharge": "price",
+                "price_discharge_less": "price",
+                "price_charge": "price",
+                "reference_price": None,
+            }
+            storage_prices = {}
+            for field, fallback in defaults.items():
+                values = orderbook_df.get(field, pd.Series(np.nan, orderbook_df.index))
+                values = values.fillna(orderbook_df[fallback] if fallback else 0.0)
+                storage_prices[field] = (
+                    orderbook_df.assign(**{field: values})
+                    .pivot(index="start_time", columns="unit_id", values=field)
+                    .reset_index(drop=True)[storage_cols]
+                )
+
+            schedule = p_set[storage_cols].fillna(0.0)
+            storage_p_nom = redispatch_network.storage_units.loc[storage_cols, "p_nom"]
+            redispatch_network.storage_units_t.p_set = schedule
+            redispatch_network.storage_units_t.p_max_pu = (
+                max_power_pivot[storage_cols].div(storage_p_nom).clip(lower=0)
+            )
+            redispatch_network.storage_units_t.p_min_pu = (
+                min_power_pivot[storage_cols].div(storage_p_nom).clip(upper=0)
+            )
+
+            capacity = storage_units.loc[storage_cols, "capacity"]
+            min_soc = (
+                storage_units.loc[storage_cols, "min_soc"].fillna(0.0)
+                if "min_soc" in storage_units
+                else 0.0
+            )
+            redispatch_network.storage_units.loc[
+                storage_cols, "state_of_charge_initial"
+            ] = soc_pivot[storage_cols].iloc[0] * capacity
+
+            storage_callback = Storage.redispatch_storage_callback(
+                storage_ids=storage_cols,
+                min_energy=(capacity * min_soc).to_dict(),
+                prices=storage_prices,
+                scheduled_dispatch=schedule.clip(lower=0),
+                scheduled_store=(-schedule).clip(lower=0),
+            )
 
         # run linear powerflow
         redispatch_network.lpf()
@@ -217,12 +291,20 @@ class RedispatchMarketRole(MarketRole):
         if line_loading.max().max() > 1:
             logger.debug("Congestion detected")
 
+            # the storage schedule is only needed for the power flow check: a
+            # StorageUnit p_set would fix the storage in the optimisation
+            storage_schedule = redispatch_network.storage_units_t.p_set.copy()
+            redispatch_network.storage_units_t.p_set = pd.DataFrame(
+                index=redispatch_network.snapshots
+            )
+
             status, termination_condition = redispatch_network.optimize(
                 solver_name=self.solver_name,
                 log_to_console=False,
                 # do not show tqdm progress bars for large grids
                 # https://github.com/PyPSA/linopy/pull/375
                 progress=False,
+                extra_functionality=storage_callback,
                 # Constant objective terms do not affect dispatch or nodal prices; omit for speed/stability.
                 include_objective_constant=False,
             )
@@ -231,13 +313,19 @@ class RedispatchMarketRole(MarketRole):
                 logger.error(f"Solver exited with {termination_condition}")
                 raise Exception("Solver in redispatch market did not converge")
 
+            # restore the schedule: redispatch = dispatch - schedule
+            redispatch_network.storage_units_t.p_set = storage_schedule
+
         # if no congestion is detected set accepted volume and price to 0
         else:
             logger.debug("No congestion detected")
 
         # process dispatch data
         self.process_dispatch_data(
-            network=redispatch_network, orderbook_df=orderbook_df
+            network=redispatch_network,
+            orderbook_df=orderbook_df,
+            storage_cols=storage_cols,
+            storage_prices=storage_prices,
         )
 
         # return orderbook_df back to orderbook format as list of dicts
@@ -263,13 +351,39 @@ class RedispatchMarketRole(MarketRole):
 
         return accepted_orders, rejected_orders, meta, flows
 
-    def process_dispatch_data(self, network: pypsa.Network, orderbook_df: pd.DataFrame):
+    def process_dispatch_data(
+        self,
+        network: pypsa.Network,
+        orderbook_df: pd.DataFrame,
+        storage_cols: pd.Index | None = None,
+        storage_prices: dict | None = None,
+    ):
         """
         This function processes the dispatch data to calculate the redispatch volumes and prices
         and update the orderbook with the accepted volumes and prices.
 
+        Power plants: the volume comes from their ``_up`` / ``_down`` generators
+        and is settled at the bid price.
+
+        Storage units: the volume is the dispatch after the clearing minus the
+        schedule (``storage_units_t.p - p_set``, 0 if no optimisation ran). With
+        ``pay_as_bid`` every direction is settled at its own price::
+
+            cashflow = price_discharge * discharged more
+                       - price_discharge_less * discharged less
+                       + price_charge * (charged less - charged more)
+
+        and ``accepted_price`` = cashflow / ``accepted_volume``, so that the usual
+        cashflow ``accepted_price * accepted_volume`` stays correct. With
+        ``pay_as_clear`` storage units get the nodal price like power plants.
+
         Args:
+            network (pypsa.Network): The solved redispatch network.
             orderbook_df (pd.DataFrame): The orderbook to be cleared.
+            storage_cols (pd.Index, optional): The storage units.
+            storage_prices (dict[str, pd.DataFrame], optional): ``price_discharge``,
+                ``price_discharge_less`` and ``price_charge`` per snapshot and
+                storage.
         """
 
         # Get all generators except for _backup generators
@@ -279,11 +393,47 @@ class RedispatchMarketRole(MarketRole):
         upward_redispatch = generators_t_p.filter(regex="_up$")
         downward_redispatch = generators_t_p.filter(regex="_down$")
 
+        # storage: redispatch = dispatch after the clearing - schedule
+        if storage_cols is None:
+            storage_cols = pd.Index([])
+        if len(storage_cols) > 0:
+            schedule = network.storage_units_t.p_set[storage_cols]
+            storage_volume = (network.storage_units_t.p[storage_cols] - schedule).round(
+                6
+            )
+            if network.storage_units_t.p_dispatch.empty:  # no optimisation ran
+                storage_cashflow = 0.0 * storage_volume
+            else:
+                dispatch_change = network.storage_units_t.p_dispatch[
+                    storage_cols
+                ] - schedule.clip(lower=0)
+                store_change = network.storage_units_t.p_store[storage_cols] - (
+                    -schedule
+                ).clip(lower=0)
+                price = {
+                    k: v.set_axis(schedule.index) for k, v in storage_prices.items()
+                }
+                storage_cashflow = (
+                    price["price_discharge"] * dispatch_change.clip(lower=0)
+                    + price["price_discharge_less"] * dispatch_change.clip(upper=0)
+                    - price["price_charge"] * store_change
+                )
+            # snapshot of every order (the snapshots are the sorted start times)
+            snapshot_of = {
+                t: i for i, t in enumerate(sorted(orderbook_df["start_time"].unique()))
+            }
+
         # Find intersection of unit_ids in orderbook_df and columns in redispatch_volumes for direct mapping
         valid_units = orderbook_df["unit_id"].unique()
 
         for unit in valid_units:
             unit_orders = orderbook_df["unit_id"] == unit
+
+            if unit in storage_cols:
+                hours = orderbook_df.loc[unit_orders, "start_time"].map(snapshot_of)
+                orderbook_df.loc[unit_orders, "accepted_volume"] = storage_volume[
+                    unit
+                ].to_numpy()[hours]
 
             if f"{unit}_up" in upward_redispatch.columns:
                 orderbook_df.loc[unit_orders, "accepted_volume"] += upward_redispatch[
@@ -295,7 +445,15 @@ class RedispatchMarketRole(MarketRole):
                     f"{unit}_down"
                 ].values
 
-            if self.payment_mechanism == "pay_as_bid":
+            if self.payment_mechanism == "pay_as_bid" and unit in storage_cols:
+                # each move at its own price: accepted_price = cashflow / volume
+                volume = orderbook_df.loc[unit_orders, "accepted_volume"].to_numpy()
+                cashflow = storage_cashflow[unit].to_numpy()[hours]
+                orderbook_df.loc[unit_orders, "accepted_price"] = np.divide(
+                    cashflow, volume, out=np.zeros_like(volume), where=volume != 0
+                )
+
+            elif self.payment_mechanism == "pay_as_bid":
                 # set accepted price as the price bid price from the orderbook
                 orderbook_df.loc[unit_orders, "accepted_price"] = np.where(
                     orderbook_df.loc[unit_orders, "accepted_volume"] > 0,

@@ -1046,3 +1046,187 @@ def test_ensure_soc_clips_the_last_time_step(mock_market_config, storage_unit):
 if __name__ == "__main__":
     # run pytest and enable prints
     pytest.main(["-s", __file__])
+
+
+@pytest.fixture
+def small_storage() -> Storage:
+    """20 MWh / 20 MW storage, lossless, starting half full."""
+    index = pd.date_range("2023-01-02", periods=6, freq="h")
+    forecaster = UnitForecaster(index, availability=1, market_prices={"EOM": 50})
+    return Storage(
+        id="small_storage",
+        unit_operator="op",
+        technology="battery",
+        bidding_strategies={},
+        forecaster=forecaster,
+        max_power_charge=-20,
+        max_power_discharge=20,
+        capacity=20,
+        initial_soc=0.5,
+    )
+
+
+def test_calculate_redispatch_power_limits_ignore_the_soc(small_storage):
+    """The clearing models the SOC; the bid only carries the power limits."""
+    s = small_storage
+    t = s.index
+    s.set_soc(t[0], 1.0)  # full: the unit itself could not charge
+    assert s.calculate_redispatch_power_limits(t[0]) == (-20.0, 20.0)
+
+
+def test_set_dispatch_plan_records_redispatch_and_locks_called_hours(small_storage):
+    """
+    A redispatch result is added on top of the DA plan and recorded; only the
+    called time step is locked for later markets.
+    """
+    from assume.common.base import BaseStrategy
+    from assume.common.market_objects import MarketConfig, MarketProduct
+
+    s = small_storage
+    t = s.index
+    s.bidding_strategies = {"EOM": BaseStrategy(), "redispatch": BaseStrategy()}
+    product = [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))]
+    eom = MarketConfig(market_id="EOM", product_type="energy", market_products=product)
+    redispatch = MarketConfig(
+        market_id="redispatch",
+        product_type="energy",
+        market_mechanism="redispatch",
+        market_products=product,
+    )
+    eom_order = {
+        "start_time": t[0],
+        "end_time": t[1],
+        "accepted_volume": 5.0,
+        "accepted_price": 80.0,
+    }
+    redispatch_order = {
+        "start_time": t[0],
+        "end_time": t[1],
+        "accepted_volume": 2.0,
+        "accepted_price": 60.0,
+    }
+    for config, order in [(eom, eom_order), (redispatch, redispatch_order)]:
+        s.set_dispatch_plan(config, [order])
+
+    # the total plan is DA + redispatch
+    assert s.outputs["energy"].at[t[0]] == pytest.approx(7.0)
+    assert s.outputs["redispatch_energy"].at[t[0]] == pytest.approx(2.0)
+    # only the called time step is locked
+    assert s.is_redispatch_called(t[0])
+    assert not s.is_redispatch_called(t[1])
+
+
+def test_as_dict_keeps_efficiencies_in_place(small_storage):
+    small_storage.efficiency_charge = 0.9
+    small_storage.efficiency_discharge = 0.8
+    d = small_storage.as_dict()
+    assert d["efficiency_charge"] == 0.9
+    assert d["efficiency_discharge"] == 0.8
+
+
+@pytest.mark.parametrize(
+    "initial_soc, da_volume, expected_up, expected_down",
+    [
+        # the bid carries the power range; the SOC (sent with it) is applied by
+        # the clearing, which models the storage with its own state of charge
+        (1.0, 50.0, 50.0, 150.0),
+        (0.0, -50.0, 150.0, 50.0),
+        (0.5, 0.0, 100.0, 100.0),
+    ],
+)
+def test_redispatch_bid_power_range_around_da_schedule(
+    initial_soc, da_volume, expected_up, expected_down
+):
+    """100 MWh / 100 MW lossless battery: redispatch bid around the DA schedule."""
+    from assume.common.market_objects import MarketConfig, MarketProduct
+    from assume.strategies.naive_strategies import (
+        StorageEnergyHeuristicRedispatchStrategy,
+    )
+
+    index = pd.date_range("2023-01-02", periods=4, freq="h")
+    t0, t1, t2 = index[:3]
+    storage = Storage(
+        id="battery",
+        unit_operator="op",
+        technology="battery",
+        bidding_strategies={},
+        forecaster=UnitForecaster(index, availability=1, market_prices={"EOM": 50}),
+        max_power_charge=-100,
+        max_power_discharge=100,
+        capacity=100,
+        initial_soc=initial_soc,
+    )
+
+    def config(market_id):
+        return MarketConfig(
+            market_id=market_id,
+            product_type="energy",
+            market_mechanism="redispatch"
+            if market_id == "redispatch"
+            else "pay_as_clear",
+            market_products=[MarketProduct(timedelta(hours=1), 2, timedelta(hours=1))],
+        )
+
+    def order(t, volume):
+        return {
+            "start_time": t,
+            "end_time": t + timedelta(hours=1),
+            "accepted_volume": volume,
+            "accepted_price": 50,
+        }
+
+    storage.set_dispatch_plan(config("EOM"), [order(t0, da_volume), order(t1, 0)])
+    bid = StorageEnergyHeuristicRedispatchStrategy().calculate_bids(
+        storage, config("redispatch"), [(t0, t1, None), (t1, t2, None)]
+    )[0]
+
+    assert bid["volume"] == pytest.approx(da_volume)
+    assert bid["max_power"] - bid["volume"] == pytest.approx(expected_up)
+    assert bid["volume"] - bid["min_power"] == pytest.approx(expected_down)
+    assert bid["soc"] == pytest.approx(initial_soc)
+
+
+def test_soc_follows_da_plus_redispatch():
+    """Full 100 MWh battery: DA accepts 50 of a 70 MW bid, redispatch adds +20."""
+    from assume.common.market_objects import MarketConfig, MarketProduct
+
+    index = pd.date_range("2023-01-02", periods=4, freq="h")
+    t0, t1 = index[:2]
+    storage = Storage(
+        id="battery",
+        unit_operator="op",
+        technology="battery",
+        bidding_strategies={},
+        forecaster=UnitForecaster(index, availability=1, market_prices={"EOM": 50}),
+        max_power_charge=-100,
+        max_power_discharge=100,
+        capacity=100,
+        initial_soc=1.0,
+    )
+    eom = MarketConfig(
+        market_id="EOM",
+        product_type="energy",
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+    )
+    redispatch = MarketConfig(
+        market_id="redispatch",
+        product_type="energy",
+        market_mechanism="redispatch",
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+    )
+
+    def order(volume):
+        return {
+            "start_time": t0,
+            "end_time": t1,
+            "accepted_volume": volume,
+            "accepted_price": 50,
+        }
+
+    storage.set_dispatch_plan(eom, [order(50)])  # only the accepted volume counts
+    assert storage.get_soc(t1) * 100 == pytest.approx(50)
+    storage.set_dispatch_plan(redispatch, [order(20)])
+    storage.execute_current_dispatch(t0, t0)
+
+    assert storage.outputs["energy"].at[t0] == pytest.approx(70)
+    assert storage.get_soc(t1) * 100 == pytest.approx(30)

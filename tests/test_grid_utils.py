@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 
+import numpy as np
 import pandas as pd
 import pytest
 from pytest import importorskip
@@ -13,6 +14,7 @@ import pypsa
 from assume.common.grid_utils import (
     add_redispatch_generators,
     add_redispatch_loads,
+    add_redispatch_storages,
     read_pypsa_grid,
 )
 
@@ -131,6 +133,43 @@ def test_add_redispatch_generators(n_2bus_1line, generators_for_n_2_bus_1line):
     assert actual_down_generators["marginal_cost"].to_numpy() == pytest.approx(
         expected_down_generators["marginal_cost"].to_numpy(), abs=1e-6, rel=0
     )
+
+
+@pytest.fixture
+def storages_for_n_2_bus_1line():
+    # storage at each bus; max_power_charge is negative (charging), discharge positive
+    storages = {
+        "name": ["storageN", "storageS"],
+        "node": ["N", "S"],
+        "max_power_discharge": [500.0, 800.0],
+        "max_power_charge": [-400.0, -600.0],
+    }
+    return pd.DataFrame(storages).set_index("name")
+
+
+def test_add_redispatch_storages(n_2bus_1line, storages_for_n_2_bus_1line):
+    n_generators = len(n_2bus_1line.generators)
+    add_redispatch_storages(n_2bus_1line, storages_for_n_2_bus_1line)
+
+    storages = storages_for_n_2_bus_1line
+    # p_nom is the larger of discharge and charge power
+    expected_p_nom = np.maximum(
+        storages["max_power_discharge"], -storages["max_power_charge"]
+    ).to_numpy()
+
+    added = n_2bus_1line.storage_units.loc[storages.index]
+    assert (added.bus.to_numpy() == storages["node"].to_numpy()).all()
+    assert added.p_nom.to_numpy() == pytest.approx(expected_p_nom)
+    assert (added.p_max_pu * added.p_nom).to_numpy() == pytest.approx(
+        storages["max_power_discharge"].to_numpy()
+    )
+    assert (added.p_min_pu * added.p_nom).to_numpy() == pytest.approx(
+        storages["max_power_charge"].to_numpy()
+    )
+    assert not added.cyclic_state_of_charge.any()
+
+    # storage is not modelled with generators, and adds no backups either
+    assert len(n_2bus_1line.generators) == n_generators
 
 
 def test_add_redispatch_loads(n_2bus_1line, loads_for_n_2_bus_1line):

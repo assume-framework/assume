@@ -15,6 +15,9 @@ from assume.strategies import (
     StorageCapacityHeuristicBalancingPosStrategy,
     StorageEnergyHeuristicFlexableStrategy,
 )
+from assume.strategies.naive_strategies import (
+    StorageEnergyHeuristicRedispatchStrategy,
+)
 from assume.units import Storage
 
 
@@ -36,6 +39,11 @@ def assert_allclose_with_indices(actual, expected, atol):
 
 # run all tests with two versions of handling simultaneous charge and discharge: True and False
 # False is the new default (10/2026) ramping behavior, True is the previous default behavior. The tests should pass for both versions.
+def set_eom_price(unit: Storage, price: float) -> None:
+    """Price the storage got on the EOM in every time step (cost-based reference)."""
+    unit.outputs["energy_accepted_price"].loc[unit.index[0] : unit.index[-1]] = price
+
+
 @pytest.fixture(
     params=[False, True],
     ids=[
@@ -68,6 +76,134 @@ def storage(request: pytest.FixtureRequest) -> Storage:
         additional_cost=1,
         simultaneous_charge_discharge_ramping=request.param,
     )
+
+
+def test_redispatch_storage(mock_market_config, storage):
+    start = datetime(2023, 7, 1)
+    end = datetime(2023, 7, 1, 1)
+    strategy = StorageEnergyHeuristicRedispatchStrategy()
+    mc = mock_market_config
+    product_tuples = [(start, end, None)]
+
+    # accepted EOM price of 50
+    set_eom_price(storage, 50)
+    bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+
+    assert len(bids) == 1
+    bid = bids[0]
+
+    # flat EOM price 50 all day: the best later price is 50 as well
+    assert bid["reference_price"] == pytest.approx(50)
+    assert bid["price_discharge"] == pytest.approx(50)
+    assert bid["price_discharge_less"] == pytest.approx(50)
+    assert bid["price_charge"] == pytest.approx(0.9 * 0.95 * 50)
+    assert bid["price"] == bid["price_discharge"]
+    # idle storage: zero baseline and the full power range in both directions
+    assert bid["volume"] == 0
+    assert bid["max_power"] == pytest.approx(storage.max_power_discharge)
+    assert bid["min_power"] == pytest.approx(storage.max_power_charge)
+    assert bid["soc"] == pytest.approx(storage.initial_soc)
+    # capacity, SOC limits and efficiencies come from the grid data
+    assert "capacity" not in bid
+    assert "node" in bid
+
+    # near-empty storage: the power range stays, the SOC goes to the clearing
+    storage.outputs["soc"].at[start] = 0.05
+    bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+    assert bids[0]["max_power"] == pytest.approx(storage.max_power_discharge)
+    assert bids[0]["soc"] == pytest.approx(0.05)
+
+
+def test_redispatch_storage_baseline_is_runnable_power(mock_market_config, storage):
+    """
+    The redispatch baseline (grid injection) is what the storage can actually run of
+    its DA plan, not the committed plan. Otherwise the grid model would compute line
+    flows with an injection that never happens.
+    """
+    start = datetime(2023, 7, 1)
+    end = datetime(2023, 7, 1, 1)
+    strategy = StorageEnergyHeuristicRedispatchStrategy()
+    product_tuples = [(start, end, None)]
+
+    # market committed 60 MW of charging, but the storage only has room for 40 MW
+    storage.set_soc(
+        start, storage.max_soc - 40 * storage.efficiency_charge / storage.capacity
+    )
+    storage.outputs["energy"][start] = -60
+
+    bids = strategy.calculate_bids(
+        storage, mock_market_config, product_tuples=product_tuples
+    )
+
+    # the grid baseline is the runnable -40, NOT the committed -60
+    assert bids[0]["volume"] == pytest.approx(-40)
+    # the clearing starts from the SOC at the start of the hour
+    assert bids[0]["soc"] == pytest.approx(
+        storage.max_soc - 40 * storage.efficiency_charge / storage.capacity
+    )
+
+
+def test_storage_keeps_committed_plan_and_runs_what_soc_allows(
+    mock_market_config, storage
+):
+    """
+    outputs["energy"] keeps the market-committed plan (the redispatch baseline,
+    because the generators were dispatched against it), while the SOC path only
+    runs what the state of charge can back.
+    """
+    start = datetime(2023, 7, 1)
+    end = datetime(2023, 7, 1, 1)
+    mc = mock_market_config
+    mc.product_type = "energy"
+
+    # nearly empty battery: it can physically deliver only
+    # soc * capacity * efficiency_discharge = 0.01 * 1000 * 0.95 = 9.5 MW
+    storage.set_soc(start, 0.01)
+
+    orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "accepted_volume": 100,  # market committed 100 MW of discharge
+            "accepted_price": 50,
+        }
+    ]
+    storage.set_dispatch_plan(mc, orderbook)
+
+    # the plan keeps the committed 100 ...
+    assert storage.outputs["energy"].at[start] == pytest.approx(100)
+    # ... while only what the SOC allows can actually run
+    runnable = storage.calculate_feasible_power(
+        storage.outputs["energy"].at[start], storage.get_soc(start)
+    )
+    assert runnable == pytest.approx(
+        0.01 * storage.capacity * storage.efficiency_discharge
+    )
+    assert storage.get_soc(end) == pytest.approx(storage.min_soc)
+
+
+def test_redispatch_storage_excludes_reserved_crm_capacity(mock_market_config, storage):
+    """
+    Capacity already sold on the CRM/aFRR markets must not be offered again to the
+    redispatch market. Reserving upward capacity has to shrink the upward (discharge)
+    head-room by the same amount, otherwise the same MW are committed twice.
+    """
+    start = datetime(2023, 7, 1)
+    end = datetime(2023, 7, 1, 1)
+    strategy = StorageEnergyHeuristicRedispatchStrategy()
+    product_tuples = [(start, end, None)]
+
+    baseline = strategy.calculate_bids(
+        storage, mock_market_config, product_tuples=product_tuples
+    )[0]
+
+    # reserve 30 MW of upward capacity on the CRM market
+    storage.outputs["capacity_pos"][start] = 30
+    reserved = strategy.calculate_bids(
+        storage, mock_market_config, product_tuples=product_tuples
+    )[0]
+
+    assert reserved["max_power"] == pytest.approx(baseline["max_power"] - 30)
 
 
 def test_flexable_eom_storage(mock_market_config, storage):
@@ -365,3 +501,64 @@ if __name__ == "__main__":
     import pytest
 
     pytest.main(["-s", __file__])
+
+
+def day_storage(accepted_prices):
+    """Battery (eta 0.8 / 0.5) with the given accepted EOM prices, one per hour."""
+    index = pd.date_range("2023-07-01", periods=len(accepted_prices), freq="h")
+    unit = Storage(
+        id="battery",
+        unit_operator="op",
+        technology="battery",
+        bidding_strategies={},
+        forecaster=UnitForecaster(index, availability=1, market_prices={"EOM": 50}),
+        max_power_charge=-10,
+        max_power_discharge=10,
+        capacity=40,
+        efficiency_charge=0.8,
+        efficiency_discharge=0.5,
+        initial_soc=0.5,
+    )
+    for t, price in zip(index, accepted_prices):
+        unit.outputs["energy_accepted_price"].at[t] = price
+    return unit, index
+
+
+@pytest.mark.parametrize(
+    "hour, expected",
+    [
+        # P = 60, best later price F = 70: discharge more max(P, F), less F
+        (0, {"reference_price": 60, "price_discharge": 70, "price_discharge_less": 70}),
+        # P = 70 is the peak, F = 40: discharging less only sells later at 40
+        (1, {"reference_price": 70, "price_discharge": 70, "price_discharge_less": 40}),
+        # last hour of the day: no later price, F = P
+        (3, {"reference_price": 30, "price_discharge": 30, "price_discharge_less": 30}),
+    ],
+)
+def test_redispatch_prices_follow_the_rest_of_the_day(hour, expected):
+    """
+    Prices from the accepted EOM price of the hour (not the forecast of 50) and
+    the best accepted price later that day; charge price = eta_c * eta_d * F.
+    """
+    unit, index = day_storage([60.0, 70.0, 40.0, 30.0])
+    prices = StorageEnergyHeuristicRedispatchStrategy().calculate_redispatch_prices(
+        unit, index[hour]
+    )
+    for field, value in expected.items():
+        assert prices[field] == pytest.approx(value)
+    assert prices["price_charge"] == pytest.approx(
+        0.8 * 0.5 * expected["price_discharge_less"]
+    )
+
+
+def test_redispatch_reference_falls_back_to_the_forecast(mock_market_config, storage):
+    """
+    Without an EOM result in that time step (no accepted price, no dispatch), the
+    EOM price forecast of that time step is used (flat forecast 50 in the fixture).
+    """
+    start = datetime(2023, 7, 1)
+    strategy = StorageEnergyHeuristicRedispatchStrategy()
+    assert strategy.reference_price(storage, start) == pytest.approx(50)
+
+    storage.outputs["energy_accepted_price"].at[start] = 30
+    assert strategy.reference_price(storage, start) == pytest.approx(30)

@@ -7,13 +7,18 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 
 import numpy as np
+import pandas as pd
 
 from assume.common.base import SupportsMinMaxCharge
 from assume.common.exceptions import ValidationError
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import UnitForecaster
+from assume.common.market_objects import MarketConfig, Orderbook
 
 logger = logging.getLogger(__name__)
+
+# EUR/MWh on every storage redispatch move, to pick the smallest moves on ties
+TIE_BREAK_COST = 0.01
 EPS = 1e-4
 
 
@@ -355,6 +360,193 @@ class Storage(SupportsMinMaxCharge):
         marginal_cost = additional_cost
 
         return marginal_cost
+
+    def set_dispatch_plan(
+        self, marketconfig: MarketConfig, orderbook: Orderbook
+    ) -> None:
+        """
+        Adds the accepted volumes (see ``SupportsMinMaxCharge.set_dispatch_plan``)
+        and, for redispatch, records them in ``outputs["redispatch_energy"]``.
+
+        ``outputs["energy"]`` keeps the committed plan, now including redispatch; it
+        is only corrected to what the storage can run at delivery
+        (:meth:`execute_current_dispatch`).
+
+        Time steps with an accepted redispatch volume are locked
+        (:meth:`is_redispatch_called`): strategies for markets that clear after
+        redispatch (e.g. intraday) must not bid for them.
+
+        Args:
+            marketconfig (MarketConfig): The market configuration.
+            orderbook (Orderbook): The orderbook.
+        """
+        super().set_dispatch_plan(marketconfig, orderbook)
+
+        if (
+            marketconfig.product_type == "energy"
+            and getattr(marketconfig, "market_mechanism", None) == "redispatch"
+        ):
+            for order in orderbook:
+                end_excl = order["end_time"] - self.index.freq
+                self.outputs["redispatch_energy"].loc[
+                    order["start_time"] : end_excl
+                ] += order["accepted_volume"]
+
+    def is_redispatch_called(self, start: datetime) -> bool:
+        """
+        Whether the storage was called for redispatch (accepted volume != 0) in the
+        time step starting at ``start``. Those time steps are locked for markets
+        that clear after redispatch.
+
+        Args:
+            start (datetime.datetime): Start of the time step.
+
+        Returns:
+            bool: True if the time step is locked.
+        """
+        return self.outputs["redispatch_energy"].at[start] != 0
+
+    def calculate_redispatch_power_limits(self, start: datetime) -> tuple[float, float]:
+        """
+        Calculates the absolute power range (MW) the storage can offer to redispatch
+        in the time step starting at ``start``.
+
+        Only the nameplate power and the capacity reserved on other markets (CRM)
+        limit it, using the same convention as :meth:`calculate_min_max_charge` and
+        :meth:`calculate_min_max_discharge`. The state of charge is NOT applied
+        here: the redispatch clearing models the storage as a PyPSA ``StorageUnit``
+        with its own state of charge (see :meth:`redispatch_storage_callback`).
+
+        Args:
+            start (datetime.datetime): Start of the time step.
+
+        Returns:
+            tuple[float, float]: Lowest (charging, <= 0) and highest (discharging,
+            >= 0) absolute power in MW.
+        """
+        capacity_pos = self.outputs["capacity_pos"].at[start]
+        capacity_neg = self.outputs["capacity_neg"].at[start]
+        max_power = self.max_power_discharge - capacity_pos
+        min_power = self.max_power_charge - capacity_neg
+        return min(min_power, 0.0), max(max_power, 0.0)
+
+    @staticmethod
+    def redispatch_storage_callback(
+        storage_ids,
+        min_energy: dict,
+        prices: dict,
+        scheduled_dispatch: pd.DataFrame,
+        scheduled_store: pd.DataFrame,
+    ):
+        """
+        Builds the ``extra_functionality`` hook that PyPSA calls in the redispatch
+        clearing after building the model and before solving it.
+
+        Redispatch models every storage as a PyPSA ``StorageUnit``: ``p_dispatch``
+        and ``p_store`` are free around the schedule and the state of charge follows
+        them with the exact efficiencies; PyPSA limits it to ``max_soc`` via
+        ``max_hours``. This hook adds the lower SOC limit (``min_soc``) and the
+        redispatch costs.
+
+        Costs. The change from the schedule is split into discharge more / less and
+        charge more / less. With ``P`` the ``reference_price`` (EOM price):
+
+        - upward moves cost their price, at least ``P``: discharge more
+          ``max(price_discharge, P)``, charge less ``max(price_charge, P)``,
+        - downward moves save their price, at most ``P``: discharge less
+          ``min(price_discharge_less, P)``, charge more ``min(price_charge, P)``.
+
+        Like the marginal costs of power plants in a merit-order dispatch, an
+        upward move then never costs less than a downward move saves, so the
+        optimiser cannot earn money by moving storage and plants against each other
+        beyond what the congestion needs. Every move also costs
+        ``TIE_BREAK_COST`` (EUR/MWh, twice for "more" moves): no energy is shifted
+        between hours when that costs exactly as much as it saves, and an
+        existing flow is reduced before the opposite one is added. The settlement uses the prices
+        without floor, cap and tie-break cost.
+
+        Args:
+            storage_ids (pandas.Index): Storage units in the redispatch network.
+            min_energy (dict): Lowest state of charge per storage (MWh).
+            prices (dict[str, pandas.DataFrame]): ``price_discharge``,
+                ``price_discharge_less``, ``price_charge`` and ``reference_price``
+                (EUR/MWh), one row per snapshot and one column per storage.
+            scheduled_dispatch (pandas.DataFrame): Scheduled discharge (MW, >= 0).
+            scheduled_store (pandas.DataFrame): Scheduled charge (MW, >= 0).
+
+        Returns:
+            Callable or None: The hook, or None if there is no storage.
+        """
+        storage_ids = pd.Index(storage_ids)
+        if len(storage_ids) == 0:
+            return None
+
+        def add_storage_terms(n, snapshots):
+            m = n.model
+            p_store = m["StorageUnit-p_store"]
+            p_dispatch = m["StorageUnit-p_dispatch"]
+            soc = m["StorageUnit-state_of_charge"]
+            # component dimension: "StorageUnit" in older, "name" in newer PyPSA
+            (dim,) = (d for d in p_store.dims if d != "snapshot")
+            index = pd.Index(snapshots, name="snapshot")
+            columns = pd.Index(storage_ids, name=dim)
+            weights = n.snapshot_weightings.objective.loc[snapshots].to_numpy()
+
+            def frame(values):
+                return pd.DataFrame(
+                    np.asarray(values, dtype=float), index=index, columns=columns
+                )
+
+            def weighted(name):
+                return (
+                    prices[name][storage_ids].to_numpy(dtype=float) * weights[:, None]
+                )
+
+            for u in storage_ids:
+                m.add_constraints(
+                    soc.sel({dim: u}, drop=True) >= float(min_energy[u]),
+                    name=f"{u}-redispatch-soc-min",
+                )
+
+            # change from the schedule = more - less, per direction
+            dispatch = p_dispatch.sel({dim: storage_ids})
+            store = p_store.sel({dim: storage_ids})
+            moves = {}
+            for name, flow, schedule in [
+                ("discharge", dispatch, scheduled_dispatch),
+                ("charge", store, scheduled_store),
+            ]:
+                scheduled = frame(schedule[storage_ids])
+                moves[f"{name}_more"] = m.add_variables(
+                    lower=0, coords=flow.coords, name=f"StorageUnit-{name}_more"
+                )
+                # at most down to zero, keeps more + less bounded at equal prices
+                moves[f"{name}_less"] = m.add_variables(
+                    lower=0, upper=scheduled, name=f"StorageUnit-{name}_less"
+                )
+                m.add_constraints(
+                    flow - moves[f"{name}_more"] + moves[f"{name}_less"] == scheduled,
+                    name=f"StorageUnit-{name}-change",
+                )
+
+            # upward moves cost at least P, downward moves save at most P. Every
+            # move also costs a tiny amount, so that ties pick the smallest moves,
+            # and "less" before "more" (no charging and discharging at once)
+            reference = weighted("reference_price")
+            up = np.maximum(weighted("price_discharge"), reference)
+            charge_up = np.maximum(weighted("price_charge"), reference)
+            down = np.minimum(weighted("price_discharge_less"), reference)
+            charge_down = np.minimum(weighted("price_charge"), reference)
+            tie = TIE_BREAK_COST * weights[:, None]
+            cost = (
+                (moves["discharge_more"] * frame(up + 2 * tie)).sum()
+                + (moves["charge_less"] * frame(charge_up + tie)).sum()
+                - (moves["discharge_less"] * frame(down - tie)).sum()
+                - (moves["charge_more"] * frame(charge_down - 2 * tie)).sum()
+            )
+            m.add_objective(m.objective.expression + cost, overwrite=True)
+
+        return add_storage_terms
 
     def calculate_soc_max_discharge(self, soc) -> float:
         """
