@@ -200,33 +200,33 @@ class FastSeries:
         """
         # datetime first, it is the hot path
         if isinstance(item, datetime):
-            return self.data[self.index.get_position(item)]
+            return self._data[self._index.get_position(item)]
         elif isinstance(item, slice):
-            return self.data[self._data_slice(item)]
+            return self._data[self._data_slice(item)]
         elif isinstance(item, _LIST_LIKE):
             # Handle list-like datetime-based inputs
             dates = self._convert_to_datetime_array(item)
             delta_seconds = np.array(
-                [(d - self.index.start).total_seconds() for d in dates]
+                [(d - self._index.start).total_seconds() for d in dates]
             )
-            indices = (delta_seconds / self.index.freq_seconds).round().astype(int)
-            remainders = delta_seconds % self.index.freq_seconds
+            indices = (delta_seconds / self._index.freq_seconds).round().astype(int)
+            remainders = delta_seconds % self._index.freq_seconds
 
             if not np.all(
                 (remainders <= _ALIGNMENT_EPSILON_SECONDS)
-                | (self.index.freq_seconds - remainders <= _ALIGNMENT_EPSILON_SECONDS)
+                | (self._index.freq_seconds - remainders <= _ALIGNMENT_EPSILON_SECONDS)
             ):
                 raise KeyError(
                     "One or more dates are not aligned with the index frequency."
                 )
-            if np.any((indices < 0) | (indices >= len(self.data))):
+            if np.any((indices < 0) | (indices >= len(self._data))):
                 raise KeyError("One or more dates are outside of the index range.")
-            return self.data[indices]
+            return self._data[indices]
 
         elif isinstance(item, str):
             # Handle string input
             date = pd.to_datetime(item).to_pydatetime()
-            return self.data[self.index.get_position(date)]
+            return self._data[self._index.get_position(date)]
 
         else:
             raise TypeError(
@@ -254,19 +254,19 @@ class FastSeries:
         """
         # single datetime or string first, it is the hot path
         if isinstance(item, datetime):
-            idx = self.index.get_position(item)
-            self.data[idx] = value
+            idx = self._index.get_position(item)
+            self._data[idx] = value
         elif isinstance(item, str):
             date = pd.to_datetime(item).to_pydatetime()
-            idx = self.index.get_position(date)
-            self.data[idx] = value
+            idx = self._index.get_position(date)
+            self._data[idx] = value
         elif isinstance(item, slice):
             data_slice = self._data_slice(item)
 
             # Assign values to the slice
-            slice_length = len(self.data[data_slice])
+            slice_length = len(self._data[data_slice])
             if np.isscalar(value) or slice_length == len(value):
-                self.data[data_slice] = value
+                self._data[data_slice] = value
             else:
                 raise ValueError(
                     f"Length of values ({len(value)}) does not match slice length ({slice_length})."
@@ -274,25 +274,25 @@ class FastSeries:
 
         elif isinstance(item, _LIST_LIKE):
             if (
-                len(item) == len(self.data)
-                and item[0] == self.index.start
-                and item[-1] == self.index.end
+                len(item) == len(self._data)
+                and item[0] == self._index.start
+                and item[-1] == self._index.end
             ):
                 # assign in place to keep the float dtype and broadcast scalars
-                self.data[:] = value
+                self._data[:] = value
             else:
                 if isinstance(value, pd.Series):
                     for idx, i in enumerate(item):
-                        start = self.index.get_position(i)
-                        self.data[start] = value.iloc[idx]
+                        start = self._index.get_position(i)
+                        self._data[start] = value.iloc[idx]
                 elif isinstance(value, list | np.ndarray):
                     for idx, i in enumerate(item):
-                        start = self.index.get_position(i)
-                        self.data[start] = value[idx]
+                        start = self._index.get_position(i)
+                        self._data[start] = value[idx]
                 else:
                     for i in item:
-                        start = self.index.get_position(i)
-                        self.data[start] = value
+                        start = self._index.get_position(i)
+                        self._data[start] = value
 
         else:
             raise TypeError(
@@ -760,10 +760,10 @@ class FastSeries:
         """
         result = self.copy()
         if isinstance(other, int | float | np.number | np.ndarray):
-            result.data = getattr(self.data, f"__{op}__")(other)
+            result.data = getattr(self._data, f"__{op}__")(other)
         elif isinstance(other, FastSeries):
             if self._index_aligned_with(other):
-                result.data = getattr(self.data, f"__{op}__")(other.data)
+                result.data = getattr(self._data, f"__{op}__")(other.data)
             else:
                 raise ValueError(f"Cannot perform {op}: Series indices do not match")
         else:
