@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 from datetime import datetime, timedelta
+from functools import cached_property
 
 import numpy as np
 import pandas as pd
@@ -10,11 +11,11 @@ from pandas.api.types import is_datetime64_any_dtype
 
 from assume.common.fast_pandas.index import _ALIGNMENT_EPSILON_SECONDS, FastIndex
 from assume.common.fast_pandas.indexers import (
-    FastSeriesAtIndexer,
-    FastSeriesIatIndexer,
     FastSeriesILocIndexer,
-    FastSeriesLocIndexer,
 )
+
+# built once: a `list | pd.Index | ...` union inside isinstance is rebuilt on every call
+_LIST_LIKE = (list, pd.Index, pd.DatetimeIndex, np.ndarray, pd.Series)
 
 
 class FastSeries:
@@ -129,12 +130,16 @@ class FastSeries:
         """
         Label-based indexing property.
 
-        Returns:
-            FastSeriesLocIndexer: Indexer for label-based access.
-        """
-        return FastSeriesLocIndexer(self)
+        Returns the series itself, since label-based access is what ``[]`` already does
+        and skipping a forwarding indexer saves a call on this hot path.
 
-    @property
+        Returns:
+            FastSeries: The series.
+        TODO: Remove this method since it literally does nothing
+        """
+        return self
+
+    @cached_property
     def iloc(self):
         """
         Integer-based indexing property.
@@ -150,9 +155,10 @@ class FastSeries:
         Label-based single-item access property.
 
         Returns:
-            FastSeriesAtIndexer: Indexer for label-based single-element access.
+            FastSeries: The series.
+        TODO: Remove this method since it literally does nothing
         """
-        return FastSeriesAtIndexer(self)
+        return self
 
     @property
     def iat(self):
@@ -160,9 +166,10 @@ class FastSeries:
         Integer-based single-item access property.
 
         Returns:
-            FastSeriesIatIndexer: Indexer for integer-based single-element access.
+            FastSeriesILocIndexer: Indexer for integer-based access.
+        TODO: Remove this method since it literally does nothing
         """
-        return FastSeriesIatIndexer(self)
+        return self.iloc
 
     def fillna(self, value):
         result = self.copy()
@@ -191,39 +198,35 @@ class FastSeries:
             TypeError: If the index type is unsupported.
             KeyError: If dates are outside of the index range or not aligned with the frequency.
         """
-        if isinstance(item, slice):
-            return self.data[self._data_slice(item)]
-
-        elif isinstance(
-            item, (list | pd.Index | pd.DatetimeIndex | np.ndarray | pd.Series)
-        ):
+        # datetime first, it is the hot path
+        if isinstance(item, datetime):
+            return self._data[self._index.get_position(item)]
+        elif isinstance(item, slice):
+            return self._data[self._data_slice(item)]
+        elif isinstance(item, _LIST_LIKE):
             # Handle list-like datetime-based inputs
             dates = self._convert_to_datetime_array(item)
             delta_seconds = np.array(
-                [(d - self.index.start).total_seconds() for d in dates]
+                [(d - self._index.start).total_seconds() for d in dates]
             )
-            indices = (delta_seconds / self.index.freq_seconds).round().astype(int)
-            remainders = delta_seconds % self.index.freq_seconds
+            indices = (delta_seconds / self._index.freq_seconds).round().astype(int)
+            remainders = delta_seconds % self._index.freq_seconds
 
             if not np.all(
                 (remainders <= _ALIGNMENT_EPSILON_SECONDS)
-                | (self.index.freq_seconds - remainders <= _ALIGNMENT_EPSILON_SECONDS)
+                | (self._index.freq_seconds - remainders <= _ALIGNMENT_EPSILON_SECONDS)
             ):
                 raise KeyError(
                     "One or more dates are not aligned with the index frequency."
                 )
-            if np.any((indices < 0) | (indices >= len(self.data))):
+            if np.any((indices < 0) | (indices >= len(self._data))):
                 raise KeyError("One or more dates are outside of the index range.")
-            return self.data[indices]
+            return self._data[indices]
 
         elif isinstance(item, str):
             # Handle string input
             date = pd.to_datetime(item).to_pydatetime()
-            return self.data[self.index.get_position(date)]
-
-        elif isinstance(item, datetime):
-            # Handle datetime input
-            return self.data[self.index.get_position(item)]
+            return self._data[self._index.get_position(date)]
 
         else:
             raise TypeError(
@@ -249,49 +252,47 @@ class FastSeries:
             ValueError: If lengths of indices and values do not match.
             KeyError: If dates are outside of the index range or not aligned with the frequency.
         """
-        if isinstance(item, slice):
+        # single datetime or string first, it is the hot path
+        if isinstance(item, datetime):
+            idx = self._index.get_position(item)
+            self._data[idx] = value
+        elif isinstance(item, str):
+            date = pd.to_datetime(item).to_pydatetime()
+            idx = self._index.get_position(date)
+            self._data[idx] = value
+        elif isinstance(item, slice):
             data_slice = self._data_slice(item)
 
             # Assign values to the slice
-            slice_length = len(self.data[data_slice])
+            slice_length = len(self._data[data_slice])
             if np.isscalar(value) or slice_length == len(value):
-                self.data[data_slice] = value
+                self._data[data_slice] = value
             else:
                 raise ValueError(
                     f"Length of values ({len(value)}) does not match slice length ({slice_length})."
                 )
 
-        elif isinstance(
-            item, (list | pd.Index | pd.DatetimeIndex | np.ndarray | pd.Series)
-        ):
+        elif isinstance(item, _LIST_LIKE):
             if (
-                len(item) == len(self.data)
-                and item[0] == self.index.start
-                and item[-1] == self.index.end
+                len(item) == len(self._data)
+                and item[0] == self._index.start
+                and item[-1] == self._index.end
             ):
                 # assign in place to keep the float dtype and broadcast scalars
-                self.data[:] = value
+                self._data[:] = value
             else:
                 if isinstance(value, pd.Series):
                     for idx, i in enumerate(item):
-                        start = self.index.get_position(i)
-                        self.data[start] = value.iloc[idx]
+                        start = self._index.get_position(i)
+                        self._data[start] = value.iloc[idx]
                 elif isinstance(value, list | np.ndarray):
                     for idx, i in enumerate(item):
-                        start = self.index.get_position(i)
-                        self.data[start] = value[idx]
+                        start = self._index.get_position(i)
+                        self._data[start] = value[idx]
                 else:
                     for i in item:
-                        start = self.index.get_position(i)
-                        self.data[start] = value
-
-        elif isinstance(item, datetime | str):
-            # Handle single datetime or string
-            date = (
-                pd.to_datetime(item).to_pydatetime() if isinstance(item, str) else item
-            )
-            idx = self.index.get_position(date)
-            self.data[idx] = value
+                        start = self._index.get_position(i)
+                        self._data[start] = value
 
         else:
             raise TypeError(
@@ -301,33 +302,15 @@ class FastSeries:
 
     def _data_slice(self, item: slice) -> slice:
         """
-        Convert a slice on the series into a slice on the data array.
+        Convert a datetime slice on the series into a positional slice on the data array.
 
-        Datetime bounds are inclusive and clipped to the index range, like label-based
-        slicing in pandas. Integer bounds are positional, like python slicing.
+        integer or string bounds raise a TypeError, use `iloc` for positional slicing instead.
+        Bounds are inclusive and clipped to the index range, like label-based slicing in pandas.
 
         Raises:
-            TypeError: If the bounds are neither datetimes nor integers, or are mixed.
+            TypeError: If a bound is neither a datetime nor None.
         """
-        bounds = [bound for bound in (item.start, item.stop) if bound is not None]
-        if all(isinstance(bound, datetime) for bound in bounds):
-            start_idx = (
-                max(0, self.index._get_idx_from_date(item.start))
-                if item.start is not None
-                else 0
-            )
-            stop_idx = (
-                max(0, self.index._get_idx_from_date(item.stop, round_up=False) + 1)
-                if item.stop is not None
-                else len(self.data)
-            )
-            return slice(start_idx, stop_idx, item.step)
-        if all(isinstance(bound, int | np.integer) for bound in bounds):
-            return item
-        raise TypeError(
-            "FastSeries slices must use datetime or integer bounds, got "
-            f"{type(item.start)} and {type(item.stop)}."
-        )
+        return self._index.data_slice(item.start, item.stop, item.step)
 
     def __add__(self, other: int | float | np.ndarray):
         return self._arithmetic_operation(other, "add")
@@ -602,7 +585,7 @@ class FastSeries:
         """
         # 1) compute the "raw" center index
         if isinstance(center, datetime):
-            raw_center = self.index._get_idx_from_date(center)
+            raw_center = self.index.get_idx_from_date(center)
         else:
             raw_center = center
 
@@ -777,10 +760,10 @@ class FastSeries:
         """
         result = self.copy()
         if isinstance(other, int | float | np.number | np.ndarray):
-            result.data = getattr(self.data, f"__{op}__")(other)
+            result.data = getattr(self._data, f"__{op}__")(other)
         elif isinstance(other, FastSeries):
             if self._index_aligned_with(other):
-                result.data = getattr(self.data, f"__{op}__")(other.data)
+                result.data = getattr(self._data, f"__{op}__")(other.data)
             else:
                 raise ValueError(f"Cannot perform {op}: Series indices do not match")
         else:

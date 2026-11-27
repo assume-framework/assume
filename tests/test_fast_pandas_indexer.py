@@ -47,8 +47,6 @@ def test_iloc_out_of_bounds_and_bad_types(series):
         series.iloc[6] = 1.0
     with pytest.raises(TypeError):
         _ = series.iloc[t0]
-    with pytest.raises(TypeError):
-        _ = series.iat[1:2]
     with pytest.raises(ValueError):
         series.iloc[0:2] = [1.0, 2.0, 3.0]
 

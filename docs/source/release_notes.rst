@@ -17,6 +17,7 @@ Upcoming Release
   - **Combining learning strategies** (#900, #901): Documented that all learning strategies of a simulation need the same foresight, action and observation dimensions, listed the dimensions of the built-in learning strategies, and documented that all learning units are assigned to ``Operator-RL``, so ``portfolio_learning`` cannot be combined with unit-level learning strategies yet.
   - **Learning config** (#672): Fixed the documented default of ``replay_buffer_size`` (50000), explained the difference between ``exploration_noise_std`` and ``noise_sigma``, and added typical ranges for ``learning_rate``, ``gamma`` and ``tau``.
   - **Runtime and memory of learning** (#886): Added rough runtime and memory figures for trainings with different numbers of learning agents on CPU and GPU.
+  - **FastSeries changes** (#958): Slicing in FastSeries now only supports detetime, for integer slicing use .iloc instead
 
 **Bug Fixes:**
   - **Compare Scenarios dashboard: bid difference panels** (#787): "Accepted Bid Prices Difference" and "Accepted Bid Volume Difference" compared the selected simulation with itself and always showed 0. They now compare ``simulation`` with ``simulation_comp``.

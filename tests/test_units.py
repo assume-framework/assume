@@ -393,15 +393,15 @@ def test_minmax_operationtime():
     runtime = mm.get_operation_time(datetime(2023, 7, 2))
     assert runtime > 0
 
-    mm.outputs["energy"][-4:] = 0
+    mm.outputs["energy"].iloc[-4:] = 0
     runtime = mm.get_operation_time(datetime(2023, 7, 2))
     assert runtime == -3
 
-    mm.outputs["energy"][-2:] = 1000
+    mm.outputs["energy"].iloc[-2:] = 1000
     runtime = mm.get_operation_time(datetime(2023, 7, 2))
     assert runtime == 1
 
-    mm.outputs["energy"][:] = 400
-    mm.outputs["energy"][-1:] = 0
+    mm.outputs["energy"].iloc[:] = 400
+    mm.outputs["energy"].iloc[-1:] = 0
     runtime = mm.get_operation_time(datetime(2023, 7, 2))
     assert runtime == 4

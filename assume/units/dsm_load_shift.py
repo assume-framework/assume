@@ -1321,7 +1321,7 @@ class DSMFlex:
             return False
 
         try:
-            current_step = self.index._get_idx_from_date(current_time)
+            current_step = self.index.get_idx_from_date(current_time)
         except (KeyError, ValueError, AttributeError, TypeError) as e:
             logger.debug(
                 "Could not map %s to index step: %s. Skipping re-optimisation.",

@@ -40,18 +40,12 @@ def test_fillna_does_not_mutate_original(series):
     assert np.isnan(series.data[1])
 
 
-def test_integer_slice_assignment_is_positional(series):
-    """series[2:4] = 7 should only overwrite positions 2 and 3, negative bounds count from the end."""
-    series[2:4] = 7
-    assert list(series.data) == [0, 1, 7, 7, 4, 5]
-    series[-2:] = [40.0, 50.0]
-    assert list(series.data) == [0, 1, 7, 7, 40, 50]
-
-
-def test_integer_slice_read_is_positional(series):
-    """series[1:3] and series[-2:] should slice by position, like python and pandas."""
-    assert list(series[1:3]) == [1, 2]
-    assert list(series[-2:]) == [4, 5]
+def test_integer_slice_is_rejected(series):
+    """[] slices take datetimes only; positional slicing goes through iloc."""
+    with pytest.raises(TypeError):
+        _ = series[1:3]
+    with pytest.raises(TypeError):
+        series[-2:] = 0
 
 
 def test_string_slice_read_is_rejected(series):
@@ -181,8 +175,8 @@ def test_create_date_range():
     new = fs.loc[start:new_end][::-1]
     assert new[0] == 33
     fs.data
-    fs.index._get_idx_from_date(start)
-    fs.index._get_idx_from_date(new_end)
+    fs.index.get_idx_from_date(start)
+    fs.index.get_idx_from_date(new_end)
     fs.data[0:4]
 
 

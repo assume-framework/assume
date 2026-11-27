@@ -106,12 +106,12 @@ class FastIndex:
         elif isinstance(item, slice):
             # datetime bounds are clipped to the index range like in pandas
             start_idx = (
-                max(0, self._get_idx_from_date(item.start))
+                max(0, self.get_idx_from_date(item.start))
                 if isinstance(item.start, datetime)
                 else item.start or 0
             )
             stop_idx = (
-                max(0, self._get_idx_from_date(item.stop, round_up=False) + 1)
+                max(0, self.get_idx_from_date(item.stop, round_up=False) + 1)
                 if isinstance(item.stop, datetime)
                 else item.stop or len(self._date_list)
             )
@@ -143,16 +143,7 @@ class FastIndex:
         """
         if self.start > date or self.end < date:
             return False
-        return self._is_aligned(date)
-
-    def _is_aligned(self, date: datetime) -> bool:
-        """Check whether a datetime lies exactly on the index grid."""
-        delta_seconds = (date - self.start).total_seconds()
-        remainder = delta_seconds % self.freq_seconds
-        return (
-            remainder <= _ALIGNMENT_EPSILON_SECONDS
-            or self.freq_seconds - remainder <= _ALIGNMENT_EPSILON_SECONDS
-        )
+        return self._locate(date)[1]
 
     def get_position(self, date: datetime) -> int:
         """
@@ -162,12 +153,13 @@ class FastIndex:
 
         Raises:
             KeyError: If the datetime lies outside the index range or is not aligned with the frequency.
+            TypeError: If the input is not a datetime (this includes None).
         """
-        if not self._is_aligned(date):
+        idx, aligned = self._locate(date)
+        if not aligned:
             raise KeyError(
                 f"{date} is not aligned with the index frequency {self.freq}"
             )
-        idx = self._get_idx_from_date(date)
         if idx < 0 or idx >= self._count:
             raise KeyError(
                 f"{date} is outside of the index range {self.start} - {self.end}"
@@ -220,8 +212,8 @@ class FastIndex:
             total_dates = np.arange(self._count) * self._freq_seconds
             self._date_list = [self._start + timedelta(seconds=s) for s in total_dates]
 
-        start_idx = max(0, self._get_idx_from_date(start or self.start))
-        end_idx = max(0, self._get_idx_from_date(end or self.end, round_up=False) + 1)
+        start_idx = max(0, self.get_idx_from_date(start or self.start))
+        end_idx = max(0, self.get_idx_from_date(end or self.end, round_up=False) + 1)
         return self._date_list[start_idx:end_idx]
 
     def as_datetimeindex(self) -> pd.DatetimeIndex:
@@ -237,7 +229,7 @@ class FastIndex:
         return pd.DatetimeIndex(pd.to_datetime(datetimes), name="FastIndex")
 
     @lru_cache(maxsize=1000)
-    def _get_idx_from_date(self, date: datetime, round_up: bool = True) -> int:
+    def get_idx_from_date(self, date: datetime, round_up: bool = True) -> int:
         """
         Convert a datetime to its corresponding index in the range.
 
@@ -252,20 +244,53 @@ class FastIndex:
             int: The index of the datetime in the index range.
 
         Raises:
-            KeyError: If the input `date` is None.
+            TypeError: If the input `date` is not a datetime (this includes None).
         """
-        if date is None:
-            raise KeyError("Date cannot be None. Please provide a valid datetime.")
+        idx, aligned = self._locate(date)
+        return idx + 1 if round_up and not aligned else idx
 
-        delta_seconds = (date - self.start).total_seconds()
-        idx, remainder = divmod(delta_seconds, self.freq_seconds)
+    @lru_cache(maxsize=1000)
+    def data_slice(
+        self, start: datetime | None, stop: datetime | None, step: int | None = None
+    ) -> slice:
+        """
+        Convert inclusive datetime bounds into a positional slice, clipped to the index range.
+
+        Raises:
+            TypeError: If a bound is neither a datetime nor None.
+        """
+        start_idx = 0 if start is None else max(0, self.get_idx_from_date(start))
+        stop_idx = (
+            self._count
+            if stop is None
+            else max(0, self.get_idx_from_date(stop, round_up=False) + 1)
+        )
+        return slice(start_idx, stop_idx, step)
+
+    @lru_cache(maxsize=1000)
+    def _locate(self, date: datetime) -> tuple[int, bool]:
+        """
+        Locate a datetime on the index grid, shared by the lookup methods.
+
+        Returns:
+            tuple[int, bool]: The index of the step at or before ``date`` (or the exact
+            step, within ``_ALIGNMENT_EPSILON_SECONDS``), and whether ``date`` is on the grid.
+
+        Raises:
+            TypeError: If the input `date` is not a datetime (this includes None).
+        """
+        if not isinstance(date, datetime):
+            raise TypeError(f"Expected datetime, got {type(date)}.")
+
+        idx, remainder = divmod(
+            (date - self._start).total_seconds(), self._freq_seconds
+        )
         idx = int(idx)
-
         if remainder <= _ALIGNMENT_EPSILON_SECONDS:
-            return idx
-        if self.freq_seconds - remainder <= _ALIGNMENT_EPSILON_SECONDS:
-            return idx + 1
-        return idx + 1 if round_up else idx
+            return idx, True
+        if self._freq_seconds - remainder <= _ALIGNMENT_EPSILON_SECONDS:
+            return idx + 1, True
+        return idx, False
 
     def align_up(self, date: datetime) -> datetime:
         """
@@ -279,7 +304,7 @@ class FastIndex:
         Returns:
             datetime.datetime: The first step at or after ``date``.
         """
-        return self.start + self._get_idx_from_date(date) * self.freq
+        return self.start + self.get_idx_from_date(date) * self.freq
 
     @staticmethod
     def _convert_to_datetime(value: datetime | str) -> datetime:
