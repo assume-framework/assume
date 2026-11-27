@@ -13,9 +13,15 @@ This document provides an overview of various market clearing algorithms used in
 Simple Market Clearing Algorithms
 ---------------------------------
 
+Merit-Order Kernel
+^^^^^^^^^^^^^^^^^^
+Both simple clearing algorithms and the naive price forecast use this function, which clears a single product on numpy arrays of bid prices and volumes. It can also be used directly.
+
+.. autofunction:: assume.markets.clearing_algorithms.simple.clear_merit_order
+
 Pay-as-Bid
 ^^^^^^^^^^
-This class implements the pay-as-bid mechanism in a simple way using iterative clearing. It is a simple clearing algorithm that clears the market by sorting the bids and offers in ascending order and then matching them one by one until the market is cleared.
+This class implements the pay-as-bid mechanism. The accepted volumes are determined with :func:`~assume.markets.clearing_algorithms.simple.clear_merit_order`, just like for pay-as-clear. Accepted supply orders receive their own bid price, accepted demand orders pay the prices of the supply orders they are matched with in the merit order, i.e. the volume-weighted average of these supply prices.
 
 .. autoclass:: assume.markets.clearing_algorithms.simple.PayAsBidRole
    :members:
@@ -23,7 +29,7 @@ This class implements the pay-as-bid mechanism in a simple way using iterative c
 
 Pay-as-Clear
 ^^^^^^^^^^^^
-This class implements the pay-as-clear mechanism within the merit order clearing algorithm. It is a simple clearing algorithm that clears the market by sorting the bids and offers in ascending order and then matching them one by one until the market is cleared. In general, the last accepted supply bid sets the market clearing price. Only if the supply is not sufficient to meet the demand (supply scarcity), the price is set by the lowest accepted demand bid price.
+This class implements the pay-as-clear mechanism with :func:`~assume.markets.clearing_algorithms.simple.clear_merit_order`, which sorts the supply bids ascending and the demand bids descending by price and then matches them one by one until the market is cleared. In general, the last accepted supply bid sets the market clearing price. Only if the first demand bid which is not fully served would pay more than that, e.g. during supply scarcity, this demand bid sets the price.
 
 .. autoclass:: assume.markets.clearing_algorithms.simple.PayAsClearRole
    :members:

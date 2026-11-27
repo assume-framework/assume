@@ -14,7 +14,6 @@ from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecast_algorithms import (
     calculate_naive_congestion_signal,
     calculate_naive_price,
-    calculate_naive_price_inelastic,
     calculate_naive_renewable_utilisation,
     calculate_naive_residual_load,
     get_forecast_registries,
@@ -358,9 +357,9 @@ def test_forecast_interface__elastic_demand(index, market_setup, forecast_setup)
     Elastic demand bids are setting the price for all timesteps in the underlying SimpleClearing, because we have supply scarcity in all timesteps.
     300 demand bids for each hour, with max_price=300 and max_volume=-3000 MW, and elasticity_model=linear.
     The corresponding bids are each 10 MW, with prices from 300 to 1 €/MWh.
-    08:00 - 10:00: nuclear + wind = 2500 MW -> 2500 MW demand accepted, last accepted demand bid sets price to 51 €/MWh
-    11:00 - 13:00: nuclear + wind + solar = 2800 MW -> 2800 MW demand accepted, last accepted demand bid sets price to 21 €/MWh
-    14:00 - 15:00: nuclear + wind = 2750 MW -> 2750 MW demand accepted, last accepted demand bid sets price to 26 €/MWh
+    08:00 - 10:00: nuclear + wind = 2500 MW -> 2500 MW demand accepted, first rejected demand bid sets price to 50 €/MWh
+    11:00 - 13:00: nuclear + wind + solar = 2800 MW -> 2800 MW demand accepted, first rejected demand bid sets price to 20 €/MWh
+    14:00 - 15:00: nuclear + wind = 2750 MW -> 2750 MW demand accepted, first rejected demand bid sets price to 25 €/MWh
     """
     mock_dsm_forecaster = forecast_setup["mock_dsm_forecaster"]
 
@@ -374,7 +373,7 @@ def test_forecast_interface__elastic_demand(index, market_setup, forecast_setup)
     # 2. Assert that results are generated like expected
     market_forecast = mock_dsm_forecaster.price
 
-    assert np.isclose(list(market_forecast["EOM"]), [51, 51, 51, 21, 21, 21, 26]).all()
+    assert np.isclose(list(market_forecast["EOM"]), [50, 50, 50, 20, 20, 20, 25]).all()
 
 
 def test_forecast_interface__elastic_demand_complex_clearing(
@@ -466,7 +465,6 @@ def test_forecast_interface__cache(market_setup, forecast_setup, shared_FastInde
     calculate_naive_residual_load.cache_clear()
     calculate_naive_congestion_signal.cache_clear()
     calculate_naive_renewable_utilisation.cache_clear()
-    calculate_naive_price_inelastic.cache_clear()
 
     mock_dsm_forecaster = forecast_setup["mock_dsm_forecaster"]
 
@@ -512,10 +510,6 @@ def test_forecast_interface__cache(market_setup, forecast_setup, shared_FastInde
 
     assert calculate_naive_renewable_utilisation.cache_info().hits == n - 1
     assert calculate_naive_renewable_utilisation.cache_info().misses == 1
-
-    # NOTE: only missed once & no hits due to lru_cache also on calculate_naive_price
-    assert calculate_naive_price_inelastic.cache_info().hits == 0
-    assert calculate_naive_price_inelastic.cache_info().misses == 1
 
 
 def test_units_operator_forecaster__matches_unit_forecasts(
@@ -615,7 +609,7 @@ def test_naive_forecast__exchange_imports_are_supply(index, shared_FastIndex):
     )
     units = (*plants, demand, exchange)
 
-    price = calculate_naive_price_inelastic(shared_FastIndex, units, market_config)
+    price = calculate_naive_price(shared_FastIndex, units, market_config)
     residual_load = calculate_naive_residual_load(
         shared_FastIndex, units, market_config
     )
@@ -624,3 +618,158 @@ def test_naive_forecast__exchange_imports_are_supply(index, shared_FastIndex):
     # export of 40 MW: residual demand of 160 MW needs the expensive plant
     assert list(price) == [10] * 3 + [50] * 4
     assert list(residual_load) == [70] * 3 + [160] * 4
+
+
+def _naive_plants(shared_FastIndex, costs, max_power=100):
+    registries = get_forecast_registries()
+    return tuple(
+        PowerPlant(
+            id=f"plant_{cost}",
+            unit_operator="op",
+            technology="gas",
+            bidding_strategies={"EOM": EnergyNaiveStrategy()},
+            max_power=max_power,
+            min_power=0,
+            efficiency=1,
+            additional_cost=cost,
+            fuel_type="renewable",
+            forecaster=PowerplantForecaster(
+                index=shared_FastIndex, forecast_registries=registries
+            ),
+        )
+        for cost in costs
+    )
+
+
+def _naive_inelastic_demand(index, shared_FastIndex, volume, price=300):
+    return Demand(
+        id="demand",
+        unit_operator="op",
+        technology="inflex_demand",
+        bidding_strategies={"EOM": EnergyNaiveStrategy()},
+        max_power=-1000,
+        min_power=0,
+        price=price,
+        forecaster=DemandForecaster(
+            index=shared_FastIndex,
+            demand=pd.Series(-volume, index=index),
+            forecast_registries=get_forecast_registries(),
+        ),
+    )
+
+
+def test_naive_forecast__pay_as_bid(index, shared_FastIndex):
+    """
+    Create units with constant volumes and prices:
+        - dem1: volume = -120, price = 300
+        - gen1: volume = 100, price = 10
+        - gen2: volume = 100, price = 50
+    gen1 and 20MW of gen2 are accepted.
+    The pay_as_clear forecast is the clearing price of 50€.
+    The pay_as_bid forecast is the volume-weighted average price of the accepted supply:
+    (100MW * 10€ + 20MW * 50€) / 120MW = 16.67€.
+    """
+    units = (
+        *_naive_plants(shared_FastIndex, (10, 50)),
+        _naive_inelastic_demand(index, shared_FastIndex, 120.0),
+    )
+
+    pay_as_clear = calculate_naive_price(
+        shared_FastIndex, units, MarketConfig(market_id="EOM")
+    )
+    pay_as_bid = calculate_naive_price(
+        shared_FastIndex,
+        units,
+        MarketConfig(market_id="EOM", market_mechanism="pay_as_bid"),
+    )
+
+    assert list(pay_as_clear) == [50] * len(index)
+    assert np.allclose(pay_as_bid, (100 * 10 + 20 * 50) / 120)
+
+
+def test_naive_forecast__elastic_demand_and_exchange(index, shared_FastIndex):
+    """
+    Create units with constant volumes and prices, without any inelastic demand:
+        - elastic dem1 (linear, 4 bids): volume = -50 each, price = 100, 75, 50, 25
+        - gen1: volume = 100, price = 10
+        - gen2: volume = 100, price = 60
+        - exchange: import volume = 50 (first 3h), price = 0 (price_import)
+                    export volume = -40 (last 4h), price = 2999 (price_export)
+    Without exchange: gen1 serves the bids at 100€ and 75€, the bid at 50€ is not served
+    and sets the price of 50€.
+    With import: import and gen1 also serve the bid at 50€, the bid at 25€ sets the price of 25€.
+    With export: the export and the bid at 100€ need gen1, the bid at 75€ needs gen2,
+    gen2 sets the price of 60€.
+    """
+    registries = get_forecast_registries()
+    market_config = MarketConfig(
+        market_id="EOM",
+        market_products=[MarketProduct(pd.Timedelta("1h"), 1, pd.Timedelta("1h"))],
+    )
+    plants = _naive_plants(shared_FastIndex, (10, 60))
+    elastic_demand = Demand(
+        id="elastic_demand",
+        unit_operator="op",
+        technology="energy",
+        bidding_strategies={"EOM": EnergyHeuristicElasticStrategy()},
+        max_power=-200,
+        min_power=0,
+        price=100,
+        elasticity=-1.0,
+        elasticity_model="linear",
+        num_bids=4,
+        forecaster=DemandForecaster(
+            index=shared_FastIndex,
+            demand=pd.Series(-200.0, index=index),
+            forecast_registries=registries,
+        ),
+    )
+    exchange = Exchange(
+        id="exchange",
+        unit_operator="op",
+        bidding_strategies={"EOM": ExchangeEnergyNaiveStrategy()},
+        forecaster=ExchangeForecaster(
+            index=shared_FastIndex,
+            volume_import=pd.Series([50.0] * 3 + [0.0] * 4, index=index),
+            volume_export=pd.Series([0.0] * 3 + [40.0] * 4, index=index),
+            forecast_registries=registries,
+        ),
+    )
+
+    price = calculate_naive_price(
+        shared_FastIndex, (*plants, elastic_demand), market_config
+    )
+    assert list(price) == [50] * len(index)
+
+    price = calculate_naive_price(
+        shared_FastIndex, (*plants, elastic_demand, exchange), market_config
+    )
+    assert list(price) == [25] * 3 + [60] * 4
+
+
+def test_naive_forecast__other_mechanisms_use_merit_order(index, shared_FastIndex):
+    """
+    Create units with constant volumes and prices:
+        - dem1: volume = -120, price = 300
+        - gen1: volume = 100, price = 10
+        - gen2: volume = 100, price = 50
+    complex_clearing, nodal_clearing and redispatch are forecasted with the same merit order
+    as pay_as_clear, so all forecasts are 50€.
+    NOTE: This is a known deficiency of the forecast for complex market mechanisms. Only the
+    marginal cost bids of the units are cleared, block orders, linked orders and grid
+    constraints (e.g. of complex_clearing or nodal_clearing) are not considered.
+    """
+    units = (
+        *_naive_plants(shared_FastIndex, (10, 50)),
+        _naive_inelastic_demand(index, shared_FastIndex, 120.0),
+    )
+    expected = calculate_naive_price(
+        shared_FastIndex, units, MarketConfig(market_id="EOM")
+    )
+    for mechanism in ("complex_clearing", "nodal_clearing", "redispatch"):
+        price = calculate_naive_price(
+            shared_FastIndex,
+            units,
+            MarketConfig(market_id="EOM", market_mechanism=mechanism),
+        )
+        assert_series_equal(price, expected)

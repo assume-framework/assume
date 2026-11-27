@@ -41,7 +41,7 @@ The available market mechanisms are the following:
 
 The :code:`PayAsClearRole` performs an electricity market clearing using a pay-as-clear mechanism.
 This means that the clearing price is the highest supply bid price that is still accepted.
-Only if the supply is not sufficient to meet the demand (supply scarcity), the clearing price is the lowest demand bid price that is still accepted.
+Only if the first demand bid which is not fully served would pay more than that, e.g. during supply scarcity, this demand bid sets the clearing price.
 This price is then valid for all accepted orders.
 For this, the demand and supply are separated, before the demand is sorted from highest to lowest order price
 and the supply lowest to highest order price.
@@ -49,8 +49,11 @@ Where those two curves in a price over power plot meet, the market is cleared fo
 All supply orders with a price below and all demand orders above are accepted.
 Where the price is equal, only partial volume is accepted.
 
-The :code:`PayAsBidRole` clears the market in the same manner as the pay-as-clear mechanism, but the accepted_price is
-the price of the supply order for both the demand order and the supply orders that meet this demand.
+The :code:`PayAsBidRole` accepts the same volumes as the pay-as-clear mechanism, but there is no uniform price.
+Each accepted supply order receives its own bid price.
+Each accepted demand order pays the prices of the supply orders it is matched with in the merit order,
+i.e. its accepted price is the volume-weighted average of these supply prices.
+For example, a demand of 100 MW matched with 50 MW at 10 €/MWh and 50 MW at 20 €/MWh pays 1500 €, i.e. 15 €/MWh.
 
 Complex clearing
 =================
