@@ -11,8 +11,6 @@ from pandas.api.types import is_datetime64_any_dtype
 
 from assume.common.fast_pandas.index import _ALIGNMENT_EPSILON_SECONDS, FastIndex
 from assume.common.fast_pandas.indexers import (
-    FastSeriesAtIndexer,
-    FastSeriesIatIndexer,
     FastSeriesILocIndexer,
 )
 
@@ -151,25 +149,27 @@ class FastSeries:
         """
         return FastSeriesILocIndexer(self)
 
-    @cached_property
+    @property
     def at(self):
         """
         Label-based single-item access property.
 
         Returns:
-            FastSeriesAtIndexer: Indexer for label-based single-element access.
+            FastSeries: The series.
+        TODO: Remove this method since it literally does nothing
         """
-        return FastSeriesAtIndexer(self)
+        return self
 
-    @cached_property
+    @property
     def iat(self):
         """
         Integer-based single-item access property.
 
         Returns:
-            FastSeriesIatIndexer: Indexer for integer-based single-element access.
+            FastSeriesILocIndexer: Indexer for integer-based access.
+        TODO: Remove this method since it literally does nothing
         """
-        return FastSeriesIatIndexer(self)
+        return self.iloc
 
     def fillna(self, value):
         result = self.copy()
