@@ -15,7 +15,6 @@ from assume.strategies.flexable import (
 )
 from assume.strategies.flexable_storage import (
     StorageEnergyHeuristicFlexableStrategy,
-    StorageEnergyHeuristicRedispatchStrategy,
     StorageCapacityHeuristicBalancingNegStrategy,
     StorageCapacityHeuristicBalancingPosStrategy,
 )
@@ -28,6 +27,7 @@ from assume.strategies.naive_strategies import (
     ExchangeEnergyNaiveStrategy,
     EnergyHeuristicElasticStrategy,
     DsmCapacityHeuristicBalancingStrategy,
+    StorageEnergyHeuristicRedispatchStrategy,
 )
 from assume.strategies.interactive_strategies import EnergyInteractiveStrategy
 from assume.strategies.dmas_powerplant import EnergyOptimizationDmasStrategy
