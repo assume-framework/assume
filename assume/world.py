@@ -489,7 +489,11 @@ class World:
         )
 
         for unit in units:
-            units_operator.add_unit(self.create_unit(**unit))
+            unit_instance = self.create_unit(**unit)
+            self.units[unit_instance.id] = unit_instance
+            units_operator.add_unit(unit_instance)
+
+        self.unit_operators[id] = units_operator
         data_update_dict = {
             "output_agent_addr": self.output_agent_addr,
         }
