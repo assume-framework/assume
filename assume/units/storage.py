@@ -434,7 +434,12 @@ class Storage(SupportsMinMaxCharge):
         min_power_charge = self.min_power_charge - (base_load + capacity_pos)
         min_power_charge = min_power_charge.clip(max=0)
 
-        max_power_charge = self.max_power_charge - (base_load + capacity_neg)
+        # capacity_neg (down reserve) is stored as a positive magnitude, while
+        # max_power_charge is <= 0 (charging is negative). Reserving down-capacity
+        # must REDUCE the available charge magnitude, i.e. push max_power_charge
+        # toward zero -> add capacity_neg (symmetric to the discharge side, which
+        # subtracts the positive capacity_pos from the positive max_power_discharge).
+        max_power_charge = self.max_power_charge - base_load + capacity_neg
         max_power_charge = np.where(
             max_power_charge <= min_power_charge, max_power_charge, 0
         )

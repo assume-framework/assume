@@ -678,6 +678,12 @@ def load_config_and_create_forecaster(
     exchanges_df = load_file(
         path=path, config=config, file_name="exchanges_df", index=index
     )
+    # Optional per-interconnector import/export prices (neighbour bus marginal
+    # price). Absent in most scenarios -> load_file returns None and exchanges
+    # keep their scalar price_import / price_export.
+    exchange_prices_df = load_file(
+        path=path, config=config, file_name="exchange_prices_df", index=index
+    )
     availability = load_file(
         path=path, config=config, file_name="availability_df", index=index
     )
@@ -754,6 +760,13 @@ def load_config_and_create_forecaster(
             )
     if exchange_units is not None:
         for id, exchange in exchange_units.iterrows():
+            import_price = None
+            export_price = None
+            if exchange_prices_df is not None:
+                if f"{id}_import" in exchange_prices_df.columns:
+                    import_price = exchange_prices_df[f"{id}_import"]
+                if f"{id}_export" in exchange_prices_df.columns:
+                    export_price = exchange_prices_df[f"{id}_export"]
             unit_forecasts[id] = ExchangeForecaster(
                 index=shared_unit_index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),
@@ -762,6 +775,8 @@ def load_config_and_create_forecaster(
                 ),
                 volume_export=exchanges_df[f"{id}_export"],
                 volume_import=exchanges_df[f"{id}_import"],
+                price_import=import_price,
+                price_export=export_price,
             )
     if dsm_units is not None:
         for type, dsm in dsm_units.items():

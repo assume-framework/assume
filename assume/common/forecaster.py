@@ -1168,6 +1168,8 @@ class ExchangeForecaster(UnitForecaster):
         residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
         market_prices: dict[str, ForecastSeries] = None,
+        price_import: ForecastSeries = None,
+        price_export: ForecastSeries = None,
     ):
         super().__init__(
             index=index,
@@ -1179,6 +1181,15 @@ class ExchangeForecaster(UnitForecaster):
         )
         self.volume_import = self._to_series(volume_import)
         self.volume_export = self._to_series(volume_export)
+        # Optional time-varying border prices (e.g. the neighbour bus marginal
+        # price per interconnector). When None, the Exchange unit falls back to
+        # its scalar price_import / price_export, preserving the old behaviour.
+        self.price_import = (
+            self._to_series(price_import) if price_import is not None else None
+        )
+        self.price_export = (
+            self._to_series(price_export) if price_export is not None else None
+        )
 
 
 class UnitsOperatorForecaster(UnitForecaster):

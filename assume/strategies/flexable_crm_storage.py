@@ -129,8 +129,11 @@ class _StorageCrmStrategy(MinMaxChargeStrategy):
     ) -> float:
         """
         Power- and SOC-feasible volume across the block (flat-SOC approximation),
-        net of any reservation already committed in this direction. ``d`` is one
-        dispatch interval.
+        net of any reservation already committed in this direction AND of the
+        same-direction energy already committed on the EOM (``base_load``), so the
+        unit can never sell reserve capacity on top of a full energy commitment
+        (mirrors ``calculate_min_max_discharge/charge`` in the unit model). ``d`` is
+        one dispatch interval.
         """
         block_start = block_steps[0]
         d = self._step_hours(unit)
@@ -139,17 +142,27 @@ class _StorageCrmStrategy(MinMaxChargeStrategy):
 
         hourly_max: list[float] = []
         for t in block_steps:
+            # EOM-committed energy at t: positive = discharging, negative = charging
+            base_load = float(unit.outputs["energy"].at[t])
             if self.direction == "pos":
                 existing = float(unit.outputs["capacity_pos"].at[t])
                 soc_room_mwh = max(0.0, soc - unit.min_soc) * capacity
                 soc_limit = soc_room_mwh * unit.efficiency_discharge / d
-                power_limit = max(0.0, unit.max_power_discharge - existing)
+                # discharge headroom = rated - already-discharging - reserved up
+                committed_discharge = max(0.0, base_load)
+                power_limit = max(
+                    0.0, unit.max_power_discharge - committed_discharge - existing
+                )
             else:
                 existing = float(unit.outputs["capacity_neg"].at[t])
                 soc_headroom_mwh = max(0.0, unit.max_soc - soc) * capacity
                 eff_ch = unit.efficiency_charge if unit.efficiency_charge > 0 else 1.0
                 soc_limit = soc_headroom_mwh / eff_ch / d
-                power_limit = max(0.0, abs(unit.max_power_charge) - existing)
+                # charge headroom = rated - already-charging - reserved down
+                committed_charge = max(0.0, -base_load)
+                power_limit = max(
+                    0.0, abs(unit.max_power_charge) - committed_charge - existing
+                )
             hourly_max.append(max(0.0, min(soc_limit, power_limit)))
 
         return float(min(hourly_max)) if hourly_max else 0.0
@@ -279,12 +292,33 @@ class _StorageCrmStrategy(MinMaxChargeStrategy):
         energy_price,
         market_config: MarketConfig,
     ) -> float:
-        """CRM energy signal at t, clipped to the band; marginal-cost fallback."""
+        """CRM (aFRR) energy bid at t, clipped to the market band.
+
+        aFRR energy is pay-as-clear, so the storage bids its true marginal
+        opportunity cost and is paid the clearing price. If an explicit CRM-energy
+        price forecast is provided it is used directly; otherwise the opportunity
+        cost is taken from the EOM arbitrage value (the storage's own marginal cost
+        is ~0, which would wrongly dump reserve energy at 0 EUR/MWh). Mirrors the
+        flexABLE EOM heuristic and the capacity leg, so the agent is coherent across
+        EOM / capacity / energy:
+            pos (discharge, supply up): EOM_foresight_avg / efficiency_discharge
+            neg (charge,   absorb down): EOM_foresight_avg * efficiency_charge
+        """
         if energy_price is not None:
             price = float(energy_price.at[t])
         else:
-            mc_sign = 1.0 if self.direction == "pos" else -1.0
-            price = float(unit.calculate_marginal_cost(t, mc_sign))
+            eom_price = unit.forecaster.price.get(self.eom_market_id)
+            if eom_price is not None:
+                eom_avg = self._foresight_average(eom_price, t)
+                if self.direction == "pos":
+                    eff_dis = unit.efficiency_discharge if unit.efficiency_discharge > 0 else 1.0
+                    price = eom_avg / eff_dis
+                else:
+                    eff_ch = unit.efficiency_charge if unit.efficiency_charge > 0 else 1.0
+                    price = eom_avg * eff_ch
+            else:
+                mc_sign = 1.0 if self.direction == "pos" else -1.0
+                price = float(unit.calculate_marginal_cost(t, mc_sign))
 
         if price >= 0:
             return min(price, market_config.maximum_bid_price)

@@ -391,25 +391,25 @@ class ExchangeEnergyNaiveStrategy(MinMaxStrategy):
             # and the volume of the product. Dispatch the order to the market.
             start = product[0]
 
-            # append import bid
+            # append import bid (time-varying neighbour price if provided, else scalar)
             bids.append(
                 {
                     "start_time": start,
                     "end_time": product[1],
                     "only_hours": product[2],
-                    "price": unit.price_import,
+                    "price": unit.get_price_import(start),
                     "volume": unit.volume_import.at[start],
                     "node": unit.node,
                 }
             )
 
-            # append export bid
+            # append export bid (time-varying neighbour price if provided, else scalar)
             bids.append(
                 {
                     "start_time": start,
                     "end_time": product[1],
                     "only_hours": product[2],
-                    "price": unit.price_export,
+                    "price": unit.get_price_export(start),
                     "volume": unit.volume_export.at[start],
                     "node": unit.node,
                 }

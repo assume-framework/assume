@@ -61,6 +61,27 @@ class Exchange(BaseUnit):
         self.price_import = price_import
         self.price_export = price_export
 
+        # Optional time-varying border prices supplied via the forecaster
+        # (neighbour bus marginal price per interconnector). When present they
+        # override the scalar price_import / price_export on a per-timestep
+        # basis; when None, the scalars are used (unchanged legacy behaviour).
+        self.price_import_series = getattr(forecaster, "price_import", None)
+        self.price_export_series = getattr(forecaster, "price_export", None)
+
+    def get_price_import(self, start) -> float:
+        """Return the import bid price at ``start``: the time-varying neighbour
+        price if one was provided, otherwise the scalar ``price_import``."""
+        if self.price_import_series is not None:
+            return float(self.price_import_series.at[start])
+        return self.price_import
+
+    def get_price_export(self, start) -> float:
+        """Return the export bid price at ``start``: the time-varying neighbour
+        price if one was provided, otherwise the scalar ``price_export``."""
+        if self.price_export_series is not None:
+            return float(self.price_export_series.at[start])
+        return self.price_export
+
     def as_dict(self) -> dict:
         """
         Returns the unit as a dictionary.

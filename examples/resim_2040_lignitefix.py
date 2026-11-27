@@ -24,7 +24,7 @@ import pandas as pd  # noqa: E402
 # Base-only: the no-actor runs (no steel/cement/aviation+maritime demand added).
 # Their corrected DA price signal feeds the investment model; the actor runs follow later.
 CASE_DIRS = [
-    "steel_base", "cement_base",
+    "steel_base",
 ]
 FAMILIES = ["fokusH2", "fokusstrom", "technologiemix"]
 YEAR = 2040
