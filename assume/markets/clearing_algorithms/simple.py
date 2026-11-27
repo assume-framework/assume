@@ -330,14 +330,8 @@ class PayAsBidRole(MarketRole):
         # write network flows here if applicable
         flows = []
 
-        # Guarantee every returned order carries the fields set_dispatch_plan reads
-        # (it accesses order["accepted_volume"] and order["accepted_price"] for both
-        # accepted and rejected orders). Rejected orders are collected above without
-        # those fields; accepted orders are always priced via the to_commit branch,
-        # but default defensively so a missing key can never crash a run.
-        for order in accepted_orders:
-            order.setdefault("accepted_volume", 0)
-            order.setdefault("accepted_price", order["price"])
+        # set_dispatch_plan reads accepted_volume and accepted_price of every order;
+        # rejected orders are collected above without them
         for order in rejected_orders:
             order["accepted_volume"] = 0
             order.setdefault("accepted_price", 0)
