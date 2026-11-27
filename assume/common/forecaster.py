@@ -44,12 +44,14 @@ def calculate_base_forecasts(
     forecast_df: ForecastSeries = None,
     preprocess_information=None,
     prefix="",
+    unit_id: str | None = None,
 ) -> dict[str, ForecastSeries]:
     """Compute per-market forecasts for a single metric (e.g. price, residual_load).
 
     For each energy market in *market_configs*, returns the corresponding column
-    from *forecast_df* if it exists (keyed as ``{prefix}_{market_id}``), otherwise
-    falls back to *forecast_algorithm* to calculate the forecast.
+    from *forecast_df* if it exists, otherwise falls back to *forecast_algorithm*
+    to calculate the forecast. A unit-specific column ``{unit_id}_{prefix}_{market_id}``
+    is preferred over the general column ``{prefix}_{market_id}``.
 
     Returns:
         dict[str, ForecastSeries]: Map of ``market_id`` to forecast series.
@@ -68,7 +70,10 @@ def calculate_base_forecasts(
             continue
 
         # NOTE: if given forecast_df will currently always prevent other forecast calculations
-        forecast[market_id] = forecast_df.get(f"{prefix}_{market_id}")
+        forecast[market_id] = forecast_df.get(
+            f"{unit_id}_{prefix}_{market_id}",
+            forecast_df.get(f"{prefix}_{market_id}"),
+        )
         if forecast[market_id] is not None:
             # go next if forecast existing
             continue
@@ -279,7 +284,8 @@ class UnitForecaster:
         Args:
             units (list[BaseUnit]): All units in the simulation.
             market_configs (list[MarketConfig]): Available market configurations.
-            forecast_df (ForecastSeries, optional): Explicitly provided forecasts (columns override calculated ones).
+            forecast_df (ForecastSeries, optional): Explicitly provided forecasts (columns override calculated ones,
+                ``{unit_id}_{metric}_{market_id}`` overrides ``{metric}_{market_id}`` for this unit).
             initializing_unit (BaseUnit, optional): The unit currently being initialized.
         """
         self.preprocess(units, market_configs, forecast_df, initializing_unit)
@@ -300,6 +306,7 @@ class UnitForecaster:
                 forecast_df,
                 self.preprocess_information["price"],
                 prefix="price",
+                unit_id=getattr(initializing_unit, "id", None),
             )
             self.price = self._dict_to_series(self.price)
 
@@ -321,6 +328,7 @@ class UnitForecaster:
                 forecast_df,
                 self.preprocess_information["residual_load"],
                 prefix="residual_load",
+                unit_id=getattr(initializing_unit, "id", None),
             )
             self.residual_load = self._dict_to_series(self.residual_load)
 
