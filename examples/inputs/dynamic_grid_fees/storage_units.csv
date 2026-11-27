@@ -1,0 +1,3 @@
+name,technology,bidding_EOM,bidding_redispatch,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_soc,max_soc,capacity,initial_soc,additional_cost_charge,additional_cost_discharge,node,unit_operator
+storage_north,battery,storage_energy_heuristic_flexable,storage_energy_naive_redispatch,500.0,500.0,0.95,0.95,0,1,1000.0,0,0,0,NORTH,operator_storage_north
+storage_south,battery,storage_energy_heuristic_flexable,storage_energy_naive_redispatch,500.0,500.0,0.95,0.95,0,1,1000.0,0,0,0,SOUTH,operator_storage_south

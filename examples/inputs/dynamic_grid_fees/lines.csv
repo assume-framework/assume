@@ -1,0 +1,2 @@
+line,bus0,bus1,s_nom,s_max_pu,x,r
+line_NORTH_SOUTH,NORTH,SOUTH,1000.0,1,0.01,0.001

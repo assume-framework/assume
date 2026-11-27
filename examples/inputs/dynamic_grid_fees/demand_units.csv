@@ -1,0 +1,3 @@
+name,technology,bidding_EOM,bidding_redispatch,max_power,min_power,node,unit_operator
+demand_north,inflex_demand,demand_energy_naive,demand_energy_naive_redispatch,100000,0,NORTH,operator_demand
+demand_south,inflex_demand,demand_energy_naive,demand_energy_naive_redispatch,100000,0,SOUTH,operator_demand

@@ -83,6 +83,11 @@ available_examples = {
         "scenario": "example_01j",
         "study_case": "zonal_case",
     },
+    # dynamic grid fees: uniform pricing with redispatch as worst case
+    "dynamic_grid_fees_uniform": {
+        "scenario": "dynamic_grid_fees",
+        "study_case": "uniform_redispatch",
+    },
     #
     # DRL references case for learning advancement testing
     "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
@@ -130,10 +135,10 @@ if __name__ == "__main__":
 
     # select to store the simulation results in a local database or in timescale
     # when using timescale, you need to have docker installed and can access the grafana dashboard
-    data_format = "local_db"  # "local_db" or "timescale"
+    data_format = "timescale"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "uni_directional_line_limits"
+    example = "dynamic_grid_fees_uniform"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"

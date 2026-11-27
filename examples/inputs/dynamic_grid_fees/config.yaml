@@ -1,0 +1,68 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: MIT
+
+# One day as 4 steps: night, morning, midday, evening (hour 0-3 of each cycle).
+# Cheap and expensive steps alternate, so the storages are empty after each peak.
+# The cycle is simulated three times, results are evaluated for the 2nd cycle (04:00-07:00).
+# The 1st cycle gives the lead time for the markets, the 3rd lets the last hour clear.
+# Both keep the price forecast average over whole cycles.
+
+# uniform pricing, congestion is solved by cost-based redispatch
+uniform_redispatch:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-01 11:00
+  time_step: 1h
+  save_frequency_hours: null
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 4h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: complex_clearing
+      additional_fields:
+        - node
+      param_dict:
+        network_path: .
+        solver_name: highs
+        zones_identifier: zone_id
+        pricing_mechanism: pay_as_clear
+
+    redispatch:
+      operator: network_operator
+      product_type: energy
+      start_date: 2019-01-01 03:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: redispatch
+      additional_fields:
+        - node
+        - min_power
+        - max_power
+      param_dict:
+        network_path: .
+        solver_name: highs
+        payment_mechanism: pay_as_bid
+        backup_marginal_cost: 10000
+        log_flows: true

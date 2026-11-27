@@ -1,0 +1,5 @@
+name,technology,bidding_EOM,bidding_redispatch,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,node,unit_operator
+wind_north,wind_onshore,powerplant_energy_naive,powerplant_energy_naive_redispatch,renewable,0.0,2000.0,0.0,1.0,0.0,NORTH,operator_north
+lignite_north,lignite,powerplant_energy_naive,powerplant_energy_naive_redispatch,lignite,0.406,1500.0,0.0,0.4,0.0,NORTH,operator_north
+coal_south,hard coal,powerplant_energy_naive,powerplant_energy_naive_redispatch,hard coal,0.335,1500.0,0.0,0.4,0.0,SOUTH,operator_south
+gas_south,open cycle gas turbine,powerplant_energy_naive,powerplant_energy_naive_redispatch,natural gas,0.201,1500.0,0.0,0.4,0.0,SOUTH,operator_south
