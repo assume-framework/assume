@@ -28,7 +28,7 @@ Upcoming Release
 **Bug Fixes:**
   - **Compare Scenarios dashboard: bid difference panels** (#787): "Accepted Bid Prices Difference" and "Accepted Bid Volume Difference" compared the selected simulation with itself and always showed 0. They now compare ``simulation`` with ``simulation_comp``.
   - **Consistent clearing price in** ``PayAsClearRole``: The last accepted supply bid sets the clearing price. Only if the first demand bid that is not fully served would pay more, e.g. during supply scarcity, this demand bid sets the price. Price ties are traded, maximising the accepted volume, and are broken randomly using ``np.random`` (seeded by the simulation seed). This can slightly change clearing prices compared to previous versions.
-  - **Consistent clearing in** ``PayAsBidRole``: The accepted volumes are the same as for ``PayAsClearRole``, including the handling of price ties. Accepted supply orders receive their own price, accepted demand orders pay the price of the most expensive supply order serving them. This can slightly change the accepted volumes compared to previous versions.
+  - **Consistent clearing in** ``PayAsBidRole``: The accepted volumes are the same as for ``PayAsClearRole``, including the handling of price ties. Accepted supply orders receive their own price, accepted demand orders pay the prices of the supply orders they are matched with (volume-weighted average). This can slightly change the accepted volumes compared to previous versions.
   - **Naive price forecast with elastic demand**: The forecast no longer fails for markets with grid data (non-existing default node ``node0``), and exchanges are no longer ignored if all demand units are elastic.
 
 0.7.0 - (11th November 2026)

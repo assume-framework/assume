@@ -6,6 +6,7 @@ import copy
 from datetime import datetime, timedelta
 
 import numpy as np
+import pytest
 from dateutil import rrule as rr
 
 from assume.common.market_objects import MarketConfig, MarketProduct
@@ -243,8 +244,8 @@ def test_market_pay_as_bid_supply_scarcity():
     assert accepted[2]["volume"] == 100
     assert accepted[2]["accepted_volume"] == 100
     assert accepted[2]["price"] == 100
-    # demand pays the price of the most expensive supply serving it
-    assert accepted[0]["accepted_price"] == 100
+    # demand pays the prices of the supply it is matched with
+    assert accepted[0]["accepted_price"] == pytest.approx((200 * 50 + 100 * 100) / 300)
     assert accepted[1]["accepted_price"] == 50
     assert accepted[2]["accepted_price"] == 100
 
@@ -268,7 +269,8 @@ def test_market_pay_as_bid_demand_price():
     gen1 serves the first 100MW of dem1, gen2 serves the remaining 50MW of dem1 and dem2.
     gen3 is too expensive for dem2 and rejected.
     Supply receives its own price: gen1 10€, gen2 50€.
-    Demand pays the price of the supply serving its last MW: dem1 50€, dem2 50€.
+    Demand pays the prices of the supply it is matched with:
+    dem1 (100 * 10€ + 50 * 50€) / 150, dem2 50€.
     """
     orderbook = extend_orderbook(products, -150, 3000)
     orderbook = extend_orderbook(products, -50, 70, orderbook)
@@ -283,10 +285,28 @@ def test_market_pay_as_bid_demand_price():
 
     prices = {order["price"]: order["accepted_price"] for order in accepted}
     volumes = {order["price"]: order["accepted_volume"] for order in accepted}
-    assert prices == {3000: 50, 70: 50, 10: 10, 50: 50}
+    assert prices == pytest.approx(
+        {3000: (100 * 10 + 50 * 50) / 150, 70: 50, 10: 10, 50: 50}
+    )
     assert volumes == {3000: -150, 70: -50, 10: 100, 50: 100}
     assert [order["price"] for order in rejected] == [80]
     assert meta[0]["price"] == (100 * 10 + 100 * 50) / 200
+    # demand pays exactly what supply receives
+    paid = sum(o["accepted_price"] * o["accepted_volume"] for o in accepted)
+    assert paid == pytest.approx(0)
+
+
+def test_clear_merit_order_demand_cost():
+    """The kernel sums up the cost of the supply each demand bid is matched with."""
+    _, _, accepted_demand, demand_cost = clear_merit_order(
+        supply_price=[20, 10],
+        supply_volume=[50, 50],
+        demand_price=[50, 100],
+        demand_volume=[40, 60],
+    )
+    # dem2 (100€) is matched first: 50MW@10€ + 10MW@20€, dem1 gets the other 40MW@20€
+    assert accepted_demand.tolist() == [40, 60]
+    assert demand_cost.tolist() == [800, 700]
 
 
 def test_clear_merit_order_on_arrays():
@@ -294,7 +314,7 @@ def test_clear_merit_order_on_arrays():
     clear_merit_order is used directly by the price forecasts: the accepted volumes are returned
     in input order, price ties keep the input order without rng and volume 0 is ignored.
     """
-    price, accepted_supply, accepted_demand = clear_merit_order(
+    price, accepted_supply, accepted_demand, _ = clear_merit_order(
         supply_price=[50, 10, 30, 30, 0],
         supply_volume=[100, 100, 100, 100, 0],
         demand_price=[1000],
@@ -305,7 +325,7 @@ def test_clear_merit_order_on_arrays():
     assert accepted_demand.tolist() == [250]
 
     # empty sides: no trade
-    price, accepted_supply, accepted_demand = clear_merit_order([], [], [10], [100])
+    price, accepted_supply, accepted_demand, _ = clear_merit_order([], [], [10], [100])
     assert price == 0
     assert len(accepted_supply) == 0
     assert accepted_demand.tolist() == [0]
@@ -313,7 +333,7 @@ def test_clear_merit_order_on_arrays():
 
 def test_clear_merit_order_random_ties_are_seedable():
     def clear(seed):
-        _, accepted_supply, _ = clear_merit_order(
+        _, accepted_supply, _, _ = clear_merit_order(
             supply_price=[10, 10, 10, 10],
             supply_volume=[100, 100, 100, 100],
             demand_price=[100],

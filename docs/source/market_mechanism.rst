@@ -51,8 +51,9 @@ Where the price is equal, only partial volume is accepted.
 
 The :code:`PayAsBidRole` accepts the same volumes as the pay-as-clear mechanism, but there is no uniform price.
 Each accepted supply order receives its own bid price.
-Each accepted demand order pays the price of the most expensive supply order serving it,
-i.e. the supply order covering the last unit of its volume in the merit order.
+Each accepted demand order pays the prices of the supply orders it is matched with in the merit order,
+i.e. its accepted price is the volume-weighted average of these supply prices.
+For example, a demand of 100 MW matched with 50 MW at 10 €/MWh and 50 MW at 20 €/MWh pays 1500 €, i.e. 15 €/MWh.
 
 Complex clearing
 =================

@@ -49,7 +49,7 @@ def clear_merit_order(
     demand_price: np.ndarray,
     demand_volume: np.ndarray,
     rng: np.random.Generator | None = None,
-) -> tuple[float, np.ndarray, np.ndarray]:
+) -> tuple[float, np.ndarray, np.ndarray, np.ndarray]:
     """
     Clears a single product with a uniform (pay-as-clear) price.
 
@@ -60,6 +60,9 @@ def clear_merit_order(
     The last accepted supply bid sets the clearing price. Only if the first demand bid which is
     not fully served would pay more than that, e.g. during supply scarcity, this demand bid sets
     the price. If nothing is traded, the price is 0.
+
+    While matching, the cost of the supply volume each demand bid is matched with is summed up,
+    i.e. what the demand bid pays under pay-as-bid.
 
     Args:
         supply_price (np.ndarray): prices of the supply bids
@@ -72,8 +75,9 @@ def clear_merit_order(
     Bids with a volume of 0 are ignored.
 
     Returns:
-        tuple[float, np.ndarray, np.ndarray]: clearing price, accepted supply volumes and accepted
-        demand volumes (positive, in input order)
+        tuple[float, np.ndarray, np.ndarray, np.ndarray]: clearing price, accepted supply volumes,
+        accepted demand volumes (positive, in input order) and the matched supply cost of each
+        demand bid (sum of matched volume times supply price, in input order)
     """
     supply_price = np.asarray(supply_price, dtype=float)
     supply_volume = np.asarray(supply_volume, dtype=float)
@@ -86,7 +90,12 @@ def clear_merit_order(
     demand_idx = np.flatnonzero(demand_volume > 0)
     demand_idx = demand_idx[_argsort_prices(-demand_price[demand_idx], rng)]
 
-    clear_price, sorted_supply_accepted, sorted_demand_accepted = _match_sorted_bids(
+    (
+        clear_price,
+        sorted_supply_accepted,
+        sorted_demand_accepted,
+        sorted_demand_cost,
+    ) = _match_sorted_bids(
         supply_price[supply_idx].tolist(),
         supply_volume[supply_idx].tolist(),
         demand_price[demand_idx].tolist(),
@@ -97,7 +106,9 @@ def clear_merit_order(
     supply_accepted[supply_idx] = sorted_supply_accepted
     demand_accepted = np.zeros(len(demand_price))
     demand_accepted[demand_idx] = sorted_demand_accepted
-    return clear_price, supply_accepted, demand_accepted
+    demand_cost = np.zeros(len(demand_price))
+    demand_cost[demand_idx] = sorted_demand_cost
+    return clear_price, supply_accepted, demand_accepted, demand_cost
 
 
 def _argsort_prices(price: np.ndarray, rng) -> np.ndarray:
@@ -113,16 +124,19 @@ def _match_sorted_bids(
     supply_volume: list[float],
     demand_price: list[float],
     demand_volume: list[float],
-) -> tuple[float, list[float], list[float]]:
+) -> tuple[float, list[float], list[float], list[float]]:
     """
     Matches the supply (ascending prices) against the demand (descending prices) bid by bid.
 
-    Returns the clearing price and the accepted volumes in the given (sorted) order.
+    Returns the clearing price, the accepted volumes and the matched supply cost of each demand
+    bid in the given (sorted) order.
     """
     n_supply, n_demand = len(supply_price), len(demand_price)
     # volumes which are not yet traded
     supply_left = list(supply_volume)
     demand_left = list(demand_volume)
+    # cost of the supply volume each demand bid is matched with
+    demand_cost = [0.0] * n_demand
     clear_price = 0.0
 
     # i and j point to the current supply and demand bid
@@ -132,6 +146,7 @@ def _match_sorted_bids(
         traded = min(supply_left[i], demand_left[j])
         supply_left[i] -= traded
         demand_left[j] -= traded
+        demand_cost[j] += traded * supply_price[i]
         clear_price = supply_price[i]
 
         # move on to the next bid on each side which is fully accepted
@@ -150,7 +165,7 @@ def _match_sorted_bids(
 
     supply_accepted = [v - left for v, left in zip(supply_volume, supply_left)]
     demand_accepted = [v - left for v, left in zip(demand_volume, demand_left)]
-    return clear_price, supply_accepted, demand_accepted
+    return clear_price, supply_accepted, demand_accepted, demand_cost
 
 
 class PayAsClearRole(MarketRole):
@@ -190,7 +205,7 @@ class PayAsClearRole(MarketRole):
             # volume 0 is ignored/invalid
 
             # price ties are broken randomly, np.random is seeded by set_random_seed
-            clear_price, supply_accepted, demand_accepted = clear_merit_order(
+            clear_price, supply_accepted, demand_accepted, _ = clear_merit_order(
                 supply_price=prices[supply],
                 supply_volume=volumes[supply],
                 demand_price=prices[demand],
@@ -239,9 +254,9 @@ class PayAsBidRole(MarketRole):
         """
         Simulates electricity market clearing using a pay-as-bid mechanism.
         The accepted volumes are the same as for pay-as-clear, see :func:`clear_merit_order`.
-        Accepted supply orders receive their own bid price. Accepted demand orders pay the price of the
-        most expensive supply order which serves them, i.e. the supply order covering the last unit of their
-        volume in the merit order.
+        Accepted supply orders receive their own bid price. Accepted demand orders pay the prices of the
+        supply orders they are matched with in the merit order, i.e. their accepted price is the
+        volume-weighted average of these supply prices.
 
         Args:
             orderbook (Orderbook): the orders to be cleared as an orderbook
@@ -271,7 +286,7 @@ class PayAsBidRole(MarketRole):
             demand = volumes < 0
             # volume 0 is ignored/invalid
 
-            _, supply_accepted, demand_accepted = clear_merit_order(
+            _, supply_accepted, demand_accepted, demand_cost = clear_merit_order(
                 supply_price=prices[supply],
                 supply_volume=volumes[supply],
                 demand_price=prices[demand],
@@ -283,9 +298,21 @@ class PayAsBidRole(MarketRole):
             # demand volumes are negative
             accepted_volumes[demand] -= demand_accepted
 
+            # supply orders receive their own price, demand orders pay the volume-weighted
+            # price of the supply orders they were matched with
+            accepted_prices = prices.copy()
+            accepted_prices[demand] = np.divide(
+                demand_cost,
+                demand_accepted,
+                out=np.zeros(len(demand_cost)),
+                where=demand_accepted > 0,
+            )
+
             accepted_supply_orders: Orderbook = []
             accepted_demand_orders: Orderbook = []
-            for order, volume in zip(product_orders, accepted_volumes.tolist()):
+            for order, volume, price in zip(
+                product_orders, accepted_volumes.tolist(), accepted_prices.tolist()
+            ):
                 if volume > 0:
                     accepted_supply_orders.append(order)
                 elif volume < 0:
@@ -294,26 +321,11 @@ class PayAsBidRole(MarketRole):
                     rejected_orders.append(order)
                     continue
                 order["accepted_volume"] = volume
-                order["accepted_price"] = order["price"]
+                order["accepted_price"] = price
 
-            # bring the accepted orders in merit order
+            # return the accepted orders in merit order
             accepted_supply_orders.sort(key=itemgetter("price"))
             accepted_demand_orders.sort(key=itemgetter("price"), reverse=True)
-
-            # each demand order pays the price of the supply order covering the end of its volume
-            if accepted_demand_orders:
-                supply_end = np.cumsum(
-                    [order["accepted_volume"] for order in accepted_supply_orders]
-                )
-                demand_end = np.cumsum(
-                    [-order["accepted_volume"] for order in accepted_demand_orders]
-                )
-                serving_supply = np.searchsorted(supply_end, demand_end)
-                serving_supply = np.minimum(
-                    serving_supply, len(accepted_supply_orders) - 1
-                )
-                for order, k in zip(accepted_demand_orders, serving_supply.tolist()):
-                    order["accepted_price"] = accepted_supply_orders[k]["price"]
 
             accepted_orders.extend(accepted_demand_orders + accepted_supply_orders)
             meta.append(

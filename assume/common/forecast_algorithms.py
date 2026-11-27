@@ -252,7 +252,7 @@ def calculate_naive_price(
             prices[t] = supply_price[t][offered].min() if offered.any() else 0.0
             continue
 
-        clear_price, supply_accepted, demand_accepted = clear_merit_order(
+        clear_price, supply_accepted, demand_accepted, _ = clear_merit_order(
             supply_price[t],
             supply_volume[t],
             demand_price[t],

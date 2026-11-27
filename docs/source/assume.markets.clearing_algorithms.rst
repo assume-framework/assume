@@ -21,7 +21,7 @@ Both simple clearing algorithms and the naive price forecast use this function, 
 
 Pay-as-Bid
 ^^^^^^^^^^
-This class implements the pay-as-bid mechanism. The accepted volumes are determined with :func:`~assume.markets.clearing_algorithms.simple.clear_merit_order`, just like for pay-as-clear. Accepted supply orders receive their own bid price, accepted demand orders pay the price of the most expensive supply order serving them, i.e. the supply order covering the last unit of their volume in the merit order.
+This class implements the pay-as-bid mechanism. The accepted volumes are determined with :func:`~assume.markets.clearing_algorithms.simple.clear_merit_order`, just like for pay-as-clear. Accepted supply orders receive their own bid price, accepted demand orders pay the prices of the supply orders they are matched with in the merit order, i.e. the volume-weighted average of these supply prices.
 
 .. autoclass:: assume.markets.clearing_algorithms.simple.PayAsBidRole
    :members:
