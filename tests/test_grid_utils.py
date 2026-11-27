@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 
+import numpy as np
 import pandas as pd
 import pytest
 from pytest import importorskip
@@ -147,40 +148,28 @@ def storages_for_n_2_bus_1line():
 
 
 def test_add_redispatch_storages(n_2bus_1line, storages_for_n_2_bus_1line):
+    n_generators = len(n_2bus_1line.generators)
     add_redispatch_storages(n_2bus_1line, storages_for_n_2_bus_1line)
 
-    # nominal power is the full span discharge - charge (charge is negative)
-    expected_span = (
-        storages_for_n_2_bus_1line["max_power_discharge"]
-        - storages_for_n_2_bus_1line["max_power_charge"]
+    storages = storages_for_n_2_bus_1line
+    # p_nom is the larger of discharge and charge power
+    expected_p_nom = np.maximum(
+        storages["max_power_discharge"], -storages["max_power_charge"]
     ).to_numpy()
-    nodes = storages_for_n_2_bus_1line["node"].to_numpy()
 
-    # fixed baseline storage generators (sign +1, may later be pinned negative)
-    baseline = n_2bus_1line.generators.loc[storages_for_n_2_bus_1line.index]
-    assert (baseline.bus.to_numpy() == nodes).all()
-    assert baseline.p_nom.to_numpy() == pytest.approx(expected_span)
-    assert (baseline.sign == 1).all()
+    added = n_2bus_1line.storage_units.loc[storages.index]
+    assert (added.bus.to_numpy() == storages["node"].to_numpy()).all()
+    assert added.p_nom.to_numpy() == pytest.approx(expected_p_nom)
+    assert (added.p_max_pu * added.p_nom).to_numpy() == pytest.approx(
+        storages["max_power_discharge"].to_numpy()
+    )
+    assert (added.p_min_pu * added.p_nom).to_numpy() == pytest.approx(
+        storages["max_power_charge"].to_numpy()
+    )
+    assert not added.cyclic_state_of_charge.any()
 
-    # upward redispatch generators (discharge more / charge less), sign +1
-    up = n_2bus_1line.generators.loc[
-        [f"{s}_up" for s in storages_for_n_2_bus_1line.index]
-    ]
-    assert (up.bus.to_numpy() == nodes).all()
-    assert up.p_nom.to_numpy() == pytest.approx(expected_span)
-    assert (up.sign == 1).all()
-    assert up.marginal_cost.to_numpy() == pytest.approx([0.0, 0.0], abs=1e-6)
-
-    # downward redispatch generators (charge more / discharge less), sign -1
-    down = n_2bus_1line.generators.loc[
-        [f"{s}_down" for s in storages_for_n_2_bus_1line.index]
-    ]
-    assert (down.bus.to_numpy() == nodes).all()
-    assert down.p_nom.to_numpy() == pytest.approx(expected_span)
-    assert (down.sign == -1).all()
-
-    # add_redispatch_storages must not add its own backup generators
-    assert n_2bus_1line.generators.filter(like="backup", axis=0).empty
+    # storage is not modelled with generators, and adds no backups either
+    assert len(n_2bus_1line.generators) == n_generators
 
 
 def test_add_redispatch_loads(n_2bus_1line, loads_for_n_2_bus_1line):
