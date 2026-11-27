@@ -16,6 +16,9 @@ from assume.common.forecaster import UnitForecaster
 from assume.common.market_objects import MarketConfig, Orderbook
 
 logger = logging.getLogger(__name__)
+
+# EUR/MWh on every storage redispatch move, to pick the smallest moves on ties
+TIE_BREAK_COST = 0.01
 EPS = 1e-4
 
 
@@ -363,113 +366,59 @@ class Storage(SupportsMinMaxCharge):
     ) -> None:
         """
         Adds the accepted volumes (see ``SupportsMinMaxCharge.set_dispatch_plan``)
-        and, for redispatch, checks that the accepted volumes can be delivered.
+        and, for redispatch, records them in ``outputs["redispatch_energy"]``.
 
-        ``outputs["energy"]`` keeps the committed plan until delivery. The redispatch
-        bids, however, use what the storage can actually run of that plan as their
-        baseline (grid injection and up/down room). So before a redispatch result
-        is added, the plan of those time steps is set to what the storage can run;
-        otherwise a change on top of an infeasible plan (e.g. "+8 MW" on a planned
-        charge of 10 MW that a full storage cannot do) would get lost, and the grid
-        model and the delivery would differ.
+        ``outputs["energy"]`` keeps the committed plan, now including redispatch; it
+        is only corrected to what the storage can run at delivery
+        (:meth:`execute_current_dispatch`).
 
-        The clearing limits the cumulative redispatch energy with
-        :meth:`add_redispatch_soc_constraints`, so the accepted redispatch volume
-        should then always be deliverable. If it is not, the guarantee was broken -
-        say so loudly.
+        Time steps with an accepted redispatch volume are locked
+        (:meth:`is_redispatch_called`): strategies for markets that clear after
+        redispatch (e.g. intraday) must not bid for them.
 
         Args:
             marketconfig (MarketConfig): The market configuration.
             orderbook (Orderbook): The orderbook.
         """
-        check = (
-            orderbook
-            and marketconfig.product_type == "energy"
-            and getattr(marketconfig, "market_mechanism", None) == "redispatch"
-        )
-        if check:
-            start = min(order["start_time"] for order in orderbook)
-            end = max(order["end_time"] for order in orderbook)
-            _, runnable_before = self.calculate_soc_path(start, end)
-            # redispatch changes what the storage can run, not the infeasible rest
-            for t, power in runnable_before.items():
-                self.outputs["energy"].at[t] = power
-
         super().set_dispatch_plan(marketconfig, orderbook)
 
-        if check:
-            _, runnable_after = self.calculate_soc_path(start, end)
-            accepted = dict.fromkeys(runnable_after, 0.0)
+        if (
+            marketconfig.product_type == "energy"
+            and getattr(marketconfig, "market_mechanism", None) == "redispatch"
+        ):
             for order in orderbook:
-                accepted[order["start_time"]] += order["accepted_volume"]
-            curtailed = sum(
-                abs(accepted[t] - (runnable_after[t] - runnable_before[t]))
-                for t in runnable_after
-            )
-            if curtailed > EPS:
-                logger.warning(
-                    "Storage %s: accepted redispatch is not SOC-feasible, %.3f MWh "
-                    "can not be delivered between %s and %s.",
-                    self.id,
-                    curtailed * (self.index.freq / timedelta(hours=1)),
-                    start,
-                    end,
-                )
+                end_excl = order["end_time"] - self.index.freq
+                self.outputs["redispatch_energy"].loc[
+                    order["start_time"] : end_excl
+                ] += order["accepted_volume"]
 
-    def calculate_soc_path(self, start: datetime, end: datetime) -> tuple[dict, dict]:
+    def is_redispatch_called(self, start: datetime) -> bool:
         """
-        Calculates what the storage can actually run of its current plan
-        ``outputs["energy"]`` between ``start`` and ``end``, and the resulting
-        state of charge.
-
-        The path starts at :meth:`get_soc` and uses the same rules as the delivery
-        (``calculate_feasible_power`` and ``calculate_delta_soc``), so it equals
-        the SOC the storage will have if nothing else changes. Time steps without a
-        plan (e.g. beyond the last day-ahead clearing or the simulation end) count
-        as idle.
-
-        Args:
-            start (datetime.datetime): First time step.
-            end (datetime.datetime): End of the last time step.
-
-        Returns:
-            tuple[dict, dict]: SOC (between 0 and 1) at every time step from
-            ``start`` to ``end`` (both included), and the power (MW) the storage
-            can run at in every time step from ``start`` to ``end`` (excluded).
-        """
-        soc = self.get_soc(start)
-        soc_path, runnable = {start: soc}, {}
-
-        t = start
-        while t < end:
-            planned = self.outputs["energy"].at[t] if t in self.index else 0.0
-            runnable[t] = self.calculate_feasible_power(planned, soc)
-            soc += self.calculate_delta_soc(runnable[t])
-            # guard against floating point drift outside the SOC limits
-            soc = min(max(soc, self.min_soc), self.max_soc)
-            t = t + self.index.freq
-            soc_path[t] = soc
-
-        return soc_path, runnable
-
-    def calculate_redispatch_power_bounds(
-        self, start: datetime, soc: float
-    ) -> tuple[float, float]:
-        """
-        Calculates the absolute power range (MW) the storage can run at in the time
-        step starting at ``start``, given the state of charge at its start.
-
-        The SOC limits are applied to the ABSOLUTE power, not to the change relative
-        to the current schedule. This matters for redispatch: a full storage that is
-        scheduled to discharge 50 MW cannot charge, but it can still discharge less
-        (down to 0 MW). Clipping the change instead would block that downward
-        redispatch. Capacity reserved on other markets (CRM) is kept free, using the
-        same convention as :meth:`calculate_min_max_charge` and
-        :meth:`calculate_min_max_discharge`.
+        Whether the storage was called for redispatch (accepted volume != 0) in the
+        time step starting at ``start``. Those time steps are locked for markets
+        that clear after redispatch.
 
         Args:
             start (datetime.datetime): Start of the time step.
-            soc (float): State of charge at ``start`` (between 0 and 1).
+
+        Returns:
+            bool: True if the time step is locked.
+        """
+        return self.outputs["redispatch_energy"].at[start] != 0
+
+    def calculate_redispatch_power_limits(self, start: datetime) -> tuple[float, float]:
+        """
+        Calculates the absolute power range (MW) the storage can offer to redispatch
+        in the time step starting at ``start``.
+
+        Only the nameplate power and the capacity reserved on other markets (CRM)
+        limit it, using the same convention as :meth:`calculate_min_max_charge` and
+        :meth:`calculate_min_max_discharge`. The state of charge is NOT applied
+        here: the redispatch clearing models the storage as a PyPSA ``StorageUnit``
+        with its own state of charge (see :meth:`redispatch_storage_callback`).
+
+        Args:
+            start (datetime.datetime): Start of the time step.
 
         Returns:
             tuple[float, float]: Lowest (charging, <= 0) and highest (discharging,
@@ -477,159 +426,127 @@ class Storage(SupportsMinMaxCharge):
         """
         capacity_pos = self.outputs["capacity_pos"].at[start]
         capacity_neg = self.outputs["capacity_neg"].at[start]
-
-        max_power = min(
-            self.max_power_discharge - capacity_pos,
-            self.calculate_soc_max_discharge(soc),
-        )
-        min_power = max(
-            self.max_power_charge - capacity_neg,
-            self.calculate_soc_max_charge(soc),
-        )
+        max_power = self.max_power_discharge - capacity_pos
+        min_power = self.max_power_charge - capacity_neg
         return min(min_power, 0.0), max(max_power, 0.0)
 
-    def calculate_redispatch_energy_headroom(self, soc: float) -> tuple[float, float]:
-        """
-        Converts a state of charge into the energy the redispatch may still take out
-        of or put into the storage.
-
-        Args:
-            soc (float): The state of charge (between 0 and 1).
-
-        Returns:
-            tuple[float, float]: Energy above ``min_soc`` and energy below ``max_soc``
-            in MWh, both measured inside the storage (i.e. before efficiencies).
-        """
-        energy_discharge_headroom = max((soc - self.min_soc) * self.capacity, 0.0)
-        energy_charge_headroom = max((self.max_soc - soc) * self.capacity, 0.0)
-        return energy_discharge_headroom, energy_charge_headroom
-
     @staticmethod
-    def redispatch_soc_callback(storage_ids, storage_bids: dict, duration_hours):
+    def redispatch_storage_callback(
+        storage_ids,
+        min_energy: dict,
+        prices: dict,
+        scheduled_dispatch: pd.DataFrame,
+        scheduled_store: pd.DataFrame,
+    ):
         """
         Builds the ``extra_functionality`` hook that PyPSA calls in the redispatch
         clearing after building the model and before solving it.
 
-        For every storage in ``storage_ids`` it adds the cumulative SOC constraints of
-        :meth:`add_redispatch_soc_constraints`. It relies on the naming of the
-        redispatch network (see ``grid_utils.add_redispatch_storages``): the variable
-        ``Generator-p`` and the generators ``<id>_up`` / ``<id>_down``.
+        Redispatch models every storage as a PyPSA ``StorageUnit``: ``p_dispatch``
+        and ``p_store`` are free around the schedule and the state of charge follows
+        them with the exact efficiencies; PyPSA limits it to ``max_soc`` via
+        ``max_hours``. This hook adds the lower SOC limit (``min_soc``) and the
+        redispatch costs.
+
+        Costs. The change from the schedule is split into discharge more / less and
+        charge more / less. With ``P`` the ``reference_price`` (EOM price):
+
+        - upward moves cost their price, at least ``P``: discharge more
+          ``max(price_discharge, P)``, charge less ``max(price_charge, P)``,
+        - downward moves save their price, at most ``P``: discharge less
+          ``min(price_discharge_less, P)``, charge more ``min(price_charge, P)``.
+
+        Like the marginal costs of power plants in a merit-order dispatch, an
+        upward move then never costs less than a downward move saves, so the
+        optimiser cannot earn money by moving storage and plants against each other
+        beyond what the congestion needs. Every move also costs
+        ``TIE_BREAK_COST`` (EUR/MWh, twice for "more" moves): no energy is shifted
+        between hours when that costs exactly as much as it saves, and an
+        existing flow is reduced before the opposite one is added. The settlement uses the prices
+        without floor, cap and tie-break cost.
 
         Args:
-            storage_ids (pandas.Index): Storage units to constrain.
-            storage_bids (dict): Per field (``energy_discharge_headroom``,
-                ``energy_charge_headroom``, ``efficiency_charge``,
-                ``efficiency_discharge``) a DataFrame with one row per snapshot and one
-                column per storage, taken from the bids, in snapshot order.
-            duration_hours (list[float]): Duration of every snapshot in hours, in
-                snapshot order.
+            storage_ids (pandas.Index): Storage units in the redispatch network.
+            min_energy (dict): Lowest state of charge per storage (MWh).
+            prices (dict[str, pandas.DataFrame]): ``price_discharge``,
+                ``price_discharge_less``, ``price_charge`` and ``reference_price``
+                (EUR/MWh), one row per snapshot and one column per storage.
+            scheduled_dispatch (pandas.DataFrame): Scheduled discharge (MW, >= 0).
+            scheduled_store (pandas.DataFrame): Scheduled charge (MW, >= 0).
 
         Returns:
-            Callable or None: The hook, or None if there is no storage to constrain.
+            Callable or None: The hook, or None if there is no storage.
         """
+        storage_ids = pd.Index(storage_ids)
         if len(storage_ids) == 0:
             return None
 
-        def add_soc_constraints(n, snapshots):
-            if len(duration_hours) != len(snapshots):
-                raise ValueError(
-                    f"{len(duration_hours)} snapshot durations for "
-                    f"{len(snapshots)} redispatch snapshots"
+        def add_storage_terms(n, snapshots):
+            m = n.model
+            p_store = m["StorageUnit-p_store"]
+            p_dispatch = m["StorageUnit-p_dispatch"]
+            soc = m["StorageUnit-state_of_charge"]
+            # component dimension: "StorageUnit" in older, "name" in newer PyPSA
+            (dim,) = (d for d in p_store.dims if d != "snapshot")
+            index = pd.Index(snapshots, name="snapshot")
+            columns = pd.Index(storage_ids, name=dim)
+            weights = n.snapshot_weightings.objective.loc[snapshots].to_numpy()
+
+            def frame(values):
+                return pd.DataFrame(
+                    np.asarray(values, dtype=float), index=index, columns=columns
                 )
-            p = n.model["Generator-p"]
-            # component dimension: "Generator" in older, "name" in newer PyPSA
-            (dim,) = (d for d in p.dims if d != "snapshot")
+
+            def weighted(name):
+                return (
+                    prices[name][storage_ids].to_numpy(dtype=float) * weights[:, None]
+                )
+
             for u in storage_ids:
-                Storage.add_redispatch_soc_constraints(
-                    model=n.model,
-                    name=u,
-                    up=p.sel({dim: f"{u}_up"}, drop=True),
-                    down=p.sel({dim: f"{u}_down"}, drop=True),
-                    duration_hours=duration_hours,
-                    energy_discharge_headroom=storage_bids["energy_discharge_headroom"][
-                        u
-                    ],
-                    energy_charge_headroom=storage_bids["energy_charge_headroom"][u],
-                    efficiency_charge=float(
-                        storage_bids["efficiency_charge"][u].iloc[0]
-                    ),
-                    efficiency_discharge=float(
-                        storage_bids["efficiency_discharge"][u].iloc[0]
-                    ),
+                m.add_constraints(
+                    soc.sel({dim: u}, drop=True) >= float(min_energy[u]),
+                    name=f"{u}-redispatch-soc-min",
                 )
 
-        return add_soc_constraints
+            # change from the schedule = more - less, per direction
+            dispatch = p_dispatch.sel({dim: storage_ids})
+            store = p_store.sel({dim: storage_ids})
+            moves = {}
+            for name, flow, schedule in [
+                ("discharge", dispatch, scheduled_dispatch),
+                ("charge", store, scheduled_store),
+            ]:
+                scheduled = frame(schedule[storage_ids])
+                moves[f"{name}_more"] = m.add_variables(
+                    lower=0, coords=flow.coords, name=f"StorageUnit-{name}_more"
+                )
+                # at most down to zero, keeps more + less bounded at equal prices
+                moves[f"{name}_less"] = m.add_variables(
+                    lower=0, upper=scheduled, name=f"StorageUnit-{name}_less"
+                )
+                m.add_constraints(
+                    flow - moves[f"{name}_more"] + moves[f"{name}_less"] == scheduled,
+                    name=f"StorageUnit-{name}-change",
+                )
 
-    @staticmethod
-    def add_redispatch_soc_constraints(
-        model,
-        name: str,
-        up,
-        down,
-        duration_hours,
-        energy_discharge_headroom,
-        energy_charge_headroom,
-        efficiency_charge: float,
-        efficiency_discharge: float,
-        snapshot_dim: str = "snapshot",
-    ) -> None:
-        """
-        Adds the cumulative SOC constraints for one storage unit to a redispatch
-        optimisation model.
+            # upward moves cost at least P, downward moves save at most P. Every
+            # move also costs a tiny amount, so that ties pick the smallest moves,
+            # and "less" before "more" (no charging and discharging at once)
+            reference = weighted("reference_price")
+            up = np.maximum(weighted("price_discharge"), reference)
+            charge_up = np.maximum(weighted("price_charge"), reference)
+            down = np.minimum(weighted("price_discharge_less"), reference)
+            charge_down = np.minimum(weighted("price_charge"), reference)
+            tie = TIE_BREAK_COST * weights[:, None]
+            cost = (
+                (moves["discharge_more"] * frame(up + 2 * tie)).sum()
+                + (moves["charge_less"] * frame(charge_up + tie)).sum()
+                - (moves["discharge_less"] * frame(down - tie)).sum()
+                - (moves["charge_more"] * frame(charge_down - 2 * tie)).sum()
+            )
+            m.add_objective(m.objective.expression + cost, overwrite=True)
 
-        Redispatch models a storage as a fixed baseline plus an upward (``up``) and a
-        downward (``down``) redispatch variable per snapshot. Power bounds per
-        snapshot alone allow the optimiser to request more energy over the horizon
-        than the storage holds, so for every snapshot ``t``::
-
-            sum_{k<=t} (up_k / eta_d - down_k * eta_c) * dt_k <= E_dis[t]  (not empty)
-            sum_{k<=t} (down_k / eta_d - up_k * eta_c) * dt_k <= E_ch[t]   (not full)
-
-        ``E_dis`` / ``E_ch`` are the energies above ``min_soc`` / below ``max_soc``
-        at the end of snapshot ``t`` along the baseline SOC path
-        (see :meth:`calculate_soc_path` and
-        :meth:`calculate_redispatch_energy_headroom`).
-
-        Upward redispatch can mean "discharge more" (drains ``up / eta_d``) or
-        "charge less" (drains ``up * eta_c``); downward redispatch can mean "charge
-        more" (adds ``down * eta_c``) or "discharge less" (adds ``down / eta_d``).
-        Each constraint uses the worst case for its own direction. The model stays
-        linear and the storage can never be over-committed; with ``eta < 1`` it can
-        be slightly conservative in snapshots where redispatch reverses the baseline
-        direction.
-
-        Args:
-            model (linopy.Model): The optimisation model.
-            name (str): Storage id, used to name the constraints.
-            up (linopy.Variable): Upward redispatch per snapshot (MW, >= 0).
-            down (linopy.Variable): Downward redispatch per snapshot (MW, >= 0).
-            duration_hours (array-like): Duration of every snapshot in hours.
-            energy_discharge_headroom (array-like): ``E_dis`` per snapshot (MWh).
-            energy_charge_headroom (array-like): ``E_ch`` per snapshot (MWh).
-            efficiency_charge (float): Charge efficiency.
-            efficiency_discharge (float): Discharge efficiency.
-            snapshot_dim (str): Name of the time dimension of ``up`` and ``down``.
-        """
-        # linopy aligns pandas objects by their index name, so plain Series indexed
-        # like the snapshot dimension of the variables are enough here
-        snapshots = pd.Index(up.coords[snapshot_dim].values, name=snapshot_dim)
-        dt = pd.Series(np.asarray(duration_hours, dtype=float), index=snapshots)
-        e_dis = pd.Series(
-            np.asarray(energy_discharge_headroom, dtype=float), index=snapshots
-        )
-        e_ch = pd.Series(
-            np.asarray(energy_charge_headroom, dtype=float), index=snapshots
-        )
-
-        drained = ((up / efficiency_discharge - down * efficiency_charge) * dt).cumsum(
-            snapshot_dim
-        )
-        added = ((down / efficiency_discharge - up * efficiency_charge) * dt).cumsum(
-            snapshot_dim
-        )
-
-        model.add_constraints(drained <= e_dis, name=f"{name}-redispatch-soc-min")
-        model.add_constraints(added <= e_ch, name=f"{name}-redispatch-soc-max")
+        return add_storage_terms
 
     def calculate_soc_max_discharge(self, soc) -> float:
         """
