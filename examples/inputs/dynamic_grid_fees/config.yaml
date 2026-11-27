@@ -31,14 +31,72 @@ uniform_redispatch:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: complex_clearing
+      market_mechanism: pay_as_clear
       additional_fields:
         - node
+
+    redispatch:
+      operator: network_operator
+      product_type: energy
+      start_date: 2019-01-01 03:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: redispatch
+      additional_fields:
+        - node
+        - min_power
+        - max_power
       param_dict:
         network_path: .
         solver_name: highs
-        zones_identifier: zone_id
+        payment_mechanism: pay_as_bid
+        backup_marginal_cost: 10000
+        log_flows: true
+
+# nodal pricing: the market clearing includes the line limit, redispatch is kept as a check
+# the default price forecast does not support nodal_clearing, so forecasts_df_nodal.csv gives
+# the nodal prices without storage: {unit_id}_price_EOM per storage, price_EOM for all other units
+nodal:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-01 11:00
+  time_step: 1h
+  save_frequency_hours: null
+  forecasts_df: forecasts_df_nodal.csv
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 4h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: nodal_clearing
+      additional_fields:
+        - node
+        - max_power
+      param_dict:
+        network_path: .
+        solver_name: highs
         pricing_mechanism: pay_as_clear
+        log_flows: true
 
     redispatch:
       operator: network_operator

@@ -83,10 +83,14 @@ available_examples = {
         "scenario": "example_01j",
         "study_case": "zonal_case",
     },
-    # dynamic grid fees: uniform pricing with redispatch as worst case
+    # dynamic grid fees: uniform pricing with redispatch as worst case, nodal pricing as reference
     "dynamic_grid_fees_uniform": {
         "scenario": "dynamic_grid_fees",
         "study_case": "uniform_redispatch",
+    },
+    "dynamic_grid_fees_nodal": {
+        "scenario": "dynamic_grid_fees",
+        "study_case": "nodal",
     },
     #
     # DRL references case for learning advancement testing
