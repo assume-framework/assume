@@ -3,7 +3,12 @@
 # SPDX-License-Identifier: MIT
 
 
-from assume.common.base import MinMaxStrategy, SupportsMinMax
+from assume.common.base import (
+    MinMaxChargeStrategy,
+    MinMaxStrategy,
+    SupportsMinMax,
+    SupportsMinMaxCharge,
+)
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 
 
@@ -208,6 +213,40 @@ class DsmEnergyOptimizationStrategy(MinMaxStrategy):
                 }
             )
 
+        return bids
+
+
+class StorageEnergyNaiveRedispatchStrategy(MinMaxChargeStrategy):
+    """
+    Submits the current dispatch of a storage to the redispatch market,
+    so that it enters the power flow. The storage offers no flexibility:
+    min_power and max_power equal the current dispatch.
+    """
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMaxCharge,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        p_nom = max(unit.max_power_discharge, abs(unit.max_power_charge))
+        bids = []
+        for start, end, only_hours in product_tuples:
+            current_power = unit.outputs["energy"].at[start]
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": only_hours,
+                    "price": 0,
+                    "volume": current_power,
+                    "max_power": current_power,
+                    "min_power": current_power,
+                    "p_nom": p_nom,
+                    "node": unit.node,
+                }
+            )
         return bids
 
 

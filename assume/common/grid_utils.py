@@ -123,6 +123,27 @@ def add_redispatch_loads(
         )
 
 
+def add_fixed_storages(
+    network: pypsa.Network,
+    storage_units: pd.DataFrame,
+) -> None:
+    """
+    Adds storage units as loads with a fixed profile, so that their market dispatch
+    enters the power flow. They are not redispatched.
+    The profile is set in redispatch.py: discharging is a negative load.
+    """
+    network.add(
+        "Load",
+        name=storage_units.index,
+        bus=storage_units["node"],
+        p_set=pd.DataFrame(
+            np.zeros((len(network.snapshots), len(storage_units.index))),
+            index=network.snapshots,
+            columns=storage_units.index,
+        ),
+    )
+
+
 def read_pypsa_grid(
     network: pypsa.Network,
     grid_dict: dict[str, pd.DataFrame],

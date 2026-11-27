@@ -9,6 +9,7 @@ import pandas as pd
 import pypsa
 
 from assume.common.grid_utils import (
+    add_fixed_storages,
     add_redispatch_generators,
     add_redispatch_loads,
     calculate_network_meta,
@@ -69,6 +70,11 @@ class RedispatchMarketRole(MarketRole):
             network=self.network,
             loads=self.grid_data["loads"],
         )
+        self.storage_names = pd.Index([])
+        storage_units = self.grid_data.get("storage_units")
+        if storage_units is not None and not storage_units.empty:
+            add_fixed_storages(network=self.network, storage_units=storage_units)
+            self.storage_names = storage_units.index
 
         self.solver_name = get_supported_solver_linopy(
             marketconfig.param_dict.get("solver_name", "highs")
@@ -175,7 +181,13 @@ class RedispatchMarketRole(MarketRole):
             fill_value=0.0,
         )
 
-        # 3. Redispatch flexibility only for power plants
+        # 3. Fixed storage dispatch as load: charging (volume < 0) is a positive load
+        storage_cols = p_set.columns.intersection(self.storage_names)
+        redispatch_network.loads_t.p_set[storage_cols] = (
+            -p_set[storage_cols].reindex(index=redispatch_network.snapshots).fillna(0.0)
+        )
+
+        # 4. Redispatch flexibility only for power plants
         # Upward redispatch capacity:
         # Possible maximum upwards generation : availability * max_power - market_cleared_capacity (no incorporation of ramping constraints yet)
         p_max_pu_up = (
